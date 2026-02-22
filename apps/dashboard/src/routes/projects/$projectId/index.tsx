@@ -67,7 +67,7 @@ function ProjectDetailPage() {
         </div>
 
         {/* Two cards side by side */}
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4 md:flex-row">
           {/* Project meta card */}
           <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
             <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
@@ -206,7 +206,7 @@ function ProjectDetailPage() {
             key={i}
             className="flex h-[68px] items-center justify-between border-b-[0.5px] border-dash-border bg-white px-3.5 last:border-b-0 dark:bg-dash-bg"
           >
-            <span className="w-[280px] text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
+            <span className="min-w-0 flex-1 truncate text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
               {domain.url}
             </span>
             <div className="flex flex-col leading-5 tracking-[-0.02px]">

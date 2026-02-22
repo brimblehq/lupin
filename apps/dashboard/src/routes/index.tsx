@@ -14,11 +14,11 @@ function DashboardHome() {
     <div className="max-w-[1000px]">
       <WelcomeSection />
       <StatsRow />
-      <hr className="-ml-10 mb-10 border-dash-border-soft" />
+      <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
       <DeployedProjects />
-      <hr className="-ml-10 mb-10 border-dash-border-soft" />
+      <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
       <ConnectedDomains />
-      <hr className="-ml-10 mb-10 border-dash-border-soft" />
+      <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
       <FeaturedIntegrations />
     </div>
   );

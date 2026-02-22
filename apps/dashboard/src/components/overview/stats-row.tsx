@@ -32,9 +32,9 @@ const deploymentRows = [
 
 export function StatsRow() {
   return (
-    <div className="mb-8 flex h-[160px] overflow-hidden rounded border-[0.5px] border-dash-border">
+    <div className="mb-8 flex flex-col overflow-hidden rounded border-[0.5px] border-dash-border md:h-[160px] md:flex-row">
       {/* Bandwidth */}
-      <div className="flex w-[36%] shrink-0 flex-col border-r-[0.5px] border-dash-border">
+      <div className="flex w-full shrink-0 flex-col border-b-[0.5px] border-dash-border md:w-[36%] md:border-b-0 md:border-r-[0.5px]">
         <div className="flex h-[30px] items-center border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-2">
           <span className="text-xs tracking-[-0.02px] text-dash-text-strong">
             Bandwidth
@@ -65,7 +65,7 @@ export function StatsRow() {
       </div>
 
       {/* Deployment minutes */}
-      <div className="flex w-[34%] shrink-0 flex-col">
+      <div className="flex w-full shrink-0 flex-col md:w-[34%]">
         <div className="flex h-[30px] items-center border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-2">
           <span className="text-xs tracking-[-0.02px] text-dash-text-strong">
             Deployment minutes

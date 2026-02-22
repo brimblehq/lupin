@@ -9,14 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ScalingRouteImport } from './routes/scaling'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as DomainsRouteImport } from './routes/domains'
+import { Route as AddonsRouteImport } from './routes/addons'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ScalingIndexRouteImport } from './routes/scaling/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as DomainsIndexRouteImport } from './routes/domains/index'
+import { Route as AddonsIndexRouteImport } from './routes/addons/index'
+import { Route as WorkspaceNewRouteImport } from './routes/workspace/new'
+import { Route as ProjectsNewRouteImport } from './routes/projects/new'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
 import { Route as DomainsDomainNameRouteImport } from './routes/domains/$domainName'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdObservabilityRouteImport } from './routes/projects/$projectId/observability'
+import { Route as ProjectsProjectIdLogsRouteImport } from './routes/projects/$projectId/logs'
 import { Route as ProjectsProjectIdEnvironmentRouteImport } from './routes/projects/$projectId/environment'
 import { Route as ProjectsProjectIdDomainsRouteImport } from './routes/projects/$projectId/domains'
 import { Route as ProjectsProjectIdDeploymentHistoryRouteImport } from './routes/projects/$projectId/deployment-history'
@@ -24,6 +32,11 @@ import { Route as ProjectsProjectIdConfigurationRouteImport } from './routes/pro
 import { Route as ProjectsProjectIdDomainsIndexRouteImport } from './routes/projects/$projectId/domains/index'
 import { Route as ProjectsProjectIdDomainsDomainNameRouteImport } from './routes/projects/$projectId/domains/$domainName'
 
+const ScalingRoute = ScalingRouteImport.update({
+  id: '/scaling',
+  path: '/scaling',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -34,10 +47,20 @@ const DomainsRoute = DomainsRouteImport.update({
   path: '/domains',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AddonsRoute = AddonsRouteImport.update({
+  id: '/addons',
+  path: '/addons',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ScalingIndexRoute = ScalingIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ScalingRoute,
 } as any)
 const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   id: '/',
@@ -48,6 +71,21 @@ const DomainsIndexRoute = DomainsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DomainsRoute,
+} as any)
+const AddonsIndexRoute = AddonsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AddonsRoute,
+} as any)
+const WorkspaceNewRoute = WorkspaceNewRouteImport.update({
+  id: '/workspace/new',
+  path: '/workspace/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsNewRoute = ProjectsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => ProjectsRoute,
 } as any)
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/$projectId',
@@ -62,6 +100,17 @@ const DomainsDomainNameRoute = DomainsDomainNameRouteImport.update({
 const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => ProjectsProjectIdRoute,
+} as any)
+const ProjectsProjectIdObservabilityRoute =
+  ProjectsProjectIdObservabilityRouteImport.update({
+    id: '/observability',
+    path: '/observability',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ProjectsProjectIdLogsRoute = ProjectsProjectIdLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
   getParentRoute: () => ProjectsProjectIdRoute,
 } as any)
 const ProjectsProjectIdEnvironmentRoute =
@@ -103,16 +152,24 @@ const ProjectsProjectIdDomainsDomainNameRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/addons': typeof AddonsRouteWithChildren
   '/domains': typeof DomainsRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
+  '/scaling': typeof ScalingRouteWithChildren
   '/domains/$domainName': typeof DomainsDomainNameRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/projects/new': typeof ProjectsNewRoute
+  '/workspace/new': typeof WorkspaceNewRoute
+  '/addons/': typeof AddonsIndexRoute
   '/domains/': typeof DomainsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/scaling/': typeof ScalingIndexRoute
   '/projects/$projectId/configuration': typeof ProjectsProjectIdConfigurationRoute
   '/projects/$projectId/deployment-history': typeof ProjectsProjectIdDeploymentHistoryRoute
   '/projects/$projectId/domains': typeof ProjectsProjectIdDomainsRouteWithChildren
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
+  '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
+  '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
   '/projects/$projectId/domains/': typeof ProjectsProjectIdDomainsIndexRoute
@@ -120,11 +177,17 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/domains/$domainName': typeof DomainsDomainNameRoute
+  '/projects/new': typeof ProjectsNewRoute
+  '/workspace/new': typeof WorkspaceNewRoute
+  '/addons': typeof AddonsIndexRoute
   '/domains': typeof DomainsIndexRoute
   '/projects': typeof ProjectsIndexRoute
+  '/scaling': typeof ScalingIndexRoute
   '/projects/$projectId/configuration': typeof ProjectsProjectIdConfigurationRoute
   '/projects/$projectId/deployment-history': typeof ProjectsProjectIdDeploymentHistoryRoute
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
+  '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
+  '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
   '/projects/$projectId/domains': typeof ProjectsProjectIdDomainsIndexRoute
@@ -132,16 +195,24 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/addons': typeof AddonsRouteWithChildren
   '/domains': typeof DomainsRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
+  '/scaling': typeof ScalingRouteWithChildren
   '/domains/$domainName': typeof DomainsDomainNameRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/projects/new': typeof ProjectsNewRoute
+  '/workspace/new': typeof WorkspaceNewRoute
+  '/addons/': typeof AddonsIndexRoute
   '/domains/': typeof DomainsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/scaling/': typeof ScalingIndexRoute
   '/projects/$projectId/configuration': typeof ProjectsProjectIdConfigurationRoute
   '/projects/$projectId/deployment-history': typeof ProjectsProjectIdDeploymentHistoryRoute
   '/projects/$projectId/domains': typeof ProjectsProjectIdDomainsRouteWithChildren
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
+  '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
+  '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
   '/projects/$projectId/domains/': typeof ProjectsProjectIdDomainsIndexRoute
@@ -150,16 +221,24 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/addons'
     | '/domains'
     | '/projects'
+    | '/scaling'
     | '/domains/$domainName'
     | '/projects/$projectId'
+    | '/projects/new'
+    | '/workspace/new'
+    | '/addons/'
     | '/domains/'
     | '/projects/'
+    | '/scaling/'
     | '/projects/$projectId/configuration'
     | '/projects/$projectId/deployment-history'
     | '/projects/$projectId/domains'
     | '/projects/$projectId/environment'
+    | '/projects/$projectId/logs'
+    | '/projects/$projectId/observability'
     | '/projects/$projectId/'
     | '/projects/$projectId/domains/$domainName'
     | '/projects/$projectId/domains/'
@@ -167,27 +246,41 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/domains/$domainName'
+    | '/projects/new'
+    | '/workspace/new'
+    | '/addons'
     | '/domains'
     | '/projects'
+    | '/scaling'
     | '/projects/$projectId/configuration'
     | '/projects/$projectId/deployment-history'
     | '/projects/$projectId/environment'
+    | '/projects/$projectId/logs'
+    | '/projects/$projectId/observability'
     | '/projects/$projectId'
     | '/projects/$projectId/domains/$domainName'
     | '/projects/$projectId/domains'
   id:
     | '__root__'
     | '/'
+    | '/addons'
     | '/domains'
     | '/projects'
+    | '/scaling'
     | '/domains/$domainName'
     | '/projects/$projectId'
+    | '/projects/new'
+    | '/workspace/new'
+    | '/addons/'
     | '/domains/'
     | '/projects/'
+    | '/scaling/'
     | '/projects/$projectId/configuration'
     | '/projects/$projectId/deployment-history'
     | '/projects/$projectId/domains'
     | '/projects/$projectId/environment'
+    | '/projects/$projectId/logs'
+    | '/projects/$projectId/observability'
     | '/projects/$projectId/'
     | '/projects/$projectId/domains/$domainName'
     | '/projects/$projectId/domains/'
@@ -195,12 +288,22 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AddonsRoute: typeof AddonsRouteWithChildren
   DomainsRoute: typeof DomainsRouteWithChildren
   ProjectsRoute: typeof ProjectsRouteWithChildren
+  ScalingRoute: typeof ScalingRouteWithChildren
+  WorkspaceNewRoute: typeof WorkspaceNewRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/scaling': {
+      id: '/scaling'
+      path: '/scaling'
+      fullPath: '/scaling'
+      preLoaderRoute: typeof ScalingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects': {
       id: '/projects'
       path: '/projects'
@@ -215,12 +318,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DomainsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/addons': {
+      id: '/addons'
+      path: '/addons'
+      fullPath: '/addons'
+      preLoaderRoute: typeof AddonsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/scaling/': {
+      id: '/scaling/'
+      path: '/'
+      fullPath: '/scaling/'
+      preLoaderRoute: typeof ScalingIndexRouteImport
+      parentRoute: typeof ScalingRoute
     }
     '/projects/': {
       id: '/projects/'
@@ -235,6 +352,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/domains/'
       preLoaderRoute: typeof DomainsIndexRouteImport
       parentRoute: typeof DomainsRoute
+    }
+    '/addons/': {
+      id: '/addons/'
+      path: '/'
+      fullPath: '/addons/'
+      preLoaderRoute: typeof AddonsIndexRouteImport
+      parentRoute: typeof AddonsRoute
+    }
+    '/workspace/new': {
+      id: '/workspace/new'
+      path: '/workspace/new'
+      fullPath: '/workspace/new'
+      preLoaderRoute: typeof WorkspaceNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/new': {
+      id: '/projects/new'
+      path: '/new'
+      fullPath: '/projects/new'
+      preLoaderRoute: typeof ProjectsNewRouteImport
+      parentRoute: typeof ProjectsRoute
     }
     '/projects/$projectId': {
       id: '/projects/$projectId'
@@ -255,6 +393,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/projects/$projectId/'
       preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/observability': {
+      id: '/projects/$projectId/observability'
+      path: '/observability'
+      fullPath: '/projects/$projectId/observability'
+      preLoaderRoute: typeof ProjectsProjectIdObservabilityRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/logs': {
+      id: '/projects/$projectId/logs'
+      path: '/logs'
+      fullPath: '/projects/$projectId/logs'
+      preLoaderRoute: typeof ProjectsProjectIdLogsRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
     '/projects/$projectId/environment': {
@@ -302,6 +454,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AddonsRouteChildren {
+  AddonsIndexRoute: typeof AddonsIndexRoute
+}
+
+const AddonsRouteChildren: AddonsRouteChildren = {
+  AddonsIndexRoute: AddonsIndexRoute,
+}
+
+const AddonsRouteWithChildren =
+  AddonsRoute._addFileChildren(AddonsRouteChildren)
+
 interface DomainsRouteChildren {
   DomainsDomainNameRoute: typeof DomainsDomainNameRoute
   DomainsIndexRoute: typeof DomainsIndexRoute
@@ -337,6 +500,8 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdDeploymentHistoryRoute: typeof ProjectsProjectIdDeploymentHistoryRoute
   ProjectsProjectIdDomainsRoute: typeof ProjectsProjectIdDomainsRouteWithChildren
   ProjectsProjectIdEnvironmentRoute: typeof ProjectsProjectIdEnvironmentRoute
+  ProjectsProjectIdLogsRoute: typeof ProjectsProjectIdLogsRoute
+  ProjectsProjectIdObservabilityRoute: typeof ProjectsProjectIdObservabilityRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
 
@@ -346,6 +511,8 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
     ProjectsProjectIdDeploymentHistoryRoute,
   ProjectsProjectIdDomainsRoute: ProjectsProjectIdDomainsRouteWithChildren,
   ProjectsProjectIdEnvironmentRoute: ProjectsProjectIdEnvironmentRoute,
+  ProjectsProjectIdLogsRoute: ProjectsProjectIdLogsRoute,
+  ProjectsProjectIdObservabilityRoute: ProjectsProjectIdObservabilityRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }
 
@@ -354,11 +521,13 @@ const ProjectsProjectIdRouteWithChildren =
 
 interface ProjectsRouteChildren {
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
+  ProjectsNewRoute: typeof ProjectsNewRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
 }
 
 const ProjectsRouteChildren: ProjectsRouteChildren = {
   ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
+  ProjectsNewRoute: ProjectsNewRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
 }
 
@@ -366,10 +535,24 @@ const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
   ProjectsRouteChildren,
 )
 
+interface ScalingRouteChildren {
+  ScalingIndexRoute: typeof ScalingIndexRoute
+}
+
+const ScalingRouteChildren: ScalingRouteChildren = {
+  ScalingIndexRoute: ScalingIndexRoute,
+}
+
+const ScalingRouteWithChildren =
+  ScalingRoute._addFileChildren(ScalingRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AddonsRoute: AddonsRouteWithChildren,
   DomainsRoute: DomainsRouteWithChildren,
   ProjectsRoute: ProjectsRouteWithChildren,
+  ScalingRoute: ScalingRouteWithChildren,
+  WorkspaceNewRoute: WorkspaceNewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

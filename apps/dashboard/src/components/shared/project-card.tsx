@@ -3,13 +3,17 @@ export interface Project {
   commitMessage: string;
   branch: string;
   updatedAt: string;
+  starred?: boolean;
 }
 
+import { useState } from "react";
 import { motion } from "motion/react";
 import { Link } from "@tanstack/react-router";
+import { Star } from "lucide-react";
 
 export function ProjectCard({ project }: { project: Project }) {
   const slug = project.name.toLowerCase().replace(/\s+/g, "-");
+  const [starred, setStarred] = useState(project.starred ?? false);
 
   return (
     <Link to={`/projects/${slug}`} className="block">
@@ -40,11 +44,25 @@ export function ProjectCard({ project }: { project: Project }) {
         </span>
       </div>
 
-      {/* Updated timestamp */}
-      <div className="flex h-10 items-center border-t-[0.5px] border-dash-border px-3.5">
+      {/* Updated timestamp + star */}
+      <div className="flex h-10 items-center justify-between border-t-[0.5px] border-dash-border px-3.5">
         <span className="font-mono text-xs uppercase leading-[18px] tracking-[-0.02px] text-dash-text-extra-faded opacity-80">
           Updated {project.updatedAt}
         </span>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setStarred(!starred);
+          }}
+          className="shrink-0 text-dash-text-extra-faded transition-colors hover:text-[#f5a623]"
+        >
+          <Star
+            className="size-4"
+            fill={starred ? "#f5a623" : "none"}
+            stroke={starred ? "#f5a623" : "currentColor"}
+          />
+        </button>
       </div>
     </motion.div>
     </Link>

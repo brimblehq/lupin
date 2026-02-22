@@ -5,10 +5,14 @@ import {
   ChevronDown,
   MoreVertical,
   GitBranch,
+  Calendar,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { type DateRange } from "react-day-picker";
 import { TabHeader } from "../../../components/shared/tab-header";
 import { Tooltip } from "../../../components/shared/tooltip";
+import { DateRangePicker } from "../../../components/shared/date-range-picker";
+import { DeploymentLogsDrawer } from "../../../components/shared/deployment-logs-drawer";
 
 export const Route = createFileRoute(
   "/projects/$projectId/deployment-history",
@@ -238,9 +242,18 @@ function StatusDotsIcon() {
 
 /* ─── Deployment row ─── */
 
-function DeploymentRow({ deployment }: { deployment: Deployment }) {
+function DeploymentRow({
+  deployment,
+  onClick,
+}: {
+  deployment: Deployment;
+  onClick: () => void;
+}) {
   return (
-    <div className="flex items-center border-b-[0.5px] border-dash-border px-3.5 py-4 last:border-b-0">
+    <div
+      onClick={onClick}
+      className="flex cursor-pointer items-center border-b-[0.5px] border-dash-border px-3.5 py-4 transition-colors last:border-b-0 hover:bg-dash-bg-elevated"
+    >
       {/* Col 1: URL + environment */}
       <div className="flex w-[280px] shrink-0 flex-col gap-0.5">
         <span className="truncate text-sm tracking-[-0.084px] text-dash-text-strong">
@@ -312,9 +325,12 @@ function DeploymentRow({ deployment }: { deployment: Deployment }) {
 
 function DeploymentHistoryPage() {
   const [search, setSearch] = useState("");
-  const [dateRange, setDateRange] = useState("All");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [environment, setEnvironment] = useState("All");
   const [status, setStatus] = useState("All");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedDeployment, setSelectedDeployment] =
+    useState<Deployment | null>(null);
 
   const filtered = deployments.filter((d) => {
     const matchesSearch =
@@ -341,7 +357,7 @@ function DeploymentHistoryPage() {
       </TabHeader>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         {/* Search */}
         <div className="flex flex-1 items-center gap-2 rounded-[4px] border border-dash-border bg-dash-bg px-3 py-1.5 shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
           <Search className="size-4 shrink-0 text-dash-text-extra-faded" />
@@ -354,12 +370,19 @@ function DeploymentHistoryPage() {
           />
         </div>
 
-        <FilterSelect
-          label="Select date range"
-          options={["All", "Last 24 hours", "Last 7 days", "Last 30 days"]}
-          value={dateRange}
-          onChange={setDateRange}
-        />
+        <DateRangePicker value={dateRange} onChange={setDateRange}>
+          <button className="flex items-center overflow-clip rounded-[4px] border border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated">
+            <span className="flex items-center gap-2 px-3 py-1.5">
+              <Calendar className="size-3.5 text-dash-text-faded" />
+              {dateRange?.from && dateRange?.to
+                ? `${dateRange.from.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${dateRange.to.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                : "Select date range"}
+            </span>
+            <span className="flex h-full items-center border-l border-dash-border px-2 py-1.5">
+              <ChevronDown className="size-4 text-dash-text-faded" />
+            </span>
+          </button>
+        </DateRangePicker>
         <FilterSelect
           label="All Environments"
           options={["All", "Production", "Preview", "Development"]}
@@ -379,7 +402,14 @@ function DeploymentHistoryPage() {
       <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
         {filtered.length > 0 ? (
           filtered.map((deployment, i) => (
-            <DeploymentRow key={i} deployment={deployment} />
+            <DeploymentRow
+              key={i}
+              deployment={deployment}
+              onClick={() => {
+                setSelectedDeployment(deployment);
+                setDrawerOpen(true);
+              }}
+            />
           ))
         ) : (
           <div className="flex h-32 items-center justify-center">
@@ -389,6 +419,16 @@ function DeploymentHistoryPage() {
           </div>
         )}
       </div>
+
+      {/* Deployment logs drawer */}
+      {selectedDeployment && (
+        <DeploymentLogsDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          environment={selectedDeployment.environment}
+          status={selectedDeployment.status}
+        />
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/jetbrains-mono";
 
 @source "../../../packages/ui/src";
 @source "../../../packages/config/src";
@@ -98,6 +99,7 @@ code {
 
   --font-family-body: 'ABC Marfa', sans-serif;
   --font-family-mono: 'ABC Marfa Mono', monospace;
+  --font-family-logs: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
 }
 
 :root {
@@ -217,4 +219,110 @@ code {
   [role="button"] {
     cursor: pointer;
   }
+}
+
+/* Hide scrollbars but keep scroll functionality */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Date range picker ─── */
+
+/* Each month: 296px, 12px padding, 8px row gap */
+.brimble-date-picker .rdp-month {
+  padding: 12px;
+}
+
+.brimble-date-picker .rdp-month_grid {
+  border-spacing: 0;
+}
+
+/* 8px vertical gap between rows */
+.brimble-date-picker .rdp-week + .rdp-week,
+.brimble-date-picker .rdp-weekdays + tbody .rdp-week:first-child {
+  margin-top: 0;
+}
+
+.brimble-date-picker .rdp-week {
+  gap: 8px;
+}
+
+.brimble-date-picker .rdp-weekdays {
+  gap: 8px;
+}
+
+/* ─ Vertical divider between the two month panels ─ */
+.brimble-date-picker .rdp-months > .rdp-month:first-child {
+  border-right: 0.5px solid #d9dadd;
+}
+
+.dark .brimble-date-picker .rdp-months > .rdp-month:first-child {
+  border-right-color: var(--dash-border);
+}
+
+/* ─ Range: start & end day pills ─ */
+.brimble-date-picker .rdp-range-start .rdp-day_button,
+.brimble-date-picker .rdp-range-end .rdp-day_button {
+  background-color: var(--dash-text-strong);
+  color: var(--dash-bg);
+  border-radius: 6px;
+}
+
+/* ─ Range: middle days highlight band ─ */
+.brimble-date-picker .rdp-range-middle {
+  background-color: #f7f7f7;
+  border-radius: 0;
+}
+
+.dark .brimble-date-picker .rdp-range-middle {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.brimble-date-picker .rdp-range-middle .rdp-day_button {
+  color: var(--dash-text-strong);
+  background: transparent;
+}
+
+.brimble-date-picker .rdp-range-middle .rdp-day_button:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.dark .brimble-date-picker .rdp-range-middle .rdp-day_button:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Range edge rounding */
+.brimble-date-picker .rdp-range-start {
+  border-radius: 6px 0 0 6px;
+}
+
+.brimble-date-picker .rdp-range-end {
+  border-radius: 0 6px 6px 0;
+}
+
+.brimble-date-picker .rdp-range-start.rdp-range-end {
+  border-radius: 6px;
+}
+
+/* ─ Today dot indicator ─ */
+.brimble-date-picker .rdp-today .rdp-day_button::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: var(--dash-text-faded);
+}
+
+/* Hide today dot when it's the selected range start/end */
+.brimble-date-picker .rdp-range-start.rdp-today .rdp-day_button::after,
+.brimble-date-picker .rdp-range-end.rdp-today .rdp-day_button::after {
+  background-color: var(--dash-bg);
 }

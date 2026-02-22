@@ -41,11 +41,11 @@ export function DeployedProjects() {
         deployments.
       </PageHeader>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {projects.map((project, i) => (
           <ProjectCard key={i} project={project} />
         ))}
-        <div className="create-new-project-card col-span-2 flex items-center justify-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+        <div className="create-new-project-card col-span-1 flex sm:col-span-2 items-center justify-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
           <DashButton className="rounded-lg px-4 py-2">
             <Plus className="size-4" />
             Create new project

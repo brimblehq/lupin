@@ -7,6 +7,7 @@ import {
   RefreshCw,
   AlertCircle,
   Minus,
+  Plus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link } from "@tanstack/react-router";
@@ -267,7 +268,15 @@ function ActiveDomainRow({
   );
 }
 
-export function DomainList({ domains, basePath }: { domains: Domain[]; basePath?: string }) {
+export function DomainList({
+  domains,
+  basePath,
+  onAddDomain,
+}: {
+  domains: Domain[];
+  basePath?: string;
+  onAddDomain?: () => void;
+}) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -302,20 +311,32 @@ export function DomainList({ domains, basePath }: { domains: Domain[]; basePath?
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Search + Filter bar */}
-      <div className="flex items-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
-        <div className="flex flex-1 items-center gap-2 px-4 py-3">
-          <Search className="size-5 shrink-0 text-dash-text-extra-faded" />
-          <input
-            type="text"
-            placeholder="Search domains"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent text-sm text-dash-text-strong outline-none placeholder:text-dash-text-faded placeholder:opacity-50"
-          />
+      {/* Search + Filter bar + Add Domain */}
+      <div className="flex items-center gap-3">
+        <div className="flex flex-1 items-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="flex flex-1 items-center gap-2 px-4 py-3">
+            <Search className="size-5 shrink-0 text-dash-text-extra-faded" />
+            <input
+              type="text"
+              placeholder="Search domains"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-sm text-dash-text-strong outline-none placeholder:text-dash-text-faded placeholder:opacity-50"
+            />
+          </div>
+          <div className="h-full w-px self-stretch bg-dash-border" />
+          <FilterDropdown value={statusFilter} onChange={setStatusFilter} />
         </div>
-        <div className="h-full w-px self-stretch bg-dash-border" />
-        <FilterDropdown value={statusFilter} onChange={setStatusFilter} />
+
+        {onAddDomain && (
+          <button
+            onClick={onAddDomain}
+            className="flex shrink-0 items-center gap-1 rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+          >
+            <Plus className="size-4" />
+            <span className="px-1">Add Domain</span>
+          </button>
+        )}
       </div>
 
       {/* Failed domains (each in its own card) */}

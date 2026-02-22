@@ -267,7 +267,7 @@ function EnvironmentPage() {
         ) : (
           <div className="flex flex-col gap-4 px-3.5 pb-6 pt-5">
             {filtered.map((envVar) => (
-              <div key={envVar.id} className="flex items-end gap-4">
+              <div key={envVar.id} className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-4">
                 {/* Key */}
                 <div className="flex flex-1 flex-col gap-1.5">
                   <label className="text-sm leading-5 tracking-[-0.02px] text-dash-text-strong">

@@ -9,7 +9,7 @@ import {
   Globe,
   Users,
 } from "lucide-react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../../hooks/use-theme";
 import { DashButton } from "../shared/dash-button";
@@ -75,7 +75,7 @@ function ProjectSwitcher({ projectId }: { projectId: string }) {
             </div>
             {/* Create project */}
             <Link
-              to="/projects"
+              to="/projects/new"
               onClick={() => setOpen(false)}
               className="flex h-10 items-center gap-2 bg-dash-bg-elevated px-3.5 text-sm text-dash-text-faded hover:text-dash-text-body transition-colors"
             >
@@ -92,6 +92,7 @@ function ProjectSwitcher({ projectId }: { projectId: string }) {
 function WorkspaceSwitcher() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -163,7 +164,7 @@ function WorkspaceSwitcher() {
             </div>
 
             {/* Teams */}
-            <div className="px-2 pb-4 pt-2">
+            <div className="border-b-[0.5px] border-dash-border px-2 pb-4 pt-2">
               <div className="py-2">
                 <span className="text-xs text-dash-text-extra-faded dark:text-dash-text-faded">Teams</span>
               </div>
@@ -178,6 +179,17 @@ function WorkspaceSwitcher() {
                 <span className="text-sm text-dash-text-body dark:text-dash-text-strong">Brimble Team</span>
               </button>
             </div>
+            {/* Create workspace */}
+            <button
+              onClick={() => {
+                setOpen(false);
+                navigate({ to: "/workspace/new" });
+              }}
+              className="flex h-10 w-full items-center gap-2 bg-dash-bg-elevated px-3.5 text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
+            >
+              <Plus className="size-4" />
+              Create workspace
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -257,6 +269,7 @@ const createMenuItems = [
 function CreateDropdown() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -304,7 +317,11 @@ function CreateDropdown() {
               return (
                 <button
                   key={item.label}
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    setOpen(false);
+                    if (item.label === "Create project") navigate({ to: "/projects/new" });
+                    if (item.label === "Create team") navigate({ to: "/workspace/new" });
+                  }}
                   className="mx-1 flex w-[calc(100%-8px)] items-center gap-2 rounded-[2px] px-2 py-1.5 text-sm font-light text-dash-text-body dark:text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
                 >
                   <Icon className="size-4" />
@@ -324,7 +341,7 @@ export function Topbar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
   const projectId = projectMatch ? projectMatch[1] : null;
-
+  const isWorkspaceNew = /^\/workspace\/new/.test(pathname);
   return (
     <div data-topbar className="flex shrink-0 flex-col bg-dash-bg">
       {/* Top row: search + notifications */}
@@ -367,8 +384,14 @@ export function Topbar() {
           <div className="flex items-center">
             <WorkspaceSwitcher />
             <span className="mx-2 text-sm text-dash-text-faded">/</span>
-            {projectId ? (
-              <ProjectSwitcher projectId={projectId} />
+            {isWorkspaceNew ? (
+              <span className="text-sm font-medium text-dash-text-faded">New Workspace</span>
+            ) : projectId ? (
+              projectId === "new" ? (
+                <span className="text-sm font-medium text-dash-text-faded">New Project</span>
+              ) : (
+                <ProjectSwitcher projectId={projectId} />
+              )
             ) : (
               <span className="text-sm font-medium text-dash-text-faded">Home</span>
             )}

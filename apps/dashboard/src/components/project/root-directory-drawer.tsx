@@ -168,7 +168,7 @@ export function RootDirectoryDrawer({
           style={{ top: topOffset }}
         />
         <Drawer.Content
-          className="fixed right-0 z-50 flex w-[500px] flex-col border-l border-dash-border bg-dash-bg shadow-[-4px_0_24px_rgba(0,0,0,0.08)] outline-none"
+          className="fixed right-0 z-50 flex w-full max-w-[500px] flex-col border-l border-dash-border bg-dash-bg shadow-[-4px_0_24px_rgba(0,0,0,0.08)] outline-none"
           style={{ top: topOffset, height: `calc(100vh - ${topOffset}px)` }}
           aria-describedby={undefined}
         >
