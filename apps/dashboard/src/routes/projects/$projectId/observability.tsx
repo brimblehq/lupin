@@ -39,182 +39,203 @@ function SegmentedToggle({
   );
 }
 
-/** Reusable SVG line chart with vertical grid, y-axis labels, time x-axis */
+/** Hatched bar chart — diagonal-line background + solid orange value bars */
 function TimeSeriesChart({
   data,
-  yUnit,
-  color = "#f5a623",
+  yUnit = "",
 }: {
   data: { time: string; value: number }[];
-  yUnit: string;
+  yUnit?: string;
   color?: string;
 }) {
+  const [hovered, setHovered] = useState<number | null>(null);
   if (data.length === 0) return null;
   const max = Math.max(...data.map((d) => d.value), 1) * 1.15;
-  const svgW = 800;
-  const svgH = 360;
-  const pad = { top: 8, bottom: 8, left: 0, right: 0 };
-  const plotW = svgW - pad.left - pad.right;
-  const plotH = svgH - pad.top - pad.bottom;
-
-  const pts = data.map((d, i) => ({
-    x: pad.left + (i / (data.length - 1)) * plotW,
-    y: pad.top + plotH - (d.value / max) * plotH,
-  }));
-
-  const linePath = "M " + pts.map((p) => `${p.x},${p.y}`).join(" L ");
-  const areaPath =
-    linePath +
-    ` L ${pts[pts.length - 1].x},${svgH - pad.bottom} L ${pts[0].x},${svgH - pad.bottom} Z`;
-
-  // Y-axis ticks
-  const yTicks = 4;
-  const yLabels = Array.from({ length: yTicks + 1 }, (_, i) => {
-    const val = (max / yTicks) * (yTicks - i);
-    return { label: `${val.toFixed(1)} ${yUnit}`, y: pad.top + (i / yTicks) * plotH };
-  });
-
-  // X-axis: show first, middle, last
-  const xIndices = [0, Math.floor(data.length / 2), data.length - 1];
+  const barH = 260;
 
   return (
     <div>
-      {/* Y labels */}
-      <div className="relative">
-        <div className="absolute -left-1 top-0 flex h-[360px] flex-col justify-between">
-          {yLabels.map((t, i) => (
-            <span key={i} className="text-[10px] text-dash-text-extra-faded">
-              {t.label}
-            </span>
-          ))}
-        </div>
-      </div>
-      <div className="pl-16">
-        <svg viewBox={`0 0 ${svgW} ${svgH}`} className="h-[360px] w-full" preserveAspectRatio="none">
-          {/* Horizontal grid */}
-          {yLabels.map((t, i) => (
-            <line
-              key={`hg-${i}`}
-              x1={pad.left}
-              y1={t.y}
-              x2={svgW - pad.right}
-              y2={t.y}
-              stroke="currentColor"
-              className="text-dash-border-soft"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-              strokeDasharray="4 4"
-            />
-          ))}
+      <div className="flex items-end gap-[2px]">
+        {data.map((d, i) => {
+          const pct = d.value / max;
+          const valH = Math.max(pct * barH, 4);
+          const isActive = hovered === i;
 
-          {/* Vertical grid */}
-          {data.map((_, i) => {
-            if (data.length > 20 && i % 5 !== 0) return null;
-            const x = pad.left + (i / (data.length - 1)) * plotW;
-            return (
-              <line
-                key={`vg-${i}`}
-                x1={x}
-                y1={pad.top}
-                x2={x}
-                y2={svgH - pad.bottom}
-                stroke="currentColor"
-                className="text-dash-border-soft"
-                strokeWidth="1"
-                vectorEffect="non-scaling-stroke"
-                strokeDasharray="4 4"
-              />
-            );
-          })}
+          return (
+            <div
+              key={i}
+              className="group flex flex-1 flex-col items-center"
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              {/* Tooltip on hover */}
+              <div className="relative mb-1.5 flex h-5 items-center justify-center">
+                {isActive && (
+                  <span className="whitespace-nowrap rounded bg-dash-text-strong px-1.5 py-0.5 font-logs text-[10px] font-medium text-dash-bg">
+                    {d.value.toFixed(1)} {yUnit}
+                  </span>
+                )}
+              </div>
 
-          {/* Area fill */}
-          <path d={areaPath} fill={color} opacity="0.06" />
+              {/* Bar */}
+              <div
+                className="relative w-full overflow-hidden rounded-[3px]"
+                style={{ height: barH }}
+              >
+                {/* Hatched background */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundColor: "var(--color-dash-bg-elevated)",
+                    backgroundImage:
+                      "repeating-linear-gradient(-45deg, transparent, transparent 3.5px, var(--color-dash-border-soft) 3.5px, var(--color-dash-border-soft) 4px)",
+                  }}
+                />
 
-          {/* Line */}
-          <path
-            d={linePath}
-            fill="none"
-            stroke={color}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-          />
+                {/* Value bar */}
+                <div
+                  className="absolute inset-x-0 bottom-0 transition-all duration-150"
+                  style={{ height: valH }}
+                >
+                  <div
+                    className="size-full"
+                    style={{
+                      backgroundColor: "#ff7a00",
+                      opacity: isActive ? 1 : 0.3,
+                    }}
+                  />
+                  {isActive && (
+                    <div
+                      className="absolute inset-x-0 top-0 -translate-y-full"
+                      style={{ height: 8, backgroundColor: "#ffa800" }}
+                    />
+                  )}
+                </div>
+              </div>
 
-          {/* End dot */}
-          <circle
-            cx={pts[pts.length - 1].x}
-            cy={pts[pts.length - 1].y}
-            r="4"
-            fill={color}
-            stroke="white"
-            strokeWidth="2"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-
-        {/* X-axis */}
-        <div className="mt-1 flex justify-between">
-          {xIndices.map((idx) => (
-            <span key={idx} className="text-[10px] text-dash-text-extra-faded">
-              {data[idx].time}
-            </span>
-          ))}
-        </div>
+              {/* Time label */}
+              <span
+                className={`mt-2 text-[10px] transition-colors ${
+                  isActive
+                    ? "font-medium text-dash-text-strong"
+                    : "text-dash-text-extra-faded"
+                }`}
+              >
+                {d.time}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-/** Donut ring gauge */
-function DonutGauge({
+/** Semi-circular tick gauge (green→red, radial lines clipped to arc band) */
+
+const TICK_COUNT = 24;
+const G = 118; // center of the 236×236 coordinate space
+const OUTER_R = 108; // outer edge of the arc band
+const INNER_R = 78; // inner edge of the arc band
+const LINE_W = 3.5; // stroke width of each radial line
+
+/* 24 colors: green (left) → yellow → orange → red (right) */
+const TICK_COLORS = [
+  "#22c55e", "#2dd46b", "#3ee377", "#5bea8a", "#78f29e",
+  "#9ae53b", "#b5e840", "#cdec44", "#e5d030", "#f0c020",
+  "#f5b020", "#f5a623", "#f09418", "#eb7d15", "#e86b11",
+  "#e5590e", "#e04a0c", "#dc3c0a", "#d63027", "#d02824",
+  "#cc2222", "#c41e1e", "#bb1a1a", "#b01616",
+];
+
+function SemiGauge({
   value,
   max,
   label,
-  sublabel,
-  color,
+  valueLabel,
+  title,
+  subtitle,
 }: {
   value: number;
   max: number;
   label: string;
-  sublabel: string;
-  color: string;
+  valueLabel: string;
+  title: string;
+  subtitle: string;
 }) {
-  const pct = Math.min(value / max, 1);
-  const r = 42;
-  const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - pct);
+  const activeTicks = Math.round((Math.min(value, max) / max) * TICK_COUNT);
+
+  /* Build radial lines: each is a line from well beyond center to well beyond outer edge,
+     clipped by a semicircular ring (donut top half). Angles go from 180° (left) to 0° (right). */
+  const lines = Array.from({ length: TICK_COUNT }, (_, i) => {
+    const angleDeg = 180 - (i / (TICK_COUNT - 1)) * 180;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    // Extend line well beyond center and outer edge so clip handles it
+    const len = OUTER_R + 30;
+    return {
+      x1: G - len * cos,
+      y1: G + len * sin,
+      x2: G + len * cos,
+      y2: G - len * sin,
+      index: i,
+    };
+  });
 
   return (
-    <div className="flex flex-1 items-center gap-5 rounded-[4px] border-[0.5px] border-dash-border p-5">
-      <svg width="100" height="100" viewBox="0 0 100 100" className="shrink-0">
-        {/* Background ring */}
-        <circle
-          cx="50"
-          cy="50"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          className="text-dash-border-soft"
-          strokeWidth="10"
-        />
-        {/* Value ring */}
-        <circle
-          cx="50"
-          cy="50"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="10"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          transform="rotate(-90 50 50)"
-        />
-      </svg>
-      <div>
-        <h3 className="text-base font-medium text-dash-text-strong">{label}</h3>
-        <p className="text-sm text-dash-text-faded">{sublabel}</p>
+    <div className="flex flex-1 flex-col rounded-[4px] border-[0.5px] border-dash-border-soft bg-dash-bg">
+      {/* Header */}
+      <div className="flex h-[72px] items-center border-b-[0.5px] border-dash-border-soft px-5">
+        <div>
+          <h3 className="text-sm text-dash-text-body">{title}</h3>
+          <p className="text-sm font-light text-dash-text-faded">{subtitle}</p>
+        </div>
+      </div>
+
+      {/* Body: gauge + info */}
+      <div className="flex items-center px-5 py-6">
+        <div className="shrink-0">
+          <svg
+            width="200"
+            height="110"
+            viewBox="0 0 236 130"
+            fill="none"
+          >
+            <defs>
+              {/* Semicircular ring mask — only the top-half donut band is visible */}
+              <clipPath id={`gauge-clip-${label}`}>
+                {/* Outer semicircle (top half) */}
+                <path
+                  d={`M ${G - OUTER_R},${G} A ${OUTER_R},${OUTER_R} 0 0,1 ${G + OUTER_R},${G} L ${G + INNER_R},${G} A ${INNER_R},${INNER_R} 0 0,0 ${G - INNER_R},${G} Z`}
+                />
+              </clipPath>
+            </defs>
+
+            <g clipPath={`url(#gauge-clip-${label})`}>
+              {lines.map((line) => {
+                const isActive = line.index < activeTicks;
+                return (
+                  <line
+                    key={line.index}
+                    x1={line.x1}
+                    y1={line.y1}
+                    x2={line.x2}
+                    y2={line.y2}
+                    stroke={isActive ? TICK_COLORS[line.index] : "var(--color-dash-border-soft)"}
+                    strokeWidth={LINE_W}
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+            </g>
+          </svg>
+        </div>
+
+        <div className="ml-5 border-l border-[#ebebeb] pl-5 dark:border-dash-border">
+          <span className="block text-base text-dash-text-strong">{label}</span>
+          <span className="block font-logs text-sm text-dash-text-faded">{valueLabel}</span>
+        </div>
       </div>
     </div>
   );
@@ -279,15 +300,18 @@ const responseTimeSeries: Record<string, { time: string; value: number }[]> = {
    ───────────────────────────────────────────── */
 
 const visitorData = [
-  { date: "21 Mar", value: 2 },
-  { date: "22 Mar", value: 2 },
-  { date: "23 Mar", value: 3 },
-  { date: "24 Mar", value: 2 },
-  { date: "25 Mar", value: 18 },
-  { date: "26 Mar", value: 40 },
-  { date: "27 Mar", value: 38 },
-  { date: "28 Mar", value: 42 },
-  { date: "29 Mar", value: 70 },
+  { month: "JAN", value: 14 },
+  { month: "FEB", value: 108 },
+  { month: "MAR", value: 166 },
+  { month: "APR", value: 55 },
+  { month: "MAY", value: 137 },
+  { month: "JUN", value: 14 },
+  { month: "JUL", value: 76 },
+  { month: "AUG", value: 55 },
+  { month: "SEP", value: 183 },
+  { month: "OCT", value: 89 },
+  { month: "NOV", value: 154 },
+  { month: "DEC", value: 13 },
 ];
 
 const topPages = [
@@ -345,44 +369,76 @@ function MiniSparkline({ className, color = "#fff" }: { className?: string; colo
   );
 }
 
-function VisitorChart() {
+function VisitorBarChart() {
+  const [hovered, setHovered] = useState<number | null>(null);
   const max = Math.max(...visitorData.map((d) => d.value), 1);
-  const cols = visitorData.length;
-  const pad = { top: 16, bottom: 16, left: 0, right: 0 };
-  const svgW = 800;
-  const svgH = 280;
-  const plotW = svgW - pad.left - pad.right;
-  const plotH = svgH - pad.top - pad.bottom;
-
-  const points = visitorData.map((d, i) => ({
-    x: pad.left + (i / (cols - 1)) * plotW,
-    y: pad.top + plotH - (d.value / max) * plotH,
-  }));
-
-  const linePath = "M " + points.map((p) => `${p.x},${p.y}`).join(" L ");
+  const barH = 240; // max bar height in px
 
   return (
-    <div className="mt-4">
-      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="h-[280px] w-full" preserveAspectRatio="none">
-        {visitorData.map((_, i) => {
-          const x = pad.left + (i / (cols - 1)) * plotW;
+    <div className="mt-6">
+      <div className="flex gap-0">
+        {visitorData.map((d, i) => {
+          const pct = d.value / max;
+          const valH = Math.max(pct * barH, 6); // min 6px so tiny values are visible
+          const isActive = hovered === i;
+
           return (
-            <line key={`vg-${i}`} x1={x} y1={pad.top} x2={x} y2={svgH - pad.bottom} stroke="currentColor" className="text-dash-border-soft" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            <div
+              key={d.month}
+              className="flex flex-1 flex-col items-center gap-2"
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              {/* Bar container */}
+              <div
+                className="relative w-full overflow-hidden rounded-[4px]"
+                style={{ height: barH }}
+              >
+                {/* Hatched background (full height) */}
+                <div
+                  className="absolute inset-0 rounded-[4px]"
+                  style={{
+                    backgroundColor: "var(--color-dash-bg-elevated)",
+                    backgroundImage:
+                      "repeating-linear-gradient(-45deg, transparent, transparent 4px, var(--color-dash-border-soft) 4px, var(--color-dash-border-soft) 4.5px)",
+                  }}
+                />
+
+                {/* Value bar (solid, anchored to bottom) */}
+                <div
+                  className="absolute inset-x-0 bottom-0 transition-all duration-150"
+                  style={{ height: valH }}
+                >
+                  <div
+                    className="size-full"
+                    style={{
+                      backgroundColor: "#ff7a00",
+                      opacity: isActive ? 1 : 0.3,
+                    }}
+                  />
+                  {/* Active cap */}
+                  {isActive && (
+                    <div
+                      className="absolute inset-x-0 top-0 -translate-y-full"
+                      style={{ height: 10, backgroundColor: "#ffa800" }}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Month label */}
+              <span
+                className={`text-[11px] font-medium tracking-wide transition-colors ${
+                  isActive
+                    ? "text-dash-text-strong"
+                    : "text-dash-text-extra-faded"
+                }`}
+              >
+                {d.month}
+              </span>
+            </div>
           );
         })}
-        <line x1={pad.left} y1={svgH - pad.bottom} x2={svgW - pad.right} y2={svgH - pad.bottom} stroke="currentColor" className="text-dash-border-soft" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-        <path d={linePath} fill="none" stroke="#f5a623" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        {points.map((p, i) => {
-          const prev = i > 0 ? visitorData[i - 1].value : visitorData[i].value;
-          const curr = visitorData[i].value;
-          const next = i < visitorData.length - 1 ? visitorData[i + 1].value : curr;
-          if (Math.abs(curr - prev) <= max * 0.1 && Math.abs(next - curr) <= max * 0.1) return null;
-          return <circle key={`dot-${i}`} cx={p.x} cy={p.y} r="5" fill="#f5a623" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" />;
-        })}
-      </svg>
-      <div className="mt-1 flex justify-between px-1">
-        <span className="text-xs text-dash-text-extra-faded">{visitorData[0].date}</span>
-        <span className="text-xs text-dash-text-extra-faded">{visitorData[visitorData.length - 1].date}</span>
       </div>
     </div>
   );
@@ -503,21 +559,23 @@ function AppMetrics() {
         <TimeIntervalDropdown value={timeInterval} onChange={setTimeInterval} />
       </div>
 
-      {/* CPU + Memory donut gauges */}
+      {/* CPU + Memory semi-circular gauges */}
       <div className="flex gap-4">
-        <DonutGauge
-          value={1287.52}
-          max={1600}
+        <SemiGauge
+          value={8}
+          max={100}
           label="CPU"
-          sublabel="1287.52 %"
-          color="#b53629"
+          valueLabel="8%-4vCPU"
+          title="CPU Usage"
+          subtitle="Current processor utilization"
         />
-        <DonutGauge
-          value={2.63}
+        <SemiGauge
+          value={10}
           max={100}
           label="Memory"
-          sublabel="2.63 % / 1.5GB"
-          color="#7c8cf8"
+          valueLabel="1.6GB of 16GB"
+          title="Memory usage"
+          subtitle="Current memory consumption"
         />
       </div>
 
@@ -549,7 +607,7 @@ function AppMetrics() {
             </div>
           )}
         </div>
-        <div className="p-5">
+        <div className="px-5 pb-5 pt-8">
           <TimeSeriesChart data={currentData} yUnit={currentUnit} />
         </div>
       </div>
@@ -661,7 +719,7 @@ function AppAnalytics() {
             </div>
           </div>
         </div>
-        <VisitorChart />
+        <VisitorBarChart />
       </div>
 
       {/* Top pages + Funnel */}

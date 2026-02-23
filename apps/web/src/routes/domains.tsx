@@ -13,7 +13,7 @@ import {
 } from "@brimble/ui";
 import { Cta } from "@/components/sections/cta";
 import balloons from "@/assets/images/balloons.png";
-import trainStation from "@/assets/images/train-station.png";
+import trainStation from "@/assets/images/train-station.svg";
 import arrowRight from "@/assets/icons/arrow-right.svg";
 
 export const Route = createFileRoute("/domains")({

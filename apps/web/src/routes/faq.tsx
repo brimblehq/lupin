@@ -10,7 +10,7 @@ import {
   AccordionContent,
 } from "@brimble/ui";
 import { Cta } from "@/components/sections/cta";
-import trainStation from "@/assets/images/train-station.png";
+import trainStation from "@/assets/images/train-station.svg";
 
 export const Route = createFileRoute("/faq")({
   component: FaqPage,

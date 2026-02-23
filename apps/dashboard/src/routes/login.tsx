@@ -1,0 +1,255 @@
+import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Github, ArrowLeft, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  AuthDivider,
+  AuthField,
+  AuthProviderButton,
+  AuthSplitLayout,
+  OtpInput,
+} from "../components/auth/auth-split-layout";
+
+export const Route = createFileRoute("/login")({
+  component: LoginPage,
+});
+
+const ease = [0.16, 1, 0.3, 1] as const;
+
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4">
+      <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.27-.97 2.34-2.03 3.06l3.28 2.54c1.92-1.77 3.02-4.37 3.02-7.46 0-.7-.06-1.37-.18-2.04H12Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.45l-3.28-2.54c-.91.61-2.07.97-3.34.97-2.57 0-4.74-1.73-5.52-4.05H3.1v2.62A10 10 0 0 0 12 22Z" />
+      <path fill="#4A90E2" d="M6.48 13.93A5.98 5.98 0 0 1 6.17 12c0-.67.12-1.32.31-1.93V7.45H3.1A10 10 0 0 0 2 12c0 1.61.38 3.14 1.1 4.55l3.38-2.62Z" />
+      <path fill="#FBBC05" d="M12 6.02c1.47 0 2.8.5 3.84 1.48l2.88-2.88C16.96 2.98 14.7 2 12 2A10 10 0 0 0 3.1 7.45l3.38 2.62c.78-2.32 2.95-4.05 5.52-4.05Z" />
+    </svg>
+  );
+}
+
+/* ─── Step 1: Enter email ─── */
+
+function EmailStep({
+  email,
+  onEmailChange,
+  onSubmit,
+  loading,
+}: {
+  email: string;
+  onEmailChange: (v: string) => void;
+  onSubmit: () => void;
+  loading: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.25, ease }}
+    >
+      <div className="space-y-2.5">
+        <AuthProviderButton icon={<Github className="size-4" />} label="Continue with GitHub" />
+        <AuthProviderButton icon={<GoogleIcon />} label="Continue with Google" />
+      </div>
+
+      <AuthDivider />
+
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+      >
+        <AuthField
+          id="login-email"
+          type="email"
+          label="Work email"
+          placeholder="name@company.com"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          autoFocus
+          inputMode="email"
+        />
+
+        <button
+          type="submit"
+          disabled={!email.trim() || loading}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#006fff] text-sm font-semibold text-white shadow-[0_1px_2px_rgba(0,80,200,0.3)] transition-all hover:bg-[#0060e0] disabled:opacity-40 disabled:hover:bg-[#006fff]"
+        >
+          {loading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            "Continue with email"
+          )}
+        </button>
+      </form>
+    </motion.div>
+  );
+}
+
+/* ─── Step 2: Verify OTP ─── */
+
+function OtpStep({
+  email,
+  otp,
+  onOtpChange,
+  onVerify,
+  onBack,
+  onResend,
+  loading,
+}: {
+  email: string;
+  otp: string;
+  onOtpChange: (v: string) => void;
+  onVerify: () => void;
+  onBack: () => void;
+  onResend: () => void;
+  loading: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.25, ease }}
+    >
+      <button
+        onClick={onBack}
+        className="mb-6 flex items-center gap-1.5 text-sm text-dash-text-faded transition-colors hover:text-dash-text-strong"
+      >
+        <ArrowLeft className="size-3.5" />
+        Back
+      </button>
+
+      <div className="mb-6">
+        <p className="text-sm text-dash-text-body">
+          We sent a 6-digit code to{" "}
+          <span className="font-medium text-dash-text-strong">{email}</span>
+        </p>
+        <p className="mt-1 text-[13px] text-dash-text-faded">
+          Check your inbox and enter the code below.
+        </p>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onVerify();
+        }}
+        className="space-y-5"
+      >
+        <OtpInput value={otp} onChange={onOtpChange} autoFocus />
+
+        <button
+          type="submit"
+          disabled={otp.length < 6 || loading}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#006fff] text-sm font-semibold text-white shadow-[0_1px_2px_rgba(0,80,200,0.3)] transition-all hover:bg-[#0060e0] disabled:opacity-40 disabled:hover:bg-[#006fff]"
+        >
+          {loading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            "Verify & sign in"
+          )}
+        </button>
+      </form>
+
+      <p className="mt-4 text-center text-[13px] text-dash-text-faded">
+        Didn&apos;t receive it?{" "}
+        <button
+          onClick={onResend}
+          className="font-medium text-[#006fff] transition-colors hover:text-[#0060e0] dark:text-[#4879f8]"
+        >
+          Resend code
+        </button>
+      </p>
+    </motion.div>
+  );
+}
+
+/* ─── Page ─── */
+
+function LoginPage() {
+  const [step, setStep] = useState<"email" | "otp">("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function handleSendOtp() {
+    if (!email.trim()) return;
+    setLoading(true);
+    // Mock: simulate API call
+    setTimeout(() => {
+      setLoading(false);
+      setStep("otp");
+    }, 800);
+  }
+
+  function handleVerify() {
+    if (otp.length < 6) return;
+    setLoading(true);
+    // Mock: simulate verification
+    setTimeout(() => {
+      setLoading(false);
+      // Navigate to dashboard on success
+    }, 1000);
+  }
+
+  function handleResend() {
+    setOtp("");
+    handleSendOtp();
+  }
+
+  return (
+    <AuthSplitLayout
+      mode="login"
+      title={
+        <>
+          Welcome back.
+          <br />
+          Sign in to deploy.
+        </>
+      }
+      description="Access your workspace, review recent builds, and continue shipping without friction."
+      footer={
+        <>
+          By signing in, you agree to Brimble&apos;s{" "}
+          <Link to="/" className="font-medium text-dash-text-faded underline underline-offset-2 transition-colors hover:text-dash-text-body">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link to="/" className="font-medium text-dash-text-faded underline underline-offset-2 transition-colors hover:text-dash-text-body">
+            Privacy Policy
+          </Link>
+          .
+        </>
+      }
+    >
+      <AnimatePresence mode="wait">
+        {step === "email" ? (
+          <EmailStep
+            key="email"
+            email={email}
+            onEmailChange={setEmail}
+            onSubmit={handleSendOtp}
+            loading={loading}
+          />
+        ) : (
+          <OtpStep
+            key="otp"
+            email={email}
+            otp={otp}
+            onOtpChange={setOtp}
+            onVerify={handleVerify}
+            onBack={() => {
+              setStep("email");
+              setOtp("");
+            }}
+            onResend={handleResend}
+            loading={loading}
+          />
+        )}
+      </AnimatePresence>
+    </AuthSplitLayout>
+  );
+}

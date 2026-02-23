@@ -9,8 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ScalingRouteImport } from './routes/scaling'
 import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as DomainsRouteImport } from './routes/domains'
 import { Route as AddonsRouteImport } from './routes/addons'
 import { Route as IndexRouteImport } from './routes/index'
@@ -22,6 +24,7 @@ import { Route as WorkspaceNewRouteImport } from './routes/workspace/new'
 import { Route as ProjectsNewRouteImport } from './routes/projects/new'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
 import { Route as DomainsDomainNameRouteImport } from './routes/domains/$domainName'
+import { Route as AddonsAddonIdRouteImport } from './routes/addons/$addonId'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
 import { Route as ProjectsProjectIdObservabilityRouteImport } from './routes/projects/$projectId/observability'
 import { Route as ProjectsProjectIdLogsRouteImport } from './routes/projects/$projectId/logs'
@@ -32,6 +35,11 @@ import { Route as ProjectsProjectIdConfigurationRouteImport } from './routes/pro
 import { Route as ProjectsProjectIdDomainsIndexRouteImport } from './routes/projects/$projectId/domains/index'
 import { Route as ProjectsProjectIdDomainsDomainNameRouteImport } from './routes/projects/$projectId/domains/$domainName'
 
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ScalingRoute = ScalingRouteImport.update({
   id: '/scaling',
   path: '/scaling',
@@ -40,6 +48,11 @@ const ScalingRoute = ScalingRouteImport.update({
 const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DomainsRoute = DomainsRouteImport.update({
@@ -96,6 +109,11 @@ const DomainsDomainNameRoute = DomainsDomainNameRouteImport.update({
   id: '/$domainName',
   path: '/$domainName',
   getParentRoute: () => DomainsRoute,
+} as any)
+const AddonsAddonIdRoute = AddonsAddonIdRouteImport.update({
+  id: '/$addonId',
+  path: '/$addonId',
+  getParentRoute: () => AddonsRoute,
 } as any)
 const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   id: '/',
@@ -154,8 +172,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/addons': typeof AddonsRouteWithChildren
   '/domains': typeof DomainsRouteWithChildren
+  '/login': typeof LoginRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/scaling': typeof ScalingRouteWithChildren
+  '/signup': typeof SignupRoute
+  '/addons/$addonId': typeof AddonsAddonIdRoute
   '/domains/$domainName': typeof DomainsDomainNameRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/new': typeof ProjectsNewRoute
@@ -176,6 +197,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/addons/$addonId': typeof AddonsAddonIdRoute
   '/domains/$domainName': typeof DomainsDomainNameRoute
   '/projects/new': typeof ProjectsNewRoute
   '/workspace/new': typeof WorkspaceNewRoute
@@ -197,8 +221,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/addons': typeof AddonsRouteWithChildren
   '/domains': typeof DomainsRouteWithChildren
+  '/login': typeof LoginRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/scaling': typeof ScalingRouteWithChildren
+  '/signup': typeof SignupRoute
+  '/addons/$addonId': typeof AddonsAddonIdRoute
   '/domains/$domainName': typeof DomainsDomainNameRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/new': typeof ProjectsNewRoute
@@ -223,8 +250,11 @@ export interface FileRouteTypes {
     | '/'
     | '/addons'
     | '/domains'
+    | '/login'
     | '/projects'
     | '/scaling'
+    | '/signup'
+    | '/addons/$addonId'
     | '/domains/$domainName'
     | '/projects/$projectId'
     | '/projects/new'
@@ -245,6 +275,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/login'
+    | '/signup'
+    | '/addons/$addonId'
     | '/domains/$domainName'
     | '/projects/new'
     | '/workspace/new'
@@ -265,8 +298,11 @@ export interface FileRouteTypes {
     | '/'
     | '/addons'
     | '/domains'
+    | '/login'
     | '/projects'
     | '/scaling'
+    | '/signup'
+    | '/addons/$addonId'
     | '/domains/$domainName'
     | '/projects/$projectId'
     | '/projects/new'
@@ -290,13 +326,22 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AddonsRoute: typeof AddonsRouteWithChildren
   DomainsRoute: typeof DomainsRouteWithChildren
+  LoginRoute: typeof LoginRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
   ScalingRoute: typeof ScalingRouteWithChildren
+  SignupRoute: typeof SignupRoute
   WorkspaceNewRoute: typeof WorkspaceNewRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/scaling': {
       id: '/scaling'
       path: '/scaling'
@@ -309,6 +354,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/domains': {
@@ -388,6 +440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DomainsDomainNameRouteImport
       parentRoute: typeof DomainsRoute
     }
+    '/addons/$addonId': {
+      id: '/addons/$addonId'
+      path: '/$addonId'
+      fullPath: '/addons/$addonId'
+      preLoaderRoute: typeof AddonsAddonIdRouteImport
+      parentRoute: typeof AddonsRoute
+    }
     '/projects/$projectId/': {
       id: '/projects/$projectId/'
       path: '/'
@@ -455,10 +514,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AddonsRouteChildren {
+  AddonsAddonIdRoute: typeof AddonsAddonIdRoute
   AddonsIndexRoute: typeof AddonsIndexRoute
 }
 
 const AddonsRouteChildren: AddonsRouteChildren = {
+  AddonsAddonIdRoute: AddonsAddonIdRoute,
   AddonsIndexRoute: AddonsIndexRoute,
 }
 
@@ -550,8 +611,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AddonsRoute: AddonsRouteWithChildren,
   DomainsRoute: DomainsRouteWithChildren,
+  LoginRoute: LoginRoute,
   ProjectsRoute: ProjectsRouteWithChildren,
   ScalingRoute: ScalingRouteWithChildren,
+  SignupRoute: SignupRoute,
   WorkspaceNewRoute: WorkspaceNewRoute,
 }
 export const routeTree = rootRouteImport

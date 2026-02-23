@@ -359,8 +359,6 @@ function Phase2Config({
 
   const extraSeats = Math.max(0, teamSize - FREE_SEATS);
   const seatCost = extraSeats * COST_PER_EXTRA_SEAT;
-  const extraBuilds = Math.max(0, concurrentBuilds - FREE_BUILDS);
-  const buildCost = extraBuilds * COST_PER_EXTRA_BUILD;
 
   return (
     <motion.div

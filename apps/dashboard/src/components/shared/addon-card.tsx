@@ -62,16 +62,19 @@ export function AddonCard({
       {/* Footer action */}
       <div className="border-t-[0.5px] border-dash-border-soft px-3.5 py-2">
         {addon.installed ? (
-          <button
+          <Link
+            to="/addons/$addonId"
+            params={{ addonId: addon.id }}
             onClick={onManage}
             className="flex items-center gap-1 text-sm font-light tracking-[-0.02px] text-dash-text-body transition-colors hover:text-dash-text-strong"
           >
             Manage addon
             <ArrowRight className="size-3" />
-          </button>
+          </Link>
         ) : (
           <Link
-            to="/addons"
+            to="/addons/$addonId"
+            params={{ addonId: addon.id }}
             className="flex items-center gap-1 text-sm font-light tracking-[-0.02px] text-dash-text-body transition-colors hover:text-dash-text-strong"
           >
             View details

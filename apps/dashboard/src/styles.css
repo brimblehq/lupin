@@ -23,6 +23,19 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Lora';
+  src: url('./assets/fonts/Lora-Italic-Variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@utility font-heading {
+  font-family: 'Lora', Georgia, serif;
+  font-style: italic;
+}
+
 html {
   scroll-behavior: smooth;
 }

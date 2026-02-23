@@ -3,7 +3,7 @@ import { motion, useInView } from "motion/react";
 import { siteConfig } from "@/config/site";
 import { Button } from "@brimble/ui";
 import brimbleLogoWhite from "@/assets/icons/brimble-logo-white.svg";
-import trainStation from "@/assets/images/train-station.png";
+import trainStation from "@/assets/images/train-station.svg";
 import arrowRight from "@/assets/icons/arrow-right.svg";
 
 export function Cta() {

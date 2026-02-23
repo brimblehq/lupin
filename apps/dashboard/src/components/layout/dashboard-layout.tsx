@@ -9,7 +9,16 @@ import { Snackbar } from "../shared/snackbar";
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthRoute = /^\/(login|signup)$/.test(pathname);
   const isFullWidth = /^\/projects\/[^/]+/.test(pathname) || /^\/workspace\/new/.test(pathname);
+
+  if (isAuthRoute) {
+    return (
+      <TooltipProvider>
+        {children}
+      </TooltipProvider>
+    );
+  }
 
   // Welcome snackbar — shown by default for new users
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
