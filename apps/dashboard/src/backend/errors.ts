@@ -9,12 +9,18 @@ export class BackendNotImplementedError extends Error {
 
 export class BackendApiError extends Error {
   code: string;
+  status?: number;
   details?: unknown;
 
-  constructor(payload: ApiErrorShape) {
+  constructor(payload: ApiErrorShape & { status?: number }) {
     super(payload.message);
     this.name = "BackendApiError";
     this.code = payload.code;
+    this.status = payload.status;
     this.details = payload.details;
+  }
+
+  get isForbidden() {
+    return this.status === 403 || this.code === "HTTP_403";
   }
 }

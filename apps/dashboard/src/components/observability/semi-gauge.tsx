@@ -88,20 +88,21 @@ export function SemiGauge({
 
   return (
     <div className="flex flex-1 flex-col rounded-[4px] border-[0.5px] border-dash-border-soft bg-dash-bg">
-      <div className="flex h-[72px] items-center border-b-[0.5px] border-dash-border-soft px-5">
+      <div className="flex min-h-[72px] items-center border-b-[0.5px] border-dash-border-soft px-4 py-3 sm:px-5 sm:py-0">
         <div>
           <h3 className="text-sm text-dash-text-strong">{title}</h3>
           <p className="text-sm font-light text-dash-text-faded">{subtitle}</p>
         </div>
       </div>
 
-      <div className="flex items-center px-5 py-6">
-        <div className="shrink-0">
+      <div className="flex flex-col items-start gap-4 px-4 py-5 sm:flex-row sm:items-center sm:gap-0 sm:px-5 sm:py-6">
+        <div className="w-full shrink-0 sm:w-auto">
           <svg
             width="200"
             height="110"
             viewBox="0 0 236 130"
             fill="none"
+            className="mx-auto sm:mx-0"
           >
             <defs>
               <clipPath id={`gauge-clip-${label}`}>
@@ -128,7 +129,7 @@ export function SemiGauge({
           </svg>
         </div>
 
-        <div className="ml-5 border-l border-[#ebebeb] pl-5 dark:border-dash-border">
+        <div className="w-full border-t border-[#ebebeb] pt-4 sm:ml-5 sm:w-auto sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0 dark:border-dash-border">
           <span className="block text-base text-dash-text-strong">{label}</span>
           <span className="block font-logs text-sm text-dash-text-faded">{valueLabel}</span>
         </div>

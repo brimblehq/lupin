@@ -234,6 +234,46 @@ export const searchDomainSaleServerFn = createServerFn({
   return getServerBackendApi().domains.searchSale(name);
 });
 
+export const purchaseDomainServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        name: string;
+        duration: number;
+        cardId: string;
+        projectId?: string;
+        privacyEnabled: boolean;
+        autoRenewal: boolean;
+      }
+    | undefined;
+
+  const name = payload?.name?.trim();
+  if (!name) {
+    throw new Error("Domain name is required");
+  }
+
+  const cardId = payload?.cardId?.trim();
+  if (!cardId) {
+    throw new Error("Payment method is required");
+  }
+
+  const teamId = await resolveTeamIdFromWorkspace(payload?.workspace);
+
+  await getServerBackendApi().domains.purchaseSale({
+    name,
+    duration: payload?.duration ?? 1,
+    cardId,
+    projectId: payload?.projectId,
+    privacyEnabled: payload?.privacyEnabled ?? false,
+    autoRenewal: payload?.autoRenewal ?? false,
+    teamId,
+  });
+
+  return { success: true };
+});
+
 export const listDomainProjectsServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {
@@ -251,6 +291,135 @@ export const listDomainProjectsServerFn = createServerFn({
     page: 1,
     limit: 100,
   }) as Promise<PaginatedProjectsResponse>;
+});
+
+export const createDomainDnsRecordServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        domainName: string;
+        record: { type: string; name: string; value: string; ttl?: number; isProxied?: boolean };
+      }
+    | undefined;
+
+  const domainName = payload?.domainName?.trim();
+  if (!domainName) {
+    throw new Error("Domain name is required");
+  }
+
+  const type = payload?.record?.type?.trim().toUpperCase();
+  const name = payload?.record?.name?.trim();
+  const value = payload?.record?.value?.trim();
+  if (!type || !name || !value) {
+    throw new Error("Record type, name, and value are required");
+  }
+
+  const teamId = await resolveTeamIdFromWorkspace(payload?.workspace);
+  const requestPayload = {
+    domain: domainName,
+    teamId,
+    record: {
+      type,
+      name,
+      value,
+      ttl: typeof payload?.record?.ttl === "number" ? payload.record.ttl : 3600,
+      isProxied: Boolean(payload?.record?.isProxied),
+    },
+  };
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[domains.dns] create", requestPayload);
+  }
+
+  return getServerBackendApi().domains.createDnsRecord(requestPayload);
+});
+
+export const updateDomainDnsRecordServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        domainName: string;
+        recordId: string;
+        record: { type: string; name: string; value: string; ttl?: number; isProxied?: boolean };
+      }
+    | undefined;
+
+  const domainName = payload?.domainName?.trim();
+  const recordId = payload?.recordId?.trim();
+  if (!domainName) {
+    throw new Error("Domain name is required");
+  }
+  if (!recordId) {
+    throw new Error("Record id is required");
+  }
+
+  const type = payload?.record?.type?.trim().toUpperCase();
+  const name = payload?.record?.name?.trim();
+  const value = payload?.record?.value?.trim();
+  if (!type || !name || !value) {
+    throw new Error("Record type, name, and value are required");
+  }
+
+  const teamId = await resolveTeamIdFromWorkspace(payload?.workspace);
+  const requestPayload = {
+    domain: domainName,
+    recordId,
+    teamId,
+    record: {
+      type,
+      name,
+      value,
+      ttl: typeof payload?.record?.ttl === "number" ? payload.record.ttl : 3600,
+      isProxied: Boolean(payload?.record?.isProxied),
+    },
+  };
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[domains.dns] update", requestPayload);
+  }
+
+  return getServerBackendApi().domains.updateDnsRecord(requestPayload);
+});
+
+export const deleteDomainDnsRecordServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        domainName: string;
+        recordId: string;
+      }
+    | undefined;
+
+  const domainName = payload?.domainName?.trim();
+  const recordId = payload?.recordId?.trim();
+  if (!domainName) {
+    throw new Error("Domain name is required");
+  }
+  if (!recordId) {
+    throw new Error("Record id is required");
+  }
+
+  const teamId = await resolveTeamIdFromWorkspace(payload?.workspace);
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[domains.dns] delete", {
+      domain: domainName,
+      recordId,
+      teamId,
+    });
+  }
+  await getServerBackendApi().domains.deleteDnsRecord({
+    domain: domainName,
+    recordId,
+    teamId,
+  });
+
+  return { success: true };
 });
 
 export type { DomainDetailsRecord, DomainRecord, PaginatedDomainsResponse };

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { SlidersHorizontal, Check } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { Spinner } from "./spinner";
 
 export interface FilterOption {
   label: string;
@@ -24,6 +25,8 @@ interface FilterDropdownProps {
   dropdownWidth?: number;
   /** Alignment of the dropdown. Default: "right" */
   align?: "left" | "right";
+  /** Show a loading spinner in the trigger */
+  loading?: boolean;
 }
 
 export function FilterDropdown({
@@ -34,6 +37,7 @@ export function FilterDropdown({
   icon,
   dropdownWidth = 160,
   align = "right",
+  loading = false,
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -70,6 +74,7 @@ export function FilterDropdown({
           icon ?? <SlidersHorizontal className="size-4" />
         )}
         {displayLabel}
+        {loading ? <Spinner size="size-3.5" className="text-dash-text-faded" /> : null}
       </button>
 
       <AnimatePresence>

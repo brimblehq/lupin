@@ -1,10 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 export const Route = createFileRoute("/$")({
   component: NotFoundPage,
 });
 
 function NotFoundPage() {
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   return (
     <div className="flex min-h-dvh items-center justify-center bg-[#f6f8f7] dark:bg-[#1a1c1e]">
       <div className="flex flex-col items-center text-center">
@@ -18,7 +20,7 @@ function NotFoundPage() {
           The page you're looking for doesn't exist or has been moved.
         </p>
         <Link
-          to="/"
+          to={withWorkspaceQuery({ pathname: "/", searchStr }) as any}
           className="text-sm font-medium text-[#4879f8] hover:underline"
         >
           Back to dashboard

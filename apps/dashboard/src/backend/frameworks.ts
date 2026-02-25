@@ -1,4 +1,5 @@
 import type { ApiClient } from "./types";
+import { asRecord, pickString } from "./normalize";
 
 export interface FrameworkOption {
   slug: string;
@@ -26,12 +27,13 @@ export function createFrameworksApi(client: ApiClient): FrameworksApi {
 
       const frameworks = items
         .map((item: any) => {
-          if (!item || typeof item !== "object") {
+          const row = asRecord(item);
+          if (!row) {
             return null;
           }
 
-          const slug = typeof item.slug === "string" ? item.slug : "";
-          const name = typeof item.name === "string" ? item.name : "";
+          const slug = pickString(row, "slug") ?? "";
+          const name = pickString(row, "name") ?? "";
 
           if (!slug || !name) {
             return null;
@@ -40,19 +42,11 @@ export function createFrameworksApi(client: ApiClient): FrameworksApi {
           return {
             slug,
             name,
-            logo: typeof item.logo === "string" ? item.logo : undefined,
-            installCommand:
-              typeof item.installCommand === "string"
-                ? item.installCommand
-                : undefined,
-            buildCommand:
-              typeof item.buildCommand === "string" ? item.buildCommand : undefined,
-            startCommand:
-              typeof item.startCommand === "string" ? item.startCommand : undefined,
-            outputDirectory:
-              typeof item.outputDirectory === "string"
-                ? item.outputDirectory
-                : undefined,
+            logo: pickString(row, "logo"),
+            installCommand: pickString(row, "installCommand"),
+            buildCommand: pickString(row, "buildCommand"),
+            startCommand: pickString(row, "startCommand"),
+            outputDirectory: pickString(row, "outputDirectory"),
           } satisfies FrameworkOption;
         })
         .filter((item): item is FrameworkOption => item !== null);

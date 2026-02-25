@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { cn } from "@brimble/ui";
-import { Link, getRouteApi, useRouterState } from "@tanstack/react-router";
+import { Link, getRouteApi, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Star, Share2, Check, Rocket } from "lucide-react";
+import { Star, Share2, Check, Rocket, Plug, Bolt, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 import { Spinner } from "../shared/spinner";
 import {
@@ -16,10 +16,25 @@ import {
 } from "@phosphor-icons/react";
 import { FolderTrashIcon } from "../shared/folder-trash-icon";
 import { WarningModal } from "../shared/warning-modal";
-import { redeployProjectServerFn } from "@/server/projects/actions";
+import {
+  backupDatabaseProjectServerFn,
+  deleteProjectServerFn,
+  redeployProjectServerFn,
+  refreshDatabaseProjectServerFn,
+} from "@/server/projects/actions";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
+import {
+  canRedeployProject,
+  isDatabaseProject,
+  shouldShowDeploymentHistoryTab,
+  shouldShowProjectDomainsTab,
+  shouldShowProjectEnvironmentTab,
+  shouldShowProjectObservabilityTab,
+  shouldShowProjectVisitSite,
+} from "@/utils/project-capabilities";
+import { DatabaseConnectionModal } from "./database-connection-modal";
 
-const tabs = [
+const baseTabs = [
   { label: "Projects details", slug: "", Icon: GlobeSimple },
   { label: "Configuration", slug: "configuration", Icon: GearSix },
   { label: "Observability", slug: "observability", Icon: ChartBar },
@@ -33,25 +48,94 @@ const projectRouteApi = getRouteApi("/projects/$projectId");
 
 export function ProjectSubnav({ projectId }: { projectId: string }) {
   const parentLoaderData = projectRouteApi.useLoaderData() as {
-    project?: { id?: string; name?: string };
+    project?: {
+      id?: string;
+      name?: string;
+      serviceType?: string;
+      framework?: string;
+      previewUrl?: string;
+      domains?: Array<{ name?: string }>;
+      repo?: { git?: string };
+      hasUpdates?: boolean;
+      status?: string;
+      connectionUri?: string;
+    };
   };
   const pathname = useRouterState({
     select: (s) => s.resolvedLocation?.pathname ?? s.location.pathname,
   });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const navigate = useNavigate();
   const redeployProject = useServerFn(redeployProjectServerFn as any) as (args: {
     data: {
       projectId: string;
       workspace?: string;
     };
   }) => Promise<{ id?: string; message?: string }>;
+  const deleteProject = useServerFn(deleteProjectServerFn as any) as (args: {
+    data: {
+      projectId: string;
+      workspace?: string;
+    };
+  }) => Promise<{ success: boolean }>;
+  const backupDatabase = useServerFn(backupDatabaseProjectServerFn as any) as (args: {
+    data: {
+      projectId: string;
+      workspace?: string;
+    };
+  }) => Promise<{ message?: string }>;
+  const refreshDatabase = useServerFn(refreshDatabaseProjectServerFn as any) as (args: {
+    data: {
+      projectId: string;
+      workspace?: string;
+    };
+  }) => Promise<{ message?: string }>;
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
   const [copied, setCopied] = useState(false);
   const [deploying, setDeploying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [refreshingDb, setRefreshingDb] = useState(false);
 
   const actualProjectId = parentLoaderData?.project?.id || projectId;
   const projectName = parentLoaderData?.project?.name || projectId;
+  const project = parentLoaderData?.project;
+  const databaseProject = isDatabaseProject(project as any);
+  const databaseStatus = String(project?.status || "").toUpperCase();
+  const canOpenDatabaseConnection = databaseProject && databaseStatus === "ACTIVE";
+  const tabs = baseTabs.filter((tab) => {
+    if (tab.slug === "observability" && !shouldShowProjectObservabilityTab(project as any)) {
+      return false;
+    }
+
+    if (tab.slug === "domains" && !shouldShowProjectDomainsTab(project as any)) {
+      return false;
+    }
+
+    if (tab.slug === "deployment-history" && !shouldShowDeploymentHistoryTab(project as any)) {
+      return false;
+    }
+
+    if (tab.slug === "environment" && !shouldShowProjectEnvironmentTab(project as any)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  let visitHref = "";
+  if (shouldShowProjectVisitSite(project as any)) {
+    const rawUrl = project?.previewUrl || project?.domains?.[0]?.name || "";
+    if (rawUrl) {
+      if (rawUrl.startsWith("http")) {
+        visitHref = rawUrl;
+      } else {
+        visitHref = `https://${rawUrl}`;
+      }
+    }
+  }
 
   async function handleRedeploy() {
     if (deploying) {
@@ -84,6 +168,68 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
       });
     } finally {
       setDeploying(false);
+    }
+  }
+
+  async function handleDatabaseBackup() {
+    if (backingUp) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchStr || "");
+    const workspace = params.get("workspace") || undefined;
+
+    try {
+      setBackingUp(true);
+      toast.loading("Starting database backup...", { id: "database-backup" });
+      const result = await backupDatabase({
+        data: {
+          projectId: actualProjectId,
+          workspace,
+        },
+      });
+      toast.success("Database backup initiated", {
+        id: "database-backup",
+        description: result?.message || "Backup has been queued.",
+      });
+    } catch (error: any) {
+      toast.error("Failed to initiate backup", {
+        id: "database-backup",
+        description: typeof error?.message === "string" ? error.message : "Please try again.",
+      });
+    } finally {
+      setBackingUp(false);
+    }
+  }
+
+  async function handleDatabaseRefresh() {
+    if (refreshingDb) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchStr || "");
+    const workspace = params.get("workspace") || undefined;
+
+    try {
+      setRefreshingDb(true);
+      toast.loading("Applying database update...", { id: "database-refresh" });
+      const result = await refreshDatabase({
+        data: {
+          projectId: actualProjectId,
+          workspace,
+        },
+      });
+      toast.success("Database update started", {
+        id: "database-refresh",
+        description: result?.message || "Updates should be visible shortly.",
+      });
+    } catch (error: any) {
+      toast.error("Failed to update database", {
+        id: "database-refresh",
+        description: typeof error?.message === "string" ? error.message : "Please try again.",
+      });
+    } finally {
+      setRefreshingDb(false);
     }
   }
 
@@ -122,20 +268,66 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
 
         {/* Right actions */}
         <div className="flex shrink-0 items-center gap-5 px-3.5">
-          <button
-            disabled={deploying}
-            onClick={() => {
-              void handleRedeploy();
-            }}
-            className="flex items-center gap-1.5 text-sm font-light text-dash-text-body transition-colors hover:text-dash-text-strong disabled:opacity-50"
-          >
-            {deploying ? (
-              <Spinner size="size-3.5" />
-            ) : (
-              <Rocket className="size-4 sm:hidden" />
-            )}
-            <span className="hidden sm:inline">{deploying ? "Redeploying..." : "Redeploy"}</span>
-          </button>
+          {databaseProject && (
+            <>
+              <button
+                disabled={!canOpenDatabaseConnection}
+                onClick={() => setConnectOpen(true)}
+                className="hidden items-center gap-1.5 text-sm font-light text-dash-text-body transition-colors hover:text-dash-text-strong disabled:cursor-not-allowed disabled:opacity-40 md:flex"
+              >
+                <Plug className="size-4" />
+                <span>Connect</span>
+              </button>
+              <button
+                disabled={backingUp}
+                onClick={() => {
+                  void handleDatabaseBackup();
+                }}
+                className="hidden items-center gap-1.5 text-sm font-light text-dash-text-body transition-colors hover:text-dash-text-strong disabled:opacity-50 md:flex"
+              >
+                {backingUp ? <Spinner size="size-3.5" /> : <Bolt className="size-4" />}
+                <span>{backingUp ? "Starting..." : "Initiate Backup"}</span>
+              </button>
+              {Boolean(project?.hasUpdates) && (
+                <button
+                  disabled={refreshingDb}
+                  onClick={() => {
+                    void handleDatabaseRefresh();
+                  }}
+                  className="hidden items-center gap-1.5 text-sm font-light text-dash-text-body transition-colors hover:text-dash-text-strong disabled:opacity-50 md:flex"
+                >
+                  {refreshingDb ? <Spinner size="size-3.5" /> : <ArrowUp className="size-4" />}
+                  <span>{refreshingDb ? "Updating..." : "Click to Update"}</span>
+                </button>
+              )}
+            </>
+          )}
+          {canRedeployProject(project as any) && (
+            <button
+              disabled={deploying}
+              onClick={() => {
+                void handleRedeploy();
+              }}
+              className="flex items-center gap-1.5 text-sm font-light text-dash-text-body transition-colors hover:text-dash-text-strong disabled:opacity-50"
+            >
+              {deploying ? (
+                <Spinner size="size-3.5" />
+              ) : (
+                <Rocket className="size-4 sm:hidden" />
+              )}
+              <span className="hidden sm:inline">{deploying ? "Redeploying..." : "Redeploy"}</span>
+            </button>
+          )}
+          {visitHref && (
+            <a
+              href={visitHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden items-center gap-1.5 text-sm font-light text-dash-text-body transition-colors hover:text-dash-text-strong md:flex"
+            >
+              <span>Visit site</span>
+            </a>
+          )}
           <div className="flex items-center gap-4">
             <button className="text-dash-text-faded hover:text-dash-text-strong transition-colors">
               <Star className="size-4" />
@@ -171,9 +363,48 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         confirmLabel="Delete project"
         cancelLabel="Cancel"
         confirmDisabled={confirmName !== projectName}
-        onConfirm={() => {
-          // TODO: wire to API
-          console.log("Delete project:", projectId);
+        onConfirm={async () => {
+          if (deleting) {
+            return;
+          }
+
+          const params = new URLSearchParams(searchStr || "");
+          const workspace = params.get("workspace") || undefined;
+
+          try {
+            setDeleting(true);
+            toast.loading("Deleting project...", { id: "delete-project" });
+
+            await deleteProject({
+              data: {
+                projectId: actualProjectId,
+                workspace,
+              },
+            });
+
+            toast.success(`${projectName} deleted successfully`, {
+              id: "delete-project",
+            });
+
+            const nextUrl = withWorkspaceQuery({
+              pathname: "/projects",
+              searchStr,
+            });
+
+            await navigate({
+              to: nextUrl as any,
+              replace: true,
+            });
+          } catch (error: any) {
+            toast.error("Failed to delete project", {
+              id: "delete-project",
+              description:
+                typeof error?.message === "string" ? error.message : "Please try again.",
+            });
+            throw error;
+          } finally {
+            setDeleting(false);
+          }
         }}
       >
         <div className="flex flex-col gap-2 text-left">
@@ -189,6 +420,13 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
           />
         </div>
       </WarningModal>
+
+      <DatabaseConnectionModal
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+        connectionUri={project?.connectionUri}
+        isActive={canOpenDatabaseConnection}
+      />
     </>
   );
 }

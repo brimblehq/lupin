@@ -97,13 +97,15 @@ export function mapDomainDetailsToDomainInfo(domain: DomainDetailsRecord): Domai
     expirationDate: formatExpiryDate(domain.expiresAt),
     creator: domain.creatorName || domain.createdByName || "Brimble",
     dnsRecords: domain.dnsRecords.map((record) => ({
+      id: record.id,
       type: record.type || "-",
       name: record.name || domain.name,
       ttl: formatTtlSeconds(record.ttl),
+      ttlSeconds: record.ttl,
       value: record.value || "-",
+      isProxied: record.isProxied,
     })),
     nameservers: displayNameservers,
     nameserverWarning: buildNameserverWarning(domain),
   };
 }
-

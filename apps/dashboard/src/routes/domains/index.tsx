@@ -21,47 +21,27 @@ import {
   updateDomainServerFn,
 } from "@/server/domains/actions";
 import { formatRelativeTime } from "@/utils/dashboard";
+import { parsePositivePageSearchValue, parseWorkspaceSearchValue, workspacePageLoaderDeps } from "@/utils/workspace-route-search";
 
 export const Route = createFileRoute("/domains/")({
   staleTime: 30_000,
   preloadStaleTime: 30_000,
   validateSearch: (search: Record<string, unknown>) => {
     const next: { page?: number; workspace?: string } = {};
-
-    const rawPage = search.page;
-    if (typeof rawPage === "number" && Number.isFinite(rawPage) && rawPage > 0) {
-      next.page = Math.floor(rawPage);
-    } else if (typeof rawPage === "string") {
-      const parsed = Number(rawPage);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        next.page = Math.floor(parsed);
-      }
+    const page = parsePositivePageSearchValue(search.page);
+    const workspace = parseWorkspaceSearchValue(search.workspace);
+    if (page) {
+      next.page = page;
     }
-
-    const rawWorkspace = search.workspace;
-    if (typeof rawWorkspace === "string" && rawWorkspace.trim()) {
-      next.workspace = rawWorkspace.trim();
+    if (workspace) {
+      next.workspace = workspace;
     }
-
     return next;
   },
-  loader: async ({ location }) => {
-    const params = new URLSearchParams(location.searchStr || "");
-    const rawPage = params.get("page");
-    const rawWorkspace = params.get("workspace");
-
-    let page = 1;
-    if (rawPage) {
-      const parsed = Number(rawPage);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        page = Math.floor(parsed);
-      }
-    }
-
-    let workspace: string | undefined;
-    if (rawWorkspace && rawWorkspace.trim()) {
-      workspace = rawWorkspace.trim();
-    }
+  loaderDeps: ({ search }) => workspacePageLoaderDeps(search),
+  loader: async ({ deps }) => {
+    const page = deps.page;
+    const workspace = deps.workspace;
 
     const [domainsResult, projectsResult] = await Promise.all([
       (listDomainsPageServerFn as unknown as (input: {
@@ -86,6 +66,7 @@ export const Route = createFileRoute("/domains/")({
       projects: projectsResult.items.map((project) => ({
         id: project.id,
         name: project.name,
+        serviceType: project.serviceType,
       })),
     };
   },
@@ -334,10 +315,8 @@ function DomainsPage() {
   return (
     <div className="max-w-[1000px]">
       <PageHeader title="Domains" image="/images/lamp.svg">
-        Welcome to faster frontend deployments! You have used{" "}
-        <span className="font-semibold text-dash-text-body">4/10</span> of your
-        free deployments, you can upgrade to a Pro plan to access unlimited
-        deployments.
+        Manage your domains and DNS records in one place. Connect projects, configure records,
+        and keep your routing organized across environments.
       </PageHeader>
 
       <DomainList
@@ -350,7 +329,7 @@ function DomainsPage() {
         onDeleteDomain={handleDeleteDomain}
       />
 
-      <div className="mt-6 flex justify-center">
+      <div className="mt-6 flex justify-end">
         <NumberPagination
           currentPage={domainsResult.currentPage}
           totalPages={domainsResult.totalPages}
@@ -368,7 +347,10 @@ function DomainsPage() {
         }}
         onRegisterDomain={() => {
           setAddDomainOpen(false);
-          navigate({ to: "/domains/buy" });
+          navigate({
+            to: "/domains/buy",
+            search: workspace ? { workspace } : {},
+          });
         }}
       />
     </div>

@@ -4,6 +4,29 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import appCss from '../styles.css?url'
 
+const chatwootBootstrapScript = `(function(d,t){
+  try {
+    if (window.__brimbleChatwootBooted) return;
+    window.__brimbleChatwootBooted = true;
+    var BASE_URL="https://app.chatwoot.com";
+    var existing=d.getElementById("brimble-chatwoot-sdk");
+    if (existing) return;
+    var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+    g.id="brimble-chatwoot-sdk";
+    g.src=BASE_URL+"/packs/js/sdk.js";
+    g.defer=true;
+    g.async=true;
+    s.parentNode.insertBefore(g,s);
+    g.onload=function(){
+      if (!window.chatwootSDK || !window.chatwootSDK.run) return;
+      window.chatwootSDK.run({
+        websiteToken:"mn5KENDDuZxcSc6bxFE5S3A9",
+        baseUrl:BASE_URL
+      });
+    };
+  } catch (e) {}
+})(document,"script");`
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -50,6 +73,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <script dangerouslySetInnerHTML={{ __html: chatwootBootstrapScript }} />
         <TanStackDevtools
           config={{
             position: 'bottom-right',

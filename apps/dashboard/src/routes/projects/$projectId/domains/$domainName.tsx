@@ -64,6 +64,7 @@ function ProjectDomainSettingsPage() {
     <DomainSettings
       domain={domainInfo}
       backPath={backPath}
+      workspace={workspace}
     />
   );
 }

@@ -1,19 +1,29 @@
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { Copy, Share2, Reply, Plus, AlertCircle, ChevronDown, Pencil } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { FolderTrashIcon } from "./folder-trash-icon";
+import { ToggleSwitch } from "./toggle-switch";
 import { WarningModal } from "./warning-modal";
+import {
+  createDomainDnsRecordServerFn,
+  deleteDomainDnsRecordServerFn,
+  updateDomainDnsRecordServerFn,
+} from "@/server/domains/actions";
 
 const dnsRecordTypes = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"];
 
 export interface DnsRecord {
+  id?: string;
   type: string;
   name: string;
   ttl: string;
+  ttlSeconds?: number;
   value: string;
+  isProxied?: boolean;
 }
 
 export interface DomainInfo {
@@ -58,11 +68,21 @@ function AddDnsRecordModal({
   onOpenChange,
   domainName,
   editingRecord,
+  onSubmit,
+  submitting,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   domainName: string;
   editingRecord?: DnsRecord | null;
+  onSubmit: (input: {
+    name: string;
+    type: string;
+    value: string;
+    ttl: string;
+    isProxied: boolean;
+  }) => Promise<void>;
+  submitting: boolean;
 }) {
   const isEditing = !!editingRecord;
   const [name, setName] = useState(editingRecord?.name ?? "");
@@ -71,6 +91,16 @@ function AddDnsRecordModal({
   const typeRef = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState(editingRecord?.value ?? "");
   const [ttl, setTtl] = useState(editingRecord?.ttl ?? "");
+  const [isProxied, setIsProxied] = useState(editingRecord?.isProxied ?? false);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(editingRecord?.name ?? "");
+    setType(editingRecord?.type ?? "CNAME");
+    setValue(editingRecord?.value ?? "");
+    setTtl(editingRecord?.ttl ?? "");
+    setIsProxied(editingRecord?.isProxied ?? false);
+  }, [open, editingRecord]);
 
   useEffect(() => {
     if (!typeOpen) return;
@@ -82,13 +112,30 @@ function AddDnsRecordModal({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [typeOpen]);
 
-  function handleSubmit() {
-    // TODO: wire to API
-    onOpenChange(false);
-    setName("");
-    setType("");
-    setValue("");
-    setTtl("");
+  const showProxyToggle = type === "A" || type === "CNAME";
+
+  async function handleSubmit() {
+    const nextName = name.trim();
+    const nextType = type.trim().toUpperCase();
+    const nextValue = value.trim();
+
+    if (!nextName || !nextType || !nextValue) {
+      toast.error("Type, name, and value are required");
+      return;
+    }
+
+    await onSubmit({
+      name: nextName,
+      type: nextType,
+      value: nextValue,
+      ttl: ttl.trim(),
+      isProxied: showProxyToggle ? isProxied : false,
+    });
+  }
+
+  let submitLabel = isEditing ? "Save Changes" : "Add Record";
+  if (submitting) {
+    submitLabel = isEditing ? "Saving..." : "Creating...";
   }
 
   return (
@@ -170,6 +217,37 @@ function AddDnsRecordModal({
 
                   <FormField label="Value" placeholder="Value" value={value} onChange={setValue} />
                   <FormField label="TTL" placeholder="1 Hour" value={ttl} onChange={setTtl} />
+
+                  {showProxyToggle ? (
+                    <div className="flex flex-col gap-3 rounded-[6px] bg-dash-bg-elevated p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium text-dash-text-strong">Proxy</span>
+                          <span className="text-sm text-dash-text-faded">
+                            Route through Brimble for SSL and IP protection
+                          </span>
+                        </div>
+                        <ToggleSwitch checked={isProxied} onChange={setIsProxied} />
+                      </div>
+
+                      {isProxied ? (
+                        <p className="text-sm leading-6 text-dash-text-body">
+                          <span className="font-semibold">
+                            {name.trim()
+                              ? name.trim() === "@"
+                                ? domainName
+                                : `${name.trim()}.${domainName}`
+                              : `[name].${domainName}`}
+                          </span>{" "}
+                          {type === "CNAME" ? "is an alias of" : "points to"}{" "}
+                          <span className="font-semibold">
+                            {value.trim() || (type === "CNAME" ? "[target]" : "[IP address]")}
+                          </span>{" "}
+                          and has its traffic proxied through Brimble.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Footer */}
@@ -180,10 +258,11 @@ function AddDnsRecordModal({
                     </button>
                   </Dialog.Close>
                   <button
-                    onClick={handleSubmit}
+                    onClick={() => void handleSubmit()}
+                    disabled={submitting}
                     className="flex items-center rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
                   >
-                    {isEditing ? "Save Changes" : "Continue"}
+                    {submitLabel}
                   </button>
                 </div>
               </motion.div>
@@ -225,34 +304,190 @@ function FormField({
 export function DomainSettings({
   domain,
   backPath,
+  workspace,
 }: {
   domain: DomainInfo;
   backPath: string;
+  workspace?: string;
 }) {
   const [records, setRecords] = useState(domain.dnsRecords);
   const [addRecordOpen, setAddRecordOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<DnsRecord | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [dnsSubmitting, setDnsSubmitting] = useState(false);
+  const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
+  const createDnsRecord = useServerFn(createDomainDnsRecordServerFn as any) as (args: {
+    data: {
+      workspace?: string;
+      domainName: string;
+      record: { type: string; name: string; value: string; ttl?: number; isProxied?: boolean };
+    };
+  }) => Promise<{ id?: string; type: string; name: string; value: string; ttl?: number }>;
+  const updateDnsRecord = useServerFn(updateDomainDnsRecordServerFn as any) as (args: {
+    data: {
+      workspace?: string;
+      domainName: string;
+      recordId: string;
+      record: { type: string; name: string; value: string; ttl?: number; isProxied?: boolean };
+    };
+  }) => Promise<{ id?: string; type: string; name: string; value: string; ttl?: number }>;
+  const deleteDnsRecord = useServerFn(deleteDomainDnsRecordServerFn as any) as (args: {
+    data: { workspace?: string; domainName: string; recordId: string };
+  }) => Promise<{ success: boolean }>;
+
+  useEffect(() => {
+    setRecords(domain.dnsRecords);
+  }, [domain.dnsRecords]);
+
+  const upsertRecord = useCallback((input: {
+    record: {
+      id?: string;
+      type: string;
+      name: string;
+      value: string;
+      ttl?: number;
+      isProxied?: boolean;
+    };
+    ttlLabel: string;
+    previousId?: string;
+  }) => {
+    setRecords((prev) => {
+      const normalized: DnsRecord = {
+        id: input.record.id,
+        type: input.record.type,
+        name: input.record.name,
+        value: input.record.value,
+        ttl: input.ttlLabel || "Auto",
+        ttlSeconds: input.record.ttl,
+        isProxied: input.record.isProxied,
+      };
+
+      const targetId = input.previousId ?? input.record.id;
+      if (targetId) {
+        const existingIndex = prev.findIndex((item) => item.id === targetId);
+        if (existingIndex >= 0) {
+          const next = [...prev];
+          next[existingIndex] = normalized;
+          return next;
+        }
+      }
+
+      return [...prev, normalized];
+    });
+  }, []);
 
   const deleteRecord = useCallback((index: number) => {
     const record = records[index];
+    if (!record?.id) {
+      toast.error("Unable to delete DNS record: missing record id");
+      return;
+    }
+
+    setDeletingRecordId(record.id);
     setRecords((prev) => prev.filter((_, i) => i !== index));
 
-    const promise = new Promise<void>((resolve) => setTimeout(resolve, 800));
-
-    toast.promise(promise, {
-      loading: "Deleting DNS record…",
-      success: "DNS record deleted",
-      error: () => {
-        setRecords((prev) => {
-          const next = [...prev];
-          next.splice(index, 0, record);
-          return next;
-        });
-        return "Failed to delete DNS record";
+    const deletePromise = deleteDnsRecord({
+      data: {
+        ...(workspace ? { workspace } : {}),
+        domainName: domain.domainName,
+        recordId: record.id,
       },
     });
-  }, [records]);
+
+    toast.promise(
+      deletePromise,
+      {
+        loading: "Deleting DNS record…",
+        success: "DNS record deleted",
+        error: (error) => {
+          setRecords((prev) => {
+            const next = [...prev];
+            next.splice(index, 0, record);
+            return next;
+          });
+          return error instanceof Error ? error.message : "Failed to delete DNS record";
+        },
+      },
+    );
+
+    void deletePromise.finally(() => {
+      setDeletingRecordId(null);
+    });
+  }, [records, deleteDnsRecord, workspace, domain.domainName]);
+
+  const handleDnsSubmit = useCallback(async (input: {
+    name: string;
+    type: string;
+    value: string;
+    ttl: string;
+    isProxied: boolean;
+  }) => {
+    const previousRecord = editingRecord;
+    const parsedTtl = Number(input.ttl);
+    const ttl = Number.isFinite(parsedTtl) && parsedTtl > 0 ? parsedTtl : (previousRecord?.ttlSeconds ?? 3600);
+
+    try {
+      setDnsSubmitting(true);
+
+      if (previousRecord?.id) {
+        const updated = await updateDnsRecord({
+          data: {
+            ...(workspace ? { workspace } : {}),
+            domainName: domain.domainName,
+            recordId: previousRecord.id,
+            record: {
+              type: input.type,
+              name: input.name,
+              value: input.value,
+              ttl,
+              isProxied: input.isProxied,
+            },
+          },
+        });
+
+        upsertRecord({
+          record: updated,
+          ttlLabel: input.ttl || previousRecord.ttl || "Auto",
+          previousId: previousRecord.id,
+        });
+        toast.success("DNS record updated");
+      } else {
+        const created = await createDnsRecord({
+          data: {
+            ...(workspace ? { workspace } : {}),
+            domainName: domain.domainName,
+            record: {
+              type: input.type,
+              name: input.name,
+              value: input.value,
+              ttl,
+              isProxied: input.isProxied,
+            },
+          },
+        });
+
+        upsertRecord({
+          record: created,
+          ttlLabel: input.ttl || "Auto",
+        });
+        toast.success("DNS record created");
+      }
+
+      setAddRecordOpen(false);
+      setEditingRecord(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save DNS record");
+    } finally {
+      setDnsSubmitting(false);
+    }
+  }, [
+    editingRecord,
+    updateDnsRecord,
+    workspace,
+    domain.domainName,
+    upsertRecord,
+    createDnsRecord,
+  ]);
 
   return (
     <div className="flex flex-col">
@@ -382,6 +617,7 @@ export function DomainSettings({
                   </button>
                   <button
                     onClick={() => deleteRecord(i)}
+                    disabled={deletingRecordId === record.id}
                     className="rounded-[4px] p-1 transition-opacity hover:opacity-70"
                     title="Delete record"
                   >
@@ -454,6 +690,8 @@ export function DomainSettings({
         }}
         domainName={domain.domainName}
         editingRecord={editingRecord}
+        onSubmit={handleDnsSubmit}
+        submitting={dnsSubmitting}
       />
 
       {/* Delete Domain Modal */}

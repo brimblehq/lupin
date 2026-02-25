@@ -1,22 +1,37 @@
+import { Link, useRouterState } from "@tanstack/react-router";
+import { withWorkspaceQuery } from "@/utils/topbar-navigation";
+
 const footerLinks = [
-  { label: "Home", href: "/" },
+  { label: "Home", href: "/", internal: true },
   { label: "Docs", href: "https://docs.brimble.io" },
   { label: "Pricing", href: "https://brimble.io/pricing" },
 ];
 
 export function Footer() {
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+
   return (
     <footer className="border-t-[0.5px] border-dash-border-soft bg-dash-bg px-6 py-4">
       <div className="mx-auto flex max-w-screen-xl items-center justify-between">
         <div className="flex items-center gap-[30px]">
           {footerLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="text-sm text-dash-text-extra-faded transition-colors hover:text-dash-text-body"
-            >
-              {link.label}
-            </a>
+            link.internal ? (
+              <Link
+                key={link.label}
+                to={withWorkspaceQuery({ pathname: link.href, searchStr }) as any}
+                className="text-sm text-dash-text-extra-faded transition-colors hover:text-dash-text-body"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.label}
+                href={link.href}
+                className="text-sm text-dash-text-extra-faded transition-colors hover:text-dash-text-body"
+              >
+                {link.label}
+              </a>
+            )
           ))}
         </div>
 

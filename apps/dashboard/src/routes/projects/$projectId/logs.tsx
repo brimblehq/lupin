@@ -8,6 +8,7 @@ import type { DateRange } from "react-day-picker";
 import { endOfDay, format, startOfDay, subDays, subHours } from "date-fns";
 import { TabHeader } from "../../../components/shared/tab-header";
 import { FilterDropdown, type FilterOption } from "../../../components/shared/filter-dropdown";
+import { SearchFilterBar } from "../../../components/shared/search-filter-bar";
 import { DateRangePicker } from "../../../components/shared/date-range-picker";
 import { NumberPagination } from "../../../components/shared/pagination";
 import type { DropdownOption } from "../../../components/shared/dropdown";
@@ -28,6 +29,7 @@ import {
   type UiLogLevel,
   type UiRequestLogEntry as RequestLogEntry,
 } from "@/utils/project-logs";
+import { isDatabaseProject, isStaticProject } from "@/utils/project-capabilities";
 
 export const Route = createFileRoute("/projects/$projectId/logs")({
   staleTime: 120_000,
@@ -217,34 +219,31 @@ function ApplicationLogs({
     <div className="flex flex-col gap-3">
       {/* Filter toolbar */}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-        <div className="flex flex-1 items-center gap-2 rounded-[4px] border border-dash-border bg-dash-bg px-3 py-1.5 shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
-          <Search className="size-4 shrink-0 text-dash-text-extra-faded" />
-          <input
-            type="text"
-            placeholder="Search logs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent font-logs text-sm text-dash-text-strong outline-none placeholder:text-dash-text-faded placeholder:opacity-50"
-          />
-        </div>
-
-        <FilterDropdown
-          value={levelFilter}
-          onChange={setLevelFilter}
-          options={levelFilterOptions}
-          placeholder="All Levels"
-          align="left"
+        <SearchFilterBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search logs..."
+          className="flex-1 bg-dash-bg shadow-[0px_1px_2px_rgba(18,18,23,0.05)]"
+          rightSlot={(
+            <FilterDropdown
+              value={levelFilter}
+              onChange={setLevelFilter}
+              options={levelFilterOptions}
+              placeholder="All Levels"
+              align="left"
+            />
+          )}
         />
 
         <DateRangePicker value={dateRange} onChange={setDateRange}>
-          <button className="flex items-center overflow-clip rounded-[4px] border border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated">
-            <span className="flex items-center gap-2 px-3 py-1.5">
+          <button className="flex items-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated">
+            <span className="flex items-center gap-2 px-3 py-3">
               <Calendar className="size-3.5 text-dash-text-faded" />
               {dateRange?.from && dateRange?.to
                 ? `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`
                 : "Select date range"}
             </span>
-            <span className="flex h-full items-center border-l border-dash-border px-2 py-1.5">
+            <span className="flex h-full items-center border-l-[0.5px] border-dash-border px-2 py-3">
               <ChevronDown className="size-4 text-dash-text-faded" />
             </span>
           </button>
@@ -757,42 +756,41 @@ function RequestLogs({
     <div className="flex flex-col gap-3">
       {/* Filter toolbar */}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-        <div className="flex flex-1 items-center gap-2 rounded-[4px] border border-dash-border bg-dash-bg px-3 py-1.5 shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
-          <Search className="size-4 shrink-0 text-dash-text-extra-faded" />
-          <input
-            type="text"
-            placeholder="Search requests..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent font-logs text-sm text-dash-text-strong outline-none placeholder:text-dash-text-faded placeholder:opacity-50"
-          />
-        </div>
-
-        <FilterDropdown
-          value={methodFilter}
-          onChange={setMethodFilter}
-          options={methodFilterOptions}
-          placeholder="All Methods"
-          align="left"
-        />
-
-        <FilterDropdown
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={statusFilterOptions}
-          placeholder="All Statuses"
-          align="left"
+        <SearchFilterBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search requests..."
+          className="flex-1 bg-dash-bg shadow-[0px_1px_2px_rgba(18,18,23,0.05)]"
+          rightSlot={(
+            <div className="flex items-center">
+              <FilterDropdown
+                value={methodFilter}
+                onChange={setMethodFilter}
+                options={methodFilterOptions}
+                placeholder="All Methods"
+                align="left"
+              />
+              <div className="h-full w-px self-stretch bg-dash-border" />
+              <FilterDropdown
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={statusFilterOptions}
+                placeholder="All Statuses"
+                align="left"
+              />
+            </div>
+          )}
         />
 
         <DateRangePicker value={dateRange} onChange={setDateRange}>
-          <button className="flex items-center overflow-clip rounded-[4px] border border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated">
-            <span className="flex items-center gap-2 px-3 py-1.5">
+          <button className="flex items-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated">
+            <span className="flex items-center gap-2 px-3 py-3">
               <Calendar className="size-3.5 text-dash-text-faded" />
               {dateRange?.from && dateRange?.to
                 ? `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`
                 : "Select date range"}
             </span>
-            <span className="flex h-full items-center border-l border-dash-border px-2 py-1.5">
+            <span className="flex h-full items-center border-l-[0.5px] border-dash-border px-2 py-3">
               <ChevronDown className="size-4 text-dash-text-faded" />
             </span>
           </button>
@@ -874,7 +872,18 @@ function RequestLogs({
 
 function LogsPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
-  const [activeTab, setActiveTab] = useState<Tab>("application");
+  const staticProject = isStaticProject(project);
+  const databaseProject = isDatabaseProject(project as any);
+  const [activeTab, setActiveTab] = useState<Tab>(staticProject ? "request" : "application");
+
+  useEffect(() => {
+    if (staticProject && activeTab !== "request") {
+      setActiveTab("request");
+    }
+    if (databaseProject && activeTab === "request") {
+      setActiveTab("application");
+    }
+  }, [staticProject, databaseProject, activeTab]);
 
   const { allocationOptions, allocationContainerByOptionId } = useMemo(() => {
     const options: DropdownOption[] = [];
@@ -934,28 +943,32 @@ function LogsPage() {
 
         {/* Tab switcher */}
         <div className="flex overflow-clip rounded-[4px] border border-dash-border-soft shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
-          <button
-            onClick={() => setActiveTab("application")}
-            className={`flex h-[34px] items-center gap-2 border-r border-dash-border-soft px-3.5 text-sm transition-colors ${
-              activeTab === "application"
-                ? "bg-dash-bg font-medium text-dash-text-strong"
-                : "bg-dash-bg-elevated text-dash-text-faded"
-            }`}
-          >
-            <Activity className="size-4" />
-            Application Logs
-          </button>
-          <button
-            onClick={() => setActiveTab("request")}
-            className={`flex h-[34px] items-center gap-2 px-3.5 text-sm transition-colors ${
-              activeTab === "request"
-                ? "bg-dash-bg font-medium text-dash-text-strong"
-                : "bg-dash-bg-elevated text-dash-text-faded"
-            }`}
-          >
-            <Forward className="size-4" />
-            Request Logs
-          </button>
+          {!staticProject && (
+            <button
+              onClick={() => setActiveTab("application")}
+              className={`flex h-[34px] items-center gap-2 border-r border-dash-border-soft px-3.5 text-sm transition-colors ${
+                activeTab === "application"
+                  ? "bg-dash-bg font-medium text-dash-text-strong"
+                  : "bg-dash-bg-elevated text-dash-text-faded"
+              }`}
+            >
+              <Activity className="size-4" />
+              Application Logs
+            </button>
+          )}
+          {!databaseProject && (
+            <button
+              onClick={() => setActiveTab("request")}
+              className={`flex h-[34px] items-center gap-2 px-3.5 text-sm transition-colors ${
+                activeTab === "request"
+                  ? "bg-dash-bg font-medium text-dash-text-strong"
+                  : "bg-dash-bg-elevated text-dash-text-faded"
+              }`}
+            >
+              <Forward className="size-4" />
+              Request Logs
+            </button>
+          )}
         </div>
       </div>
 

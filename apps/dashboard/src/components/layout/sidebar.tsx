@@ -1,10 +1,10 @@
 import { cn } from "@brimble/ui";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../../hooks/use-theme";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
-const mainNav = [
+export const mainNav = [
   { label: "Home", icon: "/icons/home.svg", href: "/" },
   { label: "Projects", icon: "/icons/project.svg", href: "/projects" },
   { label: "Domains", icon: "/icons/domains.svg", href: "/domains" },
@@ -12,7 +12,7 @@ const mainNav = [
   { label: "Sandboxes", icon: "/icons/sandbox.svg", href: "#", comingSoon: true },
 ];
 
-const moreNav = [
+export const moreNav = [
   { label: "Documentation", icon: "/icons/documentation.svg", href: "https://docs.brimble.io", external: true },
   { label: "Discover", icon: "/icons/discover.svg", href: "/addons" },
 ];
@@ -28,13 +28,13 @@ export function Sidebar({
   onProfileOpenChange: (open: boolean) => void;
 }) {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
-
   return (
     <>
       <aside className="flex w-[185px] shrink-0 flex-col border-r border-dash-border-soft bg-dash-bg">
-        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-6">
+        <nav className="scrollbar-hidden flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-6">
           <div className="flex flex-col gap-1">
             {mainNav.map((item) => {
               if (item.comingSoon) {
@@ -59,19 +59,24 @@ export function Sidebar({
                   ? pathname === "/"
                   : pathname.startsWith(item.href);
               return (
-                <Link
+                <button
                   key={item.label}
-                  to={withWorkspaceQuery({ pathname: item.href, searchStr }) as any}
+                  onClick={() =>
+                    void navigate({
+                      to: withWorkspaceQuery({ pathname: item.href, searchStr }) as any,
+                    })
+                  }
                   className={cn(
                     navItemBase,
+                    "w-full",
                     isActive
-                      ? "border border-dash-border-soft bg-dash-bg-elevated !text-dash-text-strong"
+                      ? "border border-dash-border-soft bg-dash-bg-elevated !text-dash-text-strong dark:border-transparent"
                       : "hover:bg-dash-bg-elevated"
                   )}
                 >
                   <img src={item.icon} alt="" className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80" />
                   {item.label}
-                </Link>
+                </button>
               );
             })}
           </div>
@@ -100,19 +105,24 @@ export function Sidebar({
                 }
                 const isActive = pathname.startsWith(item.href);
                 return (
-                  <Link
+                  <button
                     key={item.label}
-                    to={withWorkspaceQuery({ pathname: item.href, searchStr }) as any}
+                    onClick={() =>
+                      void navigate({
+                        to: withWorkspaceQuery({ pathname: item.href, searchStr }) as any,
+                      })
+                    }
                     className={cn(
                       navItemBase,
+                      "w-full",
                       isActive
-                        ? "border border-dash-border-soft bg-dash-bg-elevated !text-dash-text-strong"
+                        ? "border border-dash-border-soft bg-dash-bg-elevated !text-dash-text-strong dark:border-transparent"
                         : "hover:bg-dash-bg-elevated"
                     )}
                   >
                     <img src={item.icon} alt="" className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80" />
                     {item.label}
-                  </Link>
+                  </button>
                 );
               })}
             </div>

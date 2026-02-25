@@ -1,286 +1,150 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { ArrowLeft, Copy, Check, ExternalLink } from "lucide-react";
-import { DashButton } from "../../components/shared/dash-button";
+import { toast } from "sonner";
 import { AddonCard } from "../../components/shared/addon-card";
-import type { Addon } from "../../components/shared/addon-card";
+import { GlossyButton } from "../../components/shared/glossy-button";
+import { startOauthPopup } from "@/lib/auth/oauth-popup";
+import type { McpServerListResult, McpServerTemplate } from "@/backend/mcp";
+import type { GithubAccount } from "@/backend/repositories";
+import { finalizeOauthSessionServerFn } from "@/server/auth/actions";
+import { deployMcpTemplateServerFn, getMcpTemplateServerFn, listMcpTemplatesServerFn } from "@/server/mcp/actions";
+import { listGithubAccountsServerFn } from "@/server/repositories/actions";
+import { mapMcpTemplateToAddon, mapMcpTemplateToAddonDetail } from "@/utils/discover-mcp";
 
 export const Route = createFileRoute("/addons/$addonId")({
+  staleTime: 30_000,
+  preloadStaleTime: 30_000,
+  loader: async ({ params }) => {
+    const [template, relatedResult] = await Promise.all([
+      (getMcpTemplateServerFn as unknown as (input: {
+        data: { id: string };
+      }) => Promise<McpServerTemplate | null>)({
+        data: { id: params.addonId },
+      }),
+      (listMcpTemplatesServerFn as unknown as (input: {
+        data?: { limit?: number };
+      }) => Promise<McpServerListResult>)({
+        data: { limit: 12 },
+      }).catch(() => ({ servers: [], pagination: {} } as McpServerListResult)),
+    ]);
+
+    const detail = template ? mapMcpTemplateToAddonDetail(template) : null;
+    const relatedAddons = relatedResult.servers
+      .filter((server) => (detail ? (server.qualifiedName || server.id) !== params.addonId : true))
+      .slice(0, 3)
+      .map(mapMcpTemplateToAddon);
+
+    return {
+      detail,
+      relatedAddons,
+    };
+  },
   component: AddonDetailPage,
 });
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-/* ─── Mock data ─── */
-
-interface AddonDetail extends Addon {
-  longDescription: string;
-  developer: string;
-  category: string;
-  installs: string;
-  website: string;
-  documentationUrl: string;
-  envVars: { key: string; value: string }[];
+function formatWebsiteLabel(value?: string) {
+  if (!value) return undefined;
+  return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
-const addonDetails: Record<string, AddonDetail> = {
-  launchdarkly: {
-    id: "launchdarkly",
-    name: "LaunchDarkly",
-    description: "Feature flags & experimentation platform",
-    gradient: "from-[#8653ea] to-[#edbff6]",
-    logo: "🚀",
-    logoBg: "#3d2c00",
-    installed: true,
-    longDescription:
-      "LaunchDarkly is a feature management platform that empowers all teams to safely deliver and control software through feature flags. With the LaunchDarkly addon, you can connect your Brimble project to manage feature rollouts, run A/B experiments, and control infrastructure flags — all without redeploying. Toggle features on and off in real-time, target specific user segments, and measure the impact of every change.",
-    developer: "LaunchDarkly Inc.",
-    category: "Feature Management",
-    installs: "2.4K+",
-    website: "www.launchdarkly.com",
-    documentationUrl: "#",
-    envVars: [
-      { key: "LAUNCHDARKLY_SDK_KEY", value: "sdk-***-****-****" },
-      { key: "LAUNCHDARKLY_CLIENT_ID", value: "cli-***-****-****" },
-      { key: "LAUNCHDARKLY_PROJECT", value: "default" },
-      { key: "LAUNCHDARKLY_ENVIRONMENT", value: "production" },
-    ],
-  },
-  supabase: {
-    id: "supabase",
-    name: "Supabase",
-    description: "Open source Firebase alternative",
-    gradient: "from-[#e9bd4b] to-[#dce94b]",
-    logo: "⚡",
-    logoBg: "#1a5c2e",
-    installed: true,
-    longDescription:
-      "Supabase is an open source Firebase alternative providing a Postgres database, authentication, instant APIs, edge functions, realtime subscriptions, and storage. Connect your Brimble project to Supabase to get a production-ready backend in minutes. Manage your database schema, set up row-level security, and build real-time features without managing infrastructure.",
-    developer: "Supabase Inc.",
-    category: "Backend as a Service",
-    installs: "8.1K+",
-    website: "www.supabase.com",
-    documentationUrl: "#",
-    envVars: [
-      { key: "SUPABASE_URL", value: "https://*****.supabase.co" },
-      { key: "SUPABASE_ANON_KEY", value: "eyJ***" },
-      { key: "SUPABASE_SERVICE_ROLE_KEY", value: "eyJ***" },
-      { key: "SUPABASE_DB_URL", value: "postgresql://postgres:***@***:5432/postgres" },
-    ],
-  },
-  stripe: {
-    id: "stripe",
-    name: "Stripe",
-    description: "Online payment processing for internet businesses",
-    gradient: "from-[#ea51bd] to-[#f6b2c9]",
-    logo: "💳",
-    logoBg: "#32297a",
-    installed: true,
-    longDescription:
-      "Stripe is the leading payment infrastructure platform for the internet. With the Stripe addon, connect your Brimble project to accept payments, manage subscriptions, and handle billing. Stripe's APIs power commerce for millions of businesses, from startups to Fortune 500 companies. Set up webhooks, manage products and pricing, and process payments seamlessly.",
-    developer: "Stripe Inc.",
-    category: "Payments",
-    installs: "12K+",
-    website: "www.stripe.com",
-    documentationUrl: "#",
-    envVars: [
-      { key: "STRIPE_PUBLIC_KEY", value: "pk_live_***" },
-      { key: "STRIPE_SECRET_KEY", value: "sk_live_***" },
-      { key: "STRIPE_WEBHOOK_SECRET", value: "whsec_***" },
-    ],
-  },
-  sentry: {
-    id: "sentry",
-    name: "Sentry",
-    description: "Application monitoring & error tracking",
-    gradient: "from-[#53d8ea] to-[#266bf2]",
-    logo: "🛡️",
-    logoBg: "#2b1537",
-    longDescription:
-      "Sentry provides self-hosted and cloud-based error monitoring that helps all software teams discover, triage, and prioritize errors in real-time. Connect Sentry to your Brimble project to automatically capture exceptions, track performance issues, and get alerted when things break — before your users notice.",
-    developer: "Sentry Inc.",
-    category: "Monitoring",
-    installs: "5.6K+",
-    website: "www.sentry.io",
-    documentationUrl: "#",
-    envVars: [
-      { key: "SENTRY_DSN", value: "https://***@***.ingest.sentry.io/***" },
-      { key: "SENTRY_AUTH_TOKEN", value: "sntrys_***" },
-      { key: "SENTRY_ORG", value: "my-org" },
-      { key: "SENTRY_PROJECT", value: "my-project" },
-    ],
-  },
-  datadog: {
-    id: "datadog",
-    name: "Datadog",
-    description: "Cloud-scale monitoring & security",
-    gradient: "from-[#e94b4b] to-[#e94bbd]",
-    logo: "🐶",
-    logoBg: "#3a1a5c",
-    longDescription:
-      "Datadog is the monitoring and security platform for cloud applications. Bring together end-to-end traces, metrics, and logs to make your applications, infrastructure, and third-party services entirely observable. Connect Datadog to your Brimble project for real-time dashboards, intelligent alerting, and deep visibility into your deployment performance.",
-    developer: "Datadog Inc.",
-    category: "Monitoring",
-    installs: "3.2K+",
-    website: "www.datadoghq.com",
-    documentationUrl: "#",
-    envVars: [
-      { key: "DD_API_KEY", value: "***" },
-      { key: "DD_APP_KEY", value: "***" },
-      { key: "DD_SITE", value: "datadoghq.com" },
-    ],
-  },
-  cloudflare: {
-    id: "cloudflare",
-    name: "Cloudflare",
-    description: "CDN, DDoS protection & DNS services",
-    gradient: "from-[#6ab7ff] to-[#594cf3]",
-    logo: "☁️",
-    logoBg: "#1a3a5c",
-    longDescription:
-      "Cloudflare provides a global network designed to make everything you connect to the Internet secure, private, fast, and reliable. Connect Cloudflare to your Brimble project to manage DNS records, configure CDN caching, and protect your deployments with DDoS mitigation and Web Application Firewall rules.",
-    developer: "Cloudflare Inc.",
-    category: "Infrastructure",
-    installs: "6.8K+",
-    website: "www.cloudflare.com",
-    documentationUrl: "#",
-    envVars: [
-      { key: "CLOUDFLARE_API_TOKEN", value: "***" },
-      { key: "CLOUDFLARE_ZONE_ID", value: "***" },
-      { key: "CLOUDFLARE_ACCOUNT_ID", value: "***" },
-    ],
-  },
-  redis: {
-    id: "redis",
-    name: "Upstash Redis",
-    description: "Serverless Redis for low latency data",
-    gradient: "from-[#d80eff] via-[#d80eff]/[0.36] to-[#3d3055]",
-    logo: "🔴",
-    logoBg: "#5c1a1a",
-    longDescription:
-      "Upstash provides serverless Redis with per-request pricing and global replication. Connect Upstash Redis to your Brimble project for caching, session storage, rate limiting, and real-time leaderboards. With a REST API and native Redis protocol support, it works anywhere — from edge functions to serverless backends.",
-    developer: "Upstash Inc.",
-    category: "Database",
-    installs: "1.9K+",
-    website: "www.upstash.com",
-    documentationUrl: "#",
-    envVars: [
-      { key: "UPSTASH_REDIS_REST_URL", value: "https://***-***.upstash.io" },
-      { key: "UPSTASH_REDIS_REST_TOKEN", value: "***" },
-    ],
-  },
-  planetscale: {
-    id: "planetscale",
-    name: "PlanetScale",
-    description: "Serverless MySQL platform",
-    gradient: "from-[#4be9df] to-[#dce94b]",
-    logo: "🪐",
-    logoBg: "#1a3d5c",
-    longDescription:
-      "PlanetScale is the MySQL-compatible serverless database platform. Built on Vitess, it offers branching, non-blocking schema changes, and unlimited scale. Connect PlanetScale to your Brimble project to get a production-grade relational database with zero-downtime migrations and automatic connection pooling.",
-    developer: "PlanetScale Inc.",
-    category: "Database",
-    installs: "4.1K+",
-    website: "www.planetscale.com",
-    documentationUrl: "#",
-    envVars: [
-      { key: "DATABASE_URL", value: "mysql://***:***@***.connect.psdb.cloud/***?sslaccept=strict" },
-      { key: "PLANETSCALE_ORG", value: "my-org" },
-      { key: "PLANETSCALE_DB", value: "my-database" },
-    ],
-  },
-  resend: {
-    id: "resend",
-    name: "Resend",
-    description: "Email API for developers",
-    gradient: "from-[#ec6492] to-[#e9be4b]",
-    logo: "✉️",
-    logoBg: "#2b1537",
-    longDescription:
-      "Resend is the email API built for developers. Send transactional and marketing emails at scale with a modern, developer-first API. Connect Resend to your Brimble project to send beautiful emails using React components, track deliverability, and manage audiences — all from your codebase.",
-    developer: "Resend Inc.",
-    category: "Communications",
-    installs: "1.5K+",
-    website: "www.resend.com",
-    documentationUrl: "#",
-    envVars: [
-      { key: "RESEND_API_KEY", value: "re_***" },
-      { key: "RESEND_FROM_EMAIL", value: "noreply@yourdomain.com" },
-    ],
-  },
-};
+function buildToolLines(detail: NonNullable<ReturnType<typeof Route.useLoaderData>["detail"]>) {
+  const lines: Array<{ key: string; value: string }> = [];
 
-const relatedAddons: Addon[] = [
-  {
-    id: "datadog",
-    name: "Datadog",
-    description: "Cloud-scale monitoring & security",
-    gradient: "from-[#e94b4b] to-[#e94bbd]",
-    logo: "🐶",
-    logoBg: "#3a1a5c",
-  },
-  {
-    id: "cloudflare",
-    name: "Cloudflare",
-    description: "CDN, DDoS protection & DNS services",
-    gradient: "from-[#6ab7ff] to-[#594cf3]",
-    logo: "☁️",
-    logoBg: "#1a3a5c",
-  },
-  {
-    id: "sentry",
-    name: "Sentry",
-    description: "Application monitoring & error tracking",
-    gradient: "from-[#53d8ea] to-[#266bf2]",
-    logo: "🛡️",
-    logoBg: "#2b1537",
-  },
-];
+  detail.tools.slice(0, 6).forEach((tool) => {
+    lines.push({
+      key: tool.name,
+      value: tool.description || "Tool available",
+    });
+  });
 
-/* ─── Copyable env var row ─── */
+  detail.connections.forEach((connection) => {
+    if (connection.requiredFields.length === 0) return;
+    connection.requiredFields.forEach((field) => {
+      lines.push({
+        key: `${connection.type.toUpperCase()}_${field}`,
+        value: `Required ${connection.type} config field`,
+      });
+    });
+  });
 
-function EnvVarRow({ varKey, value }: { varKey: string; value: string }) {
+  return lines.slice(0, 8);
+}
+
+function CopyableRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    navigator.clipboard.writeText(`${varKey}=${value}`);
+    navigator.clipboard.writeText(`${label}: ${value}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
   return (
     <div className="flex items-center gap-2">
-      <span className="flex-1 font-mono text-[11px] leading-5 text-[#aadafa]">
-        {varKey}
-      </span>
+      <span className="flex-1 truncate font-mono text-[11px] leading-5 text-[#aadafa]">{label}</span>
       <button
         onClick={handleCopy}
         className="shrink-0 text-[#4a505c] transition-colors hover:text-[#9da3ae]"
       >
-        {copied ? (
-          <Check className="size-3.5 text-[#28c840]" />
-        ) : (
-          <Copy className="size-3.5" />
-        )}
+        {copied ? <Check className="size-3.5 text-[#28c840]" /> : <Copy className="size-3.5" />}
       </button>
     </div>
   );
 }
 
-/* ─── Page ─── */
+function chooseGithubInstallation(accounts: GithubAccount[], workspace?: string) {
+  if (!accounts.length) return null;
+
+  if (workspace) {
+    const orgAccount = accounts.find(
+      (account) => account.type === "Organization" && account.installationId !== undefined,
+    );
+    if (orgAccount) return orgAccount;
+  }
+
+  const userAccount = accounts.find(
+    (account) => account.type === "User" && account.installationId !== undefined,
+  );
+  if (userAccount) return userAccount;
+
+  return accounts.find((account) => account.installationId !== undefined) ?? null;
+}
 
 function AddonDetailPage() {
-  const { addonId } = Route.useParams();
-  const addon = addonDetails[addonId];
+  const navigate = useNavigate();
+  const search = Route.useSearch() as { workspace?: string };
+  const { detail, relatedAddons } = Route.useLoaderData();
+  const [deploying, setDeploying] = useState(false);
+  const listGithubAccounts = useServerFn(listGithubAccountsServerFn as any) as () => Promise<GithubAccount[]>;
+  const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn as any) as (args: {
+    data: {
+      accessToken: string;
+      refreshToken?: string;
+      user?: Record<string, unknown>;
+    };
+  }) => Promise<{ ok: true }>;
+  const deployMcpTemplate = useServerFn(deployMcpTemplateServerFn as any) as (args: {
+    data: {
+      workspace?: string;
+      template: string;
+      templateName: string;
+      installationId: string | number;
+    };
+  }) => Promise<{ name?: string; slug?: string }>;
 
-  if (!addon) {
+  if (!detail) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="text-center">
           <p className="text-sm text-dash-text-faded">Addon not found.</p>
           <Link
             to="/addons"
+            search={search.workspace ? { workspace: search.workspace } : {}}
             className="mt-2 inline-flex items-center gap-1 text-sm text-[#4879f8] hover:underline"
           >
             <ArrowLeft className="size-3" />
@@ -291,34 +155,102 @@ function AddonDetailPage() {
     );
   }
 
+  const toolLines = buildToolLines(detail);
+  const metadataRows = [
+    { label: "Installs", value: detail.installsLabel },
+    { label: "Developer", value: detail.developer },
+    { label: "Category", value: detail.category },
+    { label: "Language", value: detail.language || "-" },
+    { label: "Website", value: formatWebsiteLabel(detail.website), href: detail.website },
+    { label: "Documentation", value: detail.documentationUrl ? "Read" : undefined, href: detail.documentationUrl },
+    { label: "Repository", value: detail.githubUrl ? "View" : undefined, href: detail.githubUrl },
+  ].filter((row) => row.value);
+
+  async function ensureGithubAccounts() {
+    let accounts = await listGithubAccounts();
+    if (accounts.length > 0) return accounts;
+
+    const oauth = await startOauthPopup("github");
+    await finalizeOauthSession({
+      data: {
+        accessToken: oauth.access_token,
+        refreshToken: oauth.refresh_token,
+        user: {
+          id: oauth.id,
+          email: oauth.email,
+          username: oauth.username,
+          firstName: oauth.first_name,
+          lastName: oauth.last_name,
+          company: oauth.company,
+          onboarded: Boolean(oauth.onboard?.user),
+        },
+      },
+    });
+
+    accounts = await listGithubAccounts();
+    return accounts;
+  }
+
+  async function handleDeployServer() {
+    if (deploying) return;
+
+    setDeploying(true);
+    try {
+      const accounts = await ensureGithubAccounts();
+      const selectedAccount = chooseGithubInstallation(accounts, search.workspace);
+
+      if (!selectedAccount?.installationId) {
+        throw new Error("No GitHub installation found. Connect a GitHub account or organization.");
+      }
+
+      const project = await deployMcpTemplate({
+        data: {
+          workspace: search.workspace,
+          template: detail.id,
+          templateName: detail.name,
+          installationId: selectedAccount.installationId,
+        },
+      });
+
+      const projectId = project.slug || project.name;
+      if (!projectId) {
+        throw new Error("MCP server deployment failed");
+      }
+
+      toast.success("MCP server deployment started");
+      await navigate({
+        to: "/projects/$projectId",
+        params: { projectId },
+        search: search.workspace ? { workspace: search.workspace } : {},
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to deploy MCP server");
+    } finally {
+      setDeploying(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-8 md:px-10">
-      {/* Back link */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
         <Link
           to="/addons"
+          search={search.workspace ? { workspace: search.workspace } : {}}
           className="inline-flex items-center gap-1 text-sm text-dash-text-faded underline underline-offset-2 transition-colors hover:text-dash-text-strong"
         >
           Back
         </Link>
       </motion.div>
 
-      {/* Hero: banner + description */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.05, ease }}
         className="mt-5 flex flex-col gap-6 lg:flex-row lg:gap-8"
       >
-        {/* Banner card */}
         <div
-          className={`relative h-[210px] w-full shrink-0 overflow-clip rounded-[8px] bg-gradient-to-b ${addon.gradient} lg:w-[437px]`}
+          className={`relative h-[210px] w-full shrink-0 overflow-clip rounded-[8px] bg-gradient-to-b ${detail.gradient} lg:w-[437px]`}
         >
-          {/* Browser mockup */}
           <div
             className="absolute top-[26px] bottom-0 w-[388px] overflow-clip rounded-t-[4px] border-[0.5px] border-[#e6e5e5] border-b-0 bg-[#fbfbfb]"
             style={{ left: "calc(50% + 80.5px)", transform: "translateX(-50%)" }}
@@ -331,40 +263,75 @@ function AddonDetailPage() {
             <div className="mx-[6px] h-px bg-[#e6e5e5]" />
           </div>
 
-          {/* Logo */}
           <div
             className="absolute left-[17px] top-[18px] flex size-[60px] items-center justify-center rounded-full"
-            style={{ backgroundColor: addon.logoBg }}
+            style={{ backgroundColor: detail.logoBg }}
           >
-            <span className="text-2xl">{addon.logo}</span>
+            {detail.logoImageUrl ? (
+              <img src={detail.logoImageUrl} alt={`${detail.name} logo`} className="size-10 rounded-full object-cover" />
+            ) : (
+              <span className="text-2xl">{detail.logo}</span>
+            )}
           </div>
         </div>
 
-        {/* Text + actions */}
-        <div className="flex flex-col justify-between">
+        <div className="flex flex-1 flex-col justify-between">
           <div>
-            <h1 className="text-base font-medium tracking-[-0.03px] text-dash-text-strong">
-              {addon.name}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-base font-medium tracking-[-0.03px] text-dash-text-strong">{detail.name}</h1>
+              {detail.verified ? (
+                <span className="rounded-full bg-[#e8f3ff] px-2 py-0.5 text-xs text-[#3975f6]">Verified</span>
+              ) : null}
+            </div>
             <p className="mt-2 text-sm font-light leading-[1.3] text-dash-text-faded">
-              {addon.description}. Connect it to your Brimble project and streamline your workflow.
+              {detail.description}. Connect it to your Brimble project and streamline your workflow.
             </p>
+            {detail.tools.length > 0 ? (
+              <p className="mt-2 text-sm font-light leading-[1.3] text-dash-text-faded">
+                - Provides {detail.tools.length} tool{detail.tools.length === 1 ? "" : "s"}
+              </p>
+            ) : null}
+            {detail.tools.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {detail.tools.slice(0, 6).map((tool) => (
+                  <span
+                    key={tool.name}
+                    className="rounded-full bg-dash-bg-elevated px-2 py-1 text-xs text-dash-text-faded"
+                  >
+                    {tool.name}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <DashButton variant="primary" size="default">
-              Install addon
-            </DashButton>
-            <DashButton variant="outline" size="default">
-              View documentation
-            </DashButton>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <GlossyButton
+              className="min-w-[160px]"
+              loading={deploying}
+              loadingLabel="Deploying..."
+              onClick={() => {
+                void handleDeployServer();
+              }}
+            >
+              Deploy server
+            </GlossyButton>
+            {detail.documentationUrl ? (
+              <a
+                href={detail.documentationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-[40px] items-center justify-center gap-1 rounded-[8px] border border-dash-border px-3.5 text-sm text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+              >
+                View documentation
+                <ExternalLink className="size-3" />
+              </a>
+            ) : null}
           </div>
         </div>
       </motion.div>
 
-      {/* Divider */}
       <hr className="my-8 border-dash-border-soft" />
 
-      {/* Placeholder gallery */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -379,42 +346,28 @@ function AddonDetailPage() {
         ))}
       </motion.div>
 
-      {/* Divider */}
       <hr className="my-8 border-dash-border-soft" />
 
-      {/* More details: two-column */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.15, ease }}
         className="flex flex-col gap-8 lg:flex-row"
       >
-        {/* Left: description + env vars */}
         <div className="flex-1">
-          <h2 className="text-base font-medium tracking-[-0.03px] text-dash-text-strong">
-            More details
-          </h2>
-          <p className="mt-3 text-sm font-light leading-[1.45] text-dash-text-faded">
-            {addon.longDescription}
-          </p>
+          <h2 className="text-base font-medium tracking-[-0.03px] text-dash-text-strong">More details</h2>
+          <p className="mt-3 text-sm font-light leading-[1.45] text-dash-text-faded">{detail.longDescription}</p>
 
-          {/* Env vars code block */}
-          {addon.envVars.length > 0 && (
+          {toolLines.length > 0 && (
             <div className="mt-6 overflow-clip rounded-[4px]">
-              {/* Header */}
               <div className="border-b border-[#394150] bg-[#212936] px-4 py-2">
-                <span className="text-[11px] font-light text-[#9da3ae]">
-                  Public Environment Variables
-                </span>
+                <span className="text-[11px] font-light text-[#9da3ae]">Tools & configuration hints</span>
               </div>
-              {/* Body */}
               <div className="flex flex-col gap-2 bg-[#121826] px-4 py-3">
-                {addon.envVars.map((ev, i) => (
-                  <div key={ev.key} className="flex items-center gap-3">
-                    <span className="w-4 shrink-0 text-right font-mono text-[10px] text-[#4a505c]">
-                      {i + 1}
-                    </span>
-                    <EnvVarRow varKey={ev.key} value={ev.value} />
+                {toolLines.map((line, i) => (
+                  <div key={`${line.key}-${i}`} className="flex items-center gap-3">
+                    <span className="w-4 shrink-0 text-right font-mono text-[10px] text-[#4a505c]">{i + 1}</span>
+                    <CopyableRow label={line.key} value={line.value} />
                   </div>
                 ))}
               </div>
@@ -422,32 +375,13 @@ function AddonDetailPage() {
           )}
         </div>
 
-        {/* Right: metadata table */}
-        <div className="w-full shrink-0 lg:w-[320px]">
-          {[
-            { label: "Installs", value: addon.installs },
-            { label: "Developer", value: addon.developer },
-            { label: "Category", value: addon.category },
-            {
-              label: "Website",
-              value: addon.website,
-              href: `https://${addon.website}`,
-            },
-            {
-              label: "Documentation",
-              value: "Read",
-              href: addon.documentationUrl,
-            },
-          ].map((row, i, arr) => (
+        <div className="w-full shrink-0 rounded-[8px] border-[0.5px] border-dash-border-soft lg:w-[320px]">
+          {metadataRows.map((row, i) => (
             <div
               key={row.label}
-              className={`flex items-center justify-between px-3.5 py-3 ${
-                i < arr.length - 1 ? "border-b-[0.5px] border-dash-border-soft" : ""
-              }`}
+              className={`flex items-center justify-between px-3.5 py-3 ${i < metadataRows.length - 1 ? "border-b-[0.5px] border-dash-border-soft" : ""}`}
             >
-              <span className="text-sm font-light text-dash-text-body">
-                {row.label}
-              </span>
+              <span className="text-sm font-light text-dash-text-body">{row.label}</span>
               {row.href ? (
                 <a
                   href={row.href}
@@ -459,34 +393,25 @@ function AddonDetailPage() {
                   <ExternalLink className="size-3" />
                 </a>
               ) : (
-                <span className="text-sm font-light text-dash-text-faded">
-                  {row.value}
-                </span>
+                <span className="text-sm font-light text-dash-text-faded">{row.value}</span>
               )}
             </div>
           ))}
         </div>
       </motion.div>
 
-      {/* Divider */}
       <hr className="my-8 border-dash-border-soft" />
 
-      {/* More like this */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.2, ease }}
       >
-        <h2 className="mb-4 text-base font-medium tracking-[-0.03px] text-dash-text-strong">
-          More like this
-        </h2>
+        <h2 className="mb-4 text-base font-medium tracking-[-0.03px] text-dash-text-strong">More like this</h2>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-          {relatedAddons
-            .filter((a) => a.id !== addonId)
-            .slice(0, 3)
-            .map((a) => (
-              <AddonCard key={a.id} addon={a} />
-            ))}
+          {relatedAddons.map((addon) => (
+            <AddonCard key={addon.id} addon={addon} />
+          ))}
         </div>
       </motion.div>
     </div>

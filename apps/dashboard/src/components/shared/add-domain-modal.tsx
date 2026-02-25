@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Search, SlidersHorizontal, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Modal,
   ModalHeader,
@@ -9,6 +9,7 @@ import {
   ModalCancelButton,
   ModalContinueButton,
 } from "./modal";
+import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 interface Project {
   id: string;
@@ -24,7 +25,7 @@ interface AddDomainModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projects: Project[];
-  onContinue: (projectId: string, domainUrl: string) => void;
+  onContinue: (projectId: string, domainUrl: string) => void | Promise<void>;
   onCreateProject?: () => void;
   /** Called to validate the domain before submitting. Return null if valid, or an error. */
   onValidate?: (domainUrl: string) => DomainValidationError | null;
@@ -48,6 +49,27 @@ function RadioButton({ selected }: { selected: boolean }) {
 
 type Step = "select-project" | "enter-domain";
 
+function normalizeDomainInput(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isReservedBrimbleSubdomain(value: string): boolean {
+  const normalized = normalizeDomainInput(value);
+  if (!normalized) {
+    return false;
+  }
+
+  if (normalized.endsWith(".brimble.app")) {
+    return true;
+  }
+
+  if (normalized.endsWith(".brimble.io")) {
+    return true;
+  }
+
+  return false;
+}
+
 export function AddDomainModal({
   open,
   onOpenChange,
@@ -57,11 +79,13 @@ export function AddDomainModal({
   onValidate,
   onRegisterDomain,
 }: AddDomainModalProps) {
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const [step, setStep] = useState<Step>("select-project");
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [domainUrl, setDomainUrl] = useState("");
   const [error, setError] = useState<DomainValidationError | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const filtered = projects.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()),
@@ -76,20 +100,37 @@ export function AddDomainModal({
     }
   }
 
-  function handleStepTwoContinue() {
-    if (!selectedProject || !domainUrl.trim()) return;
+  async function handleStepTwoContinue() {
+    if (!selectedProject || !domainUrl.trim() || submitting) {
+      return;
+    }
+
+    const normalizedDomain = normalizeDomainInput(domainUrl);
+
+    if (isReservedBrimbleSubdomain(normalizedDomain)) {
+      setError({
+        type: "invalid",
+        message: "Brimble-managed subdomains are reserved and cannot be added manually.",
+      });
+      return;
+    }
 
     if (onValidate) {
-      const validationError = onValidate(domainUrl.trim());
+      const validationError = onValidate(normalizedDomain);
       if (validationError) {
         setError(validationError);
         return;
       }
     }
 
-    setError(null);
-    onContinue(selectedProject, domainUrl.trim());
-    resetAndClose();
+    try {
+      setSubmitting(true);
+      setError(null);
+      await onContinue(selectedProject, normalizedDomain);
+      resetAndClose();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function handleDomainChange(value: string) {
@@ -104,6 +145,7 @@ export function AddDomainModal({
     setSearch("");
     setDomainUrl("");
     setError(null);
+    setSubmitting(false);
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -176,7 +218,7 @@ export function AddDomainModal({
 
             {/* Purchase a domain row */}
             <Link
-              to="/domains/buy"
+              to={withWorkspaceQuery({ pathname: "/domains/buy", searchStr }) as any}
               onClick={() => resetAndClose()}
               className="flex w-full items-center gap-3 border-t-[0.5px] border-[#e5e5e5] bg-dash-bg-elevated px-4 py-3 transition-colors hover:bg-[#f0f0f0] dark:border-dash-border dark:hover:bg-[#333]"
             >
@@ -269,8 +311,12 @@ export function AddDomainModal({
           />
         ) : (
           <ModalContinueButton
-            onClick={handleStepTwoContinue}
-            disabled={!domainUrl.trim() || !!error}
+            onClick={() => {
+              void handleStepTwoContinue();
+            }}
+            disabled={!domainUrl.trim() || !!error || submitting}
+            loading={submitting}
+            loadingLabel="Adding..."
           />
         )}
       </ModalFooter>

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
+import { Formik, Form as FormikForm } from "formik";
 import {
   ArrowLeft,
   ChevronDown,
@@ -12,8 +14,29 @@ import {
   Info,
   Settings,
 } from "lucide-react";
+import { toast } from "sonner";
 import { GlossyButton } from "../../components/shared/glossy-button";
 import { Dropdown } from "../../components/shared/dropdown";
+import {
+  createWorkspaceServerFn,
+  verifyWorkspacePromoCodeServerFn,
+} from "@/server/workspaces/actions";
+import {
+  buildCreateWorkspacePayload,
+  extractInvitedEmails,
+  slugifyWorkspaceName,
+  workspaceConfigStepSchema,
+  workspaceInviteStepSchema,
+  workspaceNameStepSchema,
+  WORKSPACE_MAX_BUILDS,
+  WORKSPACE_MIN_BUILDS,
+  type WorkspaceConfigStepValues,
+  type WorkspaceInviteRow,
+  type WorkspaceInviteStepValues,
+  type WorkspaceNameStepValues,
+} from "@/utils/workspace-create";
+import type { Workspace } from "@/backend/workspaces";
+import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 export const Route = createFileRoute("/workspace/new")({
   component: NewWorkspacePage,
@@ -31,8 +54,6 @@ type Phase = 1 | 2 | 3;
 const teamSizeOptions = [3, 5, 10, 15, 25, 50];
 const COST_PER_MEMBER = 5;
 const COST_PER_BUILD = 7.5;
-const MIN_BUILDS = 1;
-const MAX_BUILDS = 10;
 
 const roles = ["Member", "Administrator"];
 
@@ -86,6 +107,7 @@ function Stepper({
   return (
     <div className="input-base flex items-center">
       <button
+        type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
         className="flex size-[42px] items-center justify-center text-dash-text-faded transition-colors hover:text-dash-text-strong disabled:opacity-30"
@@ -96,6 +118,7 @@ function Stepper({
         {renderValue(value)}
       </span>
       <button
+        type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
         className="flex size-[42px] items-center justify-center text-dash-text-faded transition-colors hover:text-dash-text-strong disabled:opacity-30"
@@ -110,9 +133,9 @@ function Stepper({
 
 function InfoBanner({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-2 flex items-start gap-2.5 rounded-[4px] bg-[#f5a623]/[0.06] px-3 py-2.5 dark:bg-[#f5a623]/[0.08]">
-      <Info className="mt-0.5 size-3.5 shrink-0 text-[#f5a623]" />
-      <div className="text-sm font-light leading-[1.4] text-[#b37a10] dark:text-[#f5a623]">
+    <div className="mt-2 flex items-start gap-2.5 rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
+      <Info className="mt-0.5 size-3.5 shrink-0 text-[#f59e0b]" />
+      <div className="text-sm font-light leading-[1.4] text-dash-text-body">
         {children}
       </div>
     </div>
@@ -144,6 +167,7 @@ function MiniRoleDropdown({
   return (
     <div className="relative" ref={ref}>
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className="input-base flex w-[140px] items-center justify-between px-2.5 py-2.5 text-sm text-dash-text-strong"
       >
@@ -161,6 +185,7 @@ function MiniRoleDropdown({
           >
             {roles.map((r) => (
               <button
+                type="button"
                 key={r}
                 onClick={() => { onChange(r); setOpen(false); }}
                 className={`flex w-full px-2.5 py-1.5 text-left text-sm ${
@@ -181,19 +206,11 @@ function MiniRoleDropdown({
 
 function Phase1Name({
   onSubmit,
+  initialValues,
 }: {
   onSubmit: (name: string, slug: string) => void;
+  initialValues: WorkspaceNameStepValues;
 }) {
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-
-  function handleNameChange(value: string) {
-    setName(value);
-    setSlug(
-      value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
-    );
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -208,52 +225,75 @@ function Phase1Name({
         Choose a name and URL for your team workspace.
       </p>
 
-      <div className="flex flex-col gap-4">
-        <div>
-          <label className="mb-1.5 block text-sm text-dash-text-body">
-            Workspace name
-          </label>
-          <input
-            type="text"
-            placeholder="My workspace"
-            value={name}
-            onChange={(e) => handleNameChange(e.target.value)}
-            className={inputClass}
-            autoFocus
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm text-dash-text-body">
-            Workspace URL
-          </label>
-          <div className="flex items-stretch">
-            <div className="flex items-center rounded-l-[6px] border border-r-0 border-dash-border bg-dash-bg-elevated px-3">
-              <span className="whitespace-nowrap text-sm text-dash-text-faded">
-                brimble.app/
-              </span>
+      <Formik<WorkspaceNameStepValues>
+        initialValues={initialValues}
+        validationSchema={workspaceNameStepSchema}
+        enableReinitialize
+        onSubmit={(values) => {
+          onSubmit(values.name.trim(), values.slug.trim());
+        }}
+      >
+        {({ values, errors, touched, setFieldValue, handleSubmit }) => (
+          <FormikForm onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="mb-1.5 block text-sm text-dash-text-body">
+                  Workspace name
+                </label>
+                <input
+                  type="text"
+                  placeholder="My workspace"
+                  value={values.name}
+                  onChange={(e) => {
+                    const nextName = e.target.value;
+                    setFieldValue("name", nextName);
+                    setFieldValue("slug", slugifyWorkspaceName(nextName));
+                  }}
+                  className={inputClass}
+                  autoFocus
+                />
+                {touched.name && errors.name ? (
+                  <p className="mt-1.5 text-xs text-[#ef2f1f]">{errors.name}</p>
+                ) : null}
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-dash-text-body">
+                  Workspace URL
+                </label>
+                <div className="flex items-stretch">
+                  <div className="flex items-center rounded-l-[6px] border border-r-0 border-dash-border bg-dash-bg-elevated px-3">
+                    <span className="whitespace-nowrap text-sm text-dash-text-faded">
+                      brimble.app/
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={values.slug}
+                    onChange={(e) =>
+                      setFieldValue("slug", slugifyWorkspaceName(e.target.value))
+                    }
+                    className={`${inputClass} rounded-l-none`}
+                  />
+                </div>
+                {touched.slug && errors.slug ? (
+                  <p className="mt-1.5 text-xs text-[#ef2f1f]">{errors.slug}</p>
+                ) : null}
+              </div>
             </div>
-            <input
-              type="text"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              className={`${inputClass} rounded-l-none`}
-            />
-          </div>
-        </div>
-      </div>
 
-      <div className="mt-6">
-        <GlossyButton
-          variant="blue"
-          fullWidth
-          onClick={() => {
-            if (name.trim()) onSubmit(name.trim(), slug);
-          }}
-          disabled={!name.trim()}
-        >
-          Continue
-        </GlossyButton>
-      </div>
+            <div className="mt-6">
+              <GlossyButton
+                type="submit"
+                variant="blue"
+                fullWidth
+                disabled={!values.name.trim() || !values.slug.trim()}
+              >
+                Continue
+              </GlossyButton>
+            </div>
+          </FormikForm>
+        )}
+      </Formik>
     </motion.div>
   );
 }
@@ -264,30 +304,19 @@ interface TeamConfig {
   teamSize: number;
   concurrentBuilds: number;
   promoCode: string;
+  startupCodeReference?: string;
 }
 
 function Phase2Config({
   onSubmit,
+  onVerifyPromo,
+  initialValues,
 }: {
   onSubmit: (config: TeamConfig) => void;
+  onVerifyPromo: (code: string) => Promise<{ valid: boolean; reference?: string }>;
+  initialValues: WorkspaceConfigStepValues;
 }) {
-  const [teamSize, setTeamSize] = useState(3);
-  const [concurrentBuilds, setConcurrentBuilds] = useState(2);
-  const [promoCode, setPromoCode] = useState("");
   const [promoStatus, setPromoStatus] = useState<"idle" | "verifying" | "valid" | "invalid">("idle");
-
-  function handleVerifyPromo() {
-    if (!promoCode.trim()) return;
-    setPromoStatus("verifying");
-    // Mock verification
-    setTimeout(() => {
-      setPromoStatus(promoCode.toUpperCase().startsWith("BRIMBLE") ? "valid" : "invalid");
-    }, 800);
-  }
-
-  const seatCost = teamSize * COST_PER_MEMBER;
-  const buildCost = concurrentBuilds * COST_PER_BUILD;
-  const totalCost = seatCost + buildCost;
 
   return (
     <motion.div
@@ -303,139 +332,157 @@ function Phase2Config({
         Configure your team size and build capacity.
       </p>
 
-      {/* Team Size */}
-      <div>
-        <label className="mb-1.5 block text-sm text-dash-text-body">
-          Team Size
-        </label>
-        <Dropdown
-          value={String(teamSize)}
-          options={teamSizeOptions.map(String)}
-          onChange={(v) => setTeamSize(Number(v))}
-          renderOption={(v) => `${v} Members`}
-        />
-        <InfoBanner>
-          Seat pricing: ${COST_PER_MEMBER}/member/mo
-          <br />
-          <span className="font-medium">
-            {teamSize} {teamSize === 1 ? "member" : "members"} = ${seatCost}/mo
-          </span>
-        </InfoBanner>
-      </div>
+      <Formik<WorkspaceConfigStepValues>
+        initialValues={initialValues}
+        validationSchema={workspaceConfigStepSchema}
+        enableReinitialize
+        onSubmit={(values) => {
+          onSubmit({
+            teamSize: values.teamSize,
+            concurrentBuilds: values.concurrentBuilds,
+            promoCode: values.promoCode.trim(),
+            startupCodeReference: values.startupCodeReference.trim() || undefined,
+          });
+        }}
+      >
+        {({ values, setFieldValue, handleSubmit }) => {
+          const seatCost = values.teamSize * COST_PER_MEMBER;
+          const buildCost = values.concurrentBuilds * COST_PER_BUILD;
+          const totalCost = seatCost + buildCost;
 
-      {/* Concurrent Builds */}
-      <div className="mt-5">
-        <label className="mb-1.5 block text-sm text-dash-text-body">
-          Concurrent Builds
-        </label>
-        <Stepper
-          value={concurrentBuilds}
-          min={MIN_BUILDS}
-          max={MAX_BUILDS}
-          onChange={setConcurrentBuilds}
-          renderValue={(v) => {
-            const cost = v * COST_PER_BUILD;
-            return `${v} ${v === 1 ? "Build" : "Builds"} — $${cost % 1 === 0 ? cost : cost.toFixed(2)}`;
-          }}
-        />
-        <InfoBanner>
-          Build pricing: ${COST_PER_BUILD}/build container/mo
-          <br />
-          <span className="font-medium">
-            Estimated total: ${totalCost % 1 === 0 ? totalCost : totalCost.toFixed(2)}/mo
-          </span>
-        </InfoBanner>
-      </div>
+          return (
+            <FormikForm onSubmit={handleSubmit}>
+              <div>
+                <label className="mb-1.5 block text-sm text-dash-text-body">
+                  Team Size
+                </label>
+                <Dropdown
+                  value={String(values.teamSize)}
+                  options={teamSizeOptions.map(String)}
+                  onChange={(v) => setFieldValue("teamSize", Number(v))}
+                  renderOption={(v) => `${v} Members`}
+                />
+                <InfoBanner>
+                  Seat pricing: ${COST_PER_MEMBER}/member/mo
+                  <br />
+                  <span className="font-medium">
+                    {values.teamSize} {values.teamSize === 1 ? "member" : "members"} = ${seatCost}/mo
+                  </span>
+                </InfoBanner>
+              </div>
 
-      {/* Startup Promo Code */}
-      <div className="mt-5">
-        <label className="mb-1.5 block text-sm text-dash-text-body">
-          Startup Promo Code
-        </label>
-        <div className="flex items-stretch gap-2">
-          <input
-            type="text"
-            placeholder="ABC-123"
-            value={promoCode}
-            onChange={(e) => {
-              setPromoCode(e.target.value);
-              setPromoStatus("idle");
-            }}
-            className={`flex-1 ${inputClass}`}
-          />
-          <button
-            onClick={handleVerifyPromo}
-            disabled={!promoCode.trim() || promoStatus === "verifying"}
-            className="flex h-[42px] items-center justify-center rounded-[6px] border border-dash-border bg-dash-bg-elevated px-4 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg disabled:opacity-40"
-          >
-            {promoStatus === "verifying" ? "Verifying..." : "Verify"}
-          </button>
-        </div>
-        {promoStatus === "valid" && (
-          <p className="mt-1.5 flex items-center gap-1 text-sm text-[#28c840]">
-            <Check className="size-3.5" />
-            Promo code applied successfully
-          </p>
-        )}
-        {promoStatus === "invalid" && (
-          <p className="mt-1.5 text-sm text-[#ef2f1f]">
-            Invalid promo code. Please try again.
-          </p>
-        )}
-      </div>
+              <div className="mt-5">
+                <label className="mb-1.5 block text-sm text-dash-text-body">
+                  Concurrent Builds
+                </label>
+                <Stepper
+                  value={values.concurrentBuilds}
+                  min={WORKSPACE_MIN_BUILDS}
+                  max={WORKSPACE_MAX_BUILDS}
+                  onChange={(v) => setFieldValue("concurrentBuilds", v)}
+                  renderValue={(v) => {
+                    const cost = v * COST_PER_BUILD;
+                    return `${v} ${v === 1 ? "Build" : "Builds"} — $${cost % 1 === 0 ? cost : cost.toFixed(2)}`;
+                  }}
+                />
+                <InfoBanner>
+                  Build pricing: ${COST_PER_BUILD}/build container/mo
+                  <br />
+                  <span className="font-medium">
+                    Estimated total: ${totalCost % 1 === 0 ? totalCost : totalCost.toFixed(2)}/mo
+                  </span>
+                </InfoBanner>
+              </div>
 
-      <div className="mt-6">
-        <GlossyButton
-          variant="blue"
-          fullWidth
-          onClick={() =>
-            onSubmit({ teamSize, concurrentBuilds, promoCode })
-          }
-        >
-          Continue
-        </GlossyButton>
-      </div>
+              <div className="mt-5">
+                <label className="mb-1.5 block text-sm text-dash-text-body">
+                  Startup Promo Code
+                </label>
+                <div className="flex items-stretch gap-2">
+                  <input
+                    type="text"
+                    placeholder="ABC-123"
+                    value={values.promoCode}
+                    onChange={(e) => {
+                      setFieldValue("promoCode", e.target.value);
+                      setFieldValue("startupCodeReference", "");
+                      setPromoStatus("idle");
+                    }}
+                    className={`flex-1 ${inputClass}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const code = values.promoCode.trim();
+                      if (!code) return;
+                      setPromoStatus("verifying");
+                      try {
+                        const result = await onVerifyPromo(code);
+                        if (result.valid) {
+                          setFieldValue("startupCodeReference", result.reference || code);
+                          setPromoStatus("valid");
+                        } else {
+                          setFieldValue("startupCodeReference", "");
+                          setPromoStatus("invalid");
+                        }
+                      } catch (error) {
+                        setPromoStatus("invalid");
+                        toast.error(error instanceof Error ? error.message : "Failed to verify promo code");
+                      }
+                    }}
+                    disabled={!values.promoCode.trim() || promoStatus === "verifying"}
+                    className="flex h-[42px] items-center justify-center rounded-[6px] border border-dash-border bg-dash-bg-elevated px-4 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg disabled:opacity-40"
+                  >
+                    {promoStatus === "verifying" ? "Verifying..." : "Verify"}
+                  </button>
+                </div>
+                {promoStatus === "valid" && (
+                  <p className="mt-1.5 flex items-center gap-1 text-sm text-[#28c840]">
+                    <Check className="size-3.5" />
+                    Promo code applied successfully
+                  </p>
+                )}
+                {promoStatus === "invalid" && (
+                  <p className="mt-1.5 text-sm text-[#ef2f1f]">
+                    Invalid promo code. Please try again.
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-6">
+                <GlossyButton
+                  type="submit"
+                  variant="blue"
+                  fullWidth
+                >
+                  Continue
+                </GlossyButton>
+              </div>
+            </FormikForm>
+          );
+        }}
+      </Formik>
     </motion.div>
   );
 }
 
 /* ─── Phase 3: Invite Members ─── */
 
-interface InviteRow {
-  id: number;
-  email: string;
-  role: string;
-}
-
 let inviteNextId = 1;
 
 function Phase3Invite({
   workspaceName,
   teamSize,
+  initialValues,
+  creating,
+  onSubmit,
 }: {
   workspaceName: string;
   teamSize: number;
+  initialValues: WorkspaceInviteStepValues;
+  creating?: boolean;
+  onSubmit: (rows: WorkspaceInviteRow[]) => Promise<void> | void;
 }) {
-  const [rows, setRows] = useState<InviteRow[]>([
-    { id: inviteNextId++, email: "", role: "Member" },
-  ]);
-
-  function addRow() {
-    setRows((prev) => [...prev, { id: inviteNextId++, email: "", role: "Member" }]);
-  }
-
-  function removeRow(id: number) {
-    setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
-  }
-
-  function updateRow(id: number, field: "email" | "role", value: string) {
-    setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
-    );
-  }
-
-  const filled = rows.filter((r) => r.email.trim().length > 0).length;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -450,63 +497,114 @@ function Phase3Invite({
         Add team members to &ldquo;{workspaceName}&rdquo;. You can always do this later.
       </p>
 
-      <div className="flex flex-col gap-3">
-        {rows.map((row) => (
-          <div key={row.id} className="flex items-center gap-2">
-            <input
-              type="email"
-              placeholder="colleague@company.com"
-              value={row.email}
-              onChange={(e) => updateRow(row.id, "email", e.target.value)}
-              className={`flex-1 ${inputClass}`}
-            />
-            <MiniRoleDropdown
-              value={row.role}
-              onChange={(v) => updateRow(row.id, "role", v)}
-            />
-            <button
-              onClick={() => removeRow(row.id)}
-              className="flex size-7 shrink-0 items-center justify-center rounded-[6px] text-dash-text-faded transition-colors hover:text-dash-text-strong"
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <button
-        onClick={addRow}
-        className="mt-3 flex items-center gap-1.5 text-sm text-[#4879f8] transition-colors hover:text-[#3a6ae6]"
+      <Formik<WorkspaceInviteStepValues>
+        initialValues={initialValues}
+        validationSchema={workspaceInviteStepSchema}
+        enableReinitialize
+        onSubmit={async (values) => {
+          await onSubmit(values.invites);
+        }}
       >
-        <Plus className="size-3.5" />
-        Add another
-      </button>
+        {({ values, errors, setFieldValue, handleSubmit, isSubmitting }) => {
+          const rows = values.invites;
+          const filled = rows.filter((r) => r.email.trim().length > 0).length;
+          const busy = creating || isSubmitting;
 
-      {filled > 0 && (
-        <div className="mt-4 rounded-[4px] bg-dash-bg-elevated px-4 py-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-dash-text-faded">
-              {filled} of {teamSize} seats used
-            </span>
-            {filled > teamSize && (
-              <span className="text-[#f5a623] text-xs">
-                Exceeds team size — additional seats will be charged
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+          function addRow() {
+            setFieldValue("invites", [
+              ...rows,
+              { id: inviteNextId++, email: "", role: "Member" },
+            ]);
+          }
 
-      <div className="mt-6 flex gap-3">
-        <GlossyButton variant="blue" fullWidth>
-          Create Workspace
-        </GlossyButton>
-      </div>
-      <button
-        className="mt-3 w-full text-center text-sm text-dash-text-faded transition-colors hover:text-dash-text-strong"
-      >
-        Skip for now
-      </button>
+          function removeRow(id: number) {
+            setFieldValue(
+              "invites",
+              rows.length > 1 ? rows.filter((r) => r.id !== id) : rows,
+            );
+          }
+
+          function updateRow(id: number, field: "email" | "role", value: string) {
+            setFieldValue(
+              "invites",
+              rows.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
+            );
+          }
+
+          return (
+            <FormikForm onSubmit={handleSubmit}>
+              <div className="flex flex-col gap-3">
+                {rows.map((row, index) => (
+                  <div key={row.id}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="email"
+                        placeholder="colleague@company.com"
+                        value={row.email}
+                        onChange={(e) => updateRow(row.id, "email", e.target.value)}
+                        className={`flex-1 ${inputClass}`}
+                      />
+                      <MiniRoleDropdown
+                        value={row.role}
+                        onChange={(v) => updateRow(row.id, "role", v)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeRow(row.id)}
+                        className="flex size-7 shrink-0 items-center justify-center rounded-[6px] text-dash-text-faded transition-colors hover:text-dash-text-strong"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                    {Array.isArray((errors as any).invites) && (errors as any).invites[index]?.email ? (
+                      <p className="mt-1.5 text-xs text-[#ef2f1f]">
+                        {(errors as any).invites[index].email}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+
+              {typeof errors.invites === "string" ? (
+                <p className="mt-2 text-xs text-[#ef2f1f]">{errors.invites}</p>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={addRow}
+                className="mt-3 flex items-center gap-1.5 text-sm text-[#4879f8] transition-colors hover:text-[#3a6ae6]"
+              >
+                <Plus className="size-3.5" />
+                Add another
+              </button>
+
+              {filled > 0 && (
+                <div className="mt-4 rounded-[4px] bg-dash-bg-elevated px-4 py-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-dash-text-faded">
+                      {filled} of {teamSize} seats used
+                    </span>
+                    {filled > teamSize && (
+                      <span className="text-[#f5a623] text-xs">
+                        Exceeds team size — additional seats will be charged
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <p className="mt-5 text-center text-xs text-dash-text-extra-faded">
+                Your card will be charged immediately upon creating the workspace.
+              </p>
+              <div className="mt-3 flex gap-3">
+                <GlossyButton type="submit" variant="blue" fullWidth loading={busy} loadingLabel="Creating...">
+                  Create Workspace
+                </GlossyButton>
+              </div>
+            </FormikForm>
+          );
+        }}
+      </Formik>
     </motion.div>
   );
 }
@@ -514,10 +612,23 @@ function Phase3Invite({
 /* ─── Main Page ─── */
 
 function NewWorkspacePage() {
+  const navigate = useNavigate({ from: "/workspace/new" });
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const createWorkspace = useServerFn(createWorkspaceServerFn as any) as (args: {
+    data: Record<string, unknown>;
+  }) => Promise<Workspace>;
+  const verifyPromo = useServerFn(verifyWorkspacePromoCodeServerFn as any) as (args: {
+    data: { code: string };
+  }) => Promise<{ valid: boolean; reference?: string }>;
+
   const [phase, setPhase] = useState<Phase>(1);
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceSlug, setWorkspaceSlug] = useState("");
   const [teamConfig, setTeamConfig] = useState<TeamConfig | null>(null);
+  const [inviteRows, setInviteRows] = useState<WorkspaceInviteRow[]>([
+    { id: inviteNextId++, email: "", role: "Member" },
+  ]);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
 
   function handleNameSubmit(name: string, slug: string) {
     setWorkspaceName(name);
@@ -536,9 +647,45 @@ function NewWorkspacePage() {
       setWorkspaceName("");
       setWorkspaceSlug("");
       setTeamConfig(null);
+      setInviteRows([{ id: inviteNextId++, email: "", role: "Member" }]);
     }
     if (target <= 2) {
       setTeamConfig(null);
+    }
+  }
+
+  async function handleVerifyPromo(code: string) {
+    return verifyPromo({ data: { code } });
+  }
+
+  async function submitWorkspaceCreate(rows: WorkspaceInviteRow[]) {
+    if (!teamConfig) {
+      toast.error("Team configuration is missing.");
+      return;
+    }
+
+    const payload = buildCreateWorkspacePayload({
+      workspaceName,
+      teamSize: teamConfig.teamSize,
+      concurrentBuilds: teamConfig.concurrentBuilds,
+      promoCode: teamConfig.promoCode,
+      startupCodeReference: teamConfig.startupCodeReference,
+      invitedEmails: extractInvitedEmails(rows),
+    });
+
+    try {
+      setCreatingWorkspace(true);
+      const created = await createWorkspace({ data: payload as Record<string, unknown> });
+      const nextWorkspaceSlug = created.slug || workspaceSlug;
+      toast.success("Workspace created successfully");
+      navigate({
+        to: "/",
+        search: nextWorkspaceSlug ? { workspace: nextWorkspaceSlug } : {},
+      } as any);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create workspace");
+    } finally {
+      setCreatingWorkspace(false);
     }
   }
 
@@ -548,7 +695,7 @@ function NewWorkspacePage() {
         {/* Header */}
         <div className="mb-8">
           <Link
-            to="/"
+            to={withWorkspaceQuery({ pathname: "/", searchStr }) as any}
             className="mb-4 inline-flex items-center gap-1.5 text-sm text-dash-text-faded transition-colors hover:text-dash-text-strong"
           >
             <ArrowLeft className="size-4" />
@@ -574,7 +721,11 @@ function NewWorkspacePage() {
         ) : (
           phase === 1 && (
             <AnimatePresence mode="wait">
-              <Phase1Name key="phase1" onSubmit={handleNameSubmit} />
+              <Phase1Name
+                key="phase1"
+                onSubmit={handleNameSubmit}
+                initialValues={{ name: workspaceName, slug: workspaceSlug }}
+              />
             </AnimatePresence>
           )
         )}
@@ -591,7 +742,17 @@ function NewWorkspacePage() {
         ) : (
           phase === 2 && (
             <AnimatePresence mode="wait">
-              <Phase2Config key="phase2" onSubmit={handleConfigSubmit} />
+              <Phase2Config
+                key="phase2"
+                onSubmit={handleConfigSubmit}
+                onVerifyPromo={handleVerifyPromo}
+                initialValues={{
+                  teamSize: teamConfig?.teamSize ?? 3,
+                  concurrentBuilds: teamConfig?.concurrentBuilds ?? 2,
+                  promoCode: teamConfig?.promoCode ?? "",
+                  startupCodeReference: teamConfig?.startupCodeReference ?? "",
+                }}
+              />
             </AnimatePresence>
           )
         )}
@@ -603,6 +764,12 @@ function NewWorkspacePage() {
               key="phase3"
               workspaceName={workspaceName}
               teamSize={teamConfig?.teamSize ?? 3}
+              initialValues={{ invites: inviteRows }}
+              creating={creatingWorkspace}
+              onSubmit={async (rows) => {
+                setInviteRows(rows);
+                await submitWorkspaceCreate(rows);
+              }}
             />
           </AnimatePresence>
         )}

@@ -1,40 +1,113 @@
 import { useState } from "react";
+import { Infinity } from "@phosphor-icons/react";
+import { SUBSCRIPTION_PLAN_TYPE } from "@brimble/models/dist/enum";
 import { AreaChart, Area, YAxis, ResponsiveContainer } from "recharts";
 import { DashButton } from "../shared/dash-button";
 import { ChangePlanModal } from "../shared/change-plan-modal";
+import type { OverviewSummary } from "@/backend/overview";
+import type { BandwidthSummary } from "@/backend/bandwidth";
 
-const bandwidthData = [
-  { value: 30 },
-  { value: 35 },
-  { value: 28 },
-  { value: 32 },
-  { value: 40 },
-  { value: 35 },
-  { value: 38 },
-  { value: 30 },
-  { value: 42 },
-  { value: 36 },
-  { value: 33 },
-  { value: 38 },
-  { value: 35 },
-  { value: 40 },
-  { value: 32 },
-  { value: 36 },
-  { value: 34 },
-  { value: 38 },
-  { value: 33 },
-  { value: 35 },
-];
+function formatDurationSeconds(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "N/A";
+  }
 
-const deploymentRows = [
-  { label: "Recent deployment", value: "45 Seconds" },
-  { label: "Fastest deployment", value: "15 Seconds" },
-  { label: "Slowest deployment", value: "235 Seconds" },
-];
+  const rounded = Math.max(0, Math.round(value));
+  if (rounded < 60) {
+    return `${rounded} Second${rounded === 1 ? "" : "s"}`;
+  }
 
-export function StatsRow() {
+  const minutes = Math.floor(rounded / 60);
+  const seconds = rounded % 60;
+  if (seconds === 0) {
+    return `${minutes} Minute${minutes === 1 ? "" : "s"}`;
+  }
+
+  return `${minutes}m ${seconds}s`;
+}
+
+function formatBandwidthTotal(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return "No usage data";
+  }
+
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = value;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  const decimals = size >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${size.toFixed(decimals)}${units[unitIndex]} used`;
+}
+
+/* ─── Plan helpers ─── */
+
+function getPlanInfo(planType?: string, isTeamWorkspace?: boolean) {
+  if (isTeamWorkspace) {
+    return { label: "TEAM", badgeBg: "bg-[#d4a017]", displayName: "Team", medalIcon: "/icons/medal.svg", nextPlan: null, unlimitedProjects: true };
+  }
+
+  const key = (planType ?? "").toUpperCase();
+
+  if (key === SUBSCRIPTION_PLAN_TYPE.HackerPlan || key === "HACKER") {
+    return { label: "HACKER", badgeBg: "bg-[#9ca3af]", displayName: "Hacker", medalIcon: "/icons/medal-silver.svg", nextPlan: "Pro", unlimitedProjects: false };
+  }
+
+  if (key === SUBSCRIPTION_PLAN_TYPE.DeveloperPlan || key === "PRO" || key === "PRO_PLAN") {
+    return { label: "PRO", badgeBg: "bg-[#d4a017]", displayName: "Pro", medalIcon: "/icons/medal.svg", nextPlan: null, unlimitedProjects: true };
+  }
+
+  if (key === SUBSCRIPTION_PLAN_TYPE.TeamPlan || key === "TEAM") {
+    return { label: "TEAM", badgeBg: "bg-[#d4a017]", displayName: "Team", medalIcon: "/icons/medal.svg", nextPlan: null, unlimitedProjects: true };
+  }
+
+  return { label: "FREE", badgeBg: "bg-[#cd7f32]", displayName: "Free", medalIcon: "/icons/medal-bronze.svg", nextPlan: "Hacker", unlimitedProjects: false };
+}
+
+export function StatsRow({
+  overview,
+  bandwidth,
+  planType,
+  isTeamWorkspace,
+}: {
+  overview?: OverviewSummary | null;
+  bandwidth?: BandwidthSummary | null;
+  planType?: string;
+  isTeamWorkspace?: boolean;
+}) {
   const [changePlanOpen, setChangePlanOpen] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState("Free");
+  const plan = getPlanInfo(planType, isTeamWorkspace);
+  const canChangePlan = plan.label !== "TEAM";
+  const totalProjects = overview?.total?.project ?? 0;
+  const bandwidthChartData =
+    bandwidth?.results?.map((point) => ({
+      value: typeof point.total === "number" && Number.isFinite(point.total) ? point.total : 0,
+    })) ?? [];
+  const chartData = bandwidthChartData.length > 0 ? bandwidthChartData : [{ value: 0 }];
+  const latestBandwidthTotal =
+    bandwidth?.results && bandwidth.results.length > 0
+      ? bandwidth.results[bandwidth.results.length - 1]?.total
+      : undefined;
+  const bandwidthSummaryText = formatBandwidthTotal(latestBandwidthTotal);
+
+  const deploymentRows = [
+    {
+      label: "Recent deployment",
+      value: formatDurationSeconds(overview?.deploymentBuildTime?.recent),
+    },
+    {
+      label: "Fastest deployment",
+      value: formatDurationSeconds(overview?.deploymentBuildTime?.fastest),
+    },
+    {
+      label: "Slowest deployment",
+      value: formatDurationSeconds(overview?.deploymentBuildTime?.slowest),
+    },
+  ];
 
   return (
     <div className="mb-8 flex flex-col overflow-hidden rounded border-[0.5px] border-dash-border md:h-[160px] md:flex-row">
@@ -45,16 +118,22 @@ export function StatsRow() {
             Bandwidth
           </span>
         </div>
-        <p className="px-2 pt-2 text-xs uppercase tracking-[-0.02px] text-[#ff9b01]">
-          23GB used / 25GB
+        <p className="px-2 pt-2 pb-3 text-xs uppercase tracking-[-0.02px] text-[#ff9b01]">
+          {bandwidthSummaryText}
         </p>
         <div className="mt-auto h-[65px] min-w-0">
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <AreaChart
-              data={bandwidthData}
+              data={chartData}
               margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
             >
-              <YAxis domain={[0, 'dataMax']} hide />
+              <YAxis
+                domain={[
+                  0,
+                  (max: number) => (typeof max === "number" && Number.isFinite(max) && max > 0 ? max : 1),
+                ]}
+                hide
+              />
               <Area
                 type="linear"
                 dataKey="value"
@@ -76,7 +155,7 @@ export function StatsRow() {
             Deployment minutes
           </span>
         </div>
-        <div className="flex flex-1 flex-col justify-between px-2 pt-3.5 pb-3.5">
+        <div className="flex flex-1 flex-col justify-between gap-1 px-2 py-3.5 md:gap-0">
           {deploymentRows.map((row, i) => (
             <div key={row.label}>
               <div className="flex items-center justify-between text-sm leading-[1.3] text-dash-text-faded">
@@ -84,7 +163,7 @@ export function StatsRow() {
                 <span className="text-right">{row.value}</span>
               </div>
               {i < deploymentRows.length - 1 && (
-                <hr className="mt-1.5 border-dash-border" />
+                <hr className="mt-2 border-dash-border md:mt-1.5" />
               )}
             </div>
           ))}
@@ -92,24 +171,41 @@ export function StatsRow() {
       </div>
 
       {/* Total deployments */}
-      <div className="flex flex-1 flex-col border-l-[0.5px] border-dash-border">
+      <div className="flex flex-1 flex-col border-t-[0.5px] border-dash-border md:border-t-0 md:border-l-[0.5px]">
         <div className="flex h-[30px] items-center border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-2.5">
           <span className="text-xs tracking-[-0.02px] text-dash-text-strong">
-            Total deployments
+            Total projects
           </span>
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-2">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-4 md:py-0">
           <div className="flex items-center gap-2.5">
             <p className="text-xl tracking-[-0.03px] text-dash-text-strong">
-              4<span className="text-dash-text-extra-faded">/10</span>
+              {totalProjects}
+              {plan.unlimitedProjects ? (
+                <span className="text-dash-text-extra-faded">
+                  /
+                  <span className="ml-0.5 inline-flex align-middle">
+                    <Infinity className="size-5" weight="light" aria-label="Unlimited" />
+                  </span>
+                </span>
+              ) : (
+                <span className="text-dash-text-extra-faded">/10</span>
+              )}
             </p>
-            <span className="flex h-5 items-center rounded bg-[#00c7eb] px-2 text-[8px] tracking-[-0.01px] text-white">
-              REGULAR PASS
-            </span>
           </div>
-          <DashButton onClick={() => setChangePlanOpen(true)}>
-            Get Brimble Pro
-            <img src="/icons/medal.svg" alt="" className="size-4" />
+          <DashButton
+            onClick={() => {
+              if (!canChangePlan) {
+                return;
+              }
+              setChangePlanOpen(true);
+            }}
+            disabled={!canChangePlan}
+            className={!canChangePlan ? "cursor-default opacity-100" : undefined}
+            aria-disabled={!canChangePlan}
+          >
+            {plan.nextPlan ? `Get Brimble ${plan.nextPlan}` : `Brimble ${plan.displayName}`}
+            <img src={plan.medalIcon} alt="" className="size-4" />
           </DashButton>
         </div>
       </div>
@@ -117,9 +213,8 @@ export function StatsRow() {
       <ChangePlanModal
         open={changePlanOpen}
         onOpenChange={setChangePlanOpen}
-        currentPlan={currentPlan}
-        onChangePlan={(plan) => {
-          setCurrentPlan(plan);
+        currentPlan={plan.displayName}
+        onChangePlan={() => {
           setChangePlanOpen(false);
         }}
       />

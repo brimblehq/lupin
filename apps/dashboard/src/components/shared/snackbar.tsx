@@ -43,10 +43,6 @@ export function Snackbar({ variant, message, action, onDismiss }: SnackbarProps)
           variant === "error" && "bg-[#ef2f1f]/5 dark:bg-[#ef2f1f]/15",
         )}
       >
-        <div
-          className="self-stretch w-[3px] shrink-0 rounded-full"
-          style={{ backgroundColor: color }}
-        />
         <Icon className="size-4 shrink-0" style={{ color }} />
         <p className="flex-1 text-sm text-dash-text-body dark:text-dash-text-strong">{message}</p>
         {action && (

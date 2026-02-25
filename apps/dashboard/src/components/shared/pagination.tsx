@@ -18,11 +18,6 @@ const btnOutline = cn(
   "hover:bg-dash-bg-elevated",
 );
 
-const btnActive = cn(
-  btnBase,
-  "border border-transparent bg-dash-text-strong text-dash-bg",
-);
-
 const btnDisabled = "pointer-events-none opacity-40";
 
 const tapScale = { scale: 0.95 };
@@ -94,19 +89,15 @@ export function NumberPagination({
 
   return (
     <nav aria-label="Pagination" className="flex items-center justify-center gap-1">
-      {/* Previous */}
-      <motion.button
-        whileTap={isFirst ? undefined : tapScale}
+      <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={isFirst}
         aria-label="Previous page"
-        className={cn(btnOutline, "h-8 gap-1 px-2.5", isFirst && btnDisabled)}
+        className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
       >
         <ChevronLeft className="size-4" />
-        <span className="hidden sm:inline">Prev</span>
-      </motion.button>
+      </button>
 
-      {/* Page numbers */}
       {pages.map((page, i) =>
         page === "ellipsis" ? (
           <span
@@ -117,33 +108,30 @@ export function NumberPagination({
             &hellip;
           </span>
         ) : (
-          <motion.button
+          <button
             key={page}
-            whileTap={tapScale}
             onClick={() => onPageChange(page)}
             aria-current={page === currentPage ? "page" : undefined}
             aria-label={`Page ${page}`}
-            className={cn(
-              "size-8",
-              page === currentPage ? btnActive : btnOutline,
-            )}
+            className={`flex size-8 items-center justify-center rounded-[4px] text-sm transition-colors ${
+              page === currentPage
+                ? "bg-dash-bg-elevated font-medium text-dash-text-strong"
+                : "text-dash-text-faded hover:bg-dash-bg-elevated"
+            }`}
           >
             {page}
-          </motion.button>
+          </button>
         ),
       )}
 
-      {/* Next */}
-      <motion.button
-        whileTap={isLast ? undefined : tapScale}
+      <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={isLast}
         aria-label="Next page"
-        className={cn(btnOutline, "h-8 gap-1 px-2.5", isLast && btnDisabled)}
+        className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
       >
-        <span className="hidden sm:inline">Next</span>
         <ChevronRight className="size-4" />
-      </motion.button>
+      </button>
     </nav>
   );
 }

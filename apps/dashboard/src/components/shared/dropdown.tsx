@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -28,6 +28,8 @@ type StringProps = {
 type DropdownProps = (ObjectProps | StringProps) & {
   placeholder?: string;
   className?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 };
 
 export function Dropdown({
@@ -37,14 +39,20 @@ export function Dropdown({
   placeholder,
   className,
   renderOption,
+  searchable = false,
+  searchPlaceholder = "Search...",
 }: DropdownProps) {
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [query, setQuery] = useState("");
+  const triggerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
   const safeOptions = Array.isArray(options) ? options : [];
   const isObject = safeOptions.length > 0 && typeof safeOptions[0] === "object";
   const menuWidth = pos.width > 0 ? pos.width : 240;
+  const trimmedQuery = query.trim().toLowerCase();
+  const showSearch = searchable && safeOptions.length > 0;
 
   const updatePos = useCallback(() => {
     if (!triggerRef.current) return;
@@ -77,6 +85,22 @@ export function Dropdown({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      return;
+    }
+
+    if (!showSearch) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, showSearch]);
+
   const selectedOption = isObject
     ? (safeOptions as DropdownOption[]).find((o) => o.id === value)
     : undefined;
@@ -86,32 +110,95 @@ export function Dropdown({
       ? renderOption(value)
       : value;
 
+  const filteredObjectOptions = isObject
+    ? (safeOptions as DropdownOption[]).filter((opt) =>
+        trimmedQuery ? opt.label.toLowerCase().includes(trimmedQuery) : true,
+      )
+    : [];
+
+  const filteredStringOptions = !isObject
+    ? (safeOptions as string[]).filter((opt) => {
+        if (!trimmedQuery) {
+          return true;
+        }
+
+        const label = renderOption ? renderOption(opt) : opt;
+        return label.toLowerCase().includes(trimmedQuery);
+      })
+    : [];
+
   return (
     <div>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => {
-          if (!open) {
-            updatePos();
-          }
-          setOpen((prev) => !prev);
-        }}
-        className={`flex w-full items-center justify-between input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] ${className ?? ""}`}
-      >
-        <span className={`flex items-center gap-2 ${displayLabel ? "" : "text-[#9ca3af]"}`}>
-          {selectedOption?.icon && (
-            <img src={selectedOption.icon} alt="" className="size-4 shrink-0 object-contain" />
-          )}
-          {displayLabel || placeholder || "Select..."}
-        </span>
-        <motion.span
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.2, ease }}
-        >
-          <ChevronDown className="size-3.5 text-dash-text-faded" />
-        </motion.span>
-      </button>
+      <div ref={triggerRef}>
+        {showSearch && open ? (
+          <div
+            className={`flex min-h-[46px] w-full items-center justify-between input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong ${className ?? ""}`}
+            onMouseDown={(e) => {
+              if (e.target instanceof HTMLElement && e.target.closest("button")) {
+                return;
+              }
+              e.preventDefault();
+              searchInputRef.current?.focus();
+            }}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Search className="size-3.5 shrink-0 text-dash-text-faded" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === "Escape") {
+                    setOpen(false);
+                  }
+                }}
+                placeholder={searchPlaceholder}
+                className="w-full bg-transparent text-sm leading-6 text-dash-text-strong outline-none placeholder:text-[#9ca3af]"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="ml-2 shrink-0"
+              aria-label="Close dropdown"
+            >
+              <motion.span
+                animate={{ rotate: open ? 180 : 0 }}
+                transition={{ duration: 0.2, ease }}
+                className="block"
+              >
+                <ChevronDown className="size-3.5 text-dash-text-faded" />
+              </motion.span>
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              if (!open) {
+                updatePos();
+              }
+              setOpen((prev) => !prev);
+            }}
+            className={`flex min-h-[46px] w-full items-center justify-between input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] ${className ?? ""}`}
+          >
+            <span className={`flex items-center gap-2 ${displayLabel ? "" : "text-[#9ca3af]"}`}>
+              {selectedOption?.icon && (
+                <img src={selectedOption.icon} alt="" className="size-4 shrink-0 object-contain" />
+              )}
+              {displayLabel || placeholder || "Select..."}
+            </span>
+            <motion.span
+              animate={{ rotate: open ? 180 : 0 }}
+              transition={{ duration: 0.2, ease }}
+            >
+              <ChevronDown className="size-3.5 text-dash-text-faded" />
+            </motion.span>
+          </button>
+        )}
+      </div>
       {typeof document !== "undefined" &&
         createPortal(
           <AnimatePresence>
@@ -140,7 +227,7 @@ export function Dropdown({
                 }}
               >
                 {isObject
-                  ? (safeOptions as DropdownOption[]).map((opt) => (
+                  ? filteredObjectOptions.map((opt) => (
                       <button
                         key={opt.id}
                         onClick={() => {
@@ -159,7 +246,7 @@ export function Dropdown({
                         {opt.label}
                       </button>
                     ))
-                  : (safeOptions as string[]).map((opt) => (
+                  : filteredStringOptions.map((opt) => (
                       <button
                         key={opt}
                         onClick={() => {
@@ -175,6 +262,12 @@ export function Dropdown({
                         {renderOption ? renderOption(opt) : opt}
                       </button>
                     ))}
+                {((isObject && filteredObjectOptions.length === 0) ||
+                  (!isObject && filteredStringOptions.length === 0)) && (
+                  <div className="px-3 py-2 text-sm text-dash-text-faded">
+                    No results found
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>,

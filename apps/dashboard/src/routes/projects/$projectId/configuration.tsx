@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
+import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  HardDrive,
-  Settings,
+  GearSix,
   Hammer,
   Cpu,
-  AlertTriangle,
-  GitBranch,
-} from "lucide-react";
-import { FolderOpen } from "@phosphor-icons/react";
+  Warning,
+  Database,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { Formik } from "formik";
 import { GlossyButton } from "../../../components/shared/glossy-button";
 import { TabHeader } from "../../../components/shared/tab-header";
 import { WarningModal } from "../../../components/shared/warning-modal";
@@ -19,18 +19,48 @@ import { RootDirectoryDrawer } from "../../../components/project/root-directory-
 import { RangeSlider } from "../../../components/shared/range-slider";
 import { Dropdown } from "../../../components/shared/dropdown";
 import { ToggleSwitch } from "../../../components/shared/toggle-switch";
+import { RootDirectoryTrigger } from "../../../components/shared/root-directory-trigger";
 import {
+  updateDatabaseProjectConfigServerFn,
   saveProjectGeneralConfigServerFn,
 } from "@/server/projects/actions";
+import { listScalingGroupsServerFn } from "@/server/scaling/actions";
+import { listRegionsServerFn } from "@/server/regions/actions";
 import type { FrameworkOption } from "@/backend/frameworks";
 import type { RepositoryMetadata } from "@/backend/repositories";
+import type { ScalingGroup } from "@/backend/scaling";
+import type { Region } from "@/backend/regions";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import { getGithubRepoServerFn } from "@/server/repositories/actions";
+import { mapFrameworksToDropdownOptions } from "@/utils/framework-dropdown";
 import {
   formatMemory,
   normalizeCpuValue,
   normalizeMemoryGbValue,
 } from "@/utils/project-configuration";
+import {
+  getConfigurationDescription,
+  isDatabaseProject,
+  isStaticProject,
+  shouldShowBranchRootFrameworkFields,
+  shouldShowBuildCacheToggle,
+  shouldShowBuildSection,
+  shouldShowDockerSourceFields,
+  shouldShowHealthCheckField,
+  shouldShowMcpAuthToggle,
+  shouldShowPersistentStorageField,
+  shouldShowScalingGroupField,
+} from "@/utils/project-capabilities";
+import {
+  generalConfigSchema,
+  databaseConfigSchema,
+  resourcesConfigSchema,
+} from "@/utils/configuration-schemas";
+import type {
+  GeneralConfigValues,
+  DatabaseConfigValues,
+  ResourcesConfigValues,
+} from "@/utils/configuration-schemas";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -43,6 +73,8 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
 
     let repo: RepositoryMetadata | null = null;
     let frameworks: FrameworkOption[] = [];
+    let scalingGroups: ScalingGroup[] = [];
+    let regions: Region[] = [];
     const repoName = project?.repo?.fullName || project?.repo?.name;
     const installationId = project?.repo?.installationId;
 
@@ -78,6 +110,57 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
         }),
     );
 
+    tasks.push(
+      (listScalingGroupsServerFn as unknown as (input: {
+        data?: { workspace?: string };
+      }) => Promise<
+        | { items: ScalingGroup[]; message?: string }
+        | {
+            result?: { items?: ScalingGroup[]; message?: string };
+            data?: { items?: ScalingGroup[]; message?: string };
+          }
+      >)({
+        data: { workspace },
+      })
+        .then((result) => {
+          if (result && typeof result === "object") {
+            if (Array.isArray((result as any).items)) {
+              scalingGroups = (result as any).items;
+              return;
+            }
+
+            if (Array.isArray((result as any).result?.items)) {
+              scalingGroups = (result as any).result.items;
+              return;
+            }
+
+            if (Array.isArray((result as any).data?.items)) {
+              scalingGroups = (result as any).data.items;
+              return;
+            }
+          }
+
+          scalingGroups = [];
+        })
+        .catch(() => {
+          scalingGroups = [];
+        }),
+    );
+
+    tasks.push(
+      (listRegionsServerFn as unknown as (input: {
+        data?: { type?: string; enabled?: boolean; teamId?: string };
+      }) => Promise<Region[]>)({
+        data: { type: "web", enabled: true },
+      })
+        .then((items) => {
+          regions = Array.isArray(items) ? items : [];
+        })
+        .catch(() => {
+          regions = [];
+        }),
+    );
+
     if (repoName) {
       tasks.push(
         (getGithubRepoServerFn as unknown as (input: {
@@ -96,7 +179,7 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
 
     await Promise.all(tasks);
 
-    return { repo, frameworks, workspace };
+    return { repo, frameworks, scalingGroups, regions, workspace };
   },
   component: ConfigurationPage,
 });
@@ -110,6 +193,11 @@ const inputClass =
 
 const PERSISTENT_STORAGE_PRICE_PER_GB = 0.25;
 
+function normalizeStorageValue(value: unknown, fallback = 1): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 const diskSizes = Array.from({ length: 15 }, (_, index) => {
   const size = (index + 1) * 10;
   return {
@@ -118,186 +206,223 @@ const diskSizes = Array.from({ length: 15 }, (_, index) => {
   };
 });
 
-const scalingGroupOptions = [
-  { id: "", label: "None" },
-  { id: "sg-1", label: "Web Frontend" },
-  { id: "sg-2", label: "API Workers" },
-];
-
 type Section = "general" | "build" | "resources" | "danger";
 
-const sections: { id: Section; label: string; icon: React.ReactNode }[] = [
-  { id: "general", label: "General", icon: <Settings className="size-4" /> },
-  { id: "build", label: "Build & Deploy", icon: <Hammer className="size-4" /> },
-  { id: "resources", label: "Resources", icon: <Cpu className="size-4" /> },
+const allSections: { id: Section; label: string; icon: React.ReactNode }[] = [
+  { id: "general", label: "General", icon: <GearSix size={16} weight="duotone" /> },
+  { id: "build", label: "Build & Deploy", icon: <Hammer size={16} weight="duotone" /> },
+  { id: "resources", label: "Resources", icon: <Cpu size={16} weight="duotone" /> },
   {
     id: "danger",
     label: "Danger zone",
-    icon: <AlertTriangle className="size-4" />,
+    icon: <Warning size={16} weight="duotone" />,
   },
 ];
 
 /* ─── ConfigInput ─── */
 
-function ConfigInput({
-  label,
-  icon,
-  value,
-  onClick,
-}: {
-  label: string;
-  icon?: React.ReactNode;
-  value: string;
-  onClick?: () => void;
-}) {
-  const Comp = onClick ? "button" : "div";
-  const isDefault = value === "./" || value === ".";
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-sm font-medium text-dash-text-strong">{label}</span>
-      <Comp
-        onClick={onClick}
-        className={`flex h-[34px] items-center overflow-clip rounded-[4px] border-[0.5px] border-dash-btn-outline-border bg-dash-bg pl-3.5 pr-2 ${onClick ? "transition-colors hover:border-dash-text-extra-faded" : ""}`}
-      >
-        {icon && (
-          <span className="mr-2 shrink-0 text-dash-text-faded">{icon}</span>
-        )}
-        <span
-          className={`text-sm leading-[22px] tracking-[-0.02px] ${
-            isDefault
-              ? "font-light text-dash-text-faded"
-              : "font-mono text-dash-text-strong"
-          }`}
-        >
-          {value}
-        </span>
-      </Comp>
-    </div>
-  );
-}
-
 /* ─── Section: General ─── */
 
 function GeneralSection({
-  projectName,
-  setProjectName,
-  branch,
-  setBranch,
+  initialValues,
+  onSubmit,
   branchOptions,
   rootDir,
   onOpenDrawer,
-  framework,
-  setFramework,
   frameworkOptions,
-  saveDisabled,
-  saveLoading,
-  onSave,
+  regionOptions,
+  showSourceFields,
+  dockerSourceImage,
+  showMcpAuthControl,
+  showBuildCacheControl,
 }: {
-  projectName: string;
-  setProjectName: (v: string) => void;
-  branch: string;
-  setBranch: (v: string) => void;
+  initialValues: GeneralConfigValues;
+  onSubmit: (values: GeneralConfigValues) => Promise<void>;
   branchOptions: { id: string; label: string }[];
   rootDir: string;
   onOpenDrawer: () => void;
-  framework: string;
-  setFramework: (v: string) => void;
   frameworkOptions: { id: string; label: string; icon?: string }[];
-  saveDisabled: boolean;
-  saveLoading: boolean;
-  onSave: () => void;
+  regionOptions: { id: string; label: string }[];
+  showSourceFields: boolean;
+  dockerSourceImage?: string;
+  showMcpAuthControl: boolean;
+  showBuildCacheControl: boolean;
 }) {
   return (
-    <form
-      className="rounded-[4px] border-[0.5px] border-dash-border"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSave();
+    <Formik
+      initialValues={initialValues}
+      validationSchema={generalConfigSchema}
+      onSubmit={(values, { setSubmitting }) => {
+        onSubmit(values)
+          .catch(() => {})
+          .finally(() => setSubmitting(false));
       }}
+      enableReinitialize
     >
-      {/* Row 1: Project name */}
-      <div className="flex flex-col gap-1.5 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Project name
-        </label>
-        <div
-          className="input-base input-focus-within flex items-stretch overflow-hidden"
-          style={!projectName.trim() ? { boxShadow: "0px 1px 2px rgba(239,47,31,0.3), 0px 0px 0px 1px #ef2f1f" } : undefined}
+      {({ values, errors, touched, dirty, isSubmitting, handleSubmit, handleChange, handleBlur, setFieldValue }) => (
+        <form
+          className="rounded-[4px] border-[0.5px] border-dash-border"
+          onSubmit={handleSubmit}
         >
-            <div className="flex items-center border-r border-dash-border px-3">
-              <span className="whitespace-nowrap text-sm leading-6 text-dash-text-faded">
-                brimble.io/
+          {/* Row 1: Project name */}
+          <div className="flex flex-col gap-1.5 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">
+              Project name
+            </label>
+            <div
+              className="input-base input-focus-within flex items-stretch overflow-hidden"
+              style={touched.name && errors.name ? { boxShadow: "0px 1px 2px rgba(239,47,31,0.3), 0px 0px 0px 1px #ef2f1f" } : undefined}
+            >
+                <div className="flex items-center border-r border-dash-border px-3">
+                  <span className="whitespace-nowrap text-sm leading-6 text-dash-text-faded">
+                    brimble.io/
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  name="name"
+                  value={values.name}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className="w-full bg-transparent px-3 py-2.5 text-sm leading-6 text-dash-text-strong outline-none"
+                />
+              </div>
+            {touched.name && errors.name && (
+              <span className="text-xs text-[#ef2f1f]">
+                {errors.name}
               </span>
-            </div>
-            <input
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="w-full bg-transparent px-3 py-2.5 text-sm leading-6 text-dash-text-strong outline-none"
-            />
+            )}
           </div>
-        {!projectName.trim() && (
-          <span className="text-xs text-[#ef2f1f]">
-            Project name is required
-          </span>
-        )}
-      </div>
 
-      <hr className="border-dash-border" />
+          <hr className="border-dash-border" />
 
-      {/* Row 2: Branch to deploy */}
-      <div className="flex flex-col gap-1.5 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Branch to deploy
-        </label>
-        <Dropdown
-          value={branch}
-          options={branchOptions}
-          onChange={setBranch}
-          placeholder="Select branch..."
-        />
-      </div>
+          {showSourceFields ? (
+            <>
+              {/* Row 2: Branch to deploy */}
+              <div className="flex flex-col gap-1.5 px-4 py-4">
+                <label className="text-sm font-medium text-dash-text-strong">
+                  Branch to deploy
+                </label>
+                <Dropdown
+                  value={values.branch}
+                  options={branchOptions}
+                  onChange={(v) => setFieldValue("branch", v)}
+                  placeholder="Select branch..."
+                />
+              </div>
 
-      <hr className="border-dash-border" />
+              <hr className="border-dash-border" />
 
-      {/* Row 3: Root directory */}
-      <div className="px-4 py-4">
-        <ConfigInput
-          label="Root directory"
-          icon={<FolderOpen size={20} weight="duotone" />}
-          value={rootDir}
-          onClick={onOpenDrawer}
-        />
-      </div>
+              {/* Row 3: Root directory */}
+              <div className="flex flex-col gap-1.5 px-4 py-4">
+                <label className="text-sm font-medium text-dash-text-strong">
+                  Root directory
+                </label>
+                <RootDirectoryTrigger
+                  value={rootDir}
+                  onClick={onOpenDrawer}
+                />
+              </div>
 
-      <hr className="border-dash-border" />
+              <hr className="border-dash-border" />
 
-      {/* Row 4: Framework */}
-      <div className="flex flex-col gap-1.5 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Framework
-        </label>
-        <Dropdown
-          value={framework}
-          options={frameworkOptions}
-          onChange={setFramework}
-          placeholder="Select framework..."
-        />
-      </div>
+              {/* Row 4: Framework */}
+              <div className="flex flex-col gap-1.5 px-4 py-4">
+                <label className="text-sm font-medium text-dash-text-strong">
+                  Framework
+                </label>
+                <Dropdown
+                  value={values.framework}
+                  options={frameworkOptions}
+                  onChange={(v) => setFieldValue("framework", v)}
+                  placeholder="Select framework..."
+                />
+              </div>
 
-      <hr className="border-dash-border" />
+              <hr className="border-dash-border" />
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1.5 px-4 py-4">
+                <label className="text-sm font-medium text-dash-text-strong">
+                  Source image
+                </label>
+                <div className={`${inputClass} flex items-center font-family-mono text-[13px]`}>
+                  <span className="truncate">{dockerSourceImage || "Docker source project"}</span>
+                </div>
+                <p className="text-xs text-dash-text-faded">
+                  This project is configured from a Docker image source, so branch, root directory and framework presets are not used.
+                </p>
+              </div>
+              <hr className="border-dash-border" />
+            </>
+          )}
 
-      <div className="flex justify-end px-4 py-4">
-        <GlossyButton
-          type="submit"
-          disabled={saveDisabled || saveLoading}
-          loading={saveLoading}
-          loadingLabel="Saving..."
-        >
-          Save
-        </GlossyButton>
-      </div>
-    </form>
+          {/* Region */}
+          {regionOptions.length > 0 && (
+            <>
+              <div className="flex flex-col gap-1.5 px-4 py-4">
+                <label className="text-sm font-medium text-dash-text-strong">
+                  Region
+                </label>
+                <Dropdown
+                  value={values.region}
+                  options={regionOptions}
+                  onChange={(v) => setFieldValue("region", v)}
+                  placeholder="Select region..."
+                />
+              </div>
+              <hr className="border-dash-border" />
+            </>
+          )}
+
+          {(showBuildCacheControl || showMcpAuthControl) && (
+            <>
+              <div className="flex flex-col gap-3 px-4 py-4">
+                {showBuildCacheControl && (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium text-dash-text-strong">
+                        Enable Build Cache on Redeploy
+                      </span>
+                      <span className="text-xs text-dash-text-faded">
+                        Reuse the previous build cache to speed up redeploys.
+                      </span>
+                    </div>
+                    <ToggleSwitch checked={values.buildCacheEnabled} onChange={(v) => setFieldValue("buildCacheEnabled", v)} />
+                  </div>
+                )}
+                {showMcpAuthControl && (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium text-dash-text-strong">
+                        Enable Authentication
+                      </span>
+                      <span className="text-xs text-dash-text-faded">
+                        Require API key authentication for your MCP server.
+                      </span>
+                    </div>
+                    <ToggleSwitch checked={values.authEnabled} onChange={(v) => setFieldValue("authEnabled", v)} />
+                  </div>
+                )}
+              </div>
+              <hr className="border-dash-border" />
+            </>
+          )}
+
+          <div className="flex justify-end px-4 py-4">
+            <GlossyButton
+              type="submit"
+              disabled={!dirty || isSubmitting}
+              loading={isSubmitting}
+              loadingLabel="Saving..."
+            >
+              Save
+            </GlossyButton>
+          </div>
+        </form>
+      )}
+    </Formik>
   );
 }
 
@@ -312,6 +437,13 @@ function BuildSection({
   setStartCmd,
   healthCheckPath,
   setHealthCheckPath,
+  preStartCmd,
+  setPreStartCmd,
+  dockerImage,
+  setDockerImage,
+  showCommands = true,
+  showHealthCheck = true,
+  showDockerSourceFields = false,
 }: {
   installCmd: string;
   setInstallCmd: (v: string) => void;
@@ -321,73 +453,124 @@ function BuildSection({
   setStartCmd: (v: string) => void;
   healthCheckPath: string;
   setHealthCheckPath: (v: string) => void;
+  preStartCmd: string;
+  setPreStartCmd: (v: string) => void;
+  dockerImage: string;
+  setDockerImage: (v: string) => void;
+  showCommands?: boolean;
+  showHealthCheck?: boolean;
+  showDockerSourceFields?: boolean;
 }) {
   return (
     <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
-      {/* Row 1: Install command */}
-      <div className="flex flex-col gap-1.5 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Install command
-        </label>
-        <input
-          type="text"
-          value={installCmd}
-          onChange={(e) => setInstallCmd(e.target.value)}
-          placeholder="npm install"
-          className={inputClass}
-        />
-      </div>
+      {showDockerSourceFields && (
+        <>
+          <div className="flex flex-col gap-1.5 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">
+              PreStart command
+            </label>
+            <input
+              type="text"
+              value={preStartCmd}
+              onChange={(e) => setPreStartCmd(e.target.value)}
+              placeholder="apk add curl"
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-dash-text-faded">
+              Runs in an Alpine environment before your container starts.
+            </p>
+          </div>
+          <hr className="border-dash-border" />
+          <div className="flex flex-col gap-1.5 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">
+              Docker image
+            </label>
+            <input
+              type="text"
+              value={dockerImage}
+              onChange={(e) => setDockerImage(e.target.value)}
+              placeholder="docker.io/library/nginx:latest"
+              className={`${inputClass} font-family-mono text-[13px]`}
+            />
+          </div>
+          <hr className="border-dash-border" />
+        </>
+      )}
 
-      <hr className="border-dash-border" />
+      {showCommands && (
+        <>
+          {/* Row 1: Install command */}
+          <div className="flex flex-col gap-1.5 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">
+              Install command
+            </label>
+            <input
+              type="text"
+              value={installCmd}
+              onChange={(e) => setInstallCmd(e.target.value)}
+              placeholder="npm install"
+              className={inputClass}
+            />
+          </div>
 
-      {/* Row 2: Build command */}
-      <div className="flex flex-col gap-1.5 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Build command
-        </label>
-        <input
-          type="text"
-          value={buildCmd}
-          onChange={(e) => setBuildCmd(e.target.value)}
-          placeholder="npm run build"
-          className={inputClass}
-        />
-      </div>
+          <hr className="border-dash-border" />
 
-      <hr className="border-dash-border" />
+          {/* Row 2: Build command */}
+          <div className="flex flex-col gap-1.5 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">
+              Build command
+            </label>
+            <input
+              type="text"
+              value={buildCmd}
+              onChange={(e) => setBuildCmd(e.target.value)}
+              placeholder="npm run build"
+              className={inputClass}
+            />
+          </div>
 
-      {/* Row 3: Start command */}
-      <div className="flex flex-col gap-1.5 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Start command
-        </label>
-        <input
-          type="text"
-          value={startCmd}
-          onChange={(e) => setStartCmd(e.target.value)}
-          placeholder="npm start"
-          className={inputClass}
-        />
-      </div>
+          <hr className="border-dash-border" />
 
-      <hr className="border-dash-border" />
+          {/* Row 3: Start command */}
+          <div className="flex flex-col gap-1.5 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">
+              Start command
+            </label>
+            <input
+              type="text"
+              value={startCmd}
+              onChange={(e) => setStartCmd(e.target.value)}
+              placeholder="npm start"
+              className={inputClass}
+            />
+          </div>
+          <hr className="border-dash-border" />
+        </>
+      )}
 
-      {/* Row 4: Health check */}
-      <div className="flex flex-col gap-1.5 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Health check path
-        </label>
-        <input
-          type="text"
-          value={healthCheckPath}
-          onChange={(e) => setHealthCheckPath(e.target.value)}
-          placeholder="/api/health"
-          className={inputClass}
-        />
-        <p className="mt-1 text-xs text-dash-text-faded">
-          Health check endpoint to monitor your application's status
-        </p>
-      </div>
+      {showHealthCheck && (
+        <div className="flex flex-col gap-1.5 px-4 py-4">
+          <label className="text-sm font-medium text-dash-text-strong">
+            Health check path
+          </label>
+          <input
+            type="text"
+            value={healthCheckPath}
+            onChange={(e) => setHealthCheckPath(e.target.value)}
+            placeholder="/api/health"
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-dash-text-faded">
+            Health check endpoint to monitor your application's status
+          </p>
+        </div>
+      )}
+
+      {!showHealthCheck && !showCommands && !showDockerSourceFields && (
+        <div className="px-4 py-5 text-sm font-light text-dash-text-faded">
+          Build & deploy settings are not available for this service type.
+        </div>
+      )}
 
       {/* Footer */}
       <div className="flex justify-end border-t border-dash-border px-4 py-3">
@@ -400,178 +583,348 @@ function BuildSection({
 /* ─── Section: Resources ─── */
 
 function ResourcesSection({
-  cpuValue,
-  setCpuValue,
-  memoryValue,
-  setMemoryValue,
-  scalingGroup,
-  setScalingGroup,
-  diskEnabled,
-  setDiskEnabled,
-  diskSize,
-  setDiskSize,
-  mountPath,
-  setMountPath,
+  initialValues,
+  onSubmit,
+  scalingGroupOptions,
+  showScalingGroup = true,
+  showPersistentStorage = true,
+  canSave = true,
 }: {
-  cpuValue: number;
-  setCpuValue: (v: number) => void;
-  memoryValue: number;
-  setMemoryValue: (v: number) => void;
-  scalingGroup: string;
-  setScalingGroup: (v: string) => void;
-  diskEnabled: boolean;
-  setDiskEnabled: (v: boolean) => void;
-  diskSize: string;
-  setDiskSize: (v: string) => void;
-  mountPath: string;
-  setMountPath: (v: string) => void;
+  initialValues: ResourcesConfigValues;
+  onSubmit?: (values: ResourcesConfigValues) => Promise<void>;
+  scalingGroupOptions: { id: string; label: string }[];
+  showScalingGroup?: boolean;
+  showPersistentStorage?: boolean;
+  canSave?: boolean;
 }) {
   return (
-    <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
-      {/* Row 1: CPU */}
-      <div className="flex flex-col gap-2 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">CPU</label>
-        <p className="text-sm font-light leading-[1.3] text-dash-text-faded">
-          CPU resources allocated to each container
-        </p>
-        <RangeSlider
-          value={cpuValue}
-          onChange={setCpuValue}
-          min={0.5}
-          max={8}
-          step={0.5}
-          unit=" vCPU"
-        />
-      </div>
-
-      <hr className="border-dash-border" />
-
-      {/* Row 2: Memory */}
-      <div className="flex flex-col gap-2 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Memory
-        </label>
-        <p className="text-sm font-light leading-[1.3] text-dash-text-faded">
-          Memory allocated to each container
-        </p>
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
+    <Formik
+      initialValues={initialValues}
+      validationSchema={resourcesConfigSchema}
+      onSubmit={(values, { setSubmitting }) => {
+        if (!onSubmit) return;
+        onSubmit(values)
+          .catch(() => {})
+          .finally(() => setSubmitting(false));
+      }}
+      enableReinitialize
+    >
+      {({ values, dirty, isSubmitting, handleSubmit, setFieldValue }) => (
+        <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          {/* Row 1: CPU */}
+          <div className="flex flex-col gap-2 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">CPU</label>
+            <p className="text-sm font-light leading-[1.3] text-dash-text-faded">
+              CPU resources allocated to each container
+            </p>
             <RangeSlider
-              value={memoryValue}
-              onChange={setMemoryValue}
+              value={values.cpuValue}
+              onChange={(v) => setFieldValue("cpuValue", v)}
               min={0.5}
-              max={12}
+              max={8}
               step={0.5}
-              hideValue
+              unit=" vCPU"
             />
           </div>
-          <span className="min-w-[52px] text-right text-sm font-medium text-dash-text-strong">
-            {formatMemory(memoryValue)}
-          </span>
-        </div>
-      </div>
 
-      <hr className="border-dash-border" />
+          <hr className="border-dash-border" />
 
-      {/* Row 3: Scaling group */}
-      <div className="flex flex-col gap-1.5 px-4 py-4">
-        <label className="text-sm font-medium text-dash-text-strong">
-          Scaling group
-        </label>
-        <p className="text-sm font-light leading-[1.3] text-dash-text-faded">
-          Attach to a scaling group for automatic instance management
-        </p>
-        <Dropdown
-          value={scalingGroup}
-          options={scalingGroupOptions}
-          onChange={setScalingGroup}
-          placeholder="Select scaling group..."
-        />
-      </div>
-
-      <hr className="border-dash-border" />
-
-      {/* Row 4: Persistent storage */}
-      <div className="px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <HardDrive className="size-4 text-dash-text-faded" />
-            <span className="text-sm font-medium text-dash-text-strong">
-              Persistent Storage
-            </span>
-          </div>
-          <ToggleSwitch
-            checked={diskEnabled}
-            onChange={setDiskEnabled}
-            size="sm"
-          />
-        </div>
-        <p className="mt-1 ml-6 text-sm font-light leading-[1.3] text-dash-text-faded">
-          Attach a volume that persists across restarts and deployments.
-        </p>
-
-        <AnimatePresence>
-          {diskEnabled && (
-            <motion.div
-              initial={{ opacity: 0, height: 0, overflow: "hidden" }}
-              animate={{
-                opacity: 1,
-                height: "auto",
-                transitionEnd: { overflow: "visible" },
-              }}
-              exit={{ overflow: "hidden", opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease }}
-            >
-              <div className="mt-4 flex flex-col gap-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-xs text-dash-text-faded">
-                      Disk size
-                    </label>
-                    <Dropdown
-                      value={diskSize}
-                      options={diskSizes}
-                      onChange={setDiskSize}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs text-dash-text-faded">
-                      Mount path
-                    </label>
-                    <input
-                      type="text"
-                      value={mountPath}
-                      onChange={(e) => setMountPath(e.target.value)}
-                      placeholder="/mnt/data"
-                      className={`${inputClass} font-family-mono text-[13px]`}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-[4px] bg-[#4879f8]/[0.04] px-3 py-2.5 dark:bg-[#4879f8]/[0.08]">
-                  <p className="text-xs leading-relaxed text-dash-text-body">
-                    <span className="font-medium text-[#4879f8]">
-                      ${PERSISTENT_STORAGE_PRICE_PER_GB}/GB per month.
-                    </span>{" "}
-                    Data persists across container restarts and deployments. The
-                    volume mounts at{" "}
-                    <code className="rounded bg-dash-bg-elevated px-1 py-0.5 font-family-mono text-[11px] text-dash-text-strong">
-                      {mountPath || "/mnt/data"}
-                    </code>{" "}
-                    inside your container.
-                  </p>
-                </div>
+          {/* Row 2: Memory */}
+          <div className="flex flex-col gap-2 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">
+              Memory
+            </label>
+            <p className="text-sm font-light leading-[1.3] text-dash-text-faded">
+              Memory allocated to each container
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <RangeSlider
+                  value={values.memoryValue}
+                  onChange={(v) => setFieldValue("memoryValue", v)}
+                  min={0.5}
+                  max={12}
+                  step={0.5}
+                  hideValue
+                />
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              <span className="min-w-[52px] text-right text-sm font-medium text-dash-text-strong">
+                {formatMemory(values.memoryValue)}
+              </span>
+            </div>
+          </div>
 
-      {/* Footer */}
-      <div className="flex justify-end border-t border-dash-border px-4 py-3">
-        <GlossyButton disabled>Save</GlossyButton>
-      </div>
-    </div>
+          <hr className="border-dash-border" />
+
+          {showScalingGroup && (
+            <>
+              {/* Row 3: Scaling group */}
+              <div className="flex flex-col gap-1.5 px-4 py-4">
+                <label className="text-sm font-medium text-dash-text-strong">
+                  Scaling group
+                </label>
+                <p className="text-sm font-light leading-[1.3] text-dash-text-faded">
+                  Attach to a scaling group for automatic instance management
+                </p>
+                <Dropdown
+                  value={values.scalingGroup}
+                  options={scalingGroupOptions}
+                  onChange={(v) => setFieldValue("scalingGroup", v)}
+                  placeholder="Select scaling group..."
+                />
+              </div>
+
+              <hr className="border-dash-border" />
+            </>
+          )}
+
+          {showPersistentStorage && (
+            <div className="px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database size={16} weight="duotone" className="text-dash-text-faded" />
+                <span className="text-sm font-medium text-dash-text-strong">
+                  Persistent Storage
+                </span>
+              </div>
+              <ToggleSwitch
+                checked={values.diskEnabled}
+                onChange={(v) => setFieldValue("diskEnabled", v)}
+                size="sm"
+              />
+            </div>
+            <p className="mt-1 ml-6 text-sm font-light leading-[1.3] text-dash-text-faded">
+              Attach a volume that persists across restarts and deployments.
+            </p>
+
+            <AnimatePresence>
+              {values.diskEnabled && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, overflow: "hidden" }}
+                  animate={{
+                    opacity: 1,
+                    height: "auto",
+                    transitionEnd: { overflow: "visible" },
+                  }}
+                  exit={{ overflow: "hidden", opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease }}
+                >
+                  <div className="mt-4 flex flex-col gap-4">
+                    <div className="grid grid-cols-1 gap-3 px-px pb-px sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1.5 block text-xs text-dash-text-faded">
+                          Disk size
+                        </label>
+                        <Dropdown
+                          value={values.diskSize}
+                          options={diskSizes}
+                          onChange={(v) => setFieldValue("diskSize", v)}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs text-dash-text-faded">
+                          Mount path
+                        </label>
+                        <input
+                          type="text"
+                          value={values.mountPath}
+                          onChange={(e) => setFieldValue("mountPath", e.target.value)}
+                          placeholder="/mnt/data"
+                          className={`${inputClass} font-family-mono text-[13px]`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-[4px] bg-[#4879f8]/[0.04] px-3 py-2.5 dark:bg-[#4879f8]/[0.08]">
+                      <p className="text-xs leading-relaxed text-dash-text-body">
+                        <span className="font-medium text-[#4879f8]">
+                          ${PERSISTENT_STORAGE_PRICE_PER_GB}/GB per month.
+                        </span>{" "}
+                        Data persists across container restarts and deployments. The
+                        volume mounts at{" "}
+                        <code className="rounded bg-dash-bg-elevated px-1 py-0.5 font-family-mono text-[11px] text-dash-text-strong">
+                          {values.mountPath || "/mnt/data"}
+                        </code>{" "}
+                        inside your container.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex justify-end border-t border-dash-border px-4 py-3">
+            <GlossyButton
+              disabled={!canSave || !dirty || isSubmitting}
+              loading={isSubmitting}
+              loadingLabel="Saving..."
+              onClick={() => handleSubmit()}
+            >
+              Save
+            </GlossyButton>
+          </div>
+        </div>
+      )}
+    </Formik>
+  );
+}
+
+/* ─── Section: Database Configuration ─── */
+
+function DatabaseConfigurationPanel({
+  initialValues,
+  onSubmit,
+  region,
+  dbImageName,
+  isPublicAccessEnabled,
+}: {
+  initialValues: DatabaseConfigValues;
+  onSubmit: (values: DatabaseConfigValues) => Promise<void>;
+  region?: string;
+  dbImageName?: string;
+  isPublicAccessEnabled: boolean;
+}) {
+  return (
+    <Formik
+      initialValues={initialValues}
+      validationSchema={databaseConfigSchema}
+      onSubmit={(values, { setSubmitting, setFieldValue }) => {
+        onSubmit(values)
+          .then(() => {
+            setFieldValue("password", "");
+            setFieldValue("confirmPassword", "");
+          })
+          .catch(() => {})
+          .finally(() => setSubmitting(false));
+      }}
+      enableReinitialize
+    >
+      {({ values, errors, touched, isSubmitting, handleSubmit, handleChange, handleBlur, setFieldValue }) => {
+        const hasPassword = values.password.trim().length > 0;
+        const passwordError = touched.confirmPassword && errors.confirmPassword;
+        const canSave = (hasPassword ? !passwordError : true) && !isSubmitting;
+
+        return (
+          <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+            <div className="flex flex-col gap-1.5 px-4 py-4">
+              <label className="text-sm font-medium text-dash-text-strong">Project name</label>
+              <input
+                type="text"
+                name="name"
+                value={values.name}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                placeholder="Project name"
+                className={inputClass}
+              />
+              {touched.name && errors.name && (
+                <span className="text-xs text-[#ef2f1f]">{errors.name}</span>
+              )}
+            </div>
+            <hr className="border-dash-border" />
+            <div className="grid grid-cols-1 gap-4 px-4 py-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-dash-text-strong">Database engine</span>
+                <span className="text-sm font-light text-dash-text-faded">{dbImageName || "Unknown"}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-dash-text-strong">Region</span>
+                <span className="text-sm font-light text-dash-text-faded">{region || "Unknown"}</span>
+              </div>
+            </div>
+            <hr className="border-dash-border" />
+            <div className="flex flex-col gap-3 px-4 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-dash-text-strong">Public connection</span>
+                  <span className="text-xs text-dash-text-faded">
+                    Control whether your database can be accessed from any IP address.
+                  </span>
+                </div>
+                <span className="text-sm font-light text-dash-text-body">
+                  {isPublicAccessEnabled ? "Enabled" : "Disabled"}
+                </span>
+              </div>
+              <IpWhitelist
+                ips={values.whitelistIps ?? []}
+                onAdd={() => {
+                  const current = values.whitelistIps ?? [];
+                  const nextId = current.length > 0 ? Math.max(...current.map((ip) => ip.id)) + 1 : 0;
+                  setFieldValue("whitelistIps", [...current, { id: nextId, value: "" }]);
+                }}
+                onRemove={(id) => {
+                  setFieldValue(
+                    "whitelistIps",
+                    (values.whitelistIps ?? []).filter((ip) => ip.id !== id),
+                  );
+                }}
+                onUpdate={(id, value) => {
+                  setFieldValue(
+                    "whitelistIps",
+                    (values.whitelistIps ?? []).map((ip) => (ip.id === id ? { ...ip, value } : ip)),
+                  );
+                }}
+                inputClassName={`${inputClass} flex-1 font-family-mono text-[13px]`}
+              />
+            </div>
+            <hr className="border-dash-border" />
+            <div className="grid grid-cols-1 gap-4 px-4 py-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-dash-text-strong">
+                  Database password
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  value={values.password}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="Enter new password"
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+                <p className="text-xs text-dash-text-faded">
+                  Set a new password for database connections.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-dash-text-strong">
+                  Confirm password
+                </label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={values.confirmPassword}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="Re-enter password"
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+                {passwordError && (
+                  <p className="text-xs text-[#ef2f1f]">
+                    {errors.confirmPassword}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end border-t border-dash-border px-4 py-3">
+              <GlossyButton
+                disabled={!canSave}
+                loading={isSubmitting}
+                loadingLabel="Saving..."
+                onClick={() => handleSubmit()}
+              >
+                Save
+              </GlossyButton>
+            </div>
+          </div>
+        );
+      }}
+    </Formik>
   );
 }
 
@@ -675,7 +1028,7 @@ function DangerSection({
 
 function ConfigurationPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
-  const { repo, frameworks } = Route.useLoaderData();
+  const { repo, frameworks, scalingGroups, regions } = Route.useLoaderData();
   const params = Route.useParams();
   const navigate = useNavigate();
   const saveGeneralConfig = useServerFn(saveProjectGeneralConfigServerFn as any) as (args: {
@@ -686,61 +1039,106 @@ function ConfigurationPage() {
       branch?: string;
       rootDirectory?: string;
       framework?: string;
+      region?: string;
+      cpu?: number;
+      memory?: number;
+      storage?: number;
+      authEnabled?: boolean;
+      buildCacheEnabled?: boolean;
     };
   }) => Promise<{ id?: string; message?: string }>;
+  const saveDatabaseConfig = useServerFn(updateDatabaseProjectConfigServerFn as any) as (args: {
+    data: {
+      projectId: string;
+      workspace?: string;
+      name: string;
+      password: string;
+      configurations?: Record<string, unknown> | null;
+      whitelistedIps?: string[];
+    };
+  }) => Promise<{ message?: string }>;
   const [activeSection, setActiveSection] = useState<Section>("general");
-  const [projectName, setProjectName] = useState(project?.name || "");
-  const [branch, setBranch] = useState(project?.repo?.branch || "");
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [rootDir, setRootDir] = useState(project?.rootDirectory || "./");
-  const [framework, setFramework] = useState(project?.framework || "");
 
-  // Build settings
+  // Build settings (read-only section, not Formik-managed)
   const [installCmd, setInstallCmd] = useState(project?.installCommand || "");
   const [buildCmd, setBuildCmd] = useState(project?.buildCommand || "");
   const [startCmd, setStartCmd] = useState(project?.startCommand || "");
-
-  // Health check
+  const [preStartCmd, setPreStartCmd] = useState(project?.preStartCommand || "");
+  const [dockerImage, setDockerImage] = useState(project?.repo?.name || "");
   const [healthCheckPath, setHealthCheckPath] = useState(project?.healthCheckPath || "");
 
-  // Compute resources
-  const [cpuValue, setCpuValue] = useState(normalizeCpuValue(project?.specs?.cpu));
-  const [memoryValue, setMemoryValue] = useState(
-    normalizeMemoryGbValue(project?.specs?.memory),
-  );
-
-  // Scaling group
-  const [scalingGroup, setScalingGroup] = useState(project?.autoscalingGroup?.id || "");
-
-  // Persistent storage
-  const [diskEnabled, setDiskEnabled] = useState(Boolean(project?.diskSize || project?.volumeMount));
-  const [diskSize, setDiskSize] = useState(
-    String(project?.diskSize || 1),
-  );
-  const [mountPath, setMountPath] = useState(project?.volumeMount || "");
+  // Root directory (managed outside Formik — set by drawer)
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [rootDir, setRootDir] = useState(project?.rootDirectory || "./");
 
   // Maintenance mode
   const [maintenanceMode, setMaintenanceMode] = useState(Boolean(project?.maintenance));
   const [repoMetadata, setRepoMetadata] = useState<RepositoryMetadata | null>(repo ?? null);
-  const [savingGeneral, setSavingGeneral] = useState(false);
-  const [generalBaseline, setGeneralBaseline] = useState(() => ({
-    projectName: project?.name || "",
-    branch: project?.repo?.branch || "",
-    rootDir: project?.rootDirectory || "./",
-    framework: project?.framework || "",
-  }));
-  const frameworkOptions = (() => {
-    const mapped = (frameworks || []).map((item) => ({
-      id: item.slug,
-      label: item.name,
-      icon: item.logo,
-    }));
 
-    if (!framework) {
+  // Sync when project data changes
+  useEffect(() => {
+    setInstallCmd(project?.installCommand || "");
+    setBuildCmd(project?.buildCommand || "");
+    setStartCmd(project?.startCommand || "");
+    setPreStartCmd(project?.preStartCommand || "");
+    setDockerImage(project?.repo?.name || "");
+    setHealthCheckPath(project?.healthCheckPath || "");
+    setRootDir(project?.rootDirectory || "./");
+    setMaintenanceMode(Boolean(project?.maintenance));
+  }, [project]);
+
+  useEffect(() => {
+    setRepoMetadata(repo ?? null);
+  }, [repo]);
+
+  // General section initial values
+  const currentRegionId = project?.specs?.region?.id ?? project?.specs?.region?._id ?? "";
+
+  const generalInitialValues: GeneralConfigValues = {
+    name: project?.name || "",
+    branch: project?.repo?.branch || "",
+    rootDirectory: project?.rootDirectory || "./",
+    framework: project?.framework || "",
+    region: typeof currentRegionId === "string" ? currentRegionId : "",
+    authEnabled: Boolean(project?.authEnabled),
+    buildCacheEnabled: Boolean(project?.buildCacheEnabled),
+  };
+
+  // Database section initial values
+  const initialWhitelistIps = Array.isArray(project?.whiteListedIps)
+    ? project.whiteListedIps.map((ip: string, i: number) => ({ id: i, value: ip }))
+    : [];
+
+  const databaseInitialValues: DatabaseConfigValues = {
+    name: project?.name || "",
+    password: "",
+    confirmPassword: "",
+    whitelistIps: initialWhitelistIps,
+  };
+
+  // Resources section initial values
+  const resourcesInitialValues: ResourcesConfigValues = {
+    cpuValue: normalizeCpuValue(project?.specs?.cpu),
+    memoryValue: normalizeMemoryGbValue(project?.specs?.memory),
+    scalingGroup: project?.autoscalingGroup?.id || "",
+    diskEnabled: Boolean(project?.diskSize || project?.volumeMount),
+    diskSize: String(project?.diskSize || 1),
+    mountPath: project?.volumeMount || "",
+  };
+
+  const branchOptions = (repoMetadata?.branches || []).map((branchName) => ({
+    id: branchName,
+    label: branchName,
+  }));
+
+  const frameworkOptions = (() => {
+    const mapped = mapFrameworksToDropdownOptions(frameworks);
+
+    if (!generalInitialValues.framework) {
       return mapped;
     }
 
-    const exists = mapped.some((item) => item.id === framework);
+    const exists = mapped.some((item) => item.id === generalInitialValues.framework);
     if (exists) {
       return mapped;
     }
@@ -748,75 +1146,123 @@ function ConfigurationPage() {
     return [
       ...mapped,
       {
-        id: framework,
-        label: framework,
+        id: generalInitialValues.framework,
+        label: generalInitialValues.framework,
       },
     ];
   })();
 
-  useEffect(() => {
-    setProjectName(project?.name || "");
-    setBranch(project?.repo?.branch || "");
-    setRootDir(project?.rootDirectory || "./");
-    setFramework(project?.framework || "");
-    setInstallCmd(project?.installCommand || "");
-    setBuildCmd(project?.buildCommand || "");
-    setStartCmd(project?.startCommand || "");
-    setHealthCheckPath(project?.healthCheckPath || "");
-    setCpuValue(normalizeCpuValue(project?.specs?.cpu));
-    setMemoryValue(normalizeMemoryGbValue(project?.specs?.memory));
-    setScalingGroup(project?.autoscalingGroup?.id || "");
-    setDiskEnabled(Boolean(project?.diskSize || project?.volumeMount));
-    setDiskSize(String(project?.diskSize || 1));
-    setMountPath(project?.volumeMount || "");
-    setMaintenanceMode(Boolean(project?.maintenance));
-    setGeneralBaseline({
-      projectName: project?.name || "",
-      branch: project?.repo?.branch || "",
-      rootDir: project?.rootDirectory || "./",
-      framework: project?.framework || "",
-    });
-  }, [project]);
+  const regionOptions = (() => {
+    const mapped = (regions || []).map((r) => ({
+        id: r.id,
+        label: r.country ? `${r.name} (${r.country})` : r.name,
+      }));
 
-  useEffect(() => {
-    setRepoMetadata(repo ?? null);
-  }, [repo]);
-
-  useEffect(() => {
-    setRootDir("./");
-  }, [branch]);
-
-  const branchOptions = (repoMetadata?.branches || []).map((branchName) => ({
-    id: branchName,
-    label: branchName,
-  }));
-  const isGeneralDirty =
-    projectName !== generalBaseline.projectName ||
-    branch !== generalBaseline.branch ||
-    rootDir !== generalBaseline.rootDir ||
-    framework !== generalBaseline.framework;
-  const isGeneralSaveDisabled = !projectName.trim() || !isGeneralDirty;
-
-  async function handleSaveGeneral() {
-    if (isGeneralSaveDisabled || savingGeneral) {
-      return;
+    if (!currentRegionId) {
+      return mapped;
     }
 
-    try {
-      setSavingGeneral(true);
+    const exists = mapped.some((item) => item.id === currentRegionId);
+    if (exists) {
+      return mapped;
+    }
 
+    // Fallback: show current region even if not in the list
+    const currentRegionName = project?.specs?.region?.name || project?.region || currentRegionId;
+    return [
+      ...mapped,
+      { id: currentRegionId, label: currentRegionName },
+    ];
+  })();
+
+  const scalingGroupOptions = (() => {
+    const mapped = (scalingGroups || [])
+      .filter((group) => group && typeof group.id === "string" && typeof group.name === "string")
+      .map((group) => ({
+        id: group.id,
+        label: group.name,
+      }));
+
+    const options = [{ id: "", label: "None" }, ...mapped];
+
+    const currentScalingGroup = project?.autoscalingGroup?.id || "";
+
+    if (!currentScalingGroup) {
+      return options;
+    }
+
+    const exists = options.some((option) => option.id === currentScalingGroup);
+    if (exists) {
+      return options;
+    }
+
+    let fallbackLabel = "Current scaling group";
+    if (
+      project?.autoscalingGroup &&
+      typeof project.autoscalingGroup === "object" &&
+      typeof project.autoscalingGroup.name === "string" &&
+      project.autoscalingGroup.name.trim()
+    ) {
+      fallbackLabel = project.autoscalingGroup.name.trim();
+    }
+
+    return [...options, { id: currentScalingGroup, label: fallbackLabel }];
+  })();
+
+  const databaseProject = isDatabaseProject(project);
+  const sourceFieldsVisible = shouldShowBranchRootFrameworkFields(project);
+  const dockerSourceFieldsVisible = shouldShowDockerSourceFields(project);
+  const buildSectionVisible = shouldShowBuildSection(project);
+  const healthCheckVisible = shouldShowHealthCheckField(project);
+  const scalingGroupVisible = shouldShowScalingGroupField(project);
+  const persistentStorageVisible = shouldShowPersistentStorageField(project);
+  const buildCacheToggleVisible = shouldShowBuildCacheToggle(project);
+  const mcpAuthToggleVisible = shouldShowMcpAuthToggle(project);
+
+  const sections = allSections.filter((section) => {
+    if (databaseProject && section.id === "build") {
+      return false;
+    }
+
+    if (isStaticProject(project) && section.id === "resources") {
+      return false;
+    }
+
+    if (!buildSectionVisible && section.id === "build") {
+      return false;
+    }
+
+    return true;
+  });
+
+  useEffect(() => {
+    if (!sections.some((section) => section.id === activeSection)) {
+      setActiveSection("general");
+    }
+  }, [activeSection, sections]);
+
+  /* ─── Submit handlers ─── */
+
+  async function handleSubmitGeneral(values: GeneralConfigValues) {
+    try {
       await saveGeneralConfig({
         data: {
           projectId: project?.id || params.projectId,
           workspace,
-          name: projectName.trim(),
-          branch,
+          name: values.name.trim(),
+          branch: values.branch,
           rootDirectory: rootDir,
-          framework,
+          framework: values.framework,
+          region: values.region,
+          cpu: normalizeCpuValue(project?.specs?.cpu),
+          memory: normalizeMemoryGbValue(project?.specs?.memory),
+          storage: normalizeStorageValue(project?.specs?.storage),
+          authEnabled: values.authEnabled,
+          buildCacheEnabled: values.buildCacheEnabled,
         },
       });
 
-      const nextProjectId = projectName.trim();
+      const nextProjectId = values.name.trim();
       if (nextProjectId && nextProjectId !== params.projectId) {
         let nextUrl = `/projects/${encodeURIComponent(nextProjectId)}/configuration`;
         if (workspace) {
@@ -829,30 +1275,74 @@ function ConfigurationPage() {
         });
       }
 
-      setGeneralBaseline({
-        projectName: projectName.trim(),
-        branch,
-        rootDir,
-        framework,
-      });
-
       toast.success("Configuration saved. Redeploy started.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save configuration");
-    } finally {
-      setSavingGeneral(false);
     }
   }
 
-  const serviceTypeValue = String(project?.serviceType || "").toLowerCase();
-  const isDatabaseProject = serviceTypeValue === "database";
+  async function handleSubmitDatabase(values: DatabaseConfigValues) {
+    const password = values.password.trim();
+
+    await saveDatabaseConfig({
+      data: {
+        projectId: project?.id || params.projectId,
+        workspace,
+        name: values.name.trim(),
+        password,
+        configurations: project?.specs ? ({ ...project.specs } as Record<string, unknown>) : null,
+        whitelistedIps: (values.whitelistIps ?? []).map((ip) => ip.value).filter(Boolean),
+      },
+    });
+
+    const nextProjectId = values.name.trim();
+    if (nextProjectId && nextProjectId !== params.projectId) {
+      let nextUrl = `/projects/${encodeURIComponent(nextProjectId)}/configuration`;
+      if (workspace) {
+        nextUrl = `${nextUrl}?workspace=${encodeURIComponent(workspace)}`;
+      }
+
+      await navigate({
+        to: nextUrl as any,
+        replace: true,
+      });
+    }
+
+    toast.success("Database configuration updated");
+  }
+
+  async function handleSubmitResources(values: ResourcesConfigValues) {
+    const nextConfigurations: Record<string, unknown> = {
+      cpu: values.cpuValue,
+      memory: values.memoryValue,
+      storage: project?.specs?.storage,
+      diskSize: values.diskEnabled ? Number(values.diskSize || 0) : 0,
+      volumeMount: values.diskEnabled ? (values.mountPath || "/mnt/data").trim() : "",
+    };
+
+    // Re-read current whitelist IPs from project data
+    const currentWhitelistIps = Array.isArray(project?.whiteListedIps)
+      ? project.whiteListedIps.filter(Boolean)
+      : [];
+
+    await saveDatabaseConfig({
+      data: {
+        projectId: project?.id || params.projectId,
+        workspace,
+        name: project?.name || params.projectId,
+        password: "",
+        configurations: nextConfigurations,
+        whitelistedIps: currentWhitelistIps,
+      },
+    });
+
+    toast.success("Resources updated");
+  }
 
   return (
-    <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
+    <div className="mx-auto flex max-w-[1000px] flex-col gap-4 px-4 py-8 sm:px-0">
       <TabHeader title="Configuration">
-        {isDatabaseProject
-          ? "Manage your database settings, access controls, and compute resources."
-          : "Manage your project settings and deployment configuration."}{" "}
+        {getConfigurationDescription(project)}{" "}
         <a href="#" className="text-[#4879f8] underline">
           Learn more
         </a>
@@ -861,18 +1351,18 @@ function ConfigurationPage() {
       <hr className="border-dash-border" />
 
       {/* Sidebar + Content layout */}
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
         {/* Sidebar nav */}
-        <nav className="sticky top-8 flex w-[180px] shrink-0 flex-col gap-0.5 self-start">
+        <nav className="scrollbar-hidden flex w-full gap-1 overflow-x-auto rounded-[4px] border-[0.5px] border-dash-border p-1 lg:sticky lg:top-8 lg:w-[180px] lg:shrink-0 lg:flex-col lg:gap-0.5 lg:self-start lg:overflow-visible lg:rounded-none lg:border-0 lg:p-0">
           {sections.map((s) => (
             <button
               key={s.id}
               onClick={() => setActiveSection(s.id)}
-              className={`flex items-center gap-2.5 rounded-[4px] px-3 py-2 text-left text-sm transition-colors ${
+              className={`shrink-0 whitespace-nowrap lg:w-full flex items-center gap-2.5 rounded-[4px] px-3 py-2 text-left text-sm transition-colors ${
                 s.id === activeSection
                   ? "bg-dash-bg-elevated font-medium text-dash-text-strong"
                   : "text-dash-text-faded hover:bg-dash-bg-elevated/50 hover:text-dash-text-body"
-              } ${s.id === "danger" ? "mt-4 text-red-400/80 hover:text-red-400" : ""}`}
+              } ${s.id === "danger" ? "text-red-400/80 hover:text-red-400 lg:mt-4" : ""}`}
             >
               <span
                 className={
@@ -901,21 +1391,29 @@ function ConfigurationPage() {
               transition={{ duration: 0.15, ease }}
             >
               {activeSection === "general" && (
-                <GeneralSection
-                  projectName={projectName}
-                  setProjectName={setProjectName}
-                  branch={branch}
-                  setBranch={setBranch}
-                  branchOptions={branchOptions}
-                  rootDir={rootDir}
-                  onOpenDrawer={() => setDrawerOpen(true)}
-                  framework={framework}
-                  setFramework={setFramework}
-                  frameworkOptions={frameworkOptions}
-                  saveDisabled={isGeneralSaveDisabled}
-                  saveLoading={savingGeneral}
-                  onSave={handleSaveGeneral}
-                />
+                databaseProject ? (
+                  <DatabaseConfigurationPanel
+                    initialValues={databaseInitialValues}
+                    onSubmit={handleSubmitDatabase}
+                    region={project?.region}
+                    dbImageName={project?.dbImage?.name}
+                    isPublicAccessEnabled={Boolean(project?.isPublicAccess)}
+                  />
+                ) : (
+                  <GeneralSection
+                    initialValues={generalInitialValues}
+                    onSubmit={handleSubmitGeneral}
+                    branchOptions={branchOptions}
+                    rootDir={rootDir}
+                    onOpenDrawer={() => setDrawerOpen(true)}
+                    frameworkOptions={frameworkOptions}
+                    regionOptions={regionOptions}
+                    showSourceFields={sourceFieldsVisible}
+                    dockerSourceImage={dockerImage}
+                    showMcpAuthControl={mcpAuthToggleVisible}
+                    showBuildCacheControl={buildCacheToggleVisible}
+                  />
+                )
               )}
               {activeSection === "build" && (
                 <BuildSection
@@ -927,29 +1425,30 @@ function ConfigurationPage() {
                   setStartCmd={setStartCmd}
                   healthCheckPath={healthCheckPath}
                   setHealthCheckPath={setHealthCheckPath}
+                  preStartCmd={preStartCmd}
+                  setPreStartCmd={setPreStartCmd}
+                  dockerImage={dockerImage}
+                  setDockerImage={setDockerImage}
+                  showCommands={sourceFieldsVisible}
+                  showHealthCheck={healthCheckVisible}
+                  showDockerSourceFields={dockerSourceFieldsVisible}
                 />
               )}
               {activeSection === "resources" && (
                 <ResourcesSection
-                  cpuValue={cpuValue}
-                  setCpuValue={setCpuValue}
-                  memoryValue={memoryValue}
-                  setMemoryValue={setMemoryValue}
-                  scalingGroup={scalingGroup}
-                  setScalingGroup={setScalingGroup}
-                  diskEnabled={diskEnabled}
-                  setDiskEnabled={setDiskEnabled}
-                  diskSize={diskSize}
-                  setDiskSize={setDiskSize}
-                  mountPath={mountPath}
-                  setMountPath={setMountPath}
+                  initialValues={resourcesInitialValues}
+                  onSubmit={databaseProject ? handleSubmitResources : undefined}
+                  scalingGroupOptions={scalingGroupOptions}
+                  showScalingGroup={scalingGroupVisible}
+                  showPersistentStorage={persistentStorageVisible}
+                  canSave={databaseProject}
                 />
               )}
               {activeSection === "danger" && (
                 <DangerSection
                   maintenanceMode={maintenanceMode}
                   setMaintenanceMode={setMaintenanceMode}
-                  projectName={projectName}
+                  projectName={project?.name || ""}
                 />
               )}
             </motion.div>
@@ -958,30 +1457,32 @@ function ConfigurationPage() {
       </div>
 
       {/* Root directory drawer */}
-      <RootDirectoryDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        repoName={project?.repo?.fullName || project?.repo?.name}
-        installationId={project?.repo?.installationId}
-        branch={branch}
-        selectedPath={rootDir || "./"}
-        onSelect={({ path, framework: detectedFramework }) => {
-          setRootDir(path || "./");
+      {sourceFieldsVisible && (
+        <RootDirectoryDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          repoName={project?.repo?.fullName || project?.repo?.name}
+          installationId={project?.repo?.installationId}
+          branch={generalInitialValues.branch}
+          selectedPath={rootDir || "./"}
+          onSelect={({ path, framework: detectedFramework }) => {
+            setRootDir(path || "./");
 
-          if (detectedFramework?.slug) {
-            setFramework(detectedFramework.slug);
-          }
-          if (detectedFramework?.installCommand) {
-            setInstallCmd(detectedFramework.installCommand);
-          }
-          if (detectedFramework?.buildCommand) {
-            setBuildCmd(detectedFramework.buildCommand);
-          }
-          if (detectedFramework?.startCommand) {
-            setStartCmd(detectedFramework.startCommand);
-          }
-        }}
-      />
+            if (detectedFramework?.slug) {
+              // Framework will be updated via Formik when the user saves
+            }
+            if (detectedFramework?.installCommand) {
+              setInstallCmd(detectedFramework.installCommand);
+            }
+            if (detectedFramework?.buildCommand) {
+              setBuildCmd(detectedFramework.buildCommand);
+            }
+            if (detectedFramework?.startCommand) {
+              setStartCmd(detectedFramework.startCommand);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

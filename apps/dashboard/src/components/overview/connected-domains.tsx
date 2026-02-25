@@ -1,12 +1,14 @@
 import { Plus, ArrowUpRight } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { DashButton } from "../shared/dash-button";
+import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 export function ConnectedDomains({
   activeDomains = 0,
 }: {
   activeDomains?: number;
 }) {
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   return (
     <div className="mb-8 flex rounded-[4px] border-[0.5px] border-dash-border py-2">
       {/* Left content */}
@@ -19,7 +21,7 @@ export function ConnectedDomains({
             Get intuitive domain registration and management using Brimble
           </p>
         </div>
-        <Link to="/domains/buy">
+        <Link to={withWorkspaceQuery({ pathname: "/domains/buy", searchStr }) as any}>
           <DashButton className="w-fit">
             <Plus className="size-4" />
             Register a new domain
@@ -28,7 +30,7 @@ export function ConnectedDomains({
       </div>
 
       {/* Right stat */}
-      <div className="flex h-[122px] w-[169px] shrink-0 flex-col items-center justify-center border-l-[0.5px] border-dash-border pl-3.5 pr-2">
+      <div className="hidden h-[122px] w-[169px] shrink-0 flex-col items-center justify-center border-l-[0.5px] border-dash-border pl-3.5 pr-2 sm:flex">
         <div className="flex flex-col gap-px">
           <span className="text-[56px] font-light leading-none tracking-[-0.09px] text-dash-text-strong">
             {activeDomains}

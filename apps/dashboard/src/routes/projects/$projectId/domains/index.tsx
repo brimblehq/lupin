@@ -21,6 +21,7 @@ import {
   updateDomainServerFn,
 } from "@/server/domains/actions";
 import { formatRelativeTime } from "@/utils/dashboard";
+import { shouldShowProjectDomainsTab } from "@/utils/project-capabilities";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -88,7 +89,11 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
 
     return {
       domains,
-      projects: projects.items.map((item) => ({ id: item.id, name: item.name })),
+      projects: projects.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        serviceType: item.serviceType,
+      })),
     };
   },
   component: ProjectDomainsPage,
@@ -152,6 +157,16 @@ function ProjectDomainsPage() {
   const { projectId } = Route.useParams();
   const search = Route.useSearch();
   const { project, workspace } = parentRoute.useLoaderData() as any;
+  if (!shouldShowProjectDomainsTab(project)) {
+    return (
+      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
+        <TabHeader title="Project domains">
+          Domains are not available for this project type.
+        </TabHeader>
+      </div>
+    );
+  }
+
   const { domains: domainsResult, projects } = Route.useLoaderData();
   const [addDomainOpen, setAddDomainOpen] = useState(false);
   const [rows, setRows] = useState<Domain[]>(() =>
@@ -352,7 +367,7 @@ function ProjectDomainsPage() {
         onDeleteDomain={handleDeleteDomain}
       />
 
-      <div className="mt-2 flex justify-center">
+      <div className="mt-2 flex justify-end">
         <NumberPagination
           currentPage={domainsResult.currentPage}
           totalPages={domainsResult.totalPages}

@@ -33,5 +33,5 @@ function DomainSettingsPage() {
     backPath = `/domains?workspace=${encodeURIComponent(workspace)}`;
   }
 
-  return <DomainSettings domain={domainInfo} backPath={backPath} />;
+  return <DomainSettings domain={domainInfo} backPath={backPath} workspace={workspace} />;
 }

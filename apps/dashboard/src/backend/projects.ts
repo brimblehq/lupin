@@ -1,10 +1,20 @@
 import type { ApiClient, ApiListResponse } from "./types";
 import { notImplemented } from "./utils";
+import {
+  asNonEmptyString,
+  asRecord,
+  asString,
+  pickBoolean,
+  pickNonEmptyString,
+  pickNumber,
+  pickString,
+} from "./normalize";
 
 export interface Project {
   id: string;
   name: string;
   slug: string;
+  logId?: string;
   screenshot?: string;
   framework?: string;
   createdAt?: string;
@@ -13,8 +23,12 @@ export interface Project {
   region?: string;
   serviceType?: string;
   authEnabled?: boolean;
+  buildCacheEnabled?: boolean;
+  hasUpdates?: boolean;
   maintenance?: boolean;
   passwordEnabled?: boolean;
+  isPublicAccess?: boolean;
+  connectionUri?: string;
   previewUrl?: string;
   gitLink?: string;
   statusCode?: number;
@@ -69,6 +83,11 @@ export interface Project {
   log?: {
     message?: string;
   };
+  tags?: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
   job?: {
     commonContainer?: string;
     allocations?: Array<{
@@ -80,6 +99,7 @@ export interface Project {
 
 export interface ListProjectsInput {
   q?: string;
+  serviceType?: string;
   sort?: string;
   teamId?: string;
   page?: number;
@@ -87,11 +107,62 @@ export interface ListProjectsInput {
 }
 
 export interface CreateProjectInput {
+  name?: string;
+  teamId?: string;
+  [key: string]: unknown;
+}
+
+export interface ValidateDockerImageInput {
+  imageUri: string;
+  credentials?: {
+    username: string;
+    token: string;
+  };
+}
+
+export interface DatabaseEngineOption {
+  id: string;
   name: string;
-  slug?: string;
-  repositoryId?: string;
-  framework?: string;
-  rootDirectory?: string;
+  imageUrl?: string;
+  image?: string;
+  version?: string;
+  envs: Array<{ type?: string; value: string }>;
+  isAvailable: boolean;
+  isDefault: boolean;
+  hasPort?: boolean;
+  port?: number;
+  volumePath?: string;
+  protocol?: string;
+  recommendations: Array<{
+    compute?: {
+      memory?: number;
+      cpu?: number;
+      storage?: number;
+    };
+  }>;
+}
+
+export interface CreateDatabaseProjectInput {
+  name: string;
+  dbImage: string;
+  teamId?: string;
+  configurations: {
+    cpu: number;
+    memory: number;
+    storage: number;
+    region: string;
+  };
+  whitelistedIps?: string[];
+  environments?: Array<{
+    name: string;
+    value: string;
+  }>;
+}
+
+export interface DatabaseProvisionResult {
+  name: string;
+  url?: string;
+  message?: string;
 }
 
 export interface UpdateProjectInput {
@@ -113,9 +184,30 @@ export interface ProjectsApi {
       payload?: Record<string, unknown>;
     },
   ): Promise<{ id?: string; message?: string }>;
+  databaseBackup(
+    projectId: string,
+    input?: { teamId?: string },
+  ): Promise<{ message?: string }>;
+  databaseRefresh(
+    projectId: string,
+    input?: { teamId?: string },
+  ): Promise<{ message?: string }>;
+  updateDatabaseConfig(
+    projectId: string,
+    input: {
+      name: string;
+      password: string;
+      configurations?: Record<string, unknown> | null;
+      whitelistedIps?: string[];
+      teamId?: string;
+    },
+  ): Promise<{ message?: string }>;
   create(input: CreateProjectInput): Promise<Project>;
+  validateDockerImage(input: ValidateDockerImageInput): Promise<boolean>;
+  listAvailableDatabases(): Promise<DatabaseEngineOption[]>;
+  createDatabase(input: CreateDatabaseProjectInput): Promise<DatabaseProvisionResult>;
   update(projectId: string, input: UpdateProjectInput): Promise<Project>;
-  remove(projectId: string): Promise<void>;
+  remove(projectId: string, input?: { teamId?: string }): Promise<void>;
 }
 
 export interface PaginatedProjectsResponse extends ApiListResponse<Project> {
@@ -129,15 +221,19 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
   const listEndpoint = "/core/v1/projects";
 
   function mapProject(project: any): Project {
+    const row = asRecord(project) ?? {};
+    const repoRecord = asRecord(row.repo);
+    const specsRecord = asRecord(row.specs);
+    const specsRegionRecord = asRecord(specsRecord?.region);
+
     let region: string | undefined;
-    const regionSource = project?.specs?.region ?? project?.region;
+    const regionSource = specsRecord?.region ?? row.region;
     if (typeof regionSource === "string") {
       region = regionSource;
-    } else if (regionSource && typeof regionSource === "object") {
-      const regionName =
-        typeof regionSource.name === "string" ? regionSource.name.trim() : "";
-      const regionCountry =
-        typeof regionSource.country === "string" ? regionSource.country.trim() : "";
+    } else {
+      const regionRecord = asRecord(regionSource);
+      const regionName = pickNonEmptyString(regionRecord, "name") ?? "";
+      const regionCountry = pickNonEmptyString(regionRecord, "country") ?? "";
 
       if (regionName && regionCountry) {
         region = `${regionName} (${regionCountry})`;
@@ -148,110 +244,74 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       }
     }
 
-    let passwordEnabled: boolean | undefined;
-    if (typeof project?.passwordEnabled === "boolean") {
-      passwordEnabled = project.passwordEnabled;
-    } else if (typeof project?.password_enabled === "boolean") {
-      passwordEnabled = project.password_enabled;
-    }
-
-    let previewUrl: string | undefined;
-    if (typeof project?.previewUrl === "string") {
-      previewUrl = project.previewUrl;
-    } else if (typeof project?.url === "string") {
-      previewUrl = project.url;
-    }
-
-    let gitLink: string | undefined;
-    if (typeof project?.gitLink === "string" && project.gitLink.trim()) {
-      gitLink = project.gitLink;
-    } else if (typeof project?.repo?.url === "string" && project.repo.url.trim()) {
-      gitLink = project.repo.url;
-    } else if (
-      typeof project?.repo?.html_url === "string" &&
-      project.repo.html_url.trim()
-    ) {
-      gitLink = project.repo.html_url;
-    }
-
-    let statusCode: number | undefined;
-    if (typeof project?.statusCode === "number") {
-      statusCode = project.statusCode;
-    } else if (typeof project?.status_code === "number") {
-      statusCode = project.status_code;
-    }
+    const passwordEnabled = pickBoolean(row, "passwordEnabled", "password_enabled");
+    const previewUrl = pickString(row, "previewUrl", "url");
+    const gitLink =
+      pickNonEmptyString(row, "gitLink") ??
+      pickNonEmptyString(repoRecord, "url", "html_url");
+    const statusCode = pickNumber(row, "statusCode", "status_code");
+    const connectionUri = pickNonEmptyString(row, "connectionUri", "connection_uri");
 
     let domains: Project["domains"];
-    if (Array.isArray(project?.domains)) {
-      domains = project.domains
+    if (Array.isArray(row.domains)) {
+      domains = row.domains
         .filter((domain: any) => domain?.name)
         .map((domain: any) => {
-          let isDefault: boolean | undefined;
-          if (typeof domain?.default === "boolean") {
-            isDefault = domain.default;
-          } else if (typeof domain?.isDefault === "boolean") {
-            isDefault = domain.isDefault;
-          }
+          const domainRecord = asRecord(domain) ?? {};
+          const isDefault = pickBoolean(domainRecord, "default", "isDefault");
 
           return {
-            id: domain?.id ?? domain?._id,
-            name: String(domain.name),
+            id: domainRecord.id ?? domainRecord._id,
+            name: String(domainRecord.name),
             isDefault,
-            createdAt: domain?.createdAt,
-            status: domain?.status,
+            createdAt: asString(domainRecord.createdAt),
+            status: asString(domainRecord.status),
           };
         });
     }
 
     let whiteListedIps: string[] | undefined;
-    if (Array.isArray(project?.whiteListedIps)) {
-      whiteListedIps = project.whiteListedIps
+    if (Array.isArray(row.whiteListedIps)) {
+      whiteListedIps = row.whiteListedIps
         .filter((ip: unknown) => typeof ip === "string")
         .map((ip: string) => ip);
     }
 
     let autoscalingGroup: Project["autoscalingGroup"] = null;
-    if (project?.autoscalingGroup && typeof project.autoscalingGroup === "object") {
+    if (row.autoscalingGroup && typeof row.autoscalingGroup === "object") {
+      const autoscalingGroupRecord = asRecord(row.autoscalingGroup) ?? {};
       autoscalingGroup = {
-        ...project.autoscalingGroup,
-        id: project.autoscalingGroup?._id ?? project.autoscalingGroup?.id,
-        name: project.autoscalingGroup?.name,
+        ...autoscalingGroupRecord,
+        id: autoscalingGroupRecord._id ?? autoscalingGroupRecord.id,
+        name: asString(autoscalingGroupRecord.name),
       };
     }
 
     let dbImage: Project["dbImage"] = null;
-    if (project?.dbImage && typeof project.dbImage === "object") {
+    if (row.dbImage && typeof row.dbImage === "object") {
+      const dbImageRecord = asRecord(row.dbImage) ?? {};
       dbImage = {
-        ...project.dbImage,
-        id: project.dbImage?._id ?? project.dbImage?.id,
-        name: project.dbImage?.name,
+        ...dbImageRecord,
+        id: dbImageRecord._id ?? dbImageRecord.id,
+        name: asString(dbImageRecord.name),
       };
     }
 
-    let authEnabled: boolean | undefined;
-    if (typeof project?.authEnabled === "boolean") {
-      authEnabled = project.authEnabled;
-    }
-
-    let maintenance: boolean | undefined;
-    if (typeof project?.maintenance === "boolean") {
-      maintenance = project.maintenance;
-    }
+    const authEnabled = pickBoolean(row, "authEnabled");
+    const buildCacheEnabled = pickBoolean(row, "buildCacheEnabled");
+    const hasUpdates = pickBoolean(row, "hasUpdates");
+    const maintenance = pickBoolean(row, "maintenance");
+    const isPublicAccess = pickBoolean(row, "isPublicAccess", "publicAccess");
 
     let specsRegion: Project["specs"]["region"] = null;
-    if (project?.specs?.region && typeof project.specs.region === "object") {
+    if (specsRegionRecord) {
       specsRegion = {
-        ...project.specs.region,
-        id: project.specs.region?._id ?? project.specs.region?.id,
+        ...specsRegionRecord,
+        id: specsRegionRecord._id ?? specsRegionRecord.id,
       };
     }
 
-    let rootDirectory: string | undefined;
-    if (typeof project?.rootDirectory === "string") {
-      rootDirectory = project.rootDirectory;
-    } else if (typeof project?.rootDir === "string") {
-      rootDirectory = project.rootDir;
-    }
+    const rootDirectory = pickString(row, "rootDirectory", "rootDir");
 
     let job: Project["job"] | undefined;
     if (project?.job && typeof project.job === "object") {
@@ -288,66 +348,78 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       };
     }
 
+    let tags: Project["tags"];
+    if (Array.isArray(row.tags)) {
+      tags = row.tags
+        .filter((t: any) => t && (t._id || t.id) && t.name)
+        .map((t: any) => ({
+          id: String(t._id ?? t.id),
+          name: String(t.name),
+          color: String(t.color ?? "#6366f1"),
+        }));
+    }
+
     return {
-      id: String(project?.id ?? project?._id ?? project?.name ?? ""),
-      name: String(project?.name ?? ""),
-      slug: String(project?.slug ?? project?.name ?? "")
+      id: String(row.id ?? row._id ?? row.name ?? ""),
+      name: String(row.name ?? ""),
+      slug: String(row.slug ?? row.name ?? "")
         .trim()
         .toLowerCase()
         .replace(/\s+/g, "-"),
-      screenshot:
-        typeof project?.screenshot === "string" && project.screenshot.trim()
-          ? project.screenshot
-          : undefined,
-      framework: project?.framework,
-      createdAt: project?.createdAt,
-      updatedAt: project?.updatedAt,
-      status: project?.status,
+      logId: pickString(row, "logId", "logID"),
+      screenshot: pickNonEmptyString(row, "screenshot"),
+      framework: asString(row.framework),
+      createdAt: asString(row.createdAt),
+      updatedAt: asString(row.updatedAt),
+      status: asString(row.status),
       region,
-      serviceType: project?.serviceType ?? project?.service_type,
+      serviceType: asString(row.serviceType) ?? asString(row.service_type),
       authEnabled,
+      buildCacheEnabled,
+      hasUpdates,
       maintenance,
       passwordEnabled,
+      isPublicAccess,
+      connectionUri,
       previewUrl,
       gitLink,
       statusCode,
-      healthCheckPath:
-        typeof project?.healthCheckPath === "string" ? project.healthCheckPath : undefined,
-      preStartCommand:
-        typeof project?.preStartCommand === "string" ? project.preStartCommand : undefined,
+      healthCheckPath: pickString(row, "healthCheckPath"),
+      preStartCommand: pickString(row, "preStartCommand"),
       rootDirectory,
-      installCommand:
-        typeof project?.installCommand === "string" ? project.installCommand : undefined,
-      buildCommand:
-        typeof project?.buildCommand === "string" ? project.buildCommand : undefined,
-      startCommand:
-        typeof project?.startCommand === "string" ? project.startCommand : undefined,
-      outputDirectory:
-        typeof project?.outputDirectory === "string" ? project.outputDirectory : undefined,
-      diskSize: typeof project?.diskSize === "number" ? project.diskSize : undefined,
-      volumeMount: typeof project?.volumeMount === "string" ? project.volumeMount : undefined,
+      installCommand: pickString(row, "installCommand"),
+      buildCommand: pickString(row, "buildCommand"),
+      startCommand: pickString(row, "startCommand"),
+      outputDirectory: pickString(row, "outputDirectory"),
+      diskSize: pickNumber(row, "diskSize"),
+      volumeMount: pickString(row, "volumeMount"),
       whiteListedIps,
       autoscalingGroup,
       dbImage,
-      specs: project?.specs
+      specs: specsRecord
         ? {
-            memory: project.specs?.memory,
-            cpu: project.specs?.cpu,
-            storage: project.specs?.storage,
+            memory: specsRecord.memory as number | string | undefined,
+            cpu: specsRecord.cpu as number | string | undefined,
+            storage: specsRecord.storage as number | string | undefined,
             region: specsRegion,
           }
         : undefined,
       domains,
-      repo: project?.repo
+      repo: repoRecord
         ? {
-            name: project.repo?.name,
-            fullName: project.repo?.full_name ?? project.repo?.fullName,
-            branch: project.repo?.branch,
-            git: project.repo?.git,
-            installationId: project.repo?.installationId,
+            name: asString(repoRecord.name),
+            fullName: pickString(repoRecord, "full_name", "fullName"),
+            branch: asString(repoRecord.branch),
+            git: asString(repoRecord.git),
+            installationId:
+              (typeof repoRecord.installationId === "string" ||
+                typeof repoRecord.installationId === "number")
+                ? repoRecord.installationId
+                : undefined,
           }
         : undefined,
-      log: project?.log ? { message: project.log?.message } : undefined,
+      tags,
+      log: asRecord(row.log) ? { message: asString(asRecord(row.log)?.message) } : undefined,
       job,
     };
   }
@@ -358,6 +430,7 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
         method: "GET",
         query: {
           q: input?.q,
+          serviceType: input?.serviceType,
           sort: input?.sort ?? "updatedAt",
           teamId: input?.teamId,
           page: input?.page,
@@ -372,27 +445,21 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
           ? root
           : [];
 
-      let total = rawProjects.length;
-      if (typeof root?.total === "number") {
-        total = root.total;
-      } else if (typeof root?.count === "number") {
-        total = root.count;
-      } else if (typeof root?.overallTotalProjects === "number") {
-        total = root.overallTotalProjects;
-      }
+      const rootRecord = asRecord(root);
+      const total = pickNumber(rootRecord, "total", "count", "overallTotalProjects") ?? rawProjects.length;
 
       let currentPage = 1;
-      if (typeof root?.currentPage === "number") {
-        currentPage = root.currentPage;
+      if (pickNumber(rootRecord, "currentPage") !== undefined) {
+        currentPage = pickNumber(rootRecord, "currentPage")!;
       } else if (typeof input?.page === "number" && input.page > 0) {
         currentPage = input.page;
       }
 
       let totalPages = 1;
-      if (typeof root?.totalPages === "number") {
-        totalPages = root.totalPages;
+      if (pickNumber(rootRecord, "totalPages") !== undefined) {
+        totalPages = pickNumber(rootRecord, "totalPages")!;
       } else {
-        const pageSize = typeof root?.limit === "number" ? root.limit : input?.limit;
+        const pageSize = pickNumber(rootRecord, "limit") ?? input?.limit;
         if (typeof pageSize === "number" && pageSize > 0) {
           totalPages = Math.max(1, Math.ceil(total / pageSize));
         }
@@ -403,16 +470,8 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
         total,
         currentPage,
         totalPages,
-        pageSize:
-          typeof root?.limit === "number"
-            ? root.limit
-            : typeof input?.limit === "number"
-              ? input.limit
-              : undefined,
-        overallTotalProjects:
-          typeof root?.overallTotalProjects === "number"
-            ? root.overallTotalProjects
-            : undefined,
+        pageSize: pickNumber(rootRecord, "limit") ?? (typeof input?.limit === "number" ? input.limit : undefined),
+        overallTotalProjects: pickNumber(rootRecord, "overallTotalProjects"),
       } satisfies PaginatedProjectsResponse;
     },
     async getById(projectId, input) {
@@ -435,17 +494,13 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       );
 
       const root = response?.data?.data ?? response?.data ?? response ?? null;
+      const rootRecord = asRecord(root);
 
-      if (typeof root === "string" && root.trim()) {
-        return root;
-      }
-
-      if (typeof root?.screenshot === "string" && root.screenshot.trim()) {
-        return root.screenshot;
-      }
-
-      if (typeof root?.url === "string" && root.url.trim()) {
-        return root.url;
+      const screenshotUrl =
+        asNonEmptyString(root) ??
+        pickNonEmptyString(rootRecord, "screenshot", "url");
+      if (screenshotUrl) {
+        return screenshotUrl;
       }
 
       return null;
@@ -455,31 +510,225 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
         `${listEndpoint}/${encodeURIComponent(projectId)}/redeploy`,
         {
           method: "POST",
-          query: {
-            teamId: input?.teamId,
-          },
           body: {
             ...(input?.payload || {}),
             logId: input?.logId,
             startOnly: input?.startOnly,
+            teamId: input?.teamId,
           },
         },
       );
 
       const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const rootRecord = asRecord(root);
 
       return {
-        id:
-          typeof root?.id === "string"
-            ? root.id
-            : typeof root?._id === "string"
-              ? root._id
-              : undefined,
-        message: typeof root?.message === "string" ? root.message : undefined,
+        id: pickString(rootRecord, "id", "_id"),
+        message: pickString(rootRecord, "message"),
       };
     },
-    create: () => notImplemented<Project>("projects", "create"),
+    async databaseBackup(projectId, input) {
+      const response = await client.request<any>("/core/v1/projects/database/backup", {
+        method: "POST",
+        query: {
+          teamId: input?.teamId,
+        },
+        body: {
+          projectId,
+        },
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const rootRecord = asRecord(root);
+      return {
+        message: pickString(rootRecord, "message"),
+      };
+    },
+    async databaseRefresh(projectId, input) {
+      const response = await client.request<any>("/core/v1/projects/database/refresh", {
+        method: "POST",
+        query: {
+          teamId: input?.teamId,
+        },
+        body: {
+          projectId,
+        },
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const rootRecord = asRecord(root);
+      return {
+        message: pickString(rootRecord, "message"),
+      };
+    },
+    async updateDatabaseConfig(projectId, input) {
+      const response = await client.request<any>(
+        `/core/v1/projects/database/${encodeURIComponent(projectId)}`,
+        {
+          method: "PUT",
+          query: {
+            teamId: input?.teamId,
+          },
+          body: {
+            name: input.name,
+            password: input.password,
+            configurations: input.configurations ?? null,
+            whitelistedIps: input.whitelistedIps ?? [],
+          },
+        },
+      );
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const rootRecord = asRecord(root);
+      return {
+        message: pickString(rootRecord, "message"),
+      };
+    },
+    async create(input) {
+      const body = { ...(input as Record<string, unknown>) };
+      let teamId: string | undefined;
+      if (typeof body.teamId === "string" && body.teamId.trim()) {
+        teamId = body.teamId.trim();
+        body.teamId = teamId;
+      }
+
+      const response = await client.request<any>(listEndpoint, {
+        method: "POST",
+        body,
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      return mapProject(root);
+    },
+    async validateDockerImage(input) {
+      const imageUri = input?.imageUri?.trim();
+      if (!imageUri) {
+        throw new Error("Docker image is required");
+      }
+
+      const response = await client.request<any>("/core/v1/projects/validate-image", {
+        method: "POST",
+        body: {
+          image_uri: imageUri,
+          ...(input.credentials?.username?.trim() && input.credentials?.token?.trim()
+            ? {
+                credentials: {
+                  username: input.credentials.username.trim(),
+                  token: input.credentials.token.trim(),
+                },
+              }
+            : {}),
+        },
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response;
+      if (typeof root === "boolean") {
+        return root;
+      }
+
+      const rootRecord = asRecord(root);
+      const nestedData = asRecord(rootRecord?.data);
+
+      return (
+        pickBoolean(rootRecord, "valid", "isValid", "success") ??
+        pickBoolean(nestedData, "valid", "isValid", "success") ??
+        false
+      );
+    },
+    async listAvailableDatabases() {
+      const response = await client.request<any>("/core/v1/projects/available-databases", {
+        method: "GET",
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? [];
+      const rows = Array.isArray(root) ? root : [];
+
+      return rows
+        .map((item) => {
+          const row = asRecord(item) ?? {};
+          const id = pickNonEmptyString(row, "_id", "id");
+          const name = pickNonEmptyString(row, "name");
+          if (!id || !name) {
+            return null;
+          }
+
+          const envs = Array.isArray(row.envs)
+            ? row.envs
+                .map((env) => {
+                  const envRow = asRecord(env) ?? {};
+                  const value = pickNonEmptyString(envRow, "value");
+                  if (!value) {
+                    return null;
+                  }
+                  return {
+                    type: pickNonEmptyString(envRow, "type"),
+                    value,
+                  };
+                })
+                .filter((env): env is { type?: string; value: string } => env !== null)
+            : [];
+
+          const recommendations = Array.isArray(row.recommendations)
+            ? row.recommendations
+                .map((rec) => {
+                  const recRow = asRecord(rec) ?? {};
+                  const computeRow = asRecord(recRow.compute);
+                  return {
+                    compute: computeRow
+                      ? {
+                          memory: pickNumber(computeRow, "memory"),
+                          cpu: pickNumber(computeRow, "cpu"),
+                          storage: pickNumber(computeRow, "storage"),
+                        }
+                      : undefined,
+                  };
+                })
+            : [];
+
+          return {
+            id,
+            name,
+            imageUrl: pickString(row, "image_url", "imageUrl"),
+            image: pickString(row, "image"),
+            version: pickString(row, "version"),
+            envs,
+            isAvailable: pickBoolean(row, "is_available", "isAvailable") ?? true,
+            isDefault: pickBoolean(row, "is_default", "isDefault") ?? false,
+            hasPort: pickBoolean(row, "hasPort", "has_port"),
+            port: pickNumber(row, "port"),
+            volumePath: pickString(row, "volumePath", "volume_path"),
+            protocol: pickString(row, "protocol"),
+            recommendations,
+          } satisfies DatabaseEngineOption;
+        })
+        .filter((item): item is DatabaseEngineOption => item !== null);
+    },
+    async createDatabase(input) {
+      const response = await client.request<any>("/core/v1/projects/database", {
+        method: "POST",
+        body: {
+          name: input.name,
+          dbImage: input.dbImage,
+          teamId: input.teamId,
+          configurations: input.configurations,
+          whitelistedIps: input.whitelistedIps ?? [],
+          environments: input.environments ?? [],
+        },
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const rootRecord = asRecord(root) ?? {};
+      return {
+        name: pickString(rootRecord, "name") ?? input.name,
+        url: pickString(rootRecord, "url"),
+        message: pickString(rootRecord, "message"),
+      };
+    },
     update: () => notImplemented<Project>("projects", "update"),
-    remove: () => notImplemented<void>("projects", "remove"),
+    async remove(projectId, input) {
+      await client.request<any>(`${listEndpoint}/${encodeURIComponent(projectId)}`, {
+        method: "DELETE",
+      });
+    },
   };
 }

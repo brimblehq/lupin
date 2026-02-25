@@ -16,6 +16,8 @@ interface WarningModalProps {
   confirmDisabled?: boolean;
   /** Optional label while confirm is in progress */
   confirmLoadingLabel?: string;
+  /** When false, the modal stays open after a successful confirm */
+  closeOnConfirm?: boolean;
   /** Optional content rendered between the description and footer (e.g. a confirmation input) */
   children?: React.ReactNode;
 }
@@ -30,6 +32,7 @@ export function WarningModal({
   onConfirm,
   confirmDisabled,
   confirmLoadingLabel,
+  closeOnConfirm = true,
   children,
 }: WarningModalProps) {
   const [submitting, setSubmitting] = useState(false);
@@ -69,7 +72,9 @@ export function WarningModal({
             try {
               setSubmitting(true);
               await onConfirm();
-              onOpenChange(false);
+              if (closeOnConfirm) {
+                onOpenChange(false);
+              }
             } finally {
               setSubmitting(false);
             }

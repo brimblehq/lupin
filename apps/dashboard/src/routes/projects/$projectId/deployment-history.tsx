@@ -4,8 +4,6 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Search,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   MoreVertical,
   GitBranch,
   Calendar,
@@ -13,6 +11,7 @@ import {
   ExternalLink,
   XCircle,
 } from "lucide-react";
+import { NumberPagination } from "../../../components/shared/pagination";
 import { motion, AnimatePresence } from "motion/react";
 import { createPortal } from "react-dom";
 import { type DateRange } from "react-day-picker";
@@ -523,74 +522,6 @@ function DeploymentRow({
   );
 }
 
-/* ─── Pagination ─── */
-
-function Pagination({
-  currentPage,
-  totalPages,
-  onChange,
-}: {
-  currentPage: number;
-  totalPages: number;
-  onChange: (page: number) => void;
-}) {
-  if (totalPages <= 1) return null;
-
-  const pages: (number | "...")[] = [];
-  for (let i = 1; i <= totalPages; i++) {
-    if (
-      i === 1 ||
-      i === totalPages ||
-      (i >= currentPage - 1 && i <= currentPage + 1)
-    ) {
-      pages.push(i);
-    } else if (pages[pages.length - 1] !== "...") {
-      pages.push("...");
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-center gap-1 pt-4">
-      <button
-        onClick={() => onChange(Math.max(1, currentPage - 1))}
-        disabled={currentPage <= 1}
-        className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
-      >
-        <ChevronLeft className="size-4" />
-      </button>
-      {pages.map((page, idx) =>
-        page === "..." ? (
-          <span
-            key={`ellipsis-${idx}`}
-            className="flex size-8 items-center justify-center text-sm text-dash-text-faded"
-          >
-            ...
-          </span>
-        ) : (
-          <button
-            key={page}
-            onClick={() => onChange(page)}
-            className={`flex size-8 items-center justify-center rounded-[4px] text-sm transition-colors ${
-              page === currentPage
-                ? "bg-dash-bg-elevated font-medium text-dash-text-strong"
-                : "text-dash-text-faded hover:bg-dash-bg-elevated"
-            }`}
-          >
-            {page}
-          </button>
-        ),
-      )}
-      <button
-        onClick={() => onChange(Math.min(totalPages, currentPage + 1))}
-        disabled={currentPage >= totalPages}
-        className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
-      >
-        <ChevronRight className="size-4" />
-      </button>
-    </div>
-  );
-}
-
 /* ─── Loading skeleton ─── */
 
 function DeploymentSkeleton() {
@@ -875,6 +806,70 @@ function DeploymentHistoryPage() {
     [fetchLogsForDeployment],
   );
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const raw = window.sessionStorage.getItem("brimble:open-deployment-drawer");
+    if (!raw) {
+      return;
+    }
+
+    let parsed: {
+      projectId?: string | null;
+      workspace?: string | null;
+      logId?: string | null;
+      createdAt?: number;
+    } | null = null;
+
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      window.sessionStorage.removeItem("brimble:open-deployment-drawer");
+      return;
+    }
+
+    if (!parsed) {
+      return;
+    }
+
+    const currentProjectKey = String(projectId ?? "");
+    if (!currentProjectKey || parsed.projectId !== currentProjectKey) {
+      return;
+    }
+
+    if ((parsed.workspace ?? null) !== (workspace ?? null)) {
+      return;
+    }
+
+    // Expire stale handoff triggers.
+    if (
+      typeof parsed.createdAt === "number" &&
+      Date.now() - parsed.createdAt > 2 * 60_000
+    ) {
+      window.sessionStorage.removeItem("brimble:open-deployment-drawer");
+      return;
+    }
+
+    const list = deployments?.items ?? [];
+    if (!list.length) {
+      return;
+    }
+
+    const target =
+      (parsed.logId
+        ? list.find((item) => item.id === parsed?.logId)
+        : undefined) ?? list[0];
+
+    if (!target) {
+      return;
+    }
+
+    window.sessionStorage.removeItem("brimble:open-deployment-drawer");
+    openDeploymentDrawer(target);
+  }, [deployments?.items, openDeploymentDrawer, projectId, workspace]);
+
   return (
     <div className="mx-auto flex max-w-[1000px] flex-col gap-6 py-8">
       <TabHeader title="Deployment history">
@@ -964,11 +959,13 @@ function DeploymentHistoryPage() {
 
       {/* Pagination */}
       {!fetching && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={deployments?.totalPages ?? 1}
-          onChange={handlePageChange}
-        />
+        <div className="flex justify-center pt-4">
+          <NumberPagination
+            currentPage={currentPage}
+            totalPages={deployments?.totalPages ?? 1}
+            onPageChange={handlePageChange}
+          />
+        </div>
       )}
 
       {/* Deployment logs drawer */}

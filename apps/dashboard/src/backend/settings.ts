@@ -4,6 +4,8 @@ import type {
   SettingsApi,
   SettingsApiKeyResult,
   SettingsBillingSnapshot,
+  InitializeSettingsAddCardInput,
+  InitializeSettingsAddCardResult,
   DecryptSettingsApiKeyInput,
   SettingsInvoiceItem,
   SettingsInvoicePage,
@@ -21,6 +23,8 @@ export type {
   SettingsApi,
   SettingsApiKeyResult,
   SettingsBillingSnapshot,
+  InitializeSettingsAddCardInput,
+  InitializeSettingsAddCardResult,
   DecryptSettingsApiKeyInput,
   SettingsInvoiceItem,
   SettingsInvoicePage,
@@ -146,8 +150,14 @@ function mapSpendingStats(payload: any): SettingsSpendingStats {
 }
 
 function mapInvoicePage(payload: any, page: number): SettingsInvoicePage {
-  const root = unwrapData<any>(payload) ?? {};
-  const list = Array.isArray(root?.data) ? root.data : [];
+  const root =
+    (payload?.data && typeof payload.data === "object" ? payload.data : null) ??
+    (unwrapData<any>(payload) ?? {});
+  const list = Array.isArray(root?.data)
+    ? root.data
+    : Array.isArray(root)
+      ? root
+      : [];
 
   const items: SettingsInvoiceItem[] = list.map((invoice: any) => ({
     id: String(invoice?._id ?? invoice?.id ?? ""),
@@ -160,7 +170,7 @@ function mapInvoicePage(payload: any, page: number): SettingsInvoicePage {
 
   return {
     page,
-    totalPages: Number(root?.total_pages ?? 1),
+    totalPages: Number(root?.total_pages ?? root?.totalPages ?? 1),
     limit: root?.limit !== undefined ? Number(root.limit) : undefined,
     items,
   };
@@ -270,18 +280,29 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
     decrypt: "/core/v1/decrypt",
     paymentCards: `${config.paymentApiUrl}/cards`,
     paymentProviders: `${config.paymentApiUrl}/providers`,
+    paymentInitialize: `${config.paymentApiUrl}/payment/initialize/payment`,
     paymentInvoices: `${config.paymentApiUrl}/payment/invoices`,
     paymentStats: `${config.paymentApiUrl}/subscription/stats`,
     paymentPlans: "/core/v1/plans",
   } as const;
 
-  const getBillingSnapshotInternal = async (page = 1): Promise<SettingsBillingSnapshot> => {
+  const getBillingSnapshotInternal = async (
+    page = 1,
+    options?: { subscriptionId?: string },
+  ): Promise<SettingsBillingSnapshot> => {
+    const subscriptionId = options?.subscriptionId?.trim() || undefined;
     const [cardsResponse, providersResponse, statsResponse, invoicesResponse, plansResponse] =
       await Promise.all([
         client.request(endpoints.paymentCards, { method: "GET" }),
         client.request(endpoints.paymentProviders, { method: "GET" }),
         client.request(endpoints.paymentStats, { method: "GET" }),
-        client.request(endpoints.paymentInvoices, { method: "GET", query: { page } }),
+        client.request(endpoints.paymentInvoices, {
+          method: "GET",
+          query: {
+            page,
+            ...(subscriptionId ? { subscriptionId } : {}),
+          },
+        }),
         client.request(endpoints.paymentPlans, { method: "GET" }),
       ]);
 
@@ -411,21 +432,48 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
         },
       });
     },
-    async getInvoices(page = 1) {
+    async initializeAddCard(input: InitializeSettingsAddCardInput) {
+      const paymentChannel = input.paymentChannel?.trim();
+      if (!paymentChannel) {
+        throw new Error("Payment channel is required");
+      }
+
+      const response = await client.request(endpoints.paymentInitialize, {
+        method: "POST",
+        body: {
+          type: "ADD_CARD",
+          payment_channel: paymentChannel,
+        },
+      });
+
+      const data = unwrapData<any>(response) ?? {};
+      const paymentLink = String(data?.payment_link ?? data?.paymentLink ?? "").trim();
+
+      if (!paymentLink) {
+        throw new Error("Failed to initialize card update");
+      }
+
+      return { paymentLink } satisfies InitializeSettingsAddCardResult;
+    },
+    async getInvoices(page = 1, options) {
+      const subscriptionId = options?.subscriptionId?.trim() || undefined;
       const response = await client.request(endpoints.paymentInvoices, {
         method: "GET",
-        query: { page },
+        query: {
+          page,
+          ...(subscriptionId ? { subscriptionId } : {}),
+        },
       });
       return mapInvoicePage(response, page);
     },
-    async getBillingSnapshot(page = 1) {
-      return getBillingSnapshotInternal(page);
+    async getBillingSnapshot(page = 1, options) {
+      return getBillingSnapshotInternal(page, options);
     },
-    async getSidebarSnapshot(page = 1) {
+    async getSidebarSnapshot(page = 1, options) {
       const [profileResponse, webhookResponse, billing] = await Promise.all([
         client.request(endpoints.authUserMe, { method: "GET" }),
         client.request(endpoints.webhooks, { method: "GET" }),
-        getBillingSnapshotInternal(page),
+        getBillingSnapshotInternal(page, options),
       ]);
 
       const profile = mapProfile(profileResponse);

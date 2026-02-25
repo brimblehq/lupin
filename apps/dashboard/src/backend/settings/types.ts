@@ -134,8 +134,16 @@ export interface TestWebhookInput {
   type: "discord" | "slack" | "webhook" | "custom";
 }
 
+export interface InitializeSettingsAddCardInput {
+  paymentChannel: string;
+}
+
+export interface InitializeSettingsAddCardResult {
+  paymentLink: string;
+}
+
 export interface SettingsApi {
-  getSidebarSnapshot(page?: number): Promise<SettingsSidebarSnapshot>;
+  getSidebarSnapshot(page?: number, options?: { subscriptionId?: string }): Promise<SettingsSidebarSnapshot>;
   getProfile(): Promise<SettingsUserProfile>;
   updateProfile(input: UpdateSettingsProfileInput): Promise<SettingsUserProfile>;
   requestEmailVerification(email: string): Promise<void>;
@@ -147,6 +155,7 @@ export interface SettingsApi {
   getWebhooks(): Promise<SettingsWebhookState>;
   updateWebhooks(input: UpdateSettingsWebhooksInput): Promise<SettingsWebhookState>;
   testWebhook(input: TestWebhookInput): Promise<void>;
-  getBillingSnapshot(page?: number): Promise<SettingsBillingSnapshot>;
-  getInvoices(page?: number): Promise<SettingsInvoicePage>;
+  initializeAddCard(input: InitializeSettingsAddCardInput): Promise<InitializeSettingsAddCardResult>;
+  getBillingSnapshot(page?: number, options?: { subscriptionId?: string }): Promise<SettingsBillingSnapshot>;
+  getInvoices(page?: number, options?: { subscriptionId?: string }): Promise<SettingsInvoicePage>;
 }

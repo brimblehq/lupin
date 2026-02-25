@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Search,
   MoreVertical,
   RefreshCw,
   AlertCircle,
@@ -14,6 +13,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { FilterDropdown, type FilterOption } from "./filter-dropdown";
+import { SearchFilterBar } from "./search-filter-bar";
 import { Spinner } from "./spinner";
 import { FolderTrashIcon } from "./folder-trash-icon";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "./modal";
@@ -275,6 +275,14 @@ function isValidRedirectUrl(url: string) {
   }
 }
 
+function getDomainProjectLabel(domain: Domain) {
+  return domain.project?.trim() || "";
+}
+
+function hasAssignedProject(domain: Domain) {
+  return Boolean(getDomainProjectLabel(domain) || domain.projectId);
+}
+
 function EditDomainModal({
   open,
   onOpenChange,
@@ -382,6 +390,8 @@ function EditDomainModal({
             options={projectOptions}
             onChange={setProject}
             placeholder="Select a project..."
+            searchable
+            searchPlaceholder="Search projects..."
           />
         </div>
         <div className="mt-1 flex flex-col gap-1.5">
@@ -467,7 +477,7 @@ export function DomainList({
 }: {
   domains: Domain[];
   basePath?: string;
-  projects?: Array<{ id: string; name: string }>;
+  projects?: Array<{ id: string; name: string; serviceType?: string }>;
   onAddDomain?: () => void;
   onRefreshDomain?: (domain: Domain) => Promise<void>;
   onConfigureDomain?: (input: {
@@ -491,10 +501,12 @@ export function DomainList({
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
-  const projectDropdownOptions = projects.map((project) => ({
-    id: project.id,
-    label: project.name,
-  }));
+  const projectDropdownOptions = projects
+    .filter((project) => project.serviceType !== "database")
+    .map((project) => ({
+      id: project.id,
+      label: project.name,
+    }));
 
   async function handleRefresh(domain: Domain) {
     setRefreshing((prev) => new Set(prev).add(domain.name));
@@ -623,24 +635,19 @@ export function DomainList({
     <div className="flex flex-col gap-4">
       {/* Search + Filter bar + Add Domain */}
       <div className="flex items-center gap-3">
-        <div className="flex flex-1 items-center rounded-[4px] border-[0.5px] border-dash-border">
-          <div className="flex flex-1 items-center gap-2 px-4 py-3">
-            <Search className="size-5 shrink-0 text-dash-text-extra-faded" />
-            <input
-              type="text"
-              placeholder="Search domains"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent text-sm text-dash-text-strong outline-none placeholder:text-dash-text-faded placeholder:opacity-50"
+        <SearchFilterBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search domains"
+          className="flex-1"
+          rightSlot={(
+            <FilterDropdown
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={domainStatusOptions}
             />
-          </div>
-          <div className="h-full w-px self-stretch bg-dash-border" />
-          <FilterDropdown
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={domainStatusOptions}
-          />
-        </div>
+          )}
+        />
 
         {onAddDomain && (
           <button
@@ -658,6 +665,7 @@ export function DomainList({
         const originalIndex = domains.indexOf(domain);
         const actions = actionsFor(domain);
         const domainDetailsPath = getDomainDetailsPath(domain);
+        const isAssigned = hasAssignedProject(domain);
         return (
           <div key={`failed-${i}`} className="overflow-visible rounded-[4px] border-[0.5px] border-dash-border">
             <table className="w-full border-collapse">
@@ -681,7 +689,7 @@ export function DomainList({
                         </span>
                       )}
                       <div className="flex items-center gap-2">
-                        {!domain.project && (
+                        {!isAssigned && (
                           <span className="inline-flex items-center rounded-full bg-[#f5a623]/10 px-2 py-0.5 text-[11px] font-medium leading-none text-[#c48418] dark:bg-[#f5a623]/15 dark:text-[#f5a623]">
                             Unassigned
                           </span>
@@ -756,6 +764,8 @@ export function DomainList({
                 const originalIndex = domains.indexOf(domain);
                 const actions = actionsFor(domain);
                 const domainDetailsPath = getDomainDetailsPath(domain);
+                const projectLabel = getDomainProjectLabel(domain);
+                const isAssigned = hasAssignedProject(domain);
                 return (
                   <tr
                     key={`active-${i}`}
@@ -778,15 +788,15 @@ export function DomainList({
                             {domain.name}
                           </span>
                         )}
-                        {domain.project ? (
+                        {projectLabel ? (
                           <span className="text-sm font-light leading-[1.3] text-dash-text-extra-faded">
-                            {domain.project}
+                            {projectLabel}
                           </span>
-                        ) : (
+                        ) : !isAssigned ? (
                           <span className="inline-flex w-fit items-center rounded-full bg-[#f5a623]/10 px-2 py-0.5 text-[11px] font-medium leading-none text-[#c48418] dark:bg-[#f5a623]/15 dark:text-[#f5a623]">
                             Unassigned
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                     <td className="w-[140px] py-2">

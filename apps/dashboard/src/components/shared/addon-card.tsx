@@ -1,5 +1,5 @@
 import { ArrowRight } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 
 export interface Addon {
   id: string;
@@ -8,6 +8,7 @@ export interface Addon {
   gradient: string;
   logo: string;
   logoBg: string;
+  logoImageUrl?: string;
   installed?: boolean;
 }
 
@@ -18,8 +19,10 @@ export function AddonCard({
   addon: Addon;
   onManage?: () => void;
 }) {
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const workspace = new URLSearchParams(searchStr || "").get("workspace")?.trim() || undefined;
   return (
-    <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft transition-shadow hover:shadow-[0px_2px_8px_rgba(0,0,0,0.06)]">
+    <div className="flex h-full flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft transition-shadow hover:shadow-[0px_2px_8px_rgba(0,0,0,0.06)]">
       {/* Gradient header with browser mockup + logo */}
       <div
         className={`relative h-[101px] overflow-clip bg-gradient-to-b ${addon.gradient} border-b-[0.5px] border-dash-border`}
@@ -45,16 +48,24 @@ export function AddonCard({
           className="absolute left-3.5 top-[58px] flex size-8 items-center justify-center rounded-full"
           style={{ backgroundColor: addon.logoBg }}
         >
-          <span className="text-xs">{addon.logo}</span>
+          {addon.logoImageUrl ? (
+            <img
+              src={addon.logoImageUrl}
+              alt={`${addon.name} logo`}
+              className="size-5 rounded-full object-cover"
+            />
+          ) : (
+            <span className="text-xs">{addon.logo}</span>
+          )}
         </div>
       </div>
 
       {/* Text content */}
-      <div className="px-3.5 pt-3 pb-2">
+      <div className="flex-1 px-3.5 pt-3 pb-2">
         <p className="text-sm font-medium leading-5 tracking-[-0.02px] text-dash-text-strong">
           {addon.name}
         </p>
-        <p className="mt-0.5 text-sm font-light leading-[22px] tracking-[-0.02px] text-dash-text-faded">
+        <p className="mt-0.5 line-clamp-5 text-sm font-light leading-[22px] tracking-[-0.02px] text-dash-text-faded">
           {addon.description}
         </p>
       </div>
@@ -65,6 +76,7 @@ export function AddonCard({
           <Link
             to="/addons/$addonId"
             params={{ addonId: addon.id }}
+            search={workspace ? { workspace } : {}}
             onClick={onManage}
             className="flex items-center gap-1 text-sm font-light tracking-[-0.02px] text-dash-text-body transition-colors hover:text-dash-text-strong"
           >
@@ -75,6 +87,7 @@ export function AddonCard({
           <Link
             to="/addons/$addonId"
             params={{ addonId: addon.id }}
+            search={workspace ? { workspace } : {}}
             className="flex items-center gap-1 text-sm font-light tracking-[-0.02px] text-dash-text-body transition-colors hover:text-dash-text-strong"
           >
             View details

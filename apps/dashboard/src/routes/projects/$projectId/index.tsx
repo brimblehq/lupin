@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { ExternalLink, Copy, Check, ArrowUpRight } from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
+import { StatusChip } from "../../../components/shared/status-chip";
 import { DeploymentLogsDrawer } from "../../../components/shared/deployment-logs-drawer";
 import { getProjectScreenshotServerFn } from "@/server/projects/actions";
 import { formatRelativeTime } from "@/utils/dashboard";
@@ -44,6 +45,7 @@ function ProjectDetailPage() {
   const { screenshotUrl } = Route.useLoaderData();
 
   const projectName = project?.name || projectId;
+  const isDatabaseProject = project?.serviceType === "database";
   const liveUrl = project?.previewUrl || project?.domains?.[0]?.name || "";
   let liveHref = "";
   if (liveUrl) {
@@ -54,12 +56,6 @@ function ProjectDetailPage() {
     }
   }
   const projectStatus = (project?.status || "UNKNOWN").toUpperCase();
-  let statusChipClass = "bg-dash-text-faded";
-  if (projectStatus === "READY" || projectStatus === "ACTIVE") {
-    statusChipClass = "bg-[#13d282]";
-  } else if (projectStatus === "FAILED") {
-    statusChipClass = "bg-[#ef4444]";
-  }
   const statusCode = project?.statusCode;
   const regionText = project?.region || "Unknown";
   let passwordEnabledText = "No";
@@ -126,58 +122,60 @@ function ProjectDetailPage() {
     <div className="mx-auto flex max-w-[1000px] flex-col gap-6 py-8">
       {/* Project preview banner */}
       <div className="flex flex-col gap-4">
-        <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
-          {/* Gradient banner */}
-          <div className="relative h-[232px] overflow-clip bg-gradient-to-b from-[#ea51bd] to-[#f1558a]">
-            {/* Browser window mockup */}
-            <div className="absolute inset-x-[3.38%] top-[27px] h-[236px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-white">
-              <div className="flex h-[13px] items-center border-b-[0.5px] border-dash-border px-2 py-[6px]">
-                <div className="flex gap-1">
-                  <span className="size-[4px] rounded-full bg-[#FF5F57]" />
-                  <span className="size-[4px] rounded-full bg-[#FEBC2E]" />
-                  <span className="size-[4px] rounded-full bg-[#28C840]" />
+        {!isDatabaseProject ? (
+          <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+            {/* Gradient banner */}
+            <div className="relative h-[232px] overflow-clip bg-gradient-to-b from-[#ea51bd] to-[#f1558a]">
+              {/* Browser window mockup */}
+              <div className="absolute inset-x-[3.38%] top-[27px] h-[236px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-white">
+                <div className="flex h-[13px] items-center border-b-[0.5px] border-dash-border px-2 py-[6px]">
+                  <div className="flex gap-1">
+                    <span className="size-[4px] rounded-full bg-[#FF5F57]" />
+                    <span className="size-[4px] rounded-full bg-[#FEBC2E]" />
+                    <span className="size-[4px] rounded-full bg-[#28C840]" />
+                  </div>
+                </div>
+                <div className="relative h-[222px] w-full bg-dash-bg-elevated">
+                  {screenshotUrl ? (
+                    <img
+                      src={screenshotUrl}
+                      alt={`${projectName} screenshot`}
+                      className="h-full w-full object-cover object-top"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm font-light text-dash-text-faded">
+                      No screenshot available yet.
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="relative h-[222px] w-full bg-dash-bg-elevated">
-                {screenshotUrl ? (
-                  <img
-                    src={screenshotUrl}
-                    alt={`${projectName} screenshot`}
-                    className="h-full w-full object-cover object-top"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm font-light text-dash-text-faded">
-                    No screenshot available yet.
-                  </div>
-                )}
+            </div>
+            {/* Project name bar */}
+            <div className="flex h-10 items-center justify-between border-t-[0.5px] border-dash-border bg-dash-bg-elevated px-3.5">
+              <span className="text-sm leading-5 tracking-[-0.02px] text-dash-text-faded">
+                {projectName}
+              </span>
+              <div className="flex items-center gap-2">
+                {liveHref ? (
+                  <a
+                    href={liveHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2"
+                  >
+                    <span className="text-xs font-light leading-[18px] tracking-[-0.02px] text-dash-text-faded opacity-80">
+                      View live
+                    </span>
+                    <ExternalLink className="size-4 text-dash-text-faded" />
+                  </a>
+                ) : null}
               </div>
             </div>
           </div>
-          {/* Project name bar */}
-              <div className="flex h-10 items-center justify-between border-t-[0.5px] border-dash-border bg-dash-bg-elevated px-3.5">
-            <span className="text-sm leading-5 tracking-[-0.02px] text-dash-text-faded">
-              {projectName}
-            </span>
-            <div className="flex items-center gap-2">
-              {liveHref ? (
-                <a
-                  href={liveHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2"
-                >
-                  <span className="text-xs font-light leading-[18px] tracking-[-0.02px] text-dash-text-faded opacity-80">
-                    View live
-                  </span>
-                  <ExternalLink className="size-4 text-dash-text-faded" />
-                </a>
-              ) : null}
-            </div>
-          </div>
-        </div>
+        ) : null}
 
-        {/* Two cards side by side */}
-        <div className="flex flex-col gap-4 md:flex-row">
+        {/* Meta / deployments cards */}
+        <div className={`flex flex-col gap-4 ${isDatabaseProject ? "" : "md:flex-row"}`}>
           {/* Project meta card */}
           <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
             <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
@@ -193,12 +191,7 @@ function ProjectDetailPage() {
                 <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
                   Project status
                 </span>
-                <div className={`flex h-5 items-center gap-2 rounded-[4px] px-2 ${statusChipClass}`}>
-                  <span className="size-1.5 rounded-full bg-white" />
-                  <span className="text-[8px] font-medium tracking-[-0.01px] text-white">
-                    {projectStatus}
-                  </span>
-                </div>
+                <StatusChip status={projectStatus} />
               </div>
               <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                 <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
@@ -222,14 +215,16 @@ function ProjectDetailPage() {
                   {regionText}
                 </span>
               </div>
-              <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
-                <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
-                  Site password enabled
-                </span>
-                <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
-                  {passwordEnabledText}
-                </span>
-              </div>
+              {!isDatabaseProject ? (
+                <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
+                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
+                    Site password enabled
+                  </span>
+                  <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
+                    {passwordEnabledText}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                 <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
                   Compute size
@@ -238,7 +233,9 @@ function ProjectDetailPage() {
                   {computeSizeText}
                 </span>
               </div>
-              <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
+              <div
+                className={`flex items-center justify-between p-3.5 ${!isDatabaseProject ? "border-b-[0.5px] border-dash-border" : ""}`}
+              >
                 <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
                   Framework
                 </span>
@@ -253,45 +250,48 @@ function ProjectDetailPage() {
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between p-3.5">
-                <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-faded">
-                  Repository
-                </span>
-                <div className="flex items-center gap-2">
-                  {repositoryHref ? (
-                    <a
-                      href={repositoryHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2"
-                    >
-                      <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
-                        From <span className="underline">{repoName}</span>
-                      </span>
-                      <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                        <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
-                          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                        </svg>
-                      </div>
-                    </a>
-                  ) : (
-                    <>
-                      <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
-                        From <span className="underline">{repoName}</span>
-                      </span>
-                      <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                        <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
-                          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                        </svg>
-                      </div>
-                    </>
-                  )}
+              {!isDatabaseProject ? (
+                <div className="flex items-center justify-between p-3.5">
+                  <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-faded">
+                    Repository
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {repositoryHref ? (
+                      <a
+                        href={repositoryHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2"
+                      >
+                        <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
+                          From <span className="underline">{repoName}</span>
+                        </span>
+                        <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
+                          <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                          </svg>
+                        </div>
+                      </a>
+                    ) : (
+                      <>
+                        <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
+                          From <span className="underline">{repoName}</span>
+                        </span>
+                        <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
+                          <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                          </svg>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           </div>
 
           {/* Deployments card */}
+          {!isDatabaseProject ? (
           <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
             <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
               <span className="text-dash-text-strong">Deployments</span>
@@ -365,9 +365,12 @@ function ProjectDetailPage() {
               )}
             </div>
           </div>
+          ) : null}
         </div>
       </div>
 
+      {!isDatabaseProject ? (
+      <>
       {/* Project domains section */}
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-2">
@@ -460,14 +463,18 @@ function ProjectDetailPage() {
           </tbody>
         </table>
       </div>
+      </>
+      ) : null}
 
       {/* Deployment logs drawer */}
-      <DeploymentLogsDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        environment="Production"
-        status="Successful"
-      />
+      {!isDatabaseProject ? (
+        <DeploymentLogsDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          environment="Production"
+          status="Successful"
+        />
+      ) : null}
     </div>
   );
 }

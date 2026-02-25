@@ -13,6 +13,7 @@ import {
   getProjectObservabilityMetricsServerFn,
 } from "@/server/observability/actions";
 import { normalizeMemoryGbValue } from "@/utils/project-configuration";
+import { isDatabaseProject, shouldShowProjectObservabilityTab } from "@/utils/project-capabilities";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -167,12 +168,10 @@ function AppMetrics({
     };
   }, [timeInterval, fetchMetrics, project.id, workspace, initialMetrics]);
 
-  const chartTabs: MetricChart[] = [
-    "Memory Usage",
-    "CPU Usage",
-    "Network Egress",
-    "Response Times",
-  ];
+  const isDbProject = isDatabaseProject(project as any);
+  const chartTabs: MetricChart[] = isDbProject
+    ? ["Memory Usage", "CPU Usage", "Network Egress"]
+    : ["Memory Usage", "CPU Usage", "Network Egress", "Response Times"];
 
   const aggregateSeries = useMemo(() => {
     const results = Array.isArray(metrics?.results) ? metrics.results : [];
@@ -240,7 +239,7 @@ function AppMetrics({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <TabHeader title="Metrics & Observability">
           Monitor your app's key metrics and health.
           {grafanaUrl ? (
@@ -260,7 +259,7 @@ function AppMetrics({
         <TimeIntervalDropdown value={timeInterval} onChange={setTimeInterval} />
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row">
         <SemiGauge
           value={cpuPercent}
           max={100}
@@ -280,24 +279,26 @@ function AppMetrics({
       </div>
 
       <div className="rounded-[4px] border-[0.5px] border-dash-border">
-        <div className="flex items-center justify-between border-b-[0.5px] border-dash-border">
-          <div className="flex">
-            {chartTabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveChart(tab)}
-                className={`px-4 py-3 text-sm transition-colors ${
-                  activeChart === tab
-                    ? "border-b-2 border-[#f5a623] font-medium text-[#f5a623]"
-                    : "font-light text-dash-text-faded hover:text-dash-text-body"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+        <div className="flex flex-col gap-2 border-b-[0.5px] border-dash-border sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+          <div className="scrollbar-hidden min-w-0 overflow-x-auto">
+            <div className="flex min-w-max">
+              {chartTabs.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveChart(tab)}
+                  className={`whitespace-nowrap px-4 py-3 text-sm transition-colors ${
+                    activeChart === tab
+                      ? "border-b-2 border-[#f5a623] font-medium text-[#f5a623]"
+                      : "font-light text-dash-text-faded hover:text-dash-text-body"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
           </div>
           {activeChart === "Response Times" ? (
-            <div className="pr-4">
+            <div className="px-4 pb-3 sm:pb-0 sm:pr-4">
               <SegmentedToggle
                 options={["P90", "P95", "P99", "Average"]}
                 value={responseMetric}
@@ -306,7 +307,7 @@ function AppMetrics({
             </div>
           ) : null}
         </div>
-        <div className="min-w-0 overflow-hidden px-5 pb-5 pt-8">
+        <div className="min-w-0 overflow-hidden px-3 pb-4 pt-6 sm:px-5 sm:pb-5 sm:pt-8">
           {loadingMetrics ? (
             <div className="flex h-[260px] items-center justify-center text-sm text-dash-text-faded">
               Loading metrics...
@@ -396,8 +397,8 @@ function VisitorBarChart() {
   const barH = 240;
 
   return (
-    <div className="mt-6">
-      <div className="flex gap-0">
+    <div className="scrollbar-hidden mt-6 overflow-x-auto">
+      <div className="flex min-w-[540px] gap-0 sm:min-w-0">
         {visitorData.map((d, i) => {
           const pct = d.value / max;
           const valH = Math.max(pct * barH, 6);
@@ -463,21 +464,21 @@ function VisitorBarChart() {
 function ListCard({ title, subtitle, items, showSeeAll }: { title: string; subtitle?: string; items: { label: string; icon?: string; value: string }[]; showSeeAll?: boolean }) {
   return (
     <div className="flex flex-1 flex-col rounded-[4px] border-[0.5px] border-dash-border">
-      <div className="flex items-center justify-between border-b-[0.5px] border-dash-border px-4 py-3">
+      <div className="flex items-start justify-between gap-3 border-b-[0.5px] border-dash-border px-4 py-3">
         <div>
           <h3 className="text-sm font-medium text-dash-text-strong">{title}</h3>
           {subtitle && <p className="text-xs font-light text-dash-text-faded">{subtitle}</p>}
         </div>
-        {showSeeAll && <button className="text-xs text-[#4879f8] hover:underline">See all</button>}
+        {showSeeAll && <button className="shrink-0 text-xs text-[#4879f8] hover:underline">See all</button>}
       </div>
       <div className="flex flex-col">
         {items.map((item, i) => (
           <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i < items.length - 1 ? "border-b-[0.5px] border-dash-border-soft" : ""}`}>
-            <div className="flex items-center gap-2">
+            <div className="min-w-0 flex items-center gap-2">
               {item.icon && <span className="text-sm">{item.icon}</span>}
-              <span className="text-sm font-light text-dash-text-body">{item.label}</span>
+              <span className="truncate text-sm font-light text-dash-text-body">{item.label}</span>
             </div>
-            <span className="text-xs text-dash-text-faded">{item.value}</span>
+            <span className="shrink-0 pl-3 text-xs text-dash-text-faded">{item.value}</span>
           </div>
         ))}
       </div>
@@ -518,7 +519,7 @@ function AppAnalytics() {
         </a>
       </TabHeader>
 
-      <div className="flex items-center justify-between overflow-hidden rounded-lg bg-gradient-to-r from-[#2d2b55] via-[#3b3875] to-[#2d2b55] px-6 py-5">
+      <div className="flex flex-col gap-4 overflow-hidden rounded-lg bg-gradient-to-r from-[#2d2b55] via-[#3b3875] to-[#2d2b55] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-medium uppercase tracking-[1px] text-white/60">
             Analytics TLDR:
@@ -529,31 +530,31 @@ function AppAnalytics() {
             with 'kemdrim.brimble.app'.
           </p>
         </div>
-        <div className="flex items-center gap-8">
-          <div className="flex flex-col items-center">
+        <div className="flex w-full flex-wrap items-center gap-4 sm:w-auto sm:flex-nowrap sm:gap-8">
+          <div className="flex min-w-[110px] flex-col items-start sm:items-center">
             <span className="text-3xl font-medium text-white">322</span>
             <span className="text-[9px] font-medium uppercase tracking-[0.5px] text-white/40">Unique Visitors</span>
           </div>
-          <div className="flex flex-col items-center">
+          <div className="flex min-w-[90px] flex-col items-start sm:items-center">
             <span className="text-3xl font-medium text-white">21</span>
             <span className="text-[9px] font-medium uppercase tracking-[0.5px] text-white/40">Countries</span>
           </div>
-          <MiniSparkline className="h-10 w-[140px]" />
+          <MiniSparkline className="h-10 w-[120px] sm:w-[140px]" />
         </div>
       </div>
 
       <div className="rounded-[4px] border-[0.5px] border-dash-border p-5">
-        <div className="mb-1 flex items-center justify-between">
+        <div className="mb-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-light text-dash-text-faded">Site Visitors</p>
             <span className="text-[32px] font-medium leading-tight tracking-tight text-dash-text-strong">4,900,442</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
             <SegmentedToggle options={["Visitors", "Page Views"]} value={visitorTab} onChange={setVisitorTab} />
             <div ref={periodRef} className="relative">
               <button
                 onClick={() => setPeriodOpen(!periodOpen)}
-                className="flex items-center gap-1.5 rounded-[4px] border-[0.5px] border-dash-border px-3 py-1.5 text-xs font-medium text-dash-text-strong"
+                className="flex w-full items-center justify-between gap-1.5 rounded-[4px] border-[0.5px] border-dash-border px-3 py-1.5 text-xs font-medium text-dash-text-strong sm:w-auto sm:justify-start"
               >
                 {analyticsPeriod}
                 <ChevronDown
@@ -586,15 +587,15 @@ function AppAnalytics() {
         <VisitorBarChart />
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row">
         <ListCard title="Top pages" subtitle="Most visited pages" showSeeAll items={topPages.map((p) => ({ label: p.path, value: `${p.visitors} Visitors` }))} />
         <ListCard title="Funnel" subtitle="Where your visitors have come from" items={funnelSources.map((s) => ({ label: s.name, icon: s.icon, value: String(s.visitors) }))} />
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row">
         <ListCard title="Countries" subtitle="Pages with the highest amount of visitors" showSeeAll items={countries.map((c) => ({ label: c.name, icon: c.flag, value: `${c.visitors} Visitors` }))} />
         <div className="flex flex-1 flex-col rounded-[4px] border-[0.5px] border-dash-border">
-          <div className="flex items-center justify-between border-b-[0.5px] border-dash-border px-4 py-3">
+          <div className="flex flex-col gap-2 border-b-[0.5px] border-dash-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-sm font-medium text-dash-text-strong">Browser & Device Information</h3>
             <SegmentedToggle options={["Browsers", "Devices"]} value={browserTab} onChange={setBrowserTab} />
           </div>
@@ -614,15 +615,25 @@ function AppAnalytics() {
 
 function ObservabilityPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
+  if (!shouldShowProjectObservabilityTab(project)) {
+    return (
+      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 px-4 py-8 sm:px-0">
+        <TabHeader title="Metrics & Observability">
+          Observability is not available for static projects.
+        </TabHeader>
+      </div>
+    );
+  }
   const { metrics, grafanaUrl } = Route.useLoaderData();
   const [section, setSection] = useState<"metrics" | "analytics">("metrics");
 
   return (
-    <div className="mx-auto flex max-w-[1000px] flex-col gap-6 py-8">
-      <div className="flex items-center gap-1 self-start rounded-[4px] border-[0.5px] border-dash-border p-0.5">
+    <div className="mx-auto flex max-w-[1000px] flex-col gap-6 px-4 py-8 sm:px-0">
+      <div className="scrollbar-hidden w-full overflow-x-auto sm:w-auto sm:self-start">
+        <div className="flex min-w-max items-center gap-1 rounded-[4px] border-[0.5px] border-dash-border p-0.5">
         <button
           onClick={() => setSection("metrics")}
-          className={`rounded-[3px] px-4 py-1.5 text-sm font-medium transition-colors ${
+          className={`whitespace-nowrap rounded-[3px] px-4 py-1.5 text-sm font-medium transition-colors ${
             section === "metrics"
               ? "bg-dash-bg-elevated text-dash-text-strong"
               : "text-dash-text-faded hover:text-dash-text-body"
@@ -632,7 +643,7 @@ function ObservabilityPage() {
         </button>
         <button
           onClick={() => setSection("analytics")}
-          className={`rounded-[3px] px-4 py-1.5 text-sm font-medium transition-colors ${
+          className={`whitespace-nowrap rounded-[3px] px-4 py-1.5 text-sm font-medium transition-colors ${
             section === "analytics"
               ? "bg-dash-bg-elevated text-dash-text-strong"
               : "text-dash-text-faded hover:text-dash-text-body"
@@ -640,6 +651,7 @@ function ObservabilityPage() {
         >
           App Analytics
         </button>
+        </div>
       </div>
 
       {section === "metrics" ? (

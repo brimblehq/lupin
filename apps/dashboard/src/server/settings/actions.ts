@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createBackendApi } from "@/backend";
 import type {
+  InitializeSettingsAddCardInput,
   SettingsSidebarSnapshot,
   TestWebhookInput,
   UpdateSettingsBuildsInput,
@@ -18,24 +19,43 @@ function getServerBackendApi() {
   });
 }
 
+async function resolveWorkspaceSubscriptionId(backend: ReturnType<typeof getServerBackendApi>, workspace?: string) {
+  const workspaceSlug = workspace?.trim().toLowerCase();
+  if (!workspaceSlug) {
+    return undefined;
+  }
+
+  try {
+    const team = await backend.teams.getByName(workspaceSlug);
+    return team.subscriptionId?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const getSettingsSidebarSnapshotServerFn = createServerFn({
   method: "GET",
-}).handler(async () => {
-  const snapshot = await getServerBackendApi().settings.getSidebarSnapshot(1);
+}).handler(async ({ data }) => {
+  const payload = data as { workspace?: string } | undefined;
+  const backend = getServerBackendApi();
+  const subscriptionId = await resolveWorkspaceSubscriptionId(backend, payload?.workspace);
+  const snapshot = await backend.settings.getSidebarSnapshot(1, { subscriptionId });
   return snapshot satisfies SettingsSidebarSnapshot;
 });
 
 export const listSettingsInvoicesServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {
-  const payload = data as unknown as { page?: number } | undefined;
+  const payload = data as unknown as { page?: number; workspace?: string } | undefined;
   let page = 1;
 
   if (typeof payload?.page === "number") {
     page = Math.max(1, Math.floor(payload.page));
   }
 
-  return getServerBackendApi().settings.getInvoices(page);
+  const backend = getServerBackendApi();
+  const subscriptionId = await resolveWorkspaceSubscriptionId(backend, payload?.workspace);
+  return backend.settings.getInvoices(page, { subscriptionId });
 });
 
 export const updateSettingsProfileServerFn = createServerFn({
@@ -94,6 +114,13 @@ export const testSettingsWebhookServerFn = createServerFn({
   const input = data as unknown as TestWebhookInput;
   await getServerBackendApi().settings.testWebhook(input);
   return { ok: true } as const;
+});
+
+export const initializeSettingsAddCardServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const input = data as unknown as InitializeSettingsAddCardInput;
+  return getServerBackendApi().settings.initializeAddCard(input);
 });
 
 export const updateSettingsWebhooksServerFn = createServerFn({

@@ -1,4 +1,13 @@
 import type { ApiClient, ApiListResponse } from "./types";
+import config from "@/config";
+import {
+  asNonEmptyString,
+  asRecord,
+  pickBoolean,
+  pickNonEmptyString,
+  pickNumber,
+  pickString,
+} from "./normalize";
 
 export interface DomainRecord {
   id: string;
@@ -75,6 +84,16 @@ export interface SearchDomainResult {
   renewalPrice?: number;
 }
 
+export interface PurchaseDomainInput {
+  name: string;
+  duration: number;
+  cardId: string;
+  projectId?: string;
+  privacyEnabled: boolean;
+  autoRenewal: boolean;
+  teamId?: string;
+}
+
 export interface DomainsApi {
   list(input?: ListDomainsInput): Promise<PaginatedDomainsResponse>;
   getStatus(domainName: string, input?: { teamId?: string }): Promise<DomainRecord | null>;
@@ -86,67 +105,57 @@ export interface DomainsApi {
   update(input: UpdateDomainInput): Promise<DomainRecord>;
   transfer(input: { domainId: string; projectId: string; teamId?: string }): Promise<void>;
   searchSale(domainName: string): Promise<SearchDomainResult[]>;
+  purchaseSale(input: PurchaseDomainInput): Promise<void>;
   verify(domainId: string): Promise<DomainRecord>;
   remove(input: { domainId: string; projectId?: string; teamId?: string }): Promise<void>;
+  createDnsRecord(input: {
+    domain: string;
+    record: { type: string; value: string; name: string; ttl?: number; isProxied?: boolean };
+    teamId?: string;
+  }): Promise<DomainDetailDnsRecord>;
+  updateDnsRecord(input: {
+    domain: string;
+    recordId: string;
+    record: { type: string; value: string; name: string; ttl?: number; isProxied?: boolean };
+    teamId?: string;
+  }): Promise<DomainDetailDnsRecord>;
+  deleteDnsRecord(input: { domain: string; recordId: string; teamId?: string }): Promise<void>;
 }
 
 function mapDomainRecord(domain: any): DomainRecord | null {
-  let name = "";
-  if (typeof domain?.name === "string") {
-    name = domain.name.trim();
-  }
-  if (!name && typeof domain?.whois?.name === "string") {
-    name = domain.whois.name.trim();
-  }
+  const row = asRecord(domain) ?? {};
+  const whoisRecord = asRecord(row.whois);
+  const whoisUserRecord = asRecord(whoisRecord?.user);
+  const projectRecord = asRecord(row.project);
+
+  const name = pickNonEmptyString(row, "name") ?? pickNonEmptyString(whoisRecord, "name") ?? "";
   if (!name) {
     return null;
   }
 
   let projectId: string | undefined;
   let projectName: string | undefined;
-  if (domain?.project && typeof domain.project === "object") {
-    if (domain.project.id != null || domain.project._id != null) {
-      projectId = String(domain.project.id ?? domain.project._id);
+  if (projectRecord) {
+    if (projectRecord.id != null || projectRecord._id != null) {
+      projectId = String(projectRecord.id ?? projectRecord._id);
     }
-    if (typeof domain.project.name === "string" && domain.project.name.trim()) {
-      projectName = domain.project.name.trim();
-    }
-  } else if (typeof domain?.project === "string" && domain.project.trim()) {
-    projectId = domain.project.trim();
+    projectName = pickNonEmptyString(projectRecord, "name");
+  } else {
+    projectId = asNonEmptyString(row.project);
   }
 
   let createdByName: string | undefined;
-  let firstName = "";
-  if (typeof domain?.whois?.user?.first_name === "string") {
-    firstName = domain.whois.user.first_name.trim();
-  }
-
-  let lastName = "";
-  if (typeof domain?.whois?.user?.last_name === "string") {
-    lastName = domain.whois.user.last_name.trim();
-  }
+  const firstName = pickNonEmptyString(whoisUserRecord, "first_name") ?? "";
+  const lastName = pickNonEmptyString(whoisUserRecord, "last_name") ?? "";
   if (firstName || lastName) {
     createdByName = `${firstName} ${lastName}`.trim();
   }
 
-  let active = false;
-  if (typeof domain?.active === "boolean") {
-    active = domain.active;
-  } else if (typeof domain?.enabled === "boolean") {
-    active = domain.enabled;
-  }
+  const active = pickBoolean(row, "active", "enabled") ?? false;
+  const enabled = pickBoolean(row, "enabled");
 
-  let enabled: boolean | undefined;
-  if (typeof domain?.enabled === "boolean") {
-    enabled = domain.enabled;
-  }
-
-  let isCustom: boolean | undefined;
-  if (typeof domain?.isCustom === "boolean") {
-    isCustom = domain.isCustom;
-  } else if (typeof domain?.is_custom === "boolean") {
-    isCustom = domain.is_custom;
-  } else {
+  let isCustom = pickBoolean(row, "isCustom", "is_custom");
+  if (isCustom === undefined) {
     const lowerName = name.toLowerCase();
     const isBrimbleManagedDefault =
       lowerName.endsWith(".brimble.app") || lowerName.endsWith(".brimble.io");
@@ -156,47 +165,23 @@ function mapDomainRecord(domain: any): DomainRecord | null {
     }
   }
 
-  let isExpired: boolean | undefined;
-  if (typeof domain?.isExpired === "boolean") {
-    isExpired = domain.isExpired;
-  }
-
-  let purchased: boolean | undefined;
-  if (typeof domain?.purchased === "boolean") {
-    purchased = domain.purchased;
-  }
+  const isExpired = pickBoolean(row, "isExpired");
+  const purchased = pickBoolean(row, "purchased");
 
   let redirect: DomainRecord["redirect"] = null;
-  if (domain?.redirect && typeof domain.redirect === "object") {
-    let status: number | undefined;
-    if (typeof domain.redirect.status === "number") {
-      status = domain.redirect.status;
-    }
-
-    let url: string | undefined;
-    if (typeof domain.redirect.url === "string" && domain.redirect.url.trim()) {
-      url = domain.redirect.url.trim();
-    }
-
-    redirect = { url, status };
+  const redirectRecord = asRecord(row.redirect);
+  if (redirectRecord) {
+    redirect = {
+      url: pickNonEmptyString(redirectRecord, "url"),
+      status: pickNumber(redirectRecord, "status"),
+    };
   }
 
-  let createdAt: string | undefined;
-  if (typeof domain?.createdAt === "string") {
-    createdAt = domain.createdAt;
-  } else if (typeof domain?.created_at === "string") {
-    createdAt = domain.created_at;
-  }
-
-  let updatedAt: string | undefined;
-  if (typeof domain?.updatedAt === "string") {
-    updatedAt = domain.updatedAt;
-  } else if (typeof domain?.updated_at === "string") {
-    updatedAt = domain.updated_at;
-  }
+  const createdAt = pickString(row, "createdAt", "created_at");
+  const updatedAt = pickString(row, "updatedAt", "updated_at");
 
   return {
-    id: String(domain?.id ?? domain?._id ?? name),
+    id: String(row.id ?? row._id ?? name),
     name,
     projectId,
     projectName,
@@ -218,37 +203,24 @@ function mapDomainDetailsRecord(domain: any): DomainDetailsRecord | null {
     return null;
   }
 
-  let registrar: string | undefined;
-  if (typeof domain?.whois?.registrar === "string" && domain.whois.registrar.trim()) {
-    registrar = domain.whois.registrar.trim();
-  }
+  const row = asRecord(domain) ?? {};
+  const whoisRecord = asRecord(row.whois);
+  const whoisUserRecord = asRecord(whoisRecord?.user);
+  const nameserverRecord = asRecord(row.nameserver);
+  const registrar = pickNonEmptyString(whoisRecord, "registrar");
 
   let creatorName: string | undefined;
-  let firstName = "";
-  if (typeof domain?.whois?.user?.first_name === "string") {
-    firstName = domain.whois.user.first_name.trim();
-  }
-  let lastName = "";
-  if (typeof domain?.whois?.user?.last_name === "string") {
-    lastName = domain.whois.user.last_name.trim();
-  }
+  const firstName = pickNonEmptyString(whoisUserRecord, "first_name") ?? "";
+  const lastName = pickNonEmptyString(whoisUserRecord, "last_name") ?? "";
   if (firstName || lastName) {
     creatorName = `${firstName} ${lastName}`.trim();
   }
 
-  let expiresAt: string | undefined;
-  if (typeof domain?.whois?.expires_at === "string" && domain.whois.expires_at.trim()) {
-    expiresAt = domain.whois.expires_at.trim();
-  } else if (
-    typeof domain?.whois?.renewal_date === "string" &&
-    domain.whois.renewal_date.trim()
-  ) {
-    expiresAt = domain.whois.renewal_date.trim();
-  }
+  const expiresAt = pickNonEmptyString(whoisRecord, "expires_at", "renewal_date");
 
   let nameservers: string[] = [];
-  if (Array.isArray(domain?.nameservers)) {
-    nameservers = domain.nameservers
+  if (Array.isArray(row.nameservers)) {
+    nameservers = row.nameservers
       .map((item: unknown) => {
         if (typeof item === "string") {
           return item.trim();
@@ -259,17 +231,17 @@ function mapDomainDetailsRecord(domain: any): DomainDetailsRecord | null {
   }
 
   let nameserver: DomainDetailsRecord["nameserver"] = null;
-  if (domain?.nameserver && typeof domain.nameserver === "object") {
+  if (nameserverRecord) {
     let expected: string[] = [];
-    if (Array.isArray(domain.nameserver.expected)) {
-      expected = domain.nameserver.expected
+    if (Array.isArray(nameserverRecord.expected)) {
+      expected = nameserverRecord.expected
         .map((item: unknown) => (typeof item === "string" ? item.trim() : ""))
         .filter(Boolean);
     }
 
     let actual: string[] = [];
-    if (Array.isArray(domain.nameserver.actual)) {
-      actual = domain.nameserver.actual
+    if (Array.isArray(nameserverRecord.actual)) {
+      actual = nameserverRecord.actual
         .map((item: unknown) => (typeof item === "string" ? item.trim() : ""))
         .filter(Boolean);
     }
@@ -278,42 +250,23 @@ function mapDomainDetailsRecord(domain: any): DomainDetailsRecord | null {
   }
 
   let dnsRecords: DomainDetailDnsRecord[] = [];
-  if (Array.isArray(domain?.dns)) {
-    dnsRecords = domain.dns
+  if (Array.isArray(row.dns)) {
+    dnsRecords = row.dns
       .map((record: any) => {
-        let name = "";
-        if (typeof record?.name === "string") {
-          name = record.name.trim();
-        }
-
-        let type = "";
-        if (typeof record?.type === "string") {
-          type = record.type.trim();
-        }
-
-        let value = "";
-        if (typeof record?.value === "string") {
-          value = record.value.trim();
-        }
+        const recordRow = asRecord(record) ?? {};
+        const name = pickNonEmptyString(recordRow, "name") ?? "";
+        const type = pickNonEmptyString(recordRow, "type") ?? "";
+        const value = pickNonEmptyString(recordRow, "value") ?? "";
 
         if (!name && !type && !value) {
           return null;
         }
 
-        let ttl: number | undefined;
-        if (typeof record?.ttl === "number") {
-          ttl = record.ttl;
-        }
-
-        let isProxied: boolean | undefined;
-        if (typeof record?.isProxied === "boolean") {
-          isProxied = record.isProxied;
-        } else if (typeof record?.is_proxied === "boolean") {
-          isProxied = record.is_proxied;
-        }
+        const ttl = pickNumber(recordRow, "ttl");
+        const isProxied = pickBoolean(recordRow, "isProxied", "is_proxied");
 
         return {
-          id: String(record?.id ?? record?._id ?? `${type}:${name}:${value}`),
+          id: String(recordRow.id ?? recordRow._id ?? `${type}:${name}:${value}`),
           name,
           type,
           value,
@@ -334,6 +287,26 @@ function mapDomainDetailsRecord(domain: any): DomainDetailsRecord | null {
     nameservers,
     nameserver,
     dnsRecords,
+  };
+}
+
+function mapDnsRecord(record: any): DomainDetailDnsRecord | null {
+  const recordRow = asRecord(record) ?? {};
+  const name = pickNonEmptyString(recordRow, "name") ?? "";
+  const type = pickNonEmptyString(recordRow, "type") ?? "";
+  const value = pickNonEmptyString(recordRow, "value") ?? "";
+
+  if (!name && !type && !value) {
+    return null;
+  }
+
+  return {
+    id: String(recordRow.id ?? recordRow._id ?? `${type}:${name}:${value}`),
+    name,
+    type,
+    value,
+    ttl: pickNumber(recordRow, "ttl"),
+    isProxied: pickBoolean(recordRow, "isProxied", "is_proxied"),
   };
 }
 
@@ -364,28 +337,10 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
         .map((domain: any) => mapDomainRecord(domain))
         .filter((domain: DomainRecord | null): domain is DomainRecord => domain !== null);
 
-      let currentPage = 1;
-      if (typeof root?.currentPage === "number") {
-        currentPage = root.currentPage;
-      } else if (typeof root?.current_page === "number") {
-        currentPage = root.current_page;
-      }
-
-      let totalPages = 1;
-      if (typeof root?.totalPages === "number") {
-        totalPages = root.totalPages;
-      } else if (typeof root?.total_pages === "number") {
-        totalPages = root.total_pages;
-      }
-
-      let total: number | undefined;
-      if (typeof root?.total === "number") {
-        total = root.total;
-      } else if (typeof root?.overallTotalDomains === "number") {
-        total = root.overallTotalDomains;
-      } else if (typeof root?.count === "number") {
-        total = root.count;
-      }
+      const rootRecord = asRecord(root);
+      const currentPage = pickNumber(rootRecord, "currentPage", "current_page") ?? 1;
+      const totalPages = pickNumber(rootRecord, "totalPages", "total_pages") ?? 1;
+      const total = pickNumber(rootRecord, "total", "overallTotalDomains", "count");
 
       return {
         items,
@@ -501,26 +456,35 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
 
       return items
         .map((item: any) => {
-          let name = "";
-          if (typeof item?.domainName === "string") {
-            name = item.domainName;
-          } else if (typeof item?.name === "string") {
-            name = item.name;
-          }
+          const row = asRecord(item);
+          const name = pickString(row, "domainName", "name") ?? "";
           if (!name) {
             return null;
           }
 
           return {
             domainName: name,
-            purchasable: Boolean(item?.purchasable),
-            purchasePrice:
-              typeof item?.purchasePrice === "number" ? item.purchasePrice : undefined,
-            renewalPrice:
-              typeof item?.renewalPrice === "number" ? item.renewalPrice : undefined,
+            purchasable: Boolean(row?.purchasable),
+            purchasePrice: pickNumber(row, "purchasePrice"),
+            renewalPrice: pickNumber(row, "renewalPrice"),
           } satisfies SearchDomainResult;
         })
         .filter((item: SearchDomainResult | null): item is SearchDomainResult => item !== null);
+    },
+
+    async purchaseSale(input) {
+      await client.request<any>("/core/v1/domains/sale/purchase", {
+        method: "POST",
+        body: {
+          name: input.name,
+          duration: input.duration,
+          cardId: input.cardId,
+          projectId: input.projectId ?? null,
+          privacyEnabled: input.privacyEnabled,
+          autoRenewal: input.autoRenewal,
+          teamId: input.teamId,
+        },
+      });
     },
 
     async verify() {
@@ -544,6 +508,83 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
           teamId: input.teamId,
         },
       });
+    },
+
+    async createDnsRecord(input) {
+      const response = await client.request<any>(config.dnsApiUrl, {
+        method: "POST",
+        query: {
+          teamId: input.teamId,
+        },
+        body: {
+          domain: input.domain,
+          record: input.record,
+        },
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const record =
+        mapDnsRecord(root?.record) ??
+        mapDnsRecord(root?.dns) ??
+        mapDnsRecord(root);
+
+      if (!record) {
+        return {
+          id: `${input.record.type}:${input.record.name}:${input.record.value}`,
+          name: input.record.name,
+          type: input.record.type,
+          value: input.record.value,
+        };
+      }
+
+      return record;
+    },
+
+    async updateDnsRecord(input) {
+      const response = await client.request<any>(
+        `${config.dnsApiUrl}/${encodeURIComponent(input.domain)}/${encodeURIComponent(input.recordId)}`,
+        {
+          method: "PATCH",
+          query: {
+            teamId: input.teamId,
+          },
+          body: {
+            record: input.record,
+          },
+        },
+      );
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const record =
+        mapDnsRecord(root?.record) ??
+        mapDnsRecord(root?.dns) ??
+        mapDnsRecord(root);
+
+      if (!record) {
+        return {
+          id: input.recordId,
+          name: input.record.name,
+          type: input.record.type,
+          value: input.record.value,
+        };
+      }
+
+      return {
+        ...record,
+        id: record.id || input.recordId,
+      };
+    },
+
+    async deleteDnsRecord(input) {
+      await client.request<any>(
+        `${config.dnsApiUrl}/${encodeURIComponent(input.domain)}/${encodeURIComponent(input.recordId)}`,
+        {
+          method: "DELETE",
+          query: {
+            teamId: input.teamId,
+          },
+        },
+      );
     },
   };
 }

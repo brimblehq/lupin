@@ -1,16 +1,20 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Search,
   Bell,
+  LoaderCircle,
   HelpCircle,
   ChevronDown,
   Plus,
   Globe,
   Users,
+  Menu,
+  X,
 } from "lucide-react";
 import { House } from "@phosphor-icons/react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../../hooks/use-theme";
 import { DashButton } from "../shared/dash-button";
@@ -19,12 +23,30 @@ import config from "@/config";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import type { Workspace } from "@/backend/workspaces";
 import type { Project } from "@/backend/projects";
+import type { AppTooltipMessage } from "@/backend/messages";
+import { listTooltipMessagesServerFn } from "@/server/messages/actions";
 import { toTitleCase } from "@/utils/dashboard";
 import {
   buildProjectSwitchUrl,
   buildWorkspaceSwitchUrl,
   withWorkspaceQuery,
 } from "@/utils/topbar-navigation";
+
+function getWorkspaceSearch(searchStr?: string) {
+  const params = new URLSearchParams(searchStr || "");
+  const workspace = params.get("workspace")?.trim();
+  return workspace ? ({ workspace } as const) : undefined;
+}
+
+function splitInternalUrl(url: string) {
+  const [to, query = ""] = url.split("?");
+  const params = new URLSearchParams(query);
+  const search = Object.fromEntries(params.entries());
+  return {
+    to: (to || "/") as string,
+    search: Object.keys(search).length > 0 ? (search as Record<string, string>) : undefined,
+  };
+}
 
 function ProjectSwitcher({
   projectId,
@@ -102,13 +124,17 @@ function ProjectSwitcher({
                     searchStr,
                     targetProjectId: nextProjectId,
                   });
+                  const nextNav = splitInternalUrl(nextUrl);
 
                   return (
                     <button
                       key={project.id || nextProjectId}
                       onClick={() => {
                         setOpen(false);
-                        navigate({ to: nextUrl as any });
+                        navigate({
+                          to: nextNav.to as any,
+                          search: nextNav.search as any,
+                        });
                       }}
                       className={`flex h-8 items-center pl-px pr-2 text-left text-sm transition-colors ${
                         isActive
@@ -125,14 +151,20 @@ function ProjectSwitcher({
               )}
             </div>
             {/* Create project */}
-            <Link
-              to={searchStr ? `/projects/new?${searchStr}` : "/projects/new"}
-              onClick={() => setOpen(false)}
-              className="flex h-10 items-center gap-2 bg-dash-bg-elevated px-3.5 text-sm text-dash-text-faded hover:text-dash-text-body transition-colors"
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                navigate({
+                  to: "/projects/new",
+                  search: getWorkspaceSearch(searchStr) as any,
+                });
+              }}
+              className="flex h-10 w-full items-center gap-2 bg-dash-bg-elevated px-3.5 text-left text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
             >
               <Plus className="size-4" />
               Create project
-            </Link>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -202,8 +234,12 @@ function WorkspaceSwitcher({
       searchStr,
       workspaceSlug,
     });
+    const nextNav = splitInternalUrl(nextUrl);
 
-    navigate({ to: nextUrl as any });
+    navigate({
+      to: nextNav.to as any,
+      search: nextNav.search as any,
+    });
   };
 
   const filteredTeams = workspaces.filter((team) => {
@@ -222,7 +258,7 @@ function WorkspaceSwitcher({
         className="flex items-center gap-2 text-sm font-medium text-dash-text-strong"
       >
         <img src={activeWorkspaceAvatar} alt="" className="size-6 rounded-full object-cover" />
-        <span>{activeWorkspaceLabel}</span>
+        <span className="truncate max-w-[180px]">{activeWorkspaceLabel}</span>
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
@@ -324,7 +360,10 @@ function WorkspaceSwitcher({
               <button
                 onClick={() => {
                   setOpen(false);
-                  navigate({ to: withWorkspaceQuery({ pathname: "/projects", searchStr }) as any });
+                  navigate({
+                    to: "/projects",
+                    search: getWorkspaceSearch(searchStr) as any,
+                  });
                 }}
                 className="flex h-10 w-full items-center gap-2 px-3.5 text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
               >
@@ -334,7 +373,10 @@ function WorkspaceSwitcher({
               <button
                 onClick={() => {
                   setOpen(false);
-                  navigate({ to: withWorkspaceQuery({ pathname: "/workspace/new", searchStr }) as any });
+                  navigate({
+                    to: "/workspace/new",
+                    search: getWorkspaceSearch(searchStr) as any,
+                  });
                 }}
                 className="flex h-10 w-full items-center gap-2 px-3.5 text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
               >
@@ -417,24 +459,113 @@ function EnvironmentDropdown() {
 interface Notification {
   id: string;
   message: string;
-  time: string;
+  time?: string;
   read: boolean;
+  route?: string;
 }
 
-const mockNotifications: Notification[] = [
-  { id: "1", message: "Deployment successful for audioly", time: "2 min ago", read: false },
-  { id: "2", message: "Domain kemdirim.com has been verified", time: "1 hour ago", read: false },
-  { id: "3", message: "New team member joined Brimble Team", time: "3 hours ago", read: true },
-  { id: "4", message: "Payment processed successfully", time: "1 day ago", read: true },
-  { id: "5", message: "Build failed for portfolio-v2", time: "2 days ago", read: true },
-];
+function getNotificationId(message: AppTooltipMessage, index: number) {
+  return [message.type || "notification", message.level, message.route || "", message.message, index].join("|");
+}
+
+function getNotificationTime(meta?: Record<string, unknown>) {
+  if (!meta) return undefined;
+
+  const direct = meta.time;
+  if (typeof direct === "string" && direct.trim()) {
+    return direct.trim();
+  }
+
+  const relative = meta.relativeTime;
+  if (typeof relative === "string" && relative.trim()) {
+    return relative.trim();
+  }
+
+  return undefined;
+}
+
+function mapNotifications(messages: AppTooltipMessage[] | null): Notification[] {
+  if (!messages || messages.length === 0) {
+    return [];
+  }
+
+  return messages.map((message, index) => ({
+    id: getNotificationId(message, index),
+    message: message.message,
+    time: getNotificationTime(message.meta),
+    read: false,
+    route: message.route,
+  }));
+}
 
 function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const workspaceSearch = getWorkspaceSearch(searchStr);
+  const listTooltipMessages = useServerFn(listTooltipMessagesServerFn as any) as (args: {
+    data: { workspace?: string; type: "notifications"; limit?: number; page?: number };
+  }) => Promise<AppTooltipMessage[] | null>;
+  const listTooltipMessagesRef = useRef(listTooltipMessages);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const notificationFetchKey = workspaceSearch?.workspace ?? "__personal__";
+
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+
+  useEffect(() => {
+    listTooltipMessagesRef.current = listTooltipMessages;
+  }, [listTooltipMessages]);
+
+  useEffect(() => {
+    setNotifications([]);
+    setHasLoaded(false);
+    setIsLoading(false);
+  }, [notificationFetchKey]);
+
+  useEffect(() => {
+    if (!open || hasLoaded || isLoading) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      setIsLoading(true);
+      try {
+        const messages = await listTooltipMessagesRef.current({
+          data: {
+            ...(workspaceSearch?.workspace ? { workspace: workspaceSearch.workspace } : {}),
+            type: "notifications",
+            limit: 8,
+            page: 1,
+          },
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setNotifications(mapNotifications(messages));
+      } catch {
+        if (!cancelled) {
+          setNotifications([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setHasLoaded(true);
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, hasLoaded, workspaceSearch?.workspace]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -458,6 +589,25 @@ function NotificationsDropdown() {
     );
   }
 
+  function handleNotificationClick(notification: Notification) {
+    markAsRead(notification.id);
+    setOpen(false);
+
+    if (!notification.route) {
+      return;
+    }
+
+    if (/^https?:\/\//i.test(notification.route)) {
+      window.location.href = notification.route;
+      return;
+    }
+
+    navigate({
+      to: notification.route as any,
+      search: workspaceSearch as any,
+    });
+  }
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -472,7 +622,7 @@ function NotificationsDropdown() {
             </span>
           )}
         </span>
-        <span>Notifications</span>
+        <span className="hidden md:inline">Notifications</span>
       </button>
 
       <AnimatePresence>
@@ -482,7 +632,7 @@ function NotificationsDropdown() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-full z-50 mt-2 w-[340px] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_8px_rgba(0,0,0,0.08)]"
+            className="absolute right-0 top-full z-50 mt-2 w-[340px] max-w-[calc(100vw-32px)] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_8px_rgba(0,0,0,0.08)]"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b-[0.5px] border-dash-border px-4 py-3">
@@ -501,10 +651,17 @@ function NotificationsDropdown() {
 
             {/* List */}
             <div className="max-h-[320px] overflow-y-auto">
-              {notifications.map((n) => (
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-dash-text-faded">
+                  <LoaderCircle className="size-4 animate-spin" />
+                  <span>Loading notifications...</span>
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-dash-text-faded">No notifications</div>
+              ) : notifications.map((n) => (
                 <button
                   key={n.id}
-                  onClick={() => markAsRead(n.id)}
+                  onClick={() => handleNotificationClick(n)}
                   className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated"
                 >
                   <span className={`mt-1.5 size-[6px] shrink-0 rounded-full ${n.read ? "bg-transparent" : "bg-[#ef2f1f]"}`} />
@@ -512,9 +669,9 @@ function NotificationsDropdown() {
                     <span className={`text-sm leading-[1.4] ${n.read ? "font-light text-dash-text-faded" : "text-dash-text-strong"}`}>
                       {n.message}
                     </span>
-                    <span className="text-xs text-dash-text-extra-faded">
-                      {n.time}
-                    </span>
+                    {n.time ? (
+                      <span className="text-xs text-dash-text-extra-faded">{n.time}</span>
+                    ) : null}
                   </div>
                 </button>
               ))}
@@ -553,11 +710,20 @@ function CreateDropdown() {
   return (
     <div className="relative" ref={ref}>
       <div className="flex items-stretch">
-        <button className="flex items-center gap-1 rounded-l border border-[#3964d5] bg-[#4879f8] py-[5px] pl-3 pr-2 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
+        <button
+          type="button"
+          onClick={() =>
+            navigate({
+              to: withWorkspaceQuery({ pathname: "/projects/new", searchStr }) as any,
+            })
+          }
+          className="flex items-center gap-1 rounded-l border border-[#3964d5] bg-[#4879f8] py-[5px] pl-3 pr-2 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)]"
+        >
           <img src="/icons/plus-white.svg" alt="" className="size-4" />
           Create
         </button>
         <button
+          type="button"
           onClick={() => setOpen(!open)}
           className="flex items-center rounded-r border border-l-0 border-[#3964d5] bg-[#4879f8] px-1.5 shadow-[0px_1px_2px_rgba(18,18,23,0.05)]"
         >
@@ -618,11 +784,15 @@ function CreateDropdown() {
 
 export function Topbar({
   onSettingsClick,
+  onMobileNavToggle,
+  mobileNavOpen,
   settingsSnapshot,
   workspaces,
   projectSwitcherProjects,
 }: {
   onSettingsClick: () => void;
+  onMobileNavToggle?: () => void;
+  mobileNavOpen?: boolean;
   settingsSnapshot?: SettingsSidebarSnapshot | null;
   workspaces?: Workspace[];
   projectSwitcherProjects?: Project[];
@@ -638,22 +808,33 @@ export function Topbar({
     <div data-topbar className="flex shrink-0 flex-col bg-dash-bg">
       {/* Top row: search + notifications */}
       <div className="border-b border-dash-border-soft">
-        <div className="mx-auto flex max-w-screen-xl items-center justify-between py-3">
-          <div
-            onClick={openScoutBar}
-            className="flex cursor-pointer items-center gap-2 text-dash-text-extra-faded transition-colors hover:text-dash-text-faded"
-          >
-            <Search className="size-4" />
-            <span className="text-sm">Search workspace or use cmd + k</span>
-            <kbd className="ml-1 rounded border border-dash-border-soft px-1.5 py-0.5 text-[10px] font-medium leading-none text-dash-text-extra-faded">
-              ⌘K
-            </kbd>
+        <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 md:px-0">
+          <div className="flex items-center gap-3">
+            {onMobileNavToggle && (
+              <button
+                onClick={onMobileNavToggle}
+                className="text-dash-text-faded hover:text-dash-text-strong md:hidden"
+                aria-label="Toggle navigation"
+              >
+                {mobileNavOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+              </button>
+            )}
+            <div
+              onClick={openScoutBar}
+              className="flex cursor-pointer items-center gap-2 text-dash-text-extra-faded transition-colors hover:text-dash-text-faded"
+            >
+              <Search className="size-4" />
+              <span className="hidden text-sm md:inline">Search workspace or use cmd + k</span>
+              <kbd className="ml-1 hidden rounded border border-dash-border-soft px-1.5 py-0.5 text-[10px] font-medium leading-none text-dash-text-extra-faded md:inline">
+                ⌘K
+              </kbd>
+            </div>
           </div>
-          <div className="flex items-center gap-4 text-dash-text-faded">
+          <div className="flex items-center gap-2 text-dash-text-faded md:gap-4">
             <NotificationsDropdown />
             <a href="mailto:hello@brimble.app" className="flex items-center gap-1.5 text-sm hover:text-dash-text-strong transition-colors">
               <HelpCircle className="size-4" />
-              <span>Help</span>
+              <span className="hidden md:inline">Help</span>
             </a>
             <button
               onClick={onSettingsClick}
@@ -681,8 +862,8 @@ export function Topbar({
 
       {/* Breadcrumb row */}
       <div className="border-b border-dash-border-soft">
-        <div className="mx-auto flex max-w-screen-xl items-center justify-between py-3">
-          <div className="flex items-center">
+        <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 md:px-0">
+          <div className="flex min-w-0 items-center">
             <WorkspaceSwitcher
               profile={settingsSnapshot?.profile ?? null}
               workspaces={workspaces ?? []}
@@ -707,7 +888,7 @@ export function Topbar({
               <span className="text-sm font-medium text-dash-text-faded">Home</span>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="hidden items-center gap-4 md:flex">
             {/* Environment selector */}
             <EnvironmentDropdown />
             {/* Create split button */}

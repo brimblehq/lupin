@@ -1,13 +1,25 @@
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import * as Sentry from "@sentry/tanstackstart-react";
 import { routeTree } from "./routeTree.gen";
+import { DefaultErrorComponent } from "./components/shared/default-error";
+
+let sentryInitialized = false;
 
 export function getRouter() {
   const router = createTanStackRouter({
     routeTree,
     scrollRestoration: true,
     defaultPreload: "intent",
-    defaultPreloadStaleTime: 0,
+    defaultErrorComponent: DefaultErrorComponent,
   });
+
+  if (!router.isServer && !sentryInitialized) {
+    Sentry.init({
+      dsn: "https://640585a158652a63a2d0928bfb50a950@o4506456636915712.ingest.us.sentry.io/4510945202470912",
+      sendDefaultPii: true,
+    });
+    sentryInitialized = true;
+  }
 
   if (typeof document !== "undefined") {
     import("nprogress").then((mod) => {
