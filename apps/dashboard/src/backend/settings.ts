@@ -1,6 +1,7 @@
 import config from "@/config";
 import type { ApiClient } from "./types";
 import type {
+  GitProvider,
   SettingsApi,
   SettingsApiKeyResult,
   SettingsBillingSnapshot,
@@ -20,6 +21,7 @@ import type {
 } from "./settings/types";
 
 export type {
+  GitProvider,
   SettingsApi,
   SettingsApiKeyResult,
   SettingsBillingSnapshot,
@@ -284,6 +286,7 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
     paymentInvoices: `${config.paymentApiUrl}/payment/invoices`,
     paymentStats: `${config.paymentApiUrl}/subscription/stats`,
     paymentPlans: "/core/v1/plans",
+    disconnectProvider: `${config.authApiUrl}/user/disconnect`,
   } as const;
 
   const getBillingSnapshotInternal = async (
@@ -480,6 +483,12 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
       const webhooks = mapWebhooks(webhookResponse);
 
       return { profile, webhooks, billing } satisfies SettingsSidebarSnapshot;
+    },
+    async disconnectGitProvider(provider: GitProvider) {
+      await client.request(
+        `${endpoints.disconnectProvider}/${encodeURIComponent(provider)}`,
+        { method: "DELETE" },
+      );
     },
   };
 }

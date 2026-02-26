@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { getWorkspaceFromSearch } from "@/utils/topbar-navigation";
 
 export interface Addon {
   id: string;
@@ -20,7 +21,7 @@ export function AddonCard({
   onManage?: () => void;
 }) {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
-  const workspace = new URLSearchParams(searchStr || "").get("workspace")?.trim() || undefined;
+  const workspace = getWorkspaceFromSearch({ searchStr });
   return (
     <div className="flex h-full flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft transition-shadow hover:shadow-[0px_2px_8px_rgba(0,0,0,0.06)]">
       {/* Gradient header with browser mockup + logo */}

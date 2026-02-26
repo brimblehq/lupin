@@ -1,6 +1,7 @@
 import { cn } from "@brimble/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
+import { Spinner } from "./spinner";
 
 /* ─────────────────────────────────────────────
    Shared styles
@@ -32,6 +33,10 @@ interface NumberPaginationProps {
   onPageChange: (page: number) => void;
   /** Max page buttons visible before ellipsis (default 5) */
   maxVisible?: number;
+  /** Disable pagination and show loading feedback for the pending page */
+  isLoading?: boolean;
+  /** Page number currently being fetched (used to place the spinner) */
+  loadingPage?: number | null;
 }
 
 function getPageRange(
@@ -80,6 +85,8 @@ export function NumberPagination({
   totalPages,
   onPageChange,
   maxVisible = 5,
+  isLoading = false,
+  loadingPage = null,
 }: NumberPaginationProps) {
   if (totalPages <= 1) return null;
 
@@ -91,11 +98,15 @@ export function NumberPagination({
     <nav aria-label="Pagination" className="flex items-center justify-center gap-1">
       <button
         onClick={() => onPageChange(currentPage - 1)}
-        disabled={isFirst}
+        disabled={isFirst || isLoading}
         aria-label="Previous page"
         className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
       >
-        <ChevronLeft className="size-4" />
+        {isLoading && loadingPage === currentPage - 1 ? (
+          <Spinner size="size-4" className="text-dash-text-faded" />
+        ) : (
+          <ChevronLeft className="size-4" />
+        )}
       </button>
 
       {pages.map((page, i) =>
@@ -111,26 +122,35 @@ export function NumberPagination({
           <button
             key={page}
             onClick={() => onPageChange(page)}
+            disabled={isLoading}
             aria-current={page === currentPage ? "page" : undefined}
             aria-label={`Page ${page}`}
             className={`flex size-8 items-center justify-center rounded-[4px] text-sm transition-colors ${
               page === currentPage
                 ? "bg-dash-bg-elevated font-medium text-dash-text-strong"
                 : "text-dash-text-faded hover:bg-dash-bg-elevated"
-            }`}
+            } disabled:opacity-70`}
           >
-            {page}
+            {isLoading && loadingPage === page ? (
+              <Spinner size="size-4" className="text-dash-text-faded" />
+            ) : (
+              page
+            )}
           </button>
         ),
       )}
 
       <button
         onClick={() => onPageChange(currentPage + 1)}
-        disabled={isLast}
+        disabled={isLast || isLoading}
         aria-label="Next page"
         className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
       >
-        <ChevronRight className="size-4" />
+        {isLoading && loadingPage === currentPage + 1 ? (
+          <Spinner size="size-4" className="text-dash-text-faded" />
+        ) : (
+          <ChevronRight className="size-4" />
+        )}
       </button>
     </nav>
   );

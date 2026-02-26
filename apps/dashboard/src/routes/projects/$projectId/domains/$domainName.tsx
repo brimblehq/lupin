@@ -9,6 +9,8 @@ const parentRoute = getRouteApi("/projects/$projectId");
 
 export const Route = createFileRoute("/projects/$projectId/domains/$domainName")(
   {
+    staleTime: 0,
+    preloadStaleTime: 0,
     loader: async ({ params, context, location }) => {
       const workspace = (context as any).workspace
         || new URLSearchParams(location.searchStr || "").get("workspace")

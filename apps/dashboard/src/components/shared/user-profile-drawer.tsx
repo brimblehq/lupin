@@ -30,6 +30,7 @@ import { logoutServerFn } from "@/server/auth/actions";
 import {
   createSettingsApiKeyServerFn,
   decryptSettingsApiKeyServerFn,
+  disconnectGitProviderServerFn,
   getSettingsSidebarSnapshotServerFn,
   initializeSettingsAddCardServerFn,
   listSettingsInvoicesServerFn,
@@ -47,6 +48,7 @@ import {
   removeWorkspaceTeamMemberServerFn,
   resendWorkspaceTeamInviteServerFn,
 } from "@/server/teams/actions";
+import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import type {
   SettingsInvoicePage,
   SettingsSidebarSnapshot,
@@ -66,11 +68,7 @@ import {
 } from "@/utils/billing";
 type UserProfile = DrawerUserProfile;
 
-export type ProfileTab =
-  | "profile"
-  | "members"
-  | "notifications"
-  | "billing";
+export type ProfileTab = "profile" | "members" | "notifications" | "billing";
 
 const accountNav: { label: string; key: ProfileTab }[] = [
   { label: "Profile", key: "profile" },
@@ -82,8 +80,12 @@ const accountNav: { label: string; key: ProfileTab }[] = [
 const reachUsNav = [
   { label: "Blog", emoji: "📔", href: "https://brimble.io/blog" },
   { label: "Follow on twitter", emoji: "🔵", href: "https://x.com/brimblehq" },
-  { label: "Discord", emoji: "🟣", href: "https://discord.gg" },
-  { label: "Help", emoji: "🛟", href: "https://docs.brimble.io" },
+  {
+    label: "Discord",
+    emoji: "🟣",
+    href: "https://discord.com/invite/XBCBwbXQJQ",
+  },
+  { label: "Help", emoji: "🛟", href: "mailto:hello@brimble.app" },
 ];
 
 const aboutNav = [
@@ -110,8 +112,20 @@ function CopyButton({ text }: { text: string }) {
       title="Copy"
     >
       {copied ? (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#34d399]">
-          <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          className="text-[#34d399]"
+        >
+          <path
+            d="M3 8.5L6.5 12L13 4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       ) : (
         <Copy className="size-4" />
@@ -128,7 +142,9 @@ function ProfileForm({
   onCreateApiKey,
   onResetApiKey,
   onDecryptApiKey,
+  isGithubConnected,
   onDisconnectGithub,
+  onConnectGithub,
   onRequestDeleteAccountOtp,
   onVerifyDeleteAccountOtp,
   onDeleteAccount,
@@ -145,8 +161,12 @@ function ProfileForm({
   onBuildsChange?: (enabled: boolean) => Promise<void> | void;
   onCreateApiKey?: () => Promise<string | undefined> | string | undefined;
   onResetApiKey?: () => Promise<string | undefined> | string | undefined;
-  onDecryptApiKey?: (encryptedApiKey: string) => Promise<string | null | undefined>;
+  onDecryptApiKey?: (
+    encryptedApiKey: string,
+  ) => Promise<string | null | undefined>;
+  isGithubConnected: boolean;
   onDisconnectGithub?: () => Promise<void> | void;
+  onConnectGithub?: () => void;
   onRequestDeleteAccountOtp?: () => Promise<void> | void;
   onVerifyDeleteAccountOtp?: (code: string) => Promise<void> | void;
   onDeleteAccount?: () => Promise<void> | void;
@@ -156,7 +176,9 @@ function ProfileForm({
   const [lastName, setLastName] = useState(profile.lastName);
   const [username, setUsername] = useState(profile.username);
   const [email, setEmail] = useState(profile.email);
-  const [buildsEnabled, setBuildsEnabled] = useState(profile.buildsEnabled ?? true);
+  const [buildsEnabled, setBuildsEnabled] = useState(
+    profile.buildsEnabled ?? true,
+  );
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl ?? "");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -172,7 +194,12 @@ function ProfileForm({
     "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
 
   function handleSave() {
-    void onSave?.({ firstName, lastName, username, avatarUrl: avatarUrl || undefined });
+    void onSave?.({
+      firstName,
+      lastName,
+      username,
+      avatarUrl: avatarUrl || undefined,
+    });
   }
 
   useEffect(() => {
@@ -181,13 +208,21 @@ function ProfileForm({
     setUsername(profile.username);
     setEmail(profile.email);
     setAvatarUrl(profile.avatarUrl ?? "");
-  }, [profile.avatarUrl, profile.email, profile.firstName, profile.lastName, profile.username]);
+  }, [
+    profile.avatarUrl,
+    profile.email,
+    profile.firstName,
+    profile.lastName,
+    profile.username,
+  ]);
 
   useEffect(() => {
     setBuildsEnabled(profile.buildsEnabled ?? true);
   }, [profile.buildsEnabled]);
 
-  async function handleAvatarFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleAvatarFileChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -216,7 +251,9 @@ function ProfileForm({
         toast.error("Upload succeeded but no image URL was returned.");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload image");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload image",
+      );
     } finally {
       setIsUploadingAvatar(false);
       if (event.target) {
@@ -225,7 +262,8 @@ function ProfileForm({
     }
   }
 
-  const avatarSeed = profile.username || profile.firstName || profile.email || "user";
+  const avatarSeed =
+    profile.username || profile.firstName || profile.email || "user";
   const avatarSrc =
     avatarUrl ||
     `${config.avatarUrl}/adventurer-neutral/svg?seed=${encodeURIComponent(avatarSeed)}`;
@@ -407,7 +445,9 @@ function ProfileForm({
 
       {/* Danger zone */}
       <DangerZone
+        isGithubConnected={isGithubConnected}
         onDisconnectGithub={onDisconnectGithub}
+        onConnectGithub={onConnectGithub}
         onDeleteAccount={onDeleteAccount}
       />
     </div>
@@ -415,10 +455,14 @@ function ProfileForm({
 }
 
 function DangerZone({
+  isGithubConnected,
   onDisconnectGithub,
+  onConnectGithub,
   onDeleteAccount,
 }: {
+  isGithubConnected: boolean;
   onDisconnectGithub?: () => Promise<void> | void;
+  onConnectGithub?: () => void;
   onDeleteAccount?: () => Promise<void> | void;
 }) {
   const [disconnectOpen, setDisconnectOpen] = useState(false);
@@ -440,19 +484,27 @@ function DangerZone({
         </span>
       </div>
 
-      {/* Disconnect GitHub */}
+      {/* GitHub connection */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-medium text-dash-text-strong">
-            Disconnect GitHub
+            {isGithubConnected ? "Disconnect GitHub" : "Connect GitHub"}
           </span>
           <span className="text-xs text-dash-text-faded">
-            You won't be able to deploy from Git until you reconnect.
+            {isGithubConnected
+              ? "You won't be able to deploy from Git until you reconnect."
+              : "Connect your GitHub account to deploy from Git."}
           </span>
         </div>
-        <GlossyButton variant="red" onClick={() => setDisconnectOpen(true)}>
-          Disconnect
-        </GlossyButton>
+        {isGithubConnected ? (
+          <GlossyButton variant="red" onClick={() => setDisconnectOpen(true)}>
+            Disconnect
+          </GlossyButton>
+        ) : (
+          <GlossyButton variant="black" onClick={() => onConnectGithub?.()}>
+            Connect
+          </GlossyButton>
+        )}
       </div>
 
       {/* Delete account */}
@@ -486,7 +538,11 @@ function DangerZone({
       >
         <div className="flex flex-col gap-2 text-left">
           <label className="text-sm leading-5 text-dash-text-faded">
-            Type <span className="font-medium text-dash-text-strong">DISCONNECT</span> to confirm
+            Type{" "}
+            <span className="font-medium text-dash-text-strong">
+              DISCONNECT
+            </span>{" "}
+            to confirm
           </label>
           <input
             type="text"
@@ -509,15 +565,29 @@ function DangerZone({
             setDeleteOtpError(null);
           }
         }}
-        title={deleteStep === "confirm" ? "Delete your account?" : "Verify account deletion"}
+        title={
+          deleteStep === "confirm"
+            ? "Delete your account?"
+            : "Verify account deletion"
+        }
         description={
           deleteStep === "confirm"
             ? "This action cannot be undone. All projects, deployments, domains, environment variables, and billing data will be permanently deleted."
             : "We sent a 6-digit verification code to your account email. Enter it to continue."
         }
-        confirmLabel={deleteStep === "confirm" ? "Send verification code" : "Delete my account"}
-        confirmLoadingLabel={deleteStep === "confirm" ? "Sending code..." : "Deleting account..."}
-        confirmDisabled={deleteStep === "confirm" ? deleteConfirm !== "DELETE" : deleteOtp.length < 6}
+        confirmLabel={
+          deleteStep === "confirm"
+            ? "Send verification code"
+            : "Delete my account"
+        }
+        confirmLoadingLabel={
+          deleteStep === "confirm" ? "Sending code..." : "Deleting account..."
+        }
+        confirmDisabled={
+          deleteStep === "confirm"
+            ? deleteConfirm !== "DELETE"
+            : deleteOtp.length < 6
+        }
         closeOnConfirm={deleteStep === "otp"}
         onConfirm={async () => {
           if (deleteStep === "confirm") {
@@ -550,7 +620,11 @@ function DangerZone({
           {deleteStep === "confirm" ? (
             <>
               <label className="text-sm leading-5 text-dash-text-faded">
-                Type <span className="font-medium text-dash-text-strong">DELETE</span> to confirm
+                Type{" "}
+                <span className="font-medium text-dash-text-strong">
+                  DELETE
+                </span>{" "}
+                to confirm
               </label>
               <input
                 type="text"
@@ -592,7 +666,9 @@ function DangerZone({
                     }
                   } catch (error) {
                     setDeleteOtpError(
-                      error instanceof Error ? error.message : "Failed to resend verification code",
+                      error instanceof Error
+                        ? error.message
+                        : "Failed to resend verification code",
                     );
                   }
                 }}
@@ -664,7 +740,10 @@ function ApiKeySection({
             type="text"
             value={displayValue}
             readOnly
-            className={cn(inputClass, "pr-20 font-mono text-[13px] text-dash-text-faded")}
+            className={cn(
+              inputClass,
+              "pr-20 font-mono text-[13px] text-dash-text-faded",
+            )}
           />
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
             <button
@@ -699,7 +778,11 @@ function ApiKeySection({
               className="shrink-0 rounded-[4px] p-1 text-dash-text-faded transition-colors hover:text-dash-text-strong"
               title={revealed ? "Hide" : "Reveal"}
             >
-              {revealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              {revealed ? (
+                <EyeOff className="size-3.5" />
+              ) : (
+                <Eye className="size-3.5" />
+              )}
             </button>
             {decryptedApiKey ? (
               <CopyButton text={decryptedApiKey} />
@@ -735,7 +818,9 @@ function ApiKeySection({
         onConfirm={async () => {
           setIsSubmitting(true);
           try {
-            const nextKey = encryptedApiKey ? await onReset?.() : await onCreate?.();
+            const nextKey = encryptedApiKey
+              ? await onReset?.()
+              : await onCreate?.();
             if (nextKey) {
               setEncryptedApiKey(nextKey);
               setDecryptedApiKey(null);
@@ -810,7 +895,10 @@ function ProfileNavSidebar({
             <a
               key={item.label}
               href={item.href}
-              className={cn(navItemBase, "text-dash-text-body hover:bg-dash-bg-elevated")}
+              className={cn(
+                navItemBase,
+                "text-dash-text-body hover:bg-dash-bg-elevated",
+              )}
             >
               <span className="text-sm">{item.emoji}</span>
               {item.label}
@@ -826,7 +914,10 @@ function ProfileNavSidebar({
           {aboutNav.map((item) => (
             <button
               key={item.label}
-              className={cn(navItemBase, "text-dash-text-body hover:bg-dash-bg-elevated")}
+              className={cn(
+                navItemBase,
+                "text-dash-text-body hover:bg-dash-bg-elevated",
+              )}
             >
               <span className="text-sm">{item.emoji}</span>
               {item.label}
@@ -842,7 +933,10 @@ function ProfileNavSidebar({
             void onSignOut?.();
           }}
           disabled={isSigningOut}
-          className={cn(navItemBase, "shrink-0 text-dash-text-body hover:bg-dash-bg-elevated")}
+          className={cn(
+            navItemBase,
+            "shrink-0 text-dash-text-body hover:bg-dash-bg-elevated",
+          )}
         >
           <span className="text-sm">⛳️</span>
           {isSigningOut ? "Signing out..." : "Sign out"}
@@ -868,36 +962,58 @@ export function UserProfileDrawer({
   const navigate = useNavigate();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const logout = useServerFn(logoutServerFn);
-  const getSettingsSnapshot = useServerFn(getSettingsSidebarSnapshotServerFn as any) as (args?: {
+  const getSettingsSnapshot = useServerFn(
+    getSettingsSidebarSnapshotServerFn as any,
+  ) as (args?: {
     data?: { workspace?: string };
   }) => Promise<SettingsSidebarSnapshot>;
-  const getWorkspaceTeamMembers = useServerFn(getWorkspaceTeamMembersServerFn as any) as (args: {
-    data: { workspace: string };
-  }) => Promise<TeamDetails>;
-  const listInvoices = useServerFn(listSettingsInvoicesServerFn as any) as (args: {
+  const getWorkspaceTeamMembers = useServerFn(
+    getWorkspaceTeamMembersServerFn as any,
+  ) as (args: { data: { workspace: string } }) => Promise<TeamDetails>;
+  const listInvoices = useServerFn(
+    listSettingsInvoicesServerFn as any,
+  ) as (args: {
     data: { page: number; workspace?: string };
   }) => Promise<SettingsInvoicePage>;
-  const initializeAddCard = useServerFn(initializeSettingsAddCardServerFn as any) as (args: {
+  const initializeAddCard = useServerFn(
+    initializeSettingsAddCardServerFn as any,
+  ) as (args: {
     data: { paymentChannel: string };
   }) => Promise<{ paymentLink: string }>;
-  const updateProfile = useServerFn(updateSettingsProfileServerFn as any) as (args: {
-    data: { firstName: string; lastName: string; username: string; avatarUrl?: string };
+  const updateProfile = useServerFn(
+    updateSettingsProfileServerFn as any,
+  ) as (args: {
+    data: {
+      firstName: string;
+      lastName: string;
+      username: string;
+      avatarUrl?: string;
+    };
   }) => Promise<SettingsSidebarSnapshot["profile"]>;
   const requestEmailVerification = useServerFn(
     requestSettingsEmailVerificationServerFn as any,
   ) as (args: { data: { email: string } }) => Promise<{ ok: true }>;
-  const updateNotifications = useServerFn(updateSettingsNotificationsServerFn as any) as (args: {
+  const updateNotifications = useServerFn(
+    updateSettingsNotificationsServerFn as any,
+  ) as (args: {
     data: { email: boolean; mute: boolean };
   }) => Promise<{ ok: true }>;
-  const updateBuilds = useServerFn(updateSettingsBuildsServerFn as any) as (args: {
-    data: { buildDisabled: boolean };
-  }) => Promise<{ ok: true }>;
+  const updateBuilds = useServerFn(
+    updateSettingsBuildsServerFn as any,
+  ) as (args: { data: { buildDisabled: boolean } }) => Promise<{ ok: true }>;
   const createApiKey = useServerFn(createSettingsApiKeyServerFn);
   const resetApiKey = useServerFn(resetSettingsApiKeyServerFn);
-  const decryptApiKey = useServerFn(decryptSettingsApiKeyServerFn as any) as (args: {
-    data: { encryptedApiKey: string };
-  }) => Promise<string | null>;
-  const updateWebhooks = useServerFn(updateSettingsWebhooksServerFn as any) as (args: {
+  const disconnectGitProvider = useServerFn(
+    disconnectGitProviderServerFn as any,
+  ) as (args: { data: { provider: string } }) => Promise<{ ok: true }>;
+  const listGithubAccounts = useServerFn(listGithubAccountsServerFn);
+  const [isGithubConnected, setIsGithubConnected] = useState<boolean | null>(null);
+  const decryptApiKey = useServerFn(
+    decryptSettingsApiKeyServerFn as any,
+  ) as (args: { data: { encryptedApiKey: string } }) => Promise<string | null>;
+  const updateWebhooks = useServerFn(
+    updateSettingsWebhooksServerFn as any,
+  ) as (args: {
     data: {
       webhookUrl: string | null;
       discordUrl: string | null;
@@ -905,15 +1021,25 @@ export function UserProfileDrawer({
       events: string[];
     };
   }) => Promise<SettingsSidebarSnapshot["webhooks"]>;
-  const testWebhook = useServerFn(testSettingsWebhookServerFn as any) as (args: {
+  const testWebhook = useServerFn(
+    testSettingsWebhookServerFn as any,
+  ) as (args: {
     data: { url: string; type: "discord" | "slack" | "custom" };
   }) => Promise<{ ok: true }>;
   const [activeTab, setActiveTab] = useState<ProfileTab>("profile");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isInitializingAddCard, setIsInitializingAddCard] = useState(false);
-  const [snapshot, setSnapshot] = useState<SettingsSidebarSnapshot | null>(initialSnapshot);
-  const [workspaceTeamMembersCache, setWorkspaceTeamMembersCache] = useState<Record<string, TeamDetails>>({});
+  const [isLoadingInvoicePage, setIsLoadingInvoicePage] = useState(false);
+  const [pendingInvoicePage, setPendingInvoicePage] = useState<number | null>(
+    null,
+  );
+  const [snapshot, setSnapshot] = useState<SettingsSidebarSnapshot | null>(
+    initialSnapshot,
+  );
+  const [workspaceTeamMembersCache, setWorkspaceTeamMembersCache] = useState<
+    Record<string, TeamDetails>
+  >({});
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const activeWorkspaceSlug = (() => {
@@ -959,7 +1085,8 @@ export function UserProfileDrawer({
       } as any);
       setSnapshot(nextSnapshot);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load settings";
+      const message =
+        error instanceof Error ? error.message : "Failed to load settings";
       setSettingsError(message);
     } finally {
       setIsLoadingSettings(false);
@@ -977,6 +1104,20 @@ export function UserProfileDrawer({
 
     void refreshSettings();
   }, [open, snapshot]);
+
+  useEffect(() => {
+    if (!open || isGithubConnected !== null) {
+      return;
+    }
+
+    listGithubAccounts()
+      .then((accounts) => {
+        setIsGithubConnected(Array.isArray(accounts) && accounts.length > 0);
+      })
+      .catch(() => {
+        setIsGithubConnected(false);
+      });
+  }, [open]);
 
   useEffect(() => {
     if (!hasActiveWorkspace && activeTab === "members") {
@@ -1010,7 +1151,9 @@ export function UserProfileDrawer({
 
     void (async () => {
       try {
-        const team = await getWorkspaceTeamMembers({ data: { workspace: activeWorkspaceSlug } });
+        const team = await getWorkspaceTeamMembers({
+          data: { workspace: activeWorkspaceSlug },
+        });
         if (cancelled) {
           return;
         }
@@ -1041,13 +1184,22 @@ export function UserProfileDrawer({
       onOpenChange(false);
       await navigate({ to: "/login" });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to sign out");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to sign out",
+      );
     } finally {
       setIsSigningOut(false);
     }
   }
 
   async function handleInvoicePageChange(page: number) {
+    if (isLoadingInvoicePage) {
+      return;
+    }
+
+    setIsLoadingInvoicePage(true);
+    setPendingInvoicePage(page);
+
     try {
       const invoicePage = await listInvoices({
         data: {
@@ -1070,7 +1222,12 @@ export function UserProfileDrawer({
         };
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load invoices");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load invoices",
+      );
+    } finally {
+      setIsLoadingInvoicePage(false);
+      setPendingInvoicePage(null);
     }
   }
 
@@ -1104,7 +1261,11 @@ export function UserProfileDrawer({
 
       toast.success("Redirecting to payment provider...");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to initialize card update");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to initialize card update",
+      );
     } finally {
       const elapsed = Date.now() - startedAt;
       const remaining = Math.max(0, 450 - elapsed);
@@ -1166,7 +1327,9 @@ export function UserProfileDrawer({
                 </div>
               )}
               {isLoadingSettings && !snapshot && activeTab !== "members" ? (
-                <div className="text-sm text-dash-text-faded">Loading settings…</div>
+                <div className="text-sm text-dash-text-faded">
+                  Loading settings…
+                </div>
               ) : null}
               {activeTab === "profile" && profile && (
                 <ProfileForm
@@ -1194,7 +1357,11 @@ export function UserProfileDrawer({
                       });
                       toast.success("Profile updated");
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed to update profile");
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to update profile",
+                      );
                     } finally {
                       setIsSavingProfile(false);
                     }
@@ -1204,7 +1371,11 @@ export function UserProfileDrawer({
                       await requestEmailVerification({ data: { email } });
                       toast.success("Verification email sent");
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed to send verification email");
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to send verification email",
+                      );
                     }
                   }}
                   onBuildsChange={async (enabled) => {
@@ -1224,7 +1395,11 @@ export function UserProfileDrawer({
                         };
                       });
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed to update build settings");
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to update build settings",
+                      );
                       throw error;
                     }
                   }}
@@ -1252,7 +1427,11 @@ export function UserProfileDrawer({
 
                       return apiKeyValue;
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed to create API key");
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to create API key",
+                      );
                       return undefined;
                     }
                   }}
@@ -1280,7 +1459,11 @@ export function UserProfileDrawer({
 
                       return apiKeyValue;
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed to reset API key");
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to reset API key",
+                      );
                       return undefined;
                     }
                   }}
@@ -1288,12 +1471,62 @@ export function UserProfileDrawer({
                     try {
                       return await decryptApiKey({ data: { encryptedApiKey } });
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed to decrypt API key");
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to decrypt API key",
+                      );
                       return null;
                     }
                   }}
+                  isGithubConnected={isGithubConnected ?? true}
                   onDisconnectGithub={async () => {
-                    toast.success("GitHub disconnected");
+                    try {
+                      await disconnectGitProvider({ data: { provider: "github" } });
+                      setIsGithubConnected(false);
+                      window.dispatchEvent(new Event("brimble:git-connection-changed"));
+                      toast.success("GitHub disconnected successfully");
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to disconnect GitHub",
+                      );
+                    }
+                  }}
+                  onConnectGithub={() => {
+                    const popup = window.open(
+                      "https://github.com/apps/brimble-build/installations/new",
+                      "_blank",
+                      "width=900,height=760",
+                    );
+
+                    if (!popup) {
+                      toast.error("Popup blocked. Please allow popups and try again.");
+                      return;
+                    }
+
+                    toast.success("Complete the GitHub installation in the popup, then refresh.");
+                    setIsGithubConnected(null);
+                    // Poll for connection
+                    const interval = window.setInterval(async () => {
+                      try {
+                        const accounts = await listGithubAccounts();
+                        if (Array.isArray(accounts) && accounts.length > 0) {
+                          setIsGithubConnected(true);
+                          window.clearInterval(interval);
+                          window.dispatchEvent(new Event("brimble:git-connection-changed"));
+                          toast.success("GitHub connected successfully");
+                        }
+                      } catch {}
+                    }, 3000);
+                    // Stop polling after 90s
+                    window.setTimeout(() => {
+                      window.clearInterval(interval);
+                      if (isGithubConnected === null) {
+                        setIsGithubConnected(false);
+                      }
+                    }, 90_000);
                   }}
                   onRequestDeleteAccountOtp={async () => {
                     toast.success("Verification code sent to your email");
@@ -1316,8 +1549,14 @@ export function UserProfileDrawer({
               {activeTab === "members" && activeWorkspaceSlug && (
                 <MembersForm
                   workspace={activeWorkspaceSlug}
-                  initialTeam={workspaceTeamMembersCache[activeWorkspaceSlug] ?? null}
-                  currentUser={profile ? { uniqueId: profile.uniqueId, email: profile.email } : null}
+                  initialTeam={
+                    workspaceTeamMembersCache[activeWorkspaceSlug] ?? null
+                  }
+                  currentUser={
+                    profile
+                      ? { uniqueId: profile.uniqueId, email: profile.email }
+                      : null
+                  }
                 />
               )}
               {activeTab === "notifications" && profile && (
@@ -1329,7 +1568,11 @@ export function UserProfileDrawer({
                       await testWebhook({ data: { url, type } });
                       toast.success("Test webhook sent successfully");
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed to send test webhook");
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to send test webhook",
+                      );
                     }
                   }}
                   onSave={async (data) => {
@@ -1370,16 +1613,22 @@ export function UserProfileDrawer({
 
                       toast.success("Notification settings saved");
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed to save notification settings");
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to save notification settings",
+                      );
                     }
                   }}
                 />
               )}
-              {activeTab === "notifications" && !profile && !isLoadingSettings && (
-                <div className="text-sm text-dash-text-faded">
-                  Notification settings are unavailable right now.
-                </div>
-              )}
+              {activeTab === "notifications" &&
+                !profile &&
+                !isLoadingSettings && (
+                  <div className="text-sm text-dash-text-faded">
+                    Notification settings are unavailable right now.
+                  </div>
+                )}
               {activeTab === "billing" && profile && (
                 <BillingForm
                   profile={profile}
@@ -1387,6 +1636,8 @@ export function UserProfileDrawer({
                   onInvoicesPageChange={handleInvoicePageChange}
                   onUpdateCardInformation={handleUpdateCardInformation}
                   isUpdatingCardInformation={isInitializingAddCard}
+                  isLoadingInvoicesPage={isLoadingInvoicePage}
+                  pendingInvoicesPage={pendingInvoicePage}
                 />
               )}
               {activeTab === "billing" && !profile && !isLoadingSettings && (
@@ -1456,16 +1707,23 @@ function NotificationRow({
 }
 void NotificationRow;
 
-
-function PaymentFailureBanner({ daysSinceFailure }: { daysSinceFailure: number }) {
+function PaymentFailureBanner({
+  daysSinceFailure,
+}: {
+  daysSinceFailure: number;
+}) {
   if (daysSinceFailure <= 0) return null;
 
   const isBuildsDisabled = daysSinceFailure >= 7;
   const isDeactivated = daysSinceFailure >= 14;
 
   return (
-    <div className={`rounded-[4px] border px-4 py-3 ${isDeactivated ? "border-[#ef2f1f]/30 bg-[#ef2f1f]/[0.06]" : "border-[#f5a623]/30 bg-[#f5a623]/[0.06]"}`}>
-      <p className={`text-sm font-medium leading-5 ${isDeactivated ? "text-[#ef2f1f]" : "text-[#b37a10] dark:text-[#f5a623]"}`}>
+    <div
+      className={`rounded-[4px] border px-4 py-3 ${isDeactivated ? "border-[#ef2f1f]/30 bg-[#ef2f1f]/[0.06]" : "border-[#f5a623]/30 bg-[#f5a623]/[0.06]"}`}
+    >
+      <p
+        className={`text-sm font-medium leading-5 ${isDeactivated ? "text-[#ef2f1f]" : "text-[#b37a10] dark:text-[#f5a623]"}`}
+      >
         {isDeactivated
           ? "Your subscription has been deactivated. Update payment to reactivate."
           : isBuildsDisabled
@@ -1533,10 +1791,10 @@ const mockResources: SpendingResource[] = [
   {
     label: "CPU",
     allocated: "0.5 vCPU",
-    cost: 4.50,
+    cost: 4.5,
     breakdown: [
       { label: "Base allocation", detail: "0.25 vCPU", amount: 2.25 },
-      { label: "Burst usage", detail: "0.25 vCPU avg", amount: 1.50 },
+      { label: "Burst usage", detail: "0.25 vCPU avg", amount: 1.5 },
       { label: "Autoscale overhead", detail: "2 spike events", amount: 0.75 },
     ],
   },
@@ -1546,13 +1804,13 @@ const mockResources: SpendingResource[] = [
     cost: 2.25,
     breakdown: [
       { label: "Base allocation", detail: "256 MB", amount: 1.25 },
-      { label: "Peak usage", detail: "512 MB max", amount: 1.00 },
+      { label: "Peak usage", detail: "512 MB max", amount: 1.0 },
     ],
   },
   {
     label: "Storage",
     allocated: "1 GB",
-    cost: 0.50,
+    cost: 0.5,
     breakdown: [
       { label: "Build artifacts", detail: "620 MB", amount: 0.31 },
       { label: "Cache layers", detail: "380 MB", amount: 0.19 },
@@ -1585,9 +1843,15 @@ function SpendingOverview() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-dash-border bg-dash-bg-elevated/50">
-              <th className="px-3 py-2 text-left font-medium text-dash-text-faded">Resource</th>
-              <th className="px-3 py-2 text-left font-medium text-dash-text-faded">Allocated</th>
-              <th className="px-3 py-2 text-right font-medium text-dash-text-faded">Cost</th>
+              <th className="px-3 py-2 text-left font-medium text-dash-text-faded">
+                Resource
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-dash-text-faded">
+                Allocated
+              </th>
+              <th className="px-3 py-2 text-right font-medium text-dash-text-faded">
+                Cost
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1598,14 +1862,19 @@ function SpendingOverview() {
               return (
                 <Fragment key={r.label}>
                   <tr
-                    onClick={() => isClickable && setExpanded(isOpen ? null : r.label)}
+                    onClick={() =>
+                      isClickable && setExpanded(isOpen ? null : r.label)
+                    }
                     className={cn(
                       "border-b border-dash-border transition-colors",
-                      isClickable && "cursor-pointer hover:bg-dash-bg-elevated/60",
+                      isClickable &&
+                        "cursor-pointer hover:bg-dash-bg-elevated/60",
                     )}
                   >
                     <td className="px-3 py-2 text-dash-text-body">{r.label}</td>
-                    <td className="px-3 py-2 tabular-nums text-dash-text-faded">{r.allocated}</td>
+                    <td className="px-3 py-2 tabular-nums text-dash-text-faded">
+                      {r.allocated}
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums text-dash-text-strong">
                       {r.cost > 0 ? `$${r.cost.toFixed(2)}` : "—"}
                     </td>
@@ -1618,15 +1887,22 @@ function SpendingOverview() {
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: "auto", opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                            transition={{
+                              duration: 0.2,
+                              ease: [0.16, 1, 0.3, 1],
+                            }}
                             className="overflow-hidden"
                           >
                             <table className="w-full border-b border-dash-border bg-dash-bg-elevated/30 text-xs">
                               <tbody>
                                 {r.breakdown.map((line) => (
                                   <tr key={line.label}>
-                                    <td className="py-1.5 pl-6 pr-3 text-dash-text-faded">{line.label}</td>
-                                    <td className="px-3 py-1.5 tabular-nums text-dash-text-extra-faded">{line.detail}</td>
+                                    <td className="py-1.5 pl-6 pr-3 text-dash-text-faded">
+                                      {line.label}
+                                    </td>
+                                    <td className="px-3 py-1.5 tabular-nums text-dash-text-extra-faded">
+                                      {line.detail}
+                                    </td>
                                     <td className="py-1.5 pl-3 pr-3 text-right tabular-nums text-dash-text-faded">
                                       ${line.amount.toFixed(2)}
                                     </td>
@@ -1645,7 +1921,12 @@ function SpendingOverview() {
           </tbody>
           <tfoot>
             <tr className="bg-dash-bg-elevated/50">
-              <td colSpan={2} className="px-3 py-2 font-medium text-dash-text-strong">Total</td>
+              <td
+                colSpan={2}
+                className="px-3 py-2 font-medium text-dash-text-strong"
+              >
+                Total
+              </td>
               <td className="px-3 py-2 text-right font-medium tabular-nums text-dash-text-strong">
                 ${total.toFixed(2)}
               </td>
@@ -1700,9 +1981,13 @@ function UsageSection({
 function BillingInvoices({
   invoices,
   onPageChange,
+  isPageLoading = false,
+  pendingPage = null,
 }: {
   invoices?: SettingsInvoicePage;
   onPageChange?: (page: number) => Promise<void> | void;
+  isPageLoading?: boolean;
+  pendingPage?: number | null;
 }) {
   const currentPage = invoices?.page ?? 1;
   const totalPages = invoices?.totalPages ?? 1;
@@ -1733,7 +2018,10 @@ function BillingInvoices({
           }
 
           return (
-            <div key={invoice.id} className="flex items-center justify-between gap-4">
+            <div
+              key={invoice.id}
+              className="flex items-center justify-between gap-4"
+            >
               <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
                 {label}
               </p>
@@ -1748,7 +2036,8 @@ function BillingInvoices({
                 </a>
               ) : (
                 <span className="text-xs text-dash-text-extra-faded">
-                  {invoice.due ? "overdue" : "paid"} • ${invoice.total.toFixed(2)}
+                  {invoice.due ? "overdue" : "paid"} • $
+                  {invoice.total.toFixed(2)}
                 </span>
               )}
             </div>
@@ -1764,8 +2053,14 @@ function BillingInvoices({
         <NumberPagination
           currentPage={currentPage}
           totalPages={totalPages}
+          isLoading={isPageLoading}
+          loadingPage={pendingPage}
           onPageChange={(nextPage) => {
-            if (nextPage >= 1 && nextPage <= totalPages && nextPage !== currentPage) {
+            if (
+              nextPage >= 1 &&
+              nextPage <= totalPages &&
+              nextPage !== currentPage
+            ) {
               void onPageChange?.(nextPage);
             }
           }}
@@ -1781,12 +2076,16 @@ function BillingForm({
   onInvoicesPageChange,
   onUpdateCardInformation,
   isUpdatingCardInformation = false,
+  isLoadingInvoicesPage = false,
+  pendingInvoicesPage = null,
 }: {
   profile: UserProfile;
   billing?: SettingsSidebarSnapshot["billing"];
   onInvoicesPageChange?: (page: number) => Promise<void> | void;
   onUpdateCardInformation?: () => Promise<void> | void;
   isUpdatingCardInformation?: boolean;
+  isLoadingInvoicesPage?: boolean;
+  pendingInvoicesPage?: number | null;
 }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [changePlanOpen, setChangePlanOpen] = useState(false);
@@ -1802,9 +2101,11 @@ function BillingForm({
     currentPlan = "Team";
   }
 
-  const activePlan = billingPlans.find((plan) => plan.name === currentPlan) ?? billingPlans[0];
+  const activePlan =
+    billingPlans.find((plan) => plan.name === currentPlan) ?? billingPlans[0];
   const canChangePlan = currentPlan !== "Team";
-  const primaryCard = billing?.cards.find((card) => card.preferred) ?? billing?.cards[0];
+  const primaryCard =
+    billing?.cards.find((card) => card.preferred) ?? billing?.cards[0];
   const daysSinceFailure = profile.subscriptionDue ? 1 : 0;
 
   return (
@@ -1815,10 +2116,17 @@ function BillingForm({
         <div className="px-6 py-3 pr-[116px]">
           <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body dark:text-dash-text-faded">
             You are currently on the Brimble{" "}
-            <span className="text-dash-text-strong dark:text-dash-text-strong">{activePlan.name}</span> plan
+            <span className="text-dash-text-strong dark:text-dash-text-strong">
+              {activePlan.name}
+            </span>{" "}
+            plan
             {activePlan.price > 0 ? (
               <>
-                , you pay <span className="text-dash-text-strong dark:text-dash-text-strong">${activePlan.price}</span> per month.
+                , you pay{" "}
+                <span className="text-dash-text-strong dark:text-dash-text-strong">
+                  ${activePlan.price}
+                </span>{" "}
+                per month.
               </>
             ) : (
               "."
@@ -1844,20 +2152,17 @@ function BillingForm({
 
       <div className="flex flex-col gap-[30px]">
         <div className="flex items-center gap-[14px]">
-          <div className="relative h-12 w-[68px] shrink-0 overflow-hidden rounded-[5px] bg-[radial-gradient(circle_at_84%_10%,#5a5454_0%,#383636_55%,#1f1f1f_100%)] shadow-[0px_1px_1px_rgba(0,0,0,0.16),0px_1px_0px_rgba(0,0,0,0.11)]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_18%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.02)_55%,transparent_80%)]" />
-            <img
-              src="/icons/payment.svg"
-              alt=""
-              className="absolute left-3 top-1/2 size-4 -translate-y-1/2 opacity-90 dark:invert dark:brightness-125"
-            />
-          </div>
+          <img
+            src="/images/card-payment.svg"
+            alt=""
+            className="h-12 w-[68px] shrink-0"
+          />
           <div className="flex flex-col gap-[2px] py-2">
             <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
-              Payment cards
+              Payment card
             </p>
             <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
-              {billing?.cards.length ?? 0} linked card{(billing?.cards.length ?? 0) === 1 ? "" : "s"}
+              Connected • Powered by Stripe
             </p>
           </div>
         </div>
@@ -1869,7 +2174,10 @@ function BillingForm({
                 {primaryCard.cardType || "Card"}
               </p>
               <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
-                <span className="tabular-nums text-dash-text-strong">{primaryCard.last4 || "••••"}</span>, expiring{" "}
+                <span className="tabular-nums text-dash-text-strong">
+                  {primaryCard.last4 || "••••"}
+                </span>
+                , expiring{" "}
                 <span className="tabular-nums text-dash-text-strong">
                   {primaryCard.expMonth || "--"}/{primaryCard.expYear || "----"}
                 </span>
@@ -1903,7 +2211,12 @@ function BillingForm({
 
       <hr className="-ml-8 border-dash-border-soft" />
 
-      <BillingInvoices invoices={billing?.invoices} onPageChange={onInvoicesPageChange} />
+      <BillingInvoices
+        invoices={billing?.invoices}
+        onPageChange={onInvoicesPageChange}
+        isPageLoading={isLoadingInvoicesPage}
+        pendingPage={pendingInvoicesPage}
+      />
 
       <hr className="-ml-8 border-dash-border-soft" />
 
@@ -1968,10 +2281,26 @@ const eventGroups: EventGroup[] = [
     title: "Domain Events",
     icon: "/icons/domains.svg",
     events: [
-      { key: "domain_purchased", title: "Domain Purchased", description: "Notify when a domain is purchased successfully" },
-      { key: "domain_created", title: "Domain Created", description: "Notify when a domain is created in the system" },
-      { key: "domain_renewed", title: "Domain Renewed", description: "Notify when a domain is renewed successfully" },
-      { key: "domain_expired", title: "Domain Expired", description: "Notify when a domain expires" },
+      {
+        key: "domain_purchased",
+        title: "Domain Purchased",
+        description: "Notify when a domain is purchased successfully",
+      },
+      {
+        key: "domain_created",
+        title: "Domain Created",
+        description: "Notify when a domain is created in the system",
+      },
+      {
+        key: "domain_renewed",
+        title: "Domain Renewed",
+        description: "Notify when a domain is renewed successfully",
+      },
+      {
+        key: "domain_expired",
+        title: "Domain Expired",
+        description: "Notify when a domain expires",
+      },
     ],
   },
   {
@@ -1979,10 +2308,26 @@ const eventGroups: EventGroup[] = [
     title: "Deployment Events",
     icon: "/icons/project.svg",
     events: [
-      { key: "deployment_failed", title: "Deployment Failed", description: "Notify when deployments fail or encounter errors" },
-      { key: "deployment_started", title: "Deployment Started", description: "Notify when deployments are initiated" },
-      { key: "project_domain_updated", title: "Project Domain Updated", description: "Notify when a project domain has been updated" },
-      { key: "deployment_created", title: "Deployment Created", description: "Notify when deployments are initiated" },
+      {
+        key: "deployment_failed",
+        title: "Deployment Failed",
+        description: "Notify when deployments fail or encounter errors",
+      },
+      {
+        key: "deployment_started",
+        title: "Deployment Started",
+        description: "Notify when deployments are initiated",
+      },
+      {
+        key: "project_domain_updated",
+        title: "Project Domain Updated",
+        description: "Notify when a project domain has been updated",
+      },
+      {
+        key: "deployment_created",
+        title: "Deployment Created",
+        description: "Notify when deployments are initiated",
+      },
     ],
   },
   {
@@ -1990,8 +2335,16 @@ const eventGroups: EventGroup[] = [
     title: "Payment Events",
     icon: "/icons/payment.svg",
     events: [
-      { key: "payment_successful", title: "Payment Successful", description: "Notify when payment is processed successfully" },
-      { key: "payment_failed", title: "Payment Failed", description: "Notify when payment fails" },
+      {
+        key: "payment_successful",
+        title: "Payment Successful",
+        description: "Notify when payment is processed successfully",
+      },
+      {
+        key: "payment_failed",
+        title: "Payment Failed",
+        description: "Notify when payment fails",
+      },
     ],
   },
   {
@@ -1999,8 +2352,16 @@ const eventGroups: EventGroup[] = [
     title: "Database Events",
     icon: "/icons/integrations.svg",
     events: [
-      { key: "database_created", title: "Database Created", description: "Notify when a database is created" },
-      { key: "database_backup_completed", title: "Database Backup Completed", description: "Notify when database backup completes" },
+      {
+        key: "database_created",
+        title: "Database Created",
+        description: "Notify when a database is created",
+      },
+      {
+        key: "database_backup_completed",
+        title: "Database Backup Completed",
+        description: "Notify when database backup completes",
+      },
     ],
   },
   {
@@ -2008,9 +2369,21 @@ const eventGroups: EventGroup[] = [
     title: "Env Events",
     icon: "/icons/settings.svg",
     events: [
-      { key: "env_added", title: "Environment Variables Added", description: "Notify when environment variables have been added" },
-      { key: "env_updated", title: "Environment Variables Updated", description: "Notify when environment variables have been updated" },
-      { key: "env_deleted", title: "Environment Variables Deleted", description: "Notify when environment variables have been deleted" },
+      {
+        key: "env_added",
+        title: "Environment Variables Added",
+        description: "Notify when environment variables have been added",
+      },
+      {
+        key: "env_updated",
+        title: "Environment Variables Updated",
+        description: "Notify when environment variables have been updated",
+      },
+      {
+        key: "env_deleted",
+        title: "Environment Variables Deleted",
+        description: "Notify when environment variables have been deleted",
+      },
     ],
   },
   {
@@ -2018,14 +2391,32 @@ const eventGroups: EventGroup[] = [
     title: "DNS Events",
     icon: "/icons/discover.svg",
     events: [
-      { key: "dns_record_created", title: "DNS Record Created", description: "Notify when a DNS record has been created" },
-      { key: "dns_record_updated", title: "DNS Record Updated", description: "Notify when a DNS record has been updated" },
-      { key: "dns_record_deleted", title: "DNS Record Deleted", description: "Notify when a DNS record has been deleted" },
+      {
+        key: "dns_record_created",
+        title: "DNS Record Created",
+        description: "Notify when a DNS record has been created",
+      },
+      {
+        key: "dns_record_updated",
+        title: "DNS Record Updated",
+        description: "Notify when a DNS record has been updated",
+      },
+      {
+        key: "dns_record_deleted",
+        title: "DNS Record Deleted",
+        description: "Notify when a DNS record has been deleted",
+      },
     ],
   },
 ];
 
-function Checkbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Checkbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <button
       type="button"
@@ -2039,8 +2430,20 @@ function Checkbox({ checked, onChange }: { checked: boolean; onChange: (v: boole
       }`}
     >
       {checked && (
-        <svg width="8" height="6" viewBox="0 0 8 6" fill="none" className="text-white">
-          <path d="M1 3L3 5L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <svg
+          width="8"
+          height="6"
+          viewBox="0 0 8 6"
+          fill="none"
+          className="text-white"
+        >
+          <path
+            d="M1 3L3 5L7 1"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       )}
     </button>
@@ -2161,7 +2564,10 @@ function NotificationsForm({
     slackUrl: string;
     groups: ServerWebhookGroup[];
   };
-  onTestWebhook?: (url: string, type: "discord" | "slack" | "custom") => Promise<void> | void;
+  onTestWebhook?: (
+    url: string,
+    type: "discord" | "slack" | "custom",
+  ) => Promise<void> | void;
   onSave?: (data: {
     emailNotifications: boolean;
     mute: boolean;
@@ -2171,7 +2577,9 @@ function NotificationsForm({
     events: string[];
   }) => Promise<void> | void;
 }) {
-  const [emailNotifs, setEmailNotifs] = useState(profile.notifications?.email ?? false);
+  const [emailNotifs, setEmailNotifs] = useState(
+    profile.notifications?.email ?? false,
+  );
   const [discordUrl, setDiscordUrl] = useState(webhooks?.discordUrl ?? "");
   const [slackUrl, setSlackUrl] = useState(webhooks?.slackUrl ?? "");
   const [webhookUrl, setWebhookUrl] = useState(webhooks?.webhookUrl ?? "");
@@ -2179,7 +2587,10 @@ function NotificationsForm({
   const [isSaving, setIsSaving] = useState(false);
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
 
-  async function handleTestWebhook(url: string, type: "discord" | "slack" | "custom") {
+  async function handleTestWebhook(
+    url: string,
+    type: "discord" | "slack" | "custom",
+  ) {
     if (!url.trim()) return;
     setTestingWebhook(type);
     try {
@@ -2522,11 +2933,13 @@ function formatRelativeInviteTime(input?: string) {
   const diffMinutes = Math.max(1, Math.floor(diffMs / 60_000));
   if (diffMinutes < 60) return `${diffMinutes} min ago`;
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  if (diffHours < 24)
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
   const diffMonths = Math.floor(diffDays / 30);
-  if (diffMonths < 12) return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
+  if (diffMonths < 12)
+    return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
   const diffYears = Math.floor(diffMonths / 12);
   return `${diffYears} year${diffYears === 1 ? "" : "s"} ago`;
 }
@@ -2563,7 +2976,9 @@ function mapPendingInvites(team?: TeamDetails | null): PendingInvite[] {
       id: member.id,
       email: member.email,
       role: normalizeMemberRole(member),
-      sentAt: formatRelativeInviteTime(member.invitedAt ?? member.createdAt ?? member.updatedAt),
+      sentAt: formatRelativeInviteTime(
+        member.invitedAt ?? member.createdAt ?? member.updatedAt,
+      ),
     }));
 }
 
@@ -2585,7 +3000,8 @@ function MemberActionMenu({
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     }
     if (open) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -2643,16 +3059,22 @@ function MembersForm({
   currentUser?: Pick<UserProfile, "uniqueId" | "email"> | null;
 }) {
   const [inviteOpen, setInviteOpen] = useState(false);
-  const getTeamMembers = useServerFn(getWorkspaceTeamMembersServerFn as any) as (args: {
-    data: { workspace: string };
-  }) => Promise<TeamDetails>;
-  const inviteTeamMembers = useServerFn(inviteWorkspaceTeamMembersServerFn as any) as (args: {
+  const getTeamMembers = useServerFn(
+    getWorkspaceTeamMembersServerFn as any,
+  ) as (args: { data: { workspace: string } }) => Promise<TeamDetails>;
+  const inviteTeamMembers = useServerFn(
+    inviteWorkspaceTeamMembersServerFn as any,
+  ) as (args: {
     data: { workspace: string; members: string[] };
   }) => Promise<{ ok: true }>;
-  const resendInvite = useServerFn(resendWorkspaceTeamInviteServerFn as any) as (args: {
+  const resendInvite = useServerFn(
+    resendWorkspaceTeamInviteServerFn as any,
+  ) as (args: {
     data: { workspace: string; email: string };
   }) => Promise<{ ok: true }>;
-  const removeTeamMember = useServerFn(removeWorkspaceTeamMemberServerFn as any) as (args: {
+  const removeTeamMember = useServerFn(
+    removeWorkspaceTeamMemberServerFn as any,
+  ) as (args: {
     data: { workspace: string; memberId: string };
   }) => Promise<{ ok: true }>;
 
@@ -2660,7 +3082,9 @@ function MembersForm({
   const [isLoadingMembers, setIsLoadingMembers] = useState(!initialTeam);
   const [membersError, setMembersError] = useState<string | null>(null);
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
-  const [busyMemberAction, setBusyMemberAction] = useState<"resend" | "revoke" | "remove" | null>(null);
+  const [busyMemberAction, setBusyMemberAction] = useState<
+    "resend" | "revoke" | "remove" | null
+  >(null);
 
   const members = mapActiveMembers(team);
   const pendingInvites = mapPendingInvites(team);
@@ -2676,7 +3100,9 @@ function MembersForm({
     const currentEmail = currentUser?.email?.trim().toLowerCase();
     return Boolean(currentEmail && memberEmail === currentEmail);
   });
-  const currentUserRole = currentUserTeamMember ? normalizeMemberRole(currentUserTeamMember) : null;
+  const currentUserRole = currentUserTeamMember
+    ? normalizeMemberRole(currentUserTeamMember)
+    : null;
   const canManageMembers =
     currentUserRole === "Creator" || currentUserRole === "Administrator";
 
@@ -2690,7 +3116,9 @@ function MembersForm({
       const nextTeam = await getTeamMembers({ data: { workspace } });
       setTeam(nextTeam);
     } catch (error) {
-      setMembersError(error instanceof Error ? error.message : "Failed to load team members");
+      setMembersError(
+        error instanceof Error ? error.message : "Failed to load team members",
+      );
     } finally {
       if (!options?.silent) {
         setIsLoadingMembers(false);
@@ -2721,7 +3149,11 @@ function MembersForm({
           onClick={() => setInviteOpen(true)}
           className="px-5"
           disabled={!canManageMembers}
-          title={!canManageMembers ? "Only workspace creators and administrators can invite members" : undefined}
+          title={
+            !canManageMembers
+              ? "Only workspace creators and administrators can invite members"
+              : undefined
+          }
         >
           Invite
         </GlossyButton>
@@ -2742,63 +3174,76 @@ function MembersForm({
           {members.map((member) => {
             const currentEmail = currentUser?.email?.trim().toLowerCase() ?? "";
             const isSelf =
-              (member.userId && currentUser?.uniqueId && member.userId === currentUser.uniqueId) ||
-              (currentEmail.length > 0 && member.email.trim().toLowerCase() === currentEmail);
-            const canManageTarget = canManageMembers && !isSelf && member.role !== "Creator";
+              (member.userId &&
+                currentUser?.uniqueId &&
+                member.userId === currentUser.uniqueId) ||
+              (currentEmail.length > 0 &&
+                member.email.trim().toLowerCase() === currentEmail);
+            const canManageTarget =
+              canManageMembers && !isSelf && member.role !== "Creator";
 
             return (
-          <div key={member.id} className="flex items-center gap-3">
-            {member.avatarUrl ? (
-              <img
-                src={member.avatarUrl}
-                alt={member.name}
-                className="size-8 shrink-0 rounded-full border border-dash-border-soft object-cover"
-              />
-            ) : (
-              <div
-                className="size-8 shrink-0 rounded-full"
-                style={{ background: member.gradient }}
-              />
-            )}
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
-                {member.name}
-              </span>
-              <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
-                {member.email}
-              </span>
-            </div>
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${roleBadgeStyles[member.role] ?? roleBadgeStyles.Member
-                }`}
-            >
-              {member.role}
-            </span>
-            <MemberActionMenu
-              member={member}
-              removing={busyMemberId === member.id}
-              canChangeRole={canManageTarget}
-              canRemove={canManageTarget}
-              onRemove={async (target) => {
-                try {
-                  setBusyMemberId(target.id);
-                  setBusyMemberAction("remove");
-                  await removeTeamMember({ data: { workspace, memberId: target.id } });
-                  toast.success("Member removed");
-                  await refreshMembers();
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "Failed to remove member");
-                } finally {
-                  setBusyMemberId(null);
-                  setBusyMemberAction(null);
-                }
-              }}
-            />
-          </div>
+              <div key={member.id} className="flex items-center gap-3">
+                {member.avatarUrl ? (
+                  <img
+                    src={member.avatarUrl}
+                    alt={member.name}
+                    className="size-8 shrink-0 rounded-full border border-dash-border-soft object-cover"
+                  />
+                ) : (
+                  <div
+                    className="size-8 shrink-0 rounded-full"
+                    style={{ background: member.gradient }}
+                  />
+                )}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
+                    {member.name}
+                  </span>
+                  <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
+                    {member.email}
+                  </span>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                    roleBadgeStyles[member.role] ?? roleBadgeStyles.Member
+                  }`}
+                >
+                  {member.role}
+                </span>
+                <MemberActionMenu
+                  member={member}
+                  removing={busyMemberId === member.id}
+                  canChangeRole={canManageTarget}
+                  canRemove={canManageTarget}
+                  onRemove={async (target) => {
+                    try {
+                      setBusyMemberId(target.id);
+                      setBusyMemberAction("remove");
+                      await removeTeamMember({
+                        data: { workspace, memberId: target.id },
+                      });
+                      toast.success("Member removed");
+                      await refreshMembers();
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to remove member",
+                      );
+                    } finally {
+                      setBusyMemberId(null);
+                      setBusyMemberAction(null);
+                    }
+                  }}
+                />
+              </div>
             );
           })}
           {!members.length && (
-            <div className="text-sm text-dash-text-faded">No workspace members found.</div>
+            <div className="text-sm text-dash-text-faded">
+              No workspace members found.
+            </div>
           )}
         </div>
       )}
@@ -2831,54 +3276,74 @@ function MembersForm({
                 </span>
                 <div className="flex shrink-0 items-center gap-2">
                   {canManageMembers && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        setBusyMemberId(invite.id);
-                        setBusyMemberAction("resend");
-                        await resendInvite({ data: { workspace, email: invite.email } });
-                        toast.success("Invitation resent");
-                        await refreshMembers();
-                      } catch (error) {
-                        toast.error(error instanceof Error ? error.message : "Failed to resend invite");
-                      } finally {
-                        setBusyMemberId(null);
-                        setBusyMemberAction(null);
-                      }
-                    }}
-                    disabled={busyMemberId === invite.id}
-                    className="inline-flex items-center gap-1 text-xs text-[#4879f8] transition-colors hover:text-[#3a6ae6] disabled:opacity-50"
-                  >
-                    {busyMemberId === invite.id && busyMemberAction === "resend" && (
-                      <span className="size-2.5 animate-spin rounded-full border border-current border-t-transparent" />
-                    )}
-                    {busyMemberId === invite.id && busyMemberAction === "resend" ? "Resending..." : "Resend"}
-                  </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          setBusyMemberId(invite.id);
+                          setBusyMemberAction("resend");
+                          await resendInvite({
+                            data: { workspace, email: invite.email },
+                          });
+                          toast.success("Invitation resent");
+                          await refreshMembers();
+                        } catch (error) {
+                          toast.error(
+                            error instanceof Error
+                              ? error.message
+                              : "Failed to resend invite",
+                          );
+                        } finally {
+                          setBusyMemberId(null);
+                          setBusyMemberAction(null);
+                        }
+                      }}
+                      disabled={busyMemberId === invite.id}
+                      className="inline-flex items-center gap-1 text-xs text-[#4879f8] transition-colors hover:text-[#3a6ae6] disabled:opacity-50"
+                    >
+                      {busyMemberId === invite.id &&
+                        busyMemberAction === "resend" && (
+                          <span className="size-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+                        )}
+                      {busyMemberId === invite.id &&
+                      busyMemberAction === "resend"
+                        ? "Resending..."
+                        : "Resend"}
+                    </button>
                   )}
                   {canManageMembers && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        setBusyMemberId(invite.id);
-                        setBusyMemberAction("revoke");
-                        await removeTeamMember({ data: { workspace, memberId: invite.id } });
-                        toast.success("Invitation revoked");
-                        await refreshMembers();
-                      } catch (error) {
-                        toast.error(error instanceof Error ? error.message : "Failed to revoke invitation");
-                      } finally {
-                        setBusyMemberId(null);
-                        setBusyMemberAction(null);
-                      }
-                    }}
-                    disabled={busyMemberId === invite.id}
-                    className="inline-flex items-center gap-1 text-xs text-dash-text-faded transition-colors hover:text-red-500 disabled:opacity-50"
-                  >
-                    {busyMemberId === invite.id && busyMemberAction === "revoke" && (
-                      <span className="size-2.5 animate-spin rounded-full border border-current border-t-transparent" />
-                    )}
-                    {busyMemberId === invite.id && busyMemberAction === "revoke" ? "Revoking..." : "Revoke"}
-                  </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          setBusyMemberId(invite.id);
+                          setBusyMemberAction("revoke");
+                          await removeTeamMember({
+                            data: { workspace, memberId: invite.id },
+                          });
+                          toast.success("Invitation revoked");
+                          await refreshMembers();
+                        } catch (error) {
+                          toast.error(
+                            error instanceof Error
+                              ? error.message
+                              : "Failed to revoke invitation",
+                          );
+                        } finally {
+                          setBusyMemberId(null);
+                          setBusyMemberAction(null);
+                        }
+                      }}
+                      disabled={busyMemberId === invite.id}
+                      className="inline-flex items-center gap-1 text-xs text-dash-text-faded transition-colors hover:text-red-500 disabled:opacity-50"
+                    >
+                      {busyMemberId === invite.id &&
+                        busyMemberAction === "revoke" && (
+                          <span className="size-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+                        )}
+                      {busyMemberId === invite.id &&
+                      busyMemberAction === "revoke"
+                        ? "Revoking..."
+                        : "Revoke"}
+                    </button>
                   )}
                 </div>
               </div>
@@ -2896,10 +3361,12 @@ function MembersForm({
             Seat usage
           </span>
           <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
-            {members.length} seats &times; {formatUsdMonthly(TEAM_MEMBER_SEAT_PRICE_MONTHLY)}/seat/month
+            {members.length} seats &times;{" "}
+            {formatUsdMonthly(TEAM_MEMBER_SEAT_PRICE_MONTHLY)}/seat/month
           </span>
           <span className="text-xs leading-4 tracking-[-0.02px] text-dash-text-extra-faded">
-            Team billing also includes concurrent builds at {formatUsdMonthly(TEAM_CONCURRENT_BUILD_PRICE_MONTHLY)}/build/month.
+            Team billing also includes concurrent builds at{" "}
+            {formatUsdMonthly(TEAM_CONCURRENT_BUILD_PRICE_MONTHLY)}/build/month.
           </span>
         </div>
         <span className="text-lg font-medium text-dash-text-strong">
@@ -2913,7 +3380,9 @@ function MembersForm({
         currentSeats={members.length}
         onInvite={async (emails) => {
           await inviteTeamMembers({ data: { workspace, members: emails } });
-          toast.success(`Sent ${emails.length} invitation${emails.length === 1 ? "" : "s"}`);
+          toast.success(
+            `Sent ${emails.length} invitation${emails.length === 1 ? "" : "s"}`,
+          );
           await refreshMembers();
         }}
       />

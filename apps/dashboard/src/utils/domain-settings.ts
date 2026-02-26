@@ -1,5 +1,6 @@
 import type { DomainDetailsRecord } from "@/backend/domains";
 import type { DomainInfo } from "@/components/shared/domain-settings";
+import { isDateExpired } from "@/utils/date";
 
 function formatTtlSeconds(ttl?: number): string {
   if (typeof ttl !== "number" || ttl <= 0) {
@@ -91,6 +92,7 @@ export function mapDomainDetailsToDomainInfo(domain: DomainDetailsRecord): Domai
   }
 
   return {
+    domainId: domain.id,
     domainName: domain.name,
     registrar: domain.registrar || (domain.isCustom ? "Custom domain" : "-"),
     nameserversType: getNameserversType(domain),
@@ -107,5 +109,10 @@ export function mapDomainDetailsToDomainInfo(domain: DomainDetailsRecord): Domai
     })),
     nameservers: displayNameservers,
     nameserverWarning: buildNameserverWarning(domain),
+    purchased: domain.purchased,
+    isExpired: domain.isExpired ?? isDateExpired(domain.expiresAt),
+    renewalPrice: domain.renewalPrice,
+    renewalDuration: domain.renewalDuration,
+    autoRenewal: domain.autoRenewal,
   };
 }

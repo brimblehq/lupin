@@ -1,20 +1,39 @@
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Copy, Share2, Reply, Plus, AlertCircle, ChevronDown, Pencil } from "lucide-react";
+import { CheckCircle, ShieldCheck } from "@phosphor-icons/react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { FolderTrashIcon } from "./folder-trash-icon";
+import { GlossyButton } from "./glossy-button";
+import { Dropdown } from "./dropdown";
+import {
+  Modal,
+  ModalCancelButton,
+  ModalContinueButton,
+  ModalFooter,
+  ModalHeader,
+} from "./modal";
+import { SimpleTooltip } from "./tooltip";
 import { ToggleSwitch } from "./toggle-switch";
 import { WarningModal } from "./warning-modal";
 import {
   createDomainDnsRecordServerFn,
   deleteDomainDnsRecordServerFn,
+  renewDomainSaleServerFn,
   updateDomainDnsRecordServerFn,
 } from "@/server/domains/actions";
 
 const dnsRecordTypes = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"];
+const transferProviders = [
+  { id: "namecheap", label: "Namecheap", url: "https://www.namecheap.com/domains/transfer/" },
+  { id: "godaddy", label: "GoDaddy", url: "https://www.godaddy.com/domains/domain-transfer" },
+  { id: "cloudflare", label: "Cloudflare Registrar", url: "https://dash.cloudflare.com/?to=/:account/domains/transfer" },
+  { id: "porkbun", label: "Porkbun", url: "https://porkbun.com/transfer" },
+  { id: "other", label: "Other provider", url: "" },
+] as const;
 
 export interface DnsRecord {
   id?: string;
@@ -27,6 +46,7 @@ export interface DnsRecord {
 }
 
 export interface DomainInfo {
+  domainId: string;
   domainName: string;
   registrar: string;
   nameserversType: string;
@@ -35,6 +55,11 @@ export interface DomainInfo {
   dnsRecords: DnsRecord[];
   nameservers: string[];
   nameserverWarning?: string;
+  purchased?: boolean;
+  isExpired?: boolean;
+  renewalPrice?: number;
+  renewalDuration?: number;
+  autoRenewal?: boolean;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -316,6 +341,19 @@ export function DomainSettings({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [dnsSubmitting, setDnsSubmitting] = useState(false);
   const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
+  const [renewOpen, setRenewOpen] = useState(false);
+  const [renewDuration, setRenewDuration] = useState(domain.renewalDuration || 1);
+  const [renewAutoRenew, setRenewAutoRenew] = useState(Boolean(domain.autoRenewal));
+  const [transferOutOpen, setTransferOutOpen] = useState(false);
+  const [transferProvider, setTransferProvider] = useState<string>("namecheap");
+  const [transferChecklist, setTransferChecklist] = useState({
+    unlocked: false,
+    registrantEmailReady: false,
+    understandDnsImpact: false,
+  });
+  const [transferStep, setTransferStep] = useState<"setup" | "auth-code">("setup");
+  const [transferAuthCode, setTransferAuthCode] = useState<string>("");
+  const [transferAuthLoading, setTransferAuthLoading] = useState(false);
   const createDnsRecord = useServerFn(createDomainDnsRecordServerFn as any) as (args: {
     data: {
       workspace?: string;
@@ -334,10 +372,18 @@ export function DomainSettings({
   const deleteDnsRecord = useServerFn(deleteDomainDnsRecordServerFn as any) as (args: {
     data: { workspace?: string; domainName: string; recordId: string };
   }) => Promise<{ success: boolean }>;
+  const renewDomain = useServerFn(renewDomainSaleServerFn as any) as (args: {
+    data: { workspace?: string; domainId: string; duration?: number; autoRenew?: boolean };
+  }) => Promise<{ success: boolean }>;
 
   useEffect(() => {
     setRecords(domain.dnsRecords);
   }, [domain.dnsRecords]);
+
+  useEffect(() => {
+    setRenewDuration(domain.renewalDuration || 1);
+    setRenewAutoRenew(Boolean(domain.autoRenewal));
+  }, [domain.renewalDuration, domain.autoRenewal, domain.domainId]);
 
   const upsertRecord = useCallback((input: {
     record: {
@@ -489,6 +535,60 @@ export function DomainSettings({
     createDnsRecord,
   ]);
 
+  const renewalUnitPrice = Number(domain.renewalPrice ?? 0);
+  const totalRenewalPrice = renewalUnitPrice * renewDuration;
+  const selectedTransferProvider = transferProviders.find(
+    (provider) => provider.id === transferProvider,
+  ) ?? transferProviders[0];
+  const canContinueTransfer =
+    transferChecklist.unlocked
+    && transferChecklist.registrantEmailReady
+    && transferChecklist.understandDnsImpact;
+
+  function openTransferProviderSite() {
+    if (selectedTransferProvider.url) {
+      window.open(selectedTransferProvider.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const subject = encodeURIComponent(`Domain transfer-out request: ${domain.domainName}`);
+    const body = encodeURIComponent(
+      [
+        "Hi Brimble team,",
+        "",
+        `I want to transfer my domain "${domain.domainName}" to another registrar.`,
+        `Destination provider: ${selectedTransferProvider.label}`,
+        "",
+        "Please share the next steps and authorization (EPP) code if available.",
+      ].join("\n"),
+    );
+    window.location.href = `mailto:hello@brimble.app?subject=${subject}&body=${body}`;
+  }
+
+  async function requestTransferAuthCode() {
+    // TODO: Replace with the server function once the EPP endpoint is available.
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    return `EPP-${domain.domainId.slice(0, 6).toUpperCase()}-${domain.domainName.split(".")[0].slice(0, 4).toUpperCase()}`;
+  }
+
+  async function handleContinueTransfer() {
+    try {
+      setTransferAuthLoading(true);
+      const authCode = await requestTransferAuthCode();
+      setTransferAuthCode(authCode);
+      setTransferStep("auth-code");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load EPP/Auth code");
+    } finally {
+      setTransferAuthLoading(false);
+    }
+  }
+
+  function resetTransferModalState() {
+    setTransferStep("setup");
+    setTransferAuthCode("");
+    setTransferAuthLoading(false);
+  }
   return (
     <div className="flex flex-col">
       {/* Sub-bar: Back + domain name + action icons */}
@@ -532,6 +632,24 @@ export function DomainSettings({
           </div>
         </div>
 
+        {/* Expired domain banner */}
+        {domain.isExpired && (
+          <div className="flex items-center gap-3 rounded-[4px] bg-[#fef2f2] px-4 py-3 dark:bg-[#2a1818]">
+            <AlertCircle className="size-5 shrink-0 text-[#ef4444]" />
+            <span className="text-sm text-dash-text-body">
+              This domain has expired. DNS records cannot be managed until the domain is renewed.
+            </span>
+            <GlossyButton
+              type="button"
+              variant="red"
+              onClick={() => setRenewOpen(true)}
+              className="ml-auto h-8 shrink-0 rounded-[6px] px-2.5 text-xs"
+            >
+              Renew now
+            </GlossyButton>
+          </div>
+        )}
+
         {/* DNS Records section */}
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between">
@@ -547,16 +665,27 @@ export function DomainSettings({
                 "
               </p>
             </div>
-            <button
-              onClick={() => {
-                setEditingRecord(null);
-                setAddRecordOpen(true);
-              }}
-              className="flex items-center gap-1 rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
-            >
-              <Plus className="size-4" />
-              <span className="px-1">Add a New Record</span>
-            </button>
+            {domain.isExpired ? (
+              <SimpleTooltip content="DNS cannot be managed for expired domains" side="left">
+                <span
+                  className="flex cursor-not-allowed items-center gap-1 rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 py-[5px] text-sm font-medium text-white opacity-50 shadow-[0px_1px_2px_rgba(18,18,23,0.05)]"
+                >
+                  <Plus className="size-4" />
+                  <span className="px-1">Add a New Record</span>
+                </span>
+              </SimpleTooltip>
+            ) : (
+              <button
+                onClick={() => {
+                  setEditingRecord(null);
+                  setAddRecordOpen(true);
+                }}
+                className="flex items-center gap-1 rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+              >
+                <Plus className="size-4" />
+                <span className="px-1">Add a New Record</span>
+              </button>
+            )}
           </div>
 
           <hr className="border-dash-border" />
@@ -592,8 +721,15 @@ export function DomainSettings({
                     : ""
                 }`}
               >
-                <span className="font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
+                <span className="flex items-center gap-1.5 font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
                   {record.type}
+                  {record.isProxied && (
+                    <SimpleTooltip content={<><CheckCircle size={13} weight="fill" className="text-[#34d399]" />Proxied by Brimble</>}>
+                      <span className="text-[#4879f8]">
+                        <ShieldCheck size={14} weight="fill" />
+                      </span>
+                    </SimpleTooltip>
+                  )}
                 </span>
                 <span className="font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
                   {record.name}
@@ -605,24 +741,40 @@ export function DomainSettings({
                   {record.value}
                 </span>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setEditingRecord(record);
-                      setAddRecordOpen(true);
-                    }}
-                    className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-body"
-                    title="Edit record"
-                  >
-                    <Pencil className="size-3.5" />
-                  </button>
-                  <button
-                    onClick={() => deleteRecord(i)}
-                    disabled={deletingRecordId === record.id}
-                    className="rounded-[4px] p-1 transition-opacity hover:opacity-70"
-                    title="Delete record"
-                  >
-                    <FolderTrashIcon className="size-3.5" />
-                  </button>
+                  {domain.isExpired ? (
+                    <SimpleTooltip content="DNS cannot be managed for expired domains">
+                      <span className="cursor-not-allowed rounded-[4px] p-1 text-dash-text-faded opacity-50">
+                        <Pencil className="size-3.5" />
+                      </span>
+                    </SimpleTooltip>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingRecord(record);
+                        setAddRecordOpen(true);
+                      }}
+                      className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-body"
+                      title="Edit record"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  )}
+                  {domain.isExpired ? (
+                    <SimpleTooltip content="DNS cannot be managed for expired domains">
+                      <span className="cursor-not-allowed rounded-[4px] p-1 opacity-50">
+                        <FolderTrashIcon className="size-3.5" />
+                      </span>
+                    </SimpleTooltip>
+                  ) : (
+                    <button
+                      onClick={() => deleteRecord(i)}
+                      disabled={deletingRecordId === record.id}
+                      className="rounded-[4px] p-1 transition-opacity hover:opacity-70"
+                      title="Delete record"
+                    >
+                      <FolderTrashIcon className="size-3.5" />
+                    </button>
+                  )}
                   <CopyButton text={record.value} />
                 </div>
               </div>
@@ -678,6 +830,31 @@ export function DomainSettings({
             </div>
           ))}
         </div>
+
+        {domain.purchased && (
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-base font-medium leading-5 tracking-[-0.026px] text-dash-text-body dark:text-white">
+                  Transfer to another provider
+                </h2>
+                <p className="max-w-[720px] text-sm font-light leading-[1.3] text-dash-text-faded">
+                  Move this domain to another registrar (for example from Brimble to Namecheap or
+                  GoDaddy). The transfer is finalized at the destination provider.
+                </p>
+              </div>
+              <GlossyButton
+                variant="black"
+                type="button"
+                onClick={() => setTransferOutOpen(true)}
+                className="shrink-0"
+              >
+                Start transfer
+              </GlossyButton>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Add DNS Record Modal */}
@@ -705,6 +882,294 @@ export function DomainSettings({
           // TODO: handle domain deletion
         }}
       />
+
+      <Modal
+        open={transferOutOpen}
+        onOpenChange={(open) => {
+          setTransferOutOpen(open);
+          if (!open) {
+            resetTransferModalState();
+          }
+        }}
+        width={520}
+      >
+        <ModalHeader
+          title={transferStep === "setup" ? "Transfer domain to another provider" : "EPP/Auth code"}
+          description={
+            transferStep === "setup"
+              ? `Prepare transfer-out for ${domain.domainName}`
+              : `Use this code when ${selectedTransferProvider.label} asks for domain authorization`
+          }
+        />
+
+        <div className="flex flex-col gap-4 px-6 py-5">
+          {transferStep === "setup" ? (
+            <>
+              <div className="rounded-[8px] border border-dash-border bg-dash-bg-elevated px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-dash-text-faded">Current registrar</span>
+                    <span className="text-sm font-medium text-dash-text-strong">
+                      {domain.registrar || "Brimble"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs text-dash-text-faded">Domain</span>
+                    <span className="text-sm font-medium text-dash-text-strong">
+                      {domain.domainName}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm text-dash-text-faded">Destination provider</label>
+                <Dropdown
+                  value={transferProvider}
+                  options={transferProviders.map((provider) => ({
+                    id: provider.id,
+                    label: provider.label,
+                  }))}
+                  onChange={setTransferProvider}
+                  placeholder="Select a provider..."
+                />
+              </div>
+
+              <div className="rounded-[8px] border border-dash-border bg-dash-bg-elevated px-4 py-3">
+                <p className="text-sm font-medium text-dash-text-strong">Pre-transfer checklist</p>
+                <div className="mt-3 flex flex-col gap-3">
+                  <label className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={transferChecklist.unlocked}
+                      onChange={(e) =>
+                        setTransferChecklist((prev) => ({ ...prev, unlocked: e.target.checked }))
+                      }
+                      className="mt-0.5 size-4 rounded border-dash-border"
+                    />
+                    <span className="text-sm text-dash-text-body">
+                      I have unlocked the domain for transfer (or I am ready to do so).
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={transferChecklist.registrantEmailReady}
+                      onChange={(e) =>
+                        setTransferChecklist((prev) => ({
+                          ...prev,
+                          registrantEmailReady: e.target.checked,
+                        }))
+                      }
+                      className="mt-0.5 size-4 rounded border-dash-border"
+                    />
+                    <span className="text-sm text-dash-text-body">
+                      I can access the registrant email to approve transfer verification emails.
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={transferChecklist.understandDnsImpact}
+                      onChange={(e) =>
+                        setTransferChecklist((prev) => ({
+                          ...prev,
+                          understandDnsImpact: e.target.checked,
+                        }))
+                      }
+                      className="mt-0.5 size-4 rounded border-dash-border"
+                    />
+                    <span className="text-sm text-dash-text-body">
+                      I understand DNS and renewal settings may be managed at the new registrar after
+                      transfer completes.
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-[8px] border border-dash-border bg-dash-bg px-4 py-3">
+                <p className="text-sm font-medium text-dash-text-strong">Authorization code (EPP)</p>
+                <p className="mt-1 text-xs leading-4 text-dash-text-faded">
+                  Some providers ask for an EPP/Auth code during transfer. Click Continue to load the
+                  code for this domain.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-[8px] border border-dash-border bg-dash-bg-elevated px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-dash-text-faded">Domain</span>
+                    <span className="text-sm font-medium text-dash-text-strong">
+                      {domain.domainName}
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs text-dash-text-faded">Provider</span>
+                    <span className="text-sm font-medium text-dash-text-strong">
+                      {selectedTransferProvider.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[8px] border border-dash-border bg-dash-bg-elevated px-4 py-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-dash-text-strong">EPP/Auth code</p>
+                    <span className="rounded-[999px] border border-dash-border bg-dash-bg px-2 py-0.5 text-[11px] font-medium leading-4 text-dash-text-faded">
+                      Keep private
+                    </span>
+                  </div>
+                  {transferAuthCode ? <CopyButton text={transferAuthCode} /> : null}
+                </div>
+
+                <div className="rounded-[6px] border-[0.5px] border-dash-border bg-gradient-to-b from-dash-bg to-dash-bg-elevated px-3 py-2.5 shadow-[inset_0px_1px_0px_rgba(255,255,255,0.03)]">
+                  <div className="flex items-center gap-2">
+                    <span className="size-1.5 rounded-full bg-[#4879f8]" />
+                    <code className="block min-w-0 break-all font-mono text-[13px] font-medium tracking-[0.01em] text-dash-text-strong">
+                      {transferAuthCode || "Unavailable"}
+                    </code>
+                  </div>
+                </div>
+
+                <p className="mt-2.5 text-xs leading-4 text-dash-text-faded">
+                  Paste this code at {selectedTransferProvider.label} when they request domain authorization.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        <ModalFooter>
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <ModalCancelButton />
+              {transferStep === "setup" ? (
+                <GlossyButton
+                  variant="white"
+                  onClick={() => {
+                    const subject = encodeURIComponent(
+                      `Domain transfer support request: ${domain.domainName}`,
+                    );
+                    const body = encodeURIComponent(
+                      `Hi Brimble team,\n\nI need help transferring ${domain.domainName} to ${selectedTransferProvider.label}.\nPlease share the required steps / EPP code.\n`,
+                    );
+                    window.location.href = `mailto:hello@brimble.app?subject=${subject}&body=${body}`;
+                  }}
+                  className="h-[34px] rounded-[4px] px-3.5 text-sm"
+                >
+                  Contact support
+                </GlossyButton>
+              ) : (
+                <GlossyButton
+                  variant="white"
+                  onClick={() => setTransferStep("setup")}
+                  className="h-[34px] rounded-[4px] px-3.5 text-sm"
+                >
+                  Back
+                </GlossyButton>
+              )}
+            </div>
+            {transferStep === "setup" ? (
+              <ModalContinueButton
+                disabled={!canContinueTransfer}
+                loading={transferAuthLoading}
+                loadingLabel="Loading EPP code..."
+                onClick={handleContinueTransfer}
+              >
+                Continue
+              </ModalContinueButton>
+            ) : (
+              <ModalContinueButton
+                onClick={() => {
+                  openTransferProviderSite();
+                  setTransferOutOpen(false);
+                  resetTransferModalState();
+                  toast.success(`Opened ${selectedTransferProvider.label} transfer page`);
+                }}
+              >
+                Open {selectedTransferProvider.label}
+              </ModalContinueButton>
+            )}
+          </div>
+        </ModalFooter>
+      </Modal>
+
+      <WarningModal
+        open={renewOpen}
+        onOpenChange={setRenewOpen}
+        title="Renew this domain?"
+        description="Renewing the domain will restore DNS management after the registration is active again."
+        confirmLabel={
+          renewalUnitPrice > 0
+            ? `Pay $${totalRenewalPrice.toFixed(2)} now`
+            : "Renew domain"
+        }
+        confirmLoadingLabel="Renewing domain..."
+        confirmDisabled={!domain.domainId}
+        onConfirm={async () => {
+          await renewDomain({
+            data: {
+              ...(workspace ? { workspace } : {}),
+              domainId: domain.domainId,
+              duration: renewDuration,
+              autoRenew: renewAutoRenew,
+            },
+          });
+
+          toast.success("Domain renewal submitted");
+          window.location.reload();
+        }}
+      >
+        <div className="flex flex-col gap-3 text-left">
+          <div className="flex items-center justify-between rounded-[8px] border border-dash-border bg-dash-bg-elevated px-3 py-2">
+            <span className="text-sm text-dash-text-faded">Domain</span>
+            <span className="text-sm font-medium text-dash-text-strong">
+              {domain.domainName}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm text-dash-text-faded">Renewal duration</label>
+            <select
+              value={renewDuration}
+              onChange={(e) => setRenewDuration(Number(e.target.value) || 1)}
+              className="input-base input-focus h-10 px-2.5 text-sm text-dash-text-strong"
+            >
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((year) => (
+                <option key={year} value={year}>
+                  {year} year{year > 1 ? "s" : ""}
+                  {renewalUnitPrice > 0
+                    ? ` — $${(renewalUnitPrice * year).toFixed(2)}`
+                    : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between rounded-[8px] border border-dash-border bg-dash-bg-elevated px-3 py-2.5">
+            <div className="flex flex-col">
+              <span className="text-sm text-dash-text-body">Auto renewal</span>
+              <span className="text-xs text-dash-text-faded">
+                Renew automatically before expiration
+              </span>
+            </div>
+            <ToggleSwitch checked={renewAutoRenew} onChange={setRenewAutoRenew} />
+          </div>
+
+          {renewalUnitPrice > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-dash-text-faded">Estimated total</span>
+              <span className="font-medium text-dash-text-strong">
+                ${totalRenewalPrice.toFixed(2)}
+              </span>
+            </div>
+          )}
+        </div>
+      </WarningModal>
+
     </div>
   );
 }

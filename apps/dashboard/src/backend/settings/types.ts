@@ -142,6 +142,8 @@ export interface InitializeSettingsAddCardResult {
   paymentLink: string;
 }
 
+export type GitProvider = "bitbucket" | "github" | "gitlab" | "huggingface";
+
 export interface SettingsApi {
   getSidebarSnapshot(page?: number, options?: { subscriptionId?: string }): Promise<SettingsSidebarSnapshot>;
   getProfile(): Promise<SettingsUserProfile>;
@@ -158,4 +160,5 @@ export interface SettingsApi {
   initializeAddCard(input: InitializeSettingsAddCardInput): Promise<InitializeSettingsAddCardResult>;
   getBillingSnapshot(page?: number, options?: { subscriptionId?: string }): Promise<SettingsBillingSnapshot>;
   getInvoices(page?: number, options?: { subscriptionId?: string }): Promise<SettingsInvoicePage>;
+  disconnectGitProvider(provider: GitProvider): Promise<void>;
 }

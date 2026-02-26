@@ -51,6 +51,7 @@ export const listProjectsPageServerFn = createServerFn({
         page?: number;
         q?: string;
         serviceType?: string;
+        status?: string;
       }
     | undefined;
 
@@ -58,6 +59,7 @@ export const listProjectsPageServerFn = createServerFn({
   const requestedPage = payload?.page;
   const query = payload?.q?.trim();
   const serviceType = payload?.serviceType?.trim();
+  const status = payload?.status?.trim();
 
   let page = 1;
   if (typeof requestedPage === "number" && Number.isFinite(requestedPage) && requestedPage > 0) {
@@ -77,6 +79,7 @@ export const listProjectsPageServerFn = createServerFn({
   return getServerBackendApi().projects.list({
     q: query || undefined,
     serviceType: serviceType || undefined,
+    status: status || undefined,
     sort: "updatedAt",
     page,
     teamId,

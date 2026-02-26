@@ -36,15 +36,28 @@ const PROJECT_TYPE_FILTER_OPTIONS: FilterOption[] = [
   { label: "Workers", value: "worker" },
 ];
 
+const PROJECT_STATUS_FILTER_OPTIONS: FilterOption[] = [
+  { label: "All Statuses", value: "all" },
+  { label: "Active", value: "ACTIVE", dot: "#34d399" },
+  { label: "Inactive", value: "INACTIVE", dot: "#9ca3af" },
+  { label: "In Progress", value: "INPROGRESS", dot: "#4879f8" },
+  { label: "Failed", value: "FAILED", dot: "#fc391e" },
+  { label: "Pending", value: "PENDING", dot: "#ff7a00" },
+  { label: "Cancelled", value: "CANCELLED", dot: "#9ca3af" },
+  { label: "Degraded", value: "DEGRADED", dot: "#f59e0b" },
+  { label: "Payment Due", value: "PAYMENT DUE", dot: "#ef4444" },
+];
+
 export const Route = createFileRoute("/projects/")({
   staleTime: 30_000,
   preloadStaleTime: 30_000,
   validateSearch: (search: Record<string, unknown>) => {
-    const next: { page?: number; workspace?: string; q?: string; type?: string } = {};
+    const next: { page?: number; workspace?: string; q?: string; type?: string; status?: string } = {};
     const page = parsePositivePageSearchValue(search.page);
     const workspace = parseWorkspaceSearchValue(search.workspace);
     const q = parseTextSearchValue(search.q);
     const type = parseTextSearchValue(search.type);
+    const status = parseTextSearchValue(search.status);
     if (page) {
       next.page = page;
     }
@@ -57,6 +70,9 @@ export const Route = createFileRoute("/projects/")({
     if (type) {
       next.type = type;
     }
+    if (status) {
+      next.status = status;
+    }
 
     return next;
   },
@@ -64,16 +80,18 @@ export const Route = createFileRoute("/projects/")({
     ...workspacePageLoaderDeps(search),
     q: parseTextSearchValue(search.q),
     type: parseTextSearchValue(search.type),
+    status: parseTextSearchValue(search.status),
   }),
   loader: async ({ deps }) => {
     const result = await (listProjectsPageServerFn as unknown as (input: {
-      data: { page?: number; workspace?: string; q?: string; serviceType?: string };
+      data: { page?: number; workspace?: string; q?: string; serviceType?: string; status?: string };
     }) => Promise<PaginatedProjectsResponse>)({
       data: {
         page: deps.page,
         workspace: deps.workspace,
         q: deps.q,
         serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
+        status: deps.status && deps.status !== "all" ? deps.status : undefined,
       },
     });
 
@@ -99,7 +117,9 @@ function ProjectsPage() {
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(search.q ?? "");
   const [isFilterChanging, setIsFilterChanging] = useState(false);
+  const [isStatusFilterChanging, setIsStatusFilterChanging] = useState(false);
   const activeProjectType = search.type ?? "all";
+  const activeStatus = search.status ?? "all";
 
   const refreshSignal = useTagsStore((s) => s._refreshSignal);
   const tags = useTagsStore((s) => s.tags);
@@ -111,12 +131,14 @@ function ProjectsPage() {
     workspace?: string;
     q?: string;
     type?: string;
+    status?: string;
   }) {
     return {
       page: next.page,
       workspace: next.workspace,
       q: next.q,
       type: next.type,
+      status: next.status,
     };
   }
 
@@ -124,6 +146,7 @@ function ProjectsPage() {
     setProjects(loaderData.projects);
     setPagination(loaderData.pagination);
     setIsFilterChanging(false);
+    setIsStatusFilterChanging(false);
   }, [loaderData]);
 
   useEffect(() => {
@@ -157,6 +180,7 @@ function ProjectsPage() {
           workspace: search.workspace,
           q: nextQ,
           type: search.type,
+          status: search.status,
           page: undefined,
         }),
       });
@@ -174,13 +198,14 @@ function ProjectsPage() {
     void (async () => {
       try {
         const result = await (listProjectsPageServerFn as unknown as (input: {
-          data: { page?: number; workspace?: string; q?: string; serviceType?: string };
+          data: { page?: number; workspace?: string; q?: string; serviceType?: string; status?: string };
         }) => Promise<PaginatedProjectsResponse>)({
           data: {
             page: search.page,
             workspace: search.workspace,
             q: search.q,
             serviceType: search.type && search.type !== "all" ? search.type : undefined,
+            status: search.status && search.status !== "all" ? search.status : undefined,
           },
         });
         setProjects(result.items.map(mapBackendProject));
@@ -192,7 +217,7 @@ function ProjectsPage() {
         });
       } catch {}
     })();
-  }, [refreshSignal, search.page, search.q, search.type, search.workspace]);
+  }, [refreshSignal, search.page, search.q, search.status, search.type, search.workspace]);
 
   const filteredProjects = activeTagId
     ? projects.filter((p) =>
@@ -222,6 +247,7 @@ function ProjectsPage() {
         workspace: search.workspace,
         q: search.q,
         type: search.type,
+        status: search.status,
         page: page === 1 ? undefined : page,
       }),
     });
@@ -256,6 +282,31 @@ function ProjectsPage() {
           placeholder="Search projects"
           loading={isSearchSettling}
           rightSlot={(
+            <>
+            <FilterDropdown
+              value={activeStatus}
+              onChange={(value) => {
+                const nextStatus = value === "all" ? undefined : value;
+                if ((search.status ?? undefined) === nextStatus) {
+                  return;
+                }
+                setIsStatusFilterChanging(true);
+                navigate({
+                  to: "/projects",
+                  search: buildProjectsSearch({
+                    workspace: search.workspace,
+                    q: search.q,
+                    type: search.type,
+                    status: nextStatus,
+                    page: undefined,
+                  }),
+                });
+              }}
+              loading={isStatusFilterChanging}
+              options={PROJECT_STATUS_FILTER_OPTIONS}
+              placeholder="All Statuses"
+              dropdownWidth={180}
+            />
             <FilterDropdown
               value={activeProjectType}
               onChange={(value) => {
@@ -270,6 +321,7 @@ function ProjectsPage() {
                     workspace: search.workspace,
                     q: search.q,
                     type: nextType,
+                    status: search.status,
                     page: undefined,
                   }),
                 });
@@ -278,6 +330,7 @@ function ProjectsPage() {
               options={PROJECT_TYPE_FILTER_OPTIONS}
               placeholder="All Projects"
             />
+            </>
           )}
         />
       </div>
@@ -288,7 +341,7 @@ function ProjectsPage() {
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
-          key={`${search.q ?? ""}:${activeTagId ?? "all"}:${pagination.currentPage}`}
+          key={`${search.q ?? ""}:${activeTagId ?? "all"}:${activeStatus}:${pagination.currentPage}`}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}

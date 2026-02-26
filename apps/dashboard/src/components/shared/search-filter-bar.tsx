@@ -29,7 +29,7 @@ export function SearchFilterBar({
           <Search className="size-5 shrink-0 text-dash-text-extra-faded" />
         )}
         <input
-          type="search"
+          type="text"
           placeholder={placeholder}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -40,7 +40,7 @@ export function SearchFilterBar({
       {rightSlot ? (
         <>
           <div className="h-full w-px self-stretch bg-dash-border" />
-          <div className="shrink-0">{rightSlot}</div>
+          <div className="flex shrink-0 items-center">{rightSlot}</div>
         </>
       ) : null}
     </div>

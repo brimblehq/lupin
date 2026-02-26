@@ -41,6 +41,9 @@ export interface DomainDetailsRecord extends DomainRecord {
   registrar?: string;
   creatorName?: string;
   expiresAt?: string;
+  renewalPrice?: number;
+  renewalDuration?: number;
+  autoRenewal?: boolean;
   nameservers?: string[];
   nameserver?: {
     expected: string[];
@@ -94,6 +97,13 @@ export interface PurchaseDomainInput {
   teamId?: string;
 }
 
+export interface RenewDomainInput {
+  domainId: string;
+  duration: number;
+  autoRenew: boolean;
+  teamId?: string;
+}
+
 export interface DomainsApi {
   list(input?: ListDomainsInput): Promise<PaginatedDomainsResponse>;
   getStatus(domainName: string, input?: { teamId?: string }): Promise<DomainRecord | null>;
@@ -106,6 +116,7 @@ export interface DomainsApi {
   transfer(input: { domainId: string; projectId: string; teamId?: string }): Promise<void>;
   searchSale(domainName: string): Promise<SearchDomainResult[]>;
   purchaseSale(input: PurchaseDomainInput): Promise<void>;
+  renewSale(input: RenewDomainInput): Promise<void>;
   verify(domainId: string): Promise<DomainRecord>;
   remove(input: { domainId: string; projectId?: string; teamId?: string }): Promise<void>;
   createDnsRecord(input: {
@@ -217,6 +228,9 @@ function mapDomainDetailsRecord(domain: any): DomainDetailsRecord | null {
   }
 
   const expiresAt = pickNonEmptyString(whoisRecord, "expires_at", "renewal_date");
+  const renewalPrice = pickNumber(whoisRecord, "renewal_price", "renewalPrice");
+  const renewalDuration = pickNumber(row, "renewal_duration", "renewalDuration");
+  const autoRenewal = pickBoolean(row, "auto_renewal", "autoRenewal");
 
   let nameservers: string[] = [];
   if (Array.isArray(row.nameservers)) {
@@ -284,6 +298,9 @@ function mapDomainDetailsRecord(domain: any): DomainDetailsRecord | null {
     registrar,
     creatorName,
     expiresAt,
+    renewalPrice,
+    renewalDuration,
+    autoRenewal,
     nameservers,
     nameserver,
     dnsRecords,
@@ -473,18 +490,70 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
     },
 
     async purchaseSale(input) {
-      await client.request<any>("/core/v1/domains/sale/purchase", {
+      const endpoint = "/core/v1/domains/sale/purchase";
+      const body = {
+        name: input.name,
+        duration: input.duration,
+        cardId: input.cardId,
+        ...(input.projectId ? { projectId: input.projectId } : {}),
+        privacyEnabled: input.privacyEnabled,
+        autoRenewal: input.autoRenewal,
+        teamId: input.teamId,
+      };
+      await client.request<any>(endpoint, {
         method: "POST",
-        body: {
-          name: input.name,
-          duration: input.duration,
-          cardId: input.cardId,
-          projectId: input.projectId ?? null,
-          privacyEnabled: input.privacyEnabled,
-          autoRenewal: input.autoRenewal,
-          teamId: input.teamId,
-        },
+        body,
       });
+    },
+
+    async renewSale(input) {
+      const endpoint = "/core/v1/domains/sale/renew";
+      const body = {
+        id: input.domainId,
+        duration: input.duration,
+        auto_renew: input.autoRenew,
+        teamId: input.teamId,
+      };
+
+      console.log("[domains.renewSale] request", {
+        endpoint,
+        payload: body,
+      });
+
+      try {
+        const response = await client.request<any>(endpoint, {
+          method: "POST",
+          body,
+        });
+
+        console.log("[domains.renewSale] response", {
+          endpoint,
+          response,
+        });
+      } catch (error) {
+        const err = error as {
+          message?: string;
+          status?: number;
+          code?: string;
+          details?: unknown;
+        };
+
+        console.log("[domains.renewSale] error", {
+          endpoint,
+          error: {
+            message: err?.message,
+            status: err?.status,
+            code: err?.code,
+            details: err?.details,
+          },
+        });
+        console.log(
+          "[domains.renewSale] error details json",
+          JSON.stringify(err?.details ?? null, null, 2),
+        );
+
+        throw error;
+      }
     },
 
     async verify() {

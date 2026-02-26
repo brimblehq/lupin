@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  getRouteApi,
+  useRouterState,
+} from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { Search, Globe } from "lucide-react";
@@ -20,6 +24,7 @@ import {
   purchaseDomainServerFn,
 } from "../../server/domains/actions";
 import type { SettingsPaymentCard } from "../../backend/settings/types";
+import { getWorkspaceFromSearch } from "@/utils/topbar-navigation";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -151,6 +156,7 @@ function CardChip() {
 /* ─── Main Page ─── */
 
 function BuyDomainPage() {
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const searchDomains = useServerFn(searchDomainSaleServerFn as any) as (args: {
     data: { name: string };
   }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number }>>;
@@ -167,6 +173,7 @@ function BuyDomainPage() {
   }) => Promise<{ success: boolean }>;
   const { settingsSnapshot } = rootRoute.useLoaderData() as any;
   const cards: SettingsPaymentCard[] = settingsSnapshot?.billing?.cards ?? [];
+  const workspace = getWorkspaceFromSearch({ searchStr });
 
   const [query, setQuery] = useState("");
   const [searchedQuery, setSearchedQuery] = useState("");
@@ -241,6 +248,7 @@ function BuyDomainPage() {
     try {
       await purchaseDomain({
         data: {
+          ...(workspace ? { workspace } : {}),
           name: purchaseTarget.domainName,
           duration: years,
           cardId: selectedCardId,

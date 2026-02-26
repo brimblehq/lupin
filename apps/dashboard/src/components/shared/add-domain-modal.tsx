@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Search, SlidersHorizontal, Plus } from "lucide-react";
+import { Search, SlidersHorizontal, Plus, ArrowRightLeft } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   Modal,
   ModalHeader,
@@ -9,6 +10,8 @@ import {
   ModalCancelButton,
   ModalContinueButton,
 } from "./modal";
+import { Dropdown } from "./dropdown";
+import type { SettingsPaymentCard } from "@/backend/settings/types";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 interface Project {
@@ -26,11 +29,40 @@ interface AddDomainModalProps {
   onOpenChange: (open: boolean) => void;
   projects: Project[];
   onContinue: (projectId: string, domainUrl: string) => void | Promise<void>;
+  defaultRegistrantEmail?: string;
+  paymentCards?: SettingsPaymentCard[];
   onCreateProject?: () => void;
   /** Called to validate the domain before submitting. Return null if valid, or an error. */
   onValidate?: (domainUrl: string) => DomainValidationError | null;
   /** Called when user clicks "Register" for a domain that doesn't exist. */
   onRegisterDomain?: (domainUrl: string) => void;
+}
+
+function formatCardType(cardType?: string): string {
+  if (!cardType) return "Card";
+  const lower = cardType.toLowerCase();
+  if (lower === "visa") return "Visa";
+  if (lower === "mastercard" || lower === "mc") return "Mastercard";
+  if (lower === "amex" || lower === "american_express") return "Amex";
+  if (lower === "discover") return "Discover";
+  return cardType.charAt(0).toUpperCase() + cardType.slice(1);
+}
+
+function CardChip() {
+  return (
+    <div className="relative h-8 w-[45px] shrink-0 overflow-hidden rounded-[4px] bg-[radial-gradient(circle_at_84%_10%,#5a5454_0%,#383636_55%,#1f1f1f_100%)] shadow-[0px_1px_1px_rgba(0,0,0,0.16),0px_1px_0px_rgba(0,0,0,0.11)]">
+      <div className="absolute left-[5px] top-[12px] h-[7px] w-[10px] rounded-[1.5px] bg-white/10" />
+      <div className="absolute bottom-[5px] right-[5px] flex items-center gap-0.5">
+        <span className="size-[3px] rounded-full bg-[#ea4335]" />
+        <span className="size-[3px] rounded-full bg-[#fbbc05]" />
+      </div>
+    </div>
+  );
+}
+
+function getPreferredCardId(cards: SettingsPaymentCard[]): string {
+  const preferred = cards.find((c) => c.preferred);
+  return preferred?.id ?? cards[0]?.id ?? "";
 }
 
 function RadioButton({ selected }: { selected: boolean }) {
@@ -47,7 +79,7 @@ function RadioButton({ selected }: { selected: boolean }) {
   );
 }
 
-type Step = "select-project" | "enter-domain";
+type Step = "select-project" | "enter-domain" | "transfer-in";
 
 function normalizeDomainInput(value: string): string {
   return value.trim().toLowerCase();
@@ -75,6 +107,8 @@ export function AddDomainModal({
   onOpenChange,
   projects,
   onContinue,
+  defaultRegistrantEmail,
+  paymentCards = [],
   onCreateProject,
   onValidate,
   onRegisterDomain,
@@ -86,6 +120,17 @@ export function AddDomainModal({
   const [domainUrl, setDomainUrl] = useState("");
   const [error, setError] = useState<DomainValidationError | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [transferDomain, setTransferDomain] = useState("");
+  const [transferAuthCode, setTransferAuthCode] = useState("");
+  const [transferRegistrantEmail, setTransferRegistrantEmail] = useState(
+    defaultRegistrantEmail?.trim() ?? "",
+  );
+  const [transferCardId, setTransferCardId] = useState(() => getPreferredCardId(paymentCards));
+  const [transferChecklist, setTransferChecklist] = useState({
+    domainUnlocked: false,
+    registrantEmailAccess: false,
+    acknowledgeTransferTime: false,
+  });
 
   const filtered = projects.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()),
@@ -98,6 +143,10 @@ export function AddDomainModal({
     if (selectedProject) {
       setStep("enter-domain");
     }
+  }
+
+  function handleTransferStepOpen() {
+    setStep("transfer-in");
   }
 
   async function handleStepTwoContinue() {
@@ -138,6 +187,31 @@ export function AddDomainModal({
     if (error) setError(null);
   }
 
+  async function handleTransferInContinue() {
+    if (submitting) {
+      return;
+    }
+
+    const normalizedTransferDomain = normalizeDomainInput(transferDomain);
+    if (!normalizedTransferDomain) {
+      return;
+    }
+
+    if (isReservedBrimbleSubdomain(normalizedTransferDomain)) {
+      toast.error("Brimble-managed subdomains cannot be transferred in.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // UI-only flow for now; backend endpoint is not wired yet.
+      toast.success("Transfer-in flow UI ready. Endpoint integration coming next.");
+      resetAndClose();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function resetAndClose() {
     onOpenChange(false);
     setStep("select-project");
@@ -145,8 +219,27 @@ export function AddDomainModal({
     setSearch("");
     setDomainUrl("");
     setError(null);
+    setTransferDomain("");
+    setTransferAuthCode("");
+    setTransferRegistrantEmail(defaultRegistrantEmail?.trim() ?? "");
+    setTransferCardId(getPreferredCardId(paymentCards));
+    setTransferChecklist({
+      domainUnlocked: false,
+      registrantEmailAccess: false,
+      acknowledgeTransferTime: false,
+    });
     setSubmitting(false);
   }
+
+  const canSubmitTransferIn = Boolean(
+    normalizeDomainInput(transferDomain) &&
+      transferAuthCode.trim() &&
+      transferRegistrantEmail.trim() &&
+      transferCardId &&
+      transferChecklist.domainUnlocked &&
+      transferChecklist.registrantEmailAccess &&
+      transferChecklist.acknowledgeTransferTime,
+  );
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
@@ -159,8 +252,12 @@ export function AddDomainModal({
   return (
     <Modal open={open} onOpenChange={handleOpenChange} width={500}>
       <ModalHeader
-        title="Add Domain"
-        description="Select a project to add your domain to"
+        title={step === "transfer-in" ? "Transfer Domain" : "Add Domain"}
+        description={
+          step === "transfer-in"
+            ? "Transfer an existing domain from another registrar to Brimble"
+            : "Select a project to add your domain to"
+        }
       />
 
       <AnimatePresence mode="wait" initial={false}>
@@ -188,7 +285,7 @@ export function AddDomainModal({
             </div>
 
             {/* Project list */}
-            <div className="max-h-[280px] overflow-y-auto">
+            <div className="scrollbar-hidden max-h-[280px] overflow-y-auto">
               {filtered.map((project) => (
                 <button
                   key={project.id}
@@ -229,8 +326,26 @@ export function AddDomainModal({
                 Purchase a domain
               </span>
             </Link>
+
+            <button
+              type="button"
+              onClick={handleTransferStepOpen}
+              className="flex w-full items-center gap-3 border-t-[0.5px] border-[#e5e5e5] bg-dash-bg-elevated px-4 py-3 text-left transition-colors hover:bg-[#f0f0f0] dark:border-dash-border dark:hover:bg-[#333]"
+            >
+              <div className="flex size-6 items-center justify-center rounded-full border border-dash-border-soft bg-dash-bg-elevated">
+                <ArrowRightLeft className="size-3 text-dash-text-faded" />
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="text-sm text-dash-text-strong">
+                  Transfer a domain to Brimble
+                </span>
+                <span className="text-xs text-dash-text-faded">
+                  Bring your domain from GoDaddy, Namecheap, and others
+                </span>
+              </div>
+            </button>
           </motion.div>
-        ) : (
+        ) : step === "enter-domain" ? (
           <motion.div
             key="enter-domain"
             initial={{ opacity: 0, x: 10 }}
@@ -299,6 +414,174 @@ export function AddDomainModal({
               </div>
             </div>
           </motion.div>
+        ) : (
+          <motion.div
+            key="transfer-in"
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="flex items-center justify-between border-b-[0.5px] border-[#e5e5e5] px-6 py-3.5 dark:border-dash-border">
+              <div className="flex items-center gap-2">
+                <img src="/icons/folder-open.svg" alt="" className="size-4 shrink-0" />
+                <span className="text-sm leading-5 tracking-[-0.0224px]">
+                  <span className="font-light text-[#999] dark:text-dash-text-faded">
+                    Destination Project (optional)
+                  </span>{" "}
+                  <span className="font-light text-dash-text-body">
+                    {selectedProjectName || "Not linked yet"}
+                  </span>
+                </span>
+              </div>
+              {selectedProject ? (
+                <RadioButton selected />
+              ) : (
+                <span className="text-xs text-dash-text-faded">Optional</span>
+              )}
+            </div>
+
+            <div className="px-6 pb-5 pt-4">
+              <div className="flex flex-col gap-4">
+                <div className="rounded-[8px] border border-dash-border bg-dash-bg-elevated px-4 py-3">
+                  <p className="text-sm font-medium text-dash-text-strong">Transfer domain to Brimble</p>
+                  <p className="mt-1 text-xs leading-4 text-dash-text-faded">
+                    Enter your domain details and EPP/Auth code. Linking a project is optional and
+                    can be done now or later.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
+                    Domain name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="example.com"
+                    value={transferDomain}
+                    onChange={(e) => setTransferDomain(e.target.value)}
+                    className="input-base input-focus rounded-[4px] px-2 py-1.5 text-[13px] font-light leading-5 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
+                    EPP/Auth code
+                  </label>
+                  <div className="rounded-[6px] border-[0.5px] border-dash-border bg-gradient-to-b from-dash-bg to-dash-bg-elevated px-3 py-2 shadow-[inset_0px_1px_0px_rgba(255,255,255,0.03)]">
+                    <input
+                      type="text"
+                      placeholder="Paste your authorization code"
+                      value={transferAuthCode}
+                      onChange={(e) => setTransferAuthCode(e.target.value)}
+                      className="w-full bg-transparent font-mono text-[13px] text-dash-text-strong outline-none placeholder:font-sans placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
+                    Registrant email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={transferRegistrantEmail}
+                    onChange={(e) => setTransferRegistrantEmail(e.target.value)}
+                    className="input-base input-focus rounded-[4px] px-2 py-1.5 text-[13px] font-light leading-5 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded"
+                  />
+                  <p className="text-xs text-dash-text-faded">
+                    Prefilled from your account email. You can change it if the registrant email is different.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
+                    Payment method
+                  </label>
+                  {paymentCards.length > 0 ? (
+                    paymentCards.length === 1 ? (
+                      <div className="flex items-center gap-3 rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-2.5">
+                        <CardChip />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-dash-text-strong">
+                            {formatCardType(paymentCards[0].cardType)}
+                          </span>
+                          <span className="text-xs text-dash-text-faded">
+                            ending in {paymentCards[0].last4 ?? "****"}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <Dropdown
+                        value={transferCardId}
+                        options={paymentCards.map((card) => ({
+                          id: card.id,
+                          label: `${formatCardType(card.cardType)} ending in ${card.last4 ?? "****"}`,
+                        }))}
+                        onChange={setTransferCardId}
+                        placeholder="Select payment card..."
+                      />
+                    )
+                  ) : (
+                    <div className="rounded-[4px] border-[0.5px] border-dash-border px-4 py-3">
+                      <p className="text-sm text-dash-text-faded">
+                        No payment card found. Add one in <span className="font-medium text-dash-text-strong">Settings</span>.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-[8px] border border-dash-border bg-dash-bg-elevated px-4 py-3">
+                  <p className="text-sm font-medium text-dash-text-strong">Before you continue</p>
+                  <div className="mt-3 flex flex-col gap-3">
+                    <label className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={transferChecklist.domainUnlocked}
+                        onChange={(e) =>
+                          setTransferChecklist((prev) => ({ ...prev, domainUnlocked: e.target.checked }))
+                        }
+                        className="mt-0.5 size-4 rounded border-dash-border"
+                      />
+                      <span className="text-sm text-dash-text-body">
+                        My domain is unlocked at the current registrar.
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={transferChecklist.registrantEmailAccess}
+                        onChange={(e) =>
+                          setTransferChecklist((prev) => ({ ...prev, registrantEmailAccess: e.target.checked }))
+                        }
+                        className="mt-0.5 size-4 rounded border-dash-border"
+                      />
+                      <span className="text-sm text-dash-text-body">
+                        I can access the registrant email for transfer confirmation.
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={transferChecklist.acknowledgeTransferTime}
+                        onChange={(e) =>
+                          setTransferChecklist((prev) => ({
+                            ...prev,
+                            acknowledgeTransferTime: e.target.checked,
+                          }))
+                        }
+                        className="mt-0.5 size-4 rounded border-dash-border"
+                      />
+                      <span className="text-sm text-dash-text-body">
+                        I understand transfers may take several days to complete.
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -309,7 +592,7 @@ export function AddDomainModal({
             onClick={handleStepOneContinue}
             disabled={!selectedProject}
           />
-        ) : (
+        ) : step === "enter-domain" ? (
           <ModalContinueButton
             onClick={() => {
               void handleStepTwoContinue();
@@ -318,6 +601,26 @@ export function AddDomainModal({
             loading={submitting}
             loadingLabel="Adding..."
           />
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setStep("select-project")}
+              className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
+            >
+              Back
+            </button>
+            <ModalContinueButton
+              onClick={() => {
+                void handleTransferInContinue();
+              }}
+              disabled={!canSubmitTransferIn || submitting}
+              loading={submitting}
+              loadingLabel="Preparing transfer..."
+            >
+              Start transfer
+            </ModalContinueButton>
+          </div>
         )}
       </ModalFooter>
     </Modal>

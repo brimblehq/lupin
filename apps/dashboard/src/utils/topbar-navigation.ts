@@ -44,6 +44,15 @@ export function getWorkspaceSearch(input: { searchStr?: string }): string {
   return `?${query}`;
 }
 
+export function getWorkspaceFromSearch(input: {
+  searchStr?: string;
+}): string | undefined {
+  const workspace = new URLSearchParams(input.searchStr || "")
+    .get("workspace")
+    ?.trim();
+  return workspace || undefined;
+}
+
 export function withWorkspaceQuery(input: {
   pathname: string;
   searchStr?: string;

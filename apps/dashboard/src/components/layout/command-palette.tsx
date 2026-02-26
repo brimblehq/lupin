@@ -7,7 +7,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Moon, Sun, ArrowsClockwise } from "@phosphor-icons/react";
 import { useScoutBar } from "../../contexts/scoutbar-context";
 import { useTheme } from "../../hooks/use-theme";
-import { withWorkspaceQuery } from "@/utils/topbar-navigation";
+import {
+  getWorkspaceFromSearch,
+  withWorkspaceQuery,
+} from "@/utils/topbar-navigation";
 import { listDomainsPageServerFn } from "@/server/domains/actions";
 import type { DomainRecord } from "@/backend/domains";
 import type { Project } from "@/backend/projects";
@@ -22,12 +25,6 @@ type CommandDomain = {
 };
 
 type PaletteView = "root" | "project-search" | "domain-search" | "workspace-search";
-
-function getWorkspaceFromSearch(searchStr?: string) {
-  const params = new URLSearchParams(searchStr || "");
-  const workspace = params.get("workspace")?.trim();
-  return workspace || undefined;
-}
 
 function mapDomainItems(items: DomainRecord[]): CommandDomain[] {
   return items.map((domain) => ({
@@ -53,7 +50,7 @@ export function CommandPalette() {
   const [domains, setDomains] = useState<CommandDomain[]>([]);
   const [domainsLoading, setDomainsLoading] = useState(false);
   const [domainsLoadedForKey, setDomainsLoadedForKey] = useState<string | null>(null);
-  const workspace = getWorkspaceFromSearch(searchStr);
+  const workspace = getWorkspaceFromSearch({ searchStr });
   const listDomains = useServerFn(listDomainsPageServerFn as any) as (args: {
     data: { workspace?: string; page?: number; q?: string };
   }) => Promise<{ items: DomainRecord[] }>;
@@ -165,6 +162,26 @@ export function CommandPalette() {
     fn();
   };
 
+  const openNewProject = () => {
+    runAction(() => go("/projects/new"));
+  };
+
+  const openNewDomain = () => {
+    runAction(() => go("/domains"));
+  };
+
+  const openBuyDomain = () => {
+    runAction(() => go("/domains/buy"));
+  };
+
+  const openNewDatabase = () => {
+    runAction(() => go("/projects/new"));
+  };
+
+  const openNewTeam = () => {
+    runAction(() => go("/workspace/new"));
+  };
+
   const openProjectSearch = () => {
     setPastViews((prev) => [...prev, view]);
     setFutureViews([]);
@@ -224,6 +241,110 @@ export function CommandPalette() {
     document.addEventListener("keydown", handleArrowNavigation);
     return () => document.removeEventListener("keydown", handleArrowNavigation);
   }, [isOpen, pastViews, futureViews, view]);
+
+  const shortcutBufferRef = useRef<{
+    value: string;
+    timeoutId: number | null;
+  }>({ value: "", timeoutId: null });
+
+  useEffect(() => {
+    if (!isOpen || view !== "root") {
+      if (shortcutBufferRef.current.timeoutId !== null) {
+        window.clearTimeout(shortcutBufferRef.current.timeoutId);
+      }
+      shortcutBufferRef.current = { value: "", timeoutId: null };
+      return;
+    }
+
+    const shortcutActions: Record<string, () => void> = {
+      n: openNewProject,
+      d: openNewDomain,
+      b: openBuyDomain,
+      db: openNewDatabase,
+      t: openNewTeam,
+    };
+    const shortcutPrefixes = new Set(["d"]);
+
+    const resetShortcutBuffer = () => {
+      if (shortcutBufferRef.current.timeoutId !== null) {
+        window.clearTimeout(shortcutBufferRef.current.timeoutId);
+      }
+      shortcutBufferRef.current = { value: "", timeoutId: null };
+    };
+
+    const commitShortcut = (key: string) => {
+      resetShortcutBuffer();
+      shortcutActions[key]?.();
+    };
+
+    const handleBadgeShortcuts = (event: KeyboardEvent) => {
+      if (!isOpen || view !== "root") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.length !== 1) return;
+
+      const key = event.key.toLowerCase();
+      if (!["n", "d", "b", "t"].includes(key)) {
+        resetShortcutBuffer();
+        return;
+      }
+
+      // If the user has started typing a query, keep text input behavior intact.
+      if (query.trim().length > 0) {
+        resetShortcutBuffer();
+        return;
+      }
+
+      event.preventDefault();
+
+      const buffered = shortcutBufferRef.current.value;
+      let next = `${buffered}${key}`;
+
+      if (!(next in shortcutActions) && !shortcutPrefixes.has(next)) {
+        next = key;
+      }
+
+      if (!(next in shortcutActions) && !shortcutPrefixes.has(next)) {
+        resetShortcutBuffer();
+        return;
+      }
+
+      const hasExactAction = next in shortcutActions;
+      const isPrefix = shortcutPrefixes.has(next);
+
+      if (hasExactAction && !isPrefix) {
+        commitShortcut(next);
+        return;
+      }
+
+      shortcutBufferRef.current.value = next;
+      if (shortcutBufferRef.current.timeoutId !== null) {
+        window.clearTimeout(shortcutBufferRef.current.timeoutId);
+      }
+
+      if (hasExactAction && isPrefix) {
+        shortcutBufferRef.current.timeoutId = window.setTimeout(() => {
+          if (shortcutBufferRef.current.value === next) {
+            commitShortcut(next);
+          }
+        }, 280);
+      }
+    };
+
+    document.addEventListener("keydown", handleBadgeShortcuts);
+    return () => {
+      document.removeEventListener("keydown", handleBadgeShortcuts);
+      resetShortcutBuffer();
+    };
+  }, [
+    isOpen,
+    openBuyDomain,
+    openNewDatabase,
+    openNewDomain,
+    openNewProject,
+    openNewTeam,
+    query,
+    view,
+  ]);
 
   const inputPlaceholder = (() => {
     if (view === "project-search") return "Search projects...";
@@ -313,9 +434,7 @@ export function CommandPalette() {
                             </Command.Item>
                             <Command.Item
                               value="new project create"
-                              onSelect={() =>
-                                runAction(() => go("/projects/new"))
-                              }
+                              onSelect={openNewProject}
                             >
                               <img
                                 src="/icons/scoutbar/add.svg"
@@ -345,9 +464,7 @@ export function CommandPalette() {
                             </Command.Item>
                             <Command.Item
                               value="new domain add"
-                              onSelect={() =>
-                                runAction(() => go("/domains"))
-                              }
+                              onSelect={openNewDomain}
                             >
                               <img
                                 src="/icons/scoutbar/add.svg"
@@ -362,9 +479,7 @@ export function CommandPalette() {
                             </Command.Item>
                             <Command.Item
                               value="buy domain register"
-                              onSelect={() =>
-                                runAction(() => go("/domains/buy"))
-                              }
+                              onSelect={openBuyDomain}
                             >
                               <img
                                 src="/icons/scoutbar/earth.svg"
@@ -382,9 +497,7 @@ export function CommandPalette() {
                           <Command.Group heading="DATABASES">
                             <Command.Item
                               value="new database create"
-                              onSelect={() =>
-                                runAction(() => go("/projects/new"))
-                              }
+                              onSelect={openNewDatabase}
                             >
                               <img
                                 src="/icons/scoutbar/add.svg"
@@ -417,9 +530,7 @@ export function CommandPalette() {
                             </Command.Item>
                             <Command.Item
                               value="new team create workspace"
-                              onSelect={() =>
-                                runAction(() => go("/workspace/new"))
-                              }
+                              onSelect={openNewTeam}
                             >
                               <img
                                 src="/icons/scoutbar/add.svg"

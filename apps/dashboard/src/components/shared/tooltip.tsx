@@ -132,7 +132,7 @@ export function Tooltip({
 
 interface SimpleTooltipProps {
   children: ReactNode;
-  content: string;
+  content: ReactNode;
   side?: "top" | "right" | "bottom" | "left";
   sideOffset?: number;
   delayDuration?: number;
@@ -171,7 +171,7 @@ export function SimpleTooltip({
                 transition={springTransition}
                 className="z-50 rounded-md border border-[#141414] bg-gradient-to-b from-[#434343] to-[#232323] px-2.5 py-1 shadow-[0px_0.6px_0px_rgba(0,0,0,0.1),0px_2px_4px_rgba(0,0,0,0.18),inset_0px_1px_0px_rgba(255,255,255,0.18)]"
               >
-                <span className="text-xs leading-5 tracking-[-0.019px] text-white">
+                <span className="flex items-center gap-1.5 text-xs leading-5 tracking-[-0.019px] text-white">
                   {content}
                 </span>
               </motion.div>

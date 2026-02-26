@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { PageHeader } from "../../components/shared/page-header";
@@ -9,6 +9,7 @@ import {
   AddDomainModal,
   type DomainValidationError,
 } from "../../components/shared/add-domain-modal";
+import { Route as RootRoute } from "@/routes/__root";
 import type { DomainRecord, PaginatedDomainsResponse } from "@/backend/domains";
 import type { PaginatedProjectsResponse } from "@/backend/projects";
 import {
@@ -21,33 +22,46 @@ import {
   updateDomainServerFn,
 } from "@/server/domains/actions";
 import { formatRelativeTime } from "@/utils/dashboard";
-import { parsePositivePageSearchValue, parseWorkspaceSearchValue, workspacePageLoaderDeps } from "@/utils/workspace-route-search";
+import { getWorkspaceFromSearch } from "@/utils/topbar-navigation";
+import {
+  parsePositivePageSearchValue,
+  parseTextSearchValue,
+  parseWorkspaceSearchValue,
+  workspacePageLoaderDeps,
+} from "@/utils/workspace-route-search";
 
 export const Route = createFileRoute("/domains/")({
   staleTime: 30_000,
   preloadStaleTime: 30_000,
   validateSearch: (search: Record<string, unknown>) => {
-    const next: { page?: number; workspace?: string } = {};
+    const next: { page?: number; workspace?: string; q?: string } = {};
     const page = parsePositivePageSearchValue(search.page);
     const workspace = parseWorkspaceSearchValue(search.workspace);
+    const q = parseTextSearchValue(search.q);
     if (page) {
       next.page = page;
     }
     if (workspace) {
       next.workspace = workspace;
     }
+    if (q) {
+      next.q = q;
+    }
     return next;
   },
-  loaderDeps: ({ search }) => workspacePageLoaderDeps(search),
+  loaderDeps: ({ search }) => ({
+    ...workspacePageLoaderDeps(search),
+    q: parseTextSearchValue(search.q),
+  }),
   loader: async ({ deps }) => {
     const page = deps.page;
     const workspace = deps.workspace;
 
     const [domainsResult, projectsResult] = await Promise.all([
       (listDomainsPageServerFn as unknown as (input: {
-        data: { page?: number; workspace?: string };
+        data: { page?: number; workspace?: string; q?: string };
       }) => Promise<PaginatedDomainsResponse>)({
-        data: { page, workspace },
+        data: { page, workspace, q: deps.q },
       }),
       (listDomainProjectsServerFn as unknown as (input: {
         data: { workspace?: string };
@@ -131,7 +145,11 @@ function mapDomainToRow(domain: DomainRecord): Domain {
 function DomainsPage() {
   const search = Route.useSearch();
   const { domains: domainsResult, projects, workspace } = Route.useLoaderData();
+  const { settingsSnapshot } = RootRoute.useLoaderData();
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const workspaceFromUrl = getWorkspaceFromSearch({ searchStr });
   const [addDomainOpen, setAddDomainOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(search.q ?? "");
   const [rows, setRows] = useState<Domain[]>(() =>
     domainsResult.items.map((item) => mapDomainToRow(item)),
   );
@@ -157,9 +175,50 @@ function DomainsPage() {
     data: { workspace?: string; domainId: string; projectId?: string };
   }) => Promise<{ success: boolean }>;
 
+  function buildDomainsSearch(next: {
+    page?: number;
+    q?: string;
+  }) {
+    return {
+      page: next.page,
+      workspace: workspaceFromUrl,
+      q: next.q,
+    };
+  }
+
   useEffect(() => {
     setRows(domainsResult.items.map((item) => mapDomainToRow(item)));
   }, [domainsResult.items]);
+
+  useEffect(() => {
+    setSearchQuery(search.q ?? "");
+  }, [search.q]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const nextQ = searchQuery.trim() || undefined;
+      if ((search.q ?? undefined) === nextQ) {
+        return;
+      }
+
+      navigate({
+        to: "/domains/",
+        replace: true,
+        search: buildDomainsSearch({
+          q: nextQ,
+          page: undefined,
+        }),
+      });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [navigate, search, search.q, searchQuery]);
+
+  const settledSearchQuery = search.q?.trim() ?? "";
+  const pendingSearchQuery = searchQuery.trim();
+  const isSearchSettling = pendingSearchQuery !== settledSearchQuery;
 
   function handlePageChange(page: number) {
     if (page < 1 || page === domainsResult.currentPage || page > domainsResult.totalPages) {
@@ -168,10 +227,10 @@ function DomainsPage() {
 
     navigate({
       to: "/domains/",
-      search: {
-        ...(search || {}),
+      search: buildDomainsSearch({
+        q: search.q,
         page: page === 1 ? undefined : page,
-      },
+      }),
     });
   }
 
@@ -323,6 +382,9 @@ function DomainsPage() {
         domains={rows}
         basePath="/domains"
         projects={projects}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        searchLoading={isSearchSettling}
         onAddDomain={() => setAddDomainOpen(true)}
         onRefreshDomain={handleRefreshDomain}
         onConfigureDomain={handleConfigureDomain}
@@ -341,6 +403,8 @@ function DomainsPage() {
         open={addDomainOpen}
         onOpenChange={setAddDomainOpen}
         projects={projects}
+        defaultRegistrantEmail={settingsSnapshot?.profile?.email ?? ""}
+        paymentCards={settingsSnapshot?.billing?.cards ?? []}
         onValidate={validateDomain}
         onContinue={(projectId, domainUrl) => {
           void handleAddDomain(projectId, domainUrl);

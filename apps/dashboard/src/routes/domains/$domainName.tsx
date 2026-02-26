@@ -6,6 +6,8 @@ import {
 import { mapDomainDetailsToDomainInfo } from "@/utils/domain-settings";
 
 export const Route = createFileRoute("/domains/$domainName")({
+  staleTime: 0,
+  preloadStaleTime: 0,
   loader: async ({ params, location }) => {
     const searchParams = new URLSearchParams(location.searchStr || "");
     const workspace = searchParams.get("workspace") || undefined;

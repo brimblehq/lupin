@@ -100,6 +100,7 @@ export interface Project {
 export interface ListProjectsInput {
   q?: string;
   serviceType?: string;
+  status?: string;
   sort?: string;
   teamId?: string;
   page?: number;
@@ -431,6 +432,7 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
         query: {
           q: input?.q,
           serviceType: input?.serviceType,
+          status: input?.status,
           sort: input?.sort ?? "updatedAt",
           teamId: input?.teamId,
           page: input?.page,

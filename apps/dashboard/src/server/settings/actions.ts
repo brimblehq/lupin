@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createBackendApi } from "@/backend";
 import type {
+  GitProvider,
   InitializeSettingsAddCardInput,
   SettingsSidebarSnapshot,
   TestWebhookInput,
@@ -128,4 +129,12 @@ export const updateSettingsWebhooksServerFn = createServerFn({
 }).handler(async ({ data }) => {
   const input = data as unknown as UpdateSettingsWebhooksInput;
   return getServerBackendApi().settings.updateWebhooks(input);
+});
+
+export const disconnectGitProviderServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const input = data as unknown as { provider: GitProvider };
+  await getServerBackendApi().settings.disconnectGitProvider(input.provider);
+  return { ok: true } as const;
 });

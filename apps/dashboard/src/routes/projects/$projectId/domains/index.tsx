@@ -9,6 +9,7 @@ import {
   AddDomainModal,
   type DomainValidationError,
 } from "../../../../components/shared/add-domain-modal";
+import { Route as RootRoute } from "@/routes/__root";
 import type { DomainRecord, PaginatedDomainsResponse } from "@/backend/domains";
 import type { PaginatedProjectsResponse } from "@/backend/projects";
 import {
@@ -157,6 +158,7 @@ function ProjectDomainsPage() {
   const { projectId } = Route.useParams();
   const search = Route.useSearch();
   const { project, workspace } = parentRoute.useLoaderData() as any;
+  const { settingsSnapshot } = RootRoute.useLoaderData() as any;
   if (!shouldShowProjectDomainsTab(project)) {
     return (
       <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
@@ -379,6 +381,8 @@ function ProjectDomainsPage() {
         open={addDomainOpen}
         onOpenChange={setAddDomainOpen}
         projects={[{ id: project.id, name: project.name }]}
+        defaultRegistrantEmail={settingsSnapshot?.profile?.email ?? ""}
+        paymentCards={settingsSnapshot?.billing?.cards ?? []}
         onValidate={validateDomain}
         onContinue={(selectedProjectId, domainUrl) => {
           void handleAddDomain(selectedProjectId, domainUrl);

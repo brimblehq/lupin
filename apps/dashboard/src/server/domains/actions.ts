@@ -260,8 +260,7 @@ export const purchaseDomainServerFn = createServerFn({
   }
 
   const teamId = await resolveTeamIdFromWorkspace(payload?.workspace);
-
-  await getServerBackendApi().domains.purchaseSale({
+  const requestPayload = {
     name,
     duration: payload?.duration ?? 1,
     cardId,
@@ -269,7 +268,51 @@ export const purchaseDomainServerFn = createServerFn({
     privacyEnabled: payload?.privacyEnabled ?? false,
     autoRenewal: payload?.autoRenewal ?? false,
     teamId,
+  };
+
+  await getServerBackendApi().domains.purchaseSale(requestPayload);
+
+  return { success: true };
+});
+
+export const renewDomainSaleServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        domainId: string;
+        duration?: number;
+        autoRenew?: boolean;
+      }
+    | undefined;
+
+  const domainId = payload?.domainId?.trim();
+  if (!domainId) {
+    throw new Error("Domain id is required");
+  }
+
+  const durationRaw = Number(payload?.duration ?? 1);
+  const duration = Number.isFinite(durationRaw) && durationRaw > 0
+    ? Math.floor(durationRaw)
+    : 1;
+
+  const teamId = await resolveTeamIdFromWorkspace(payload?.workspace);
+  const requestPayload = {
+    domainId,
+    duration,
+    autoRenew: Boolean(payload?.autoRenew),
+    teamId,
+  };
+
+  console.log("[domains.renew] server action payload", {
+    workspace: payload?.workspace,
+    resolvedTeamId: teamId,
+    endpoint: "/core/v1/domains/sale/renew",
+    payload: requestPayload,
   });
+
+  await getServerBackendApi().domains.renewSale(requestPayload);
 
   return { success: true };
 });

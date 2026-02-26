@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { FilterDropdown, type FilterOption } from "./filter-dropdown";
 import { SearchFilterBar } from "./search-filter-bar";
 import { Spinner } from "./spinner";
+import { SimpleTooltip } from "./tooltip";
+import { CheckCircle } from "@phosphor-icons/react";
 import { FolderTrashIcon } from "./folder-trash-icon";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "./modal";
 import { WarningModal } from "./warning-modal";
@@ -470,6 +472,9 @@ export function DomainList({
   domains,
   basePath,
   projects = [],
+  searchQuery: searchQueryProp,
+  onSearchQueryChange,
+  searchLoading = false,
   onAddDomain,
   onRefreshDomain,
   onConfigureDomain,
@@ -478,6 +483,9 @@ export function DomainList({
   domains: Domain[];
   basePath?: string;
   projects?: Array<{ id: string; name: string; serviceType?: string }>;
+  searchQuery?: string;
+  onSearchQueryChange?: (value: string) => void;
+  searchLoading?: boolean;
   onAddDomain?: () => void;
   onRefreshDomain?: (domain: Domain) => Promise<void>;
   onConfigureDomain?: (input: {
@@ -493,7 +501,7 @@ export function DomainList({
     select: (state) => state.location.searchStr,
   });
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQueryInternal, setSearchQueryInternal] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [editingDomain, setEditingDomain] = useState<Domain | null>(null);
   const [transferringDomain, setTransferringDomain] = useState<Domain | null>(null);
@@ -501,6 +509,8 @@ export function DomainList({
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const searchQuery = searchQueryProp ?? searchQueryInternal;
+  const setSearchQuery = onSearchQueryChange ?? setSearchQueryInternal;
   const projectDropdownOptions = projects
     .filter((project) => project.serviceType !== "database")
     .map((project) => ({
@@ -639,6 +649,7 @@ export function DomainList({
           value={searchQuery}
           onChange={setSearchQuery}
           placeholder="Search domains"
+          loading={searchLoading}
           className="flex-1"
           rightSlot={(
             <FilterDropdown
@@ -676,18 +687,27 @@ export function DomainList({
                   </td>
                   <td className="py-2">
                     <div className="flex flex-col gap-1">
-                      {domainDetailsPath ? (
-                        <Link
-                          to={domainDetailsPath}
-                          className="text-sm tracking-[-0.084px] text-dash-text-body transition-colors hover:text-dash-text-strong hover:underline"
-                        >
-                          {domain.name}
-                        </Link>
-                      ) : (
-                        <span className="text-sm tracking-[-0.084px] text-dash-text-body">
-                          {domain.name}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {domainDetailsPath ? (
+                          <Link
+                            to={domainDetailsPath}
+                            className="text-sm tracking-[-0.084px] text-dash-text-body transition-colors hover:text-dash-text-strong hover:underline"
+                          >
+                            {domain.name}
+                          </Link>
+                        ) : (
+                          <span className="text-sm tracking-[-0.084px] text-dash-text-body">
+                            {domain.name}
+                          </span>
+                        )}
+                        {domain.purchased && (
+                          <SimpleTooltip content={<><CheckCircle size={13} weight="fill" className="text-[#34d399]" />Purchased from Brimble</>} side="right">
+                            <span className="text-[#4879f8]">
+                              <CheckCircle size={14} weight="fill" />
+                            </span>
+                          </SimpleTooltip>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
                         {!isAssigned && (
                           <span className="inline-flex items-center rounded-full bg-[#f5a623]/10 px-2 py-0.5 text-[11px] font-medium leading-none text-[#c48418] dark:bg-[#f5a623]/15 dark:text-[#f5a623]">
@@ -776,18 +796,27 @@ export function DomainList({
                     </td>
                     <td className="py-2">
                       <div className="flex flex-col gap-1">
-                        {domainDetailsPath ? (
-                          <Link
-                            to={domainDetailsPath}
-                            className="text-sm tracking-[-0.084px] text-dash-text-body transition-colors hover:text-dash-text-strong hover:underline"
-                          >
-                            {domain.name}
-                          </Link>
-                        ) : (
-                          <span className="text-sm tracking-[-0.084px] text-dash-text-body">
-                            {domain.name}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {domainDetailsPath ? (
+                            <Link
+                              to={domainDetailsPath}
+                              className="text-sm tracking-[-0.084px] text-dash-text-body transition-colors hover:text-dash-text-strong hover:underline"
+                            >
+                              {domain.name}
+                            </Link>
+                          ) : (
+                            <span className="text-sm tracking-[-0.084px] text-dash-text-body">
+                              {domain.name}
+                            </span>
+                          )}
+                          {domain.purchased && (
+                            <SimpleTooltip content={<><CheckCircle size={13} weight="fill" className="text-[#34d399]" />Purchased from Brimble</>} side="right">
+                              <span className="text-[#4879f8]">
+                                <CheckCircle size={14} weight="fill" />
+                              </span>
+                            </SimpleTooltip>
+                          )}
+                        </div>
                         {projectLabel ? (
                           <span className="text-sm font-light leading-[1.3] text-dash-text-extra-faded">
                             {projectLabel}

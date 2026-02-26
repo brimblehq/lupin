@@ -115,7 +115,19 @@ export function OnboardingChecklist({
   const [customDomainFetchFailedByWorkspace, setCustomDomainFetchFailedByWorkspace] = useState<Record<string, true>>({});
   const [teamMembersFetchFailedByWorkspace, setTeamMembersFetchFailedByWorkspace] = useState<Record<string, true>>({});
   const [hasConnectedGit, setHasConnectedGit] = useState<boolean | null>(null);
+  const [gitRefreshKey, setGitRefreshKey] = useState(0);
   const workspaceCacheKey = activeWorkspaceSlug ?? "__personal__";
+
+  useEffect(() => {
+    function handleGitChange() {
+      setGitRefreshKey((k) => k + 1);
+    }
+
+    window.addEventListener("brimble:git-connection-changed", handleGitChange);
+    return () => {
+      window.removeEventListener("brimble:git-connection-changed", handleGitChange);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,7 +149,8 @@ export function OnboardingChecklist({
     return () => {
       cancelled = true;
     };
-  }, [listGithubAccounts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- listGithubAccounts is stable in behavior but unstable in reference (useServerFn)
+  }, [gitRefreshKey]);
 
   useEffect(() => {
     if (workspaceCacheKey in customDomainByWorkspace) {
@@ -172,7 +185,8 @@ export function OnboardingChecklist({
     return () => {
       cancelled = true;
     };
-  }, [activeWorkspaceSlug, listDomains, customDomainByWorkspace, workspaceCacheKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- listDomains is stable in behavior but unstable in reference (useServerFn)
+  }, [activeWorkspaceSlug, customDomainByWorkspace, workspaceCacheKey]);
 
   useEffect(() => {
     if (!isTeamWorkspace || !activeWorkspaceSlug) {
@@ -217,7 +231,8 @@ export function OnboardingChecklist({
     return () => {
       cancelled = true;
     };
-  }, [activeWorkspaceSlug, getTeamMembers, isTeamWorkspace, teamDetails, teamDetailsByWorkspace]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- getTeamMembers is stable in behavior but unstable in reference (useServerFn)
+  }, [activeWorkspaceSlug, isTeamWorkspace, teamDetails, teamDetailsByWorkspace]);
 
   const projectList = projects ?? [];
   const deployableProjects = projectList.filter((project) => {
