@@ -32,6 +32,8 @@ export interface TeamDetails {
   description?: string;
   avatarUrl?: string;
   buildDisabled?: boolean;
+  buildDisabledBy?: string | null;
+  spendingLimit?: number | null;
   seatCount?: number;
   concurrentBuilds?: number;
   isCreator?: boolean;
@@ -128,6 +130,12 @@ export function createTeamsApi(client: ApiClient): TeamsApi {
         description: pickString(root, "description") || undefined,
         avatarUrl: pickString(root, "avatar", "avatarUrl", "avatar_url"),
         buildDisabled: pickBoolean(root, "build_disabled", "buildDisabled"),
+        buildDisabledBy:
+          pickString(root, "build_disabled_by", "buildDisabledBy") ?? null,
+        spendingLimit:
+          root.spending_limit === null || root.spending_limit === undefined
+            ? null
+            : Number(root.spending_limit),
         seatCount: pickNumber(subscriptionSpecs, "members", "member_count", "seats"),
         concurrentBuilds: pickNumber(
           subscriptionSpecs,

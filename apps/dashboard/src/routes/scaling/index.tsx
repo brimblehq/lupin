@@ -20,6 +20,8 @@ import {
 } from "@/server/scaling/actions";
 import { formatRelativeTime } from "@/utils/dashboard";
 import { workspaceLoaderDeps } from "@/utils/workspace-route-search";
+import { usePlanGate } from "@/hooks/use-plan-gate";
+import { PlanUpgradePrompt } from "../../components/shared/plan-upgrade-prompt";
 
 export const Route = createFileRoute("/scaling/")({
   staleTime: 30_000,
@@ -505,6 +507,7 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
 }
 
 function ScalingPage() {
+  const { autoscalingEnabled } = usePlanGate();
   const { groups: serverGroups, workspace } = Route.useLoaderData();
   const saveScalingGroup = useServerFn(saveScalingGroupServerFn as any) as (args: {
     data: {
@@ -691,6 +694,22 @@ function ScalingPage() {
         return next;
       });
     }
+  }
+
+  if (!autoscalingEnabled) {
+    return (
+      <div className="max-w-[1000px]">
+        <PageHeader title="Scaling" image="/images/scaling-tab.svg">
+          Configure auto-scaling groups to automatically adjust the number of running
+          instances for your projects based on CPU and memory thresholds.
+        </PageHeader>
+        <hr className="-ml-4 mb-6 border-dash-border-soft md:-ml-10" />
+        <PlanUpgradePrompt
+          feature="Autoscaling"
+          description="Autoscaling automatically adjusts your instance count based on CPU and memory usage. Upgrade your plan to enable autoscaling."
+        />
+      </div>
+    );
   }
 
   return (

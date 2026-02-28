@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import type { StripeCardElementOptions } from "@stripe/stripe-js";
 import { motion } from "motion/react";
 import { useTheme } from "@/hooks/use-theme";
 import { usePricing } from "@/contexts/pricing-context";
+import { PencilSimple } from "@phosphor-icons/react";
 import { Theme } from "@/types/enums";
 import { Plus, Star, X, CreditCard } from "lucide-react";
 import { FolderTrashIcon } from "../shared/folder-trash-icon";
@@ -27,6 +28,7 @@ import {
   useUpdateSpendingLimit,
 } from "@/hooks/use-payments";
 import type { PaymentMethod } from "@/backend/payments";
+import type { TeamDetails } from "@/backend/teams";
 import type { DrawerUserProfile } from "@/utils/dashboard";
 
 type UserProfile = DrawerUserProfile;
@@ -39,16 +41,22 @@ export function BillingForm({
   profile,
   initialPaymentMethods,
   initialInvoices,
+  initialSpendingStats,
   hidePaymentMethods = false,
   hideCurrentPlan = false,
   teamId,
+  workspaceTeam,
+  onSpendingLimitSaved,
 }: {
   profile: UserProfile;
   initialPaymentMethods?: PaymentMethod[] | null;
   initialInvoices?: any;
+  initialSpendingStats?: { used: number; spendingLimit: number } | null;
   hidePaymentMethods?: boolean;
   hideCurrentPlan?: boolean;
   teamId?: string;
+  workspaceTeam?: TeamDetails | null;
+  onSpendingLimitSaved?: () => void | Promise<void>;
 }) {
   return (
     <PaymentProvider>
@@ -56,9 +64,12 @@ export function BillingForm({
         profile={profile}
         initialPaymentMethods={initialPaymentMethods}
         initialInvoices={initialInvoices}
+        initialSpendingStats={initialSpendingStats}
         hidePaymentMethods={hidePaymentMethods}
         hideCurrentPlan={hideCurrentPlan}
         teamId={teamId}
+        workspaceTeam={workspaceTeam}
+        onSpendingLimitSaved={onSpendingLimitSaved}
       />
     </PaymentProvider>
   );
@@ -70,20 +81,27 @@ function BillingFormInner({
   profile,
   initialPaymentMethods,
   initialInvoices,
+  initialSpendingStats,
   hidePaymentMethods = false,
   hideCurrentPlan = false,
   teamId,
+  workspaceTeam,
+  onSpendingLimitSaved,
 }: {
   profile: UserProfile;
   initialPaymentMethods?: PaymentMethod[] | null;
   initialInvoices?: any;
+  initialSpendingStats?: { used: number; spendingLimit: number } | null;
   hidePaymentMethods?: boolean;
   hideCurrentPlan?: boolean;
   teamId?: string;
+  workspaceTeam?: TeamDetails | null;
+  onSpendingLimitSaved?: () => void | Promise<void>;
 }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [changePlanOpen, setChangePlanOpen] = useState(false);
   const [showAddCard, setShowAddCard] = useState(false);
+  const [replacePaymentMethodId, setReplacePaymentMethodId] = useState<string | null>(null);
   const [invoiceCursor, setInvoiceCursor] = useState<string | null>(null);
   const [invoicePage, setInvoicePage] = useState(1);
   const [spendingLimitInput, setSpendingLimitInput] = useState("");
@@ -94,7 +112,7 @@ function BillingFormInner({
   const { data: estimate } = useBillEstimate();
   const { data: invoices } = useInvoices(invoiceCursor, teamId, initialInvoices);
   const cancelMutation = useCancelSubscription();
-  const spendingLimitMutation = useUpdateSpendingLimit();
+  const spendingLimitMutation = useUpdateSpendingLimit(teamId);
 
   const daysSinceFailure = profile.subscriptionDue ? 1 : 0;
 
@@ -114,8 +132,24 @@ function BillingFormInner({
   const pricing = usePricing();
   const activePlanPrice = pricing.plans.find((p) => p.name === currentPlan)?.amount ?? 0;
   const canChangePlan = currentPlan !== "Team";
+  const hasActivePaidSubscription =
+    currentPlan !== "Free" && subscription?.status !== "canceled";
+  const isTeamMode = hideCurrentPlan || Boolean(teamId);
+  const canEditSpendingLimit = isTeamMode
+    ? Boolean(teamId) && workspaceTeam?.isCreator !== false
+    : true;
+  const initialLimit = isTeamMode
+    ? (workspaceTeam?.spendingLimit ?? null)
+    : (profile.spendingLimit ?? null);
+  const [savedSpendingLimit, setSavedSpendingLimit] = useState<number | null>(
+    initialLimit,
+  );
 
   const defaultMethod = paymentMethods.find((m) => m.is_default) ?? paymentMethods[0];
+
+  useEffect(() => {
+    setSavedSpendingLimit(initialLimit);
+  }, [initialLimit]);
 
   function normalizeCurrencyInput(raw: string) {
     return raw.replace(/[^\d.]/g, "");
@@ -128,20 +162,37 @@ function BillingFormInner({
 
   function handleSaveSpendingLimit() {
     const value = toCurrencyValue(spendingLimitInput);
-    if (Number.isNaN(value) || value < 0) {
+    if (Number.isNaN(value)) {
       toast.error("Enter a valid amount");
       return;
     }
+
+    if (value < 5) {
+      toast.error("Spending limit must be at least $5");
+      return;
+    }
+
     spendingLimitMutation.mutate(value, {
-      onSuccess: () => {
+      onSuccess: async () => {
+        setSavedSpendingLimit(value);
         toast.success("Spending limit updated");
         setIsEditingLimit(false);
+        setSpendingLimitInput("");
+        await onSpendingLimitSaved?.();
       },
       onError: (err) => {
         toast.error(err instanceof Error ? err.message : "Failed to update spending limit");
       },
     });
   }
+
+  const snapshotUsage = initialSpendingStats?.used;
+  const currentUsage =
+    typeof snapshotUsage === "number"
+      ? snapshotUsage
+      : Number(estimate?.projected_total ?? estimate?.current_usage ?? 0);
+  const hasSpendingLimit =
+    typeof savedSpendingLimit === "number" && savedSpendingLimit >= 5;
 
   return (
     <div className="flex max-w-[488px] flex-col gap-8">
@@ -223,6 +274,15 @@ function BillingFormInner({
                     key={method.id}
                     method={method}
                     isDefault={method.id === defaultMethod?.id}
+                    canRemove={!hasActivePaidSubscription}
+                    onChangeCard={
+                      method.id === defaultMethod?.id
+                        ? () => {
+                            setReplacePaymentMethodId(method.id);
+                            setShowAddCard(true);
+                          }
+                        : undefined
+                    }
                   />
                 ))}
               </div>
@@ -232,15 +292,34 @@ function BillingFormInner({
               !showAddCard ? (
                 <button
                   type="button"
-                  onClick={() => setShowAddCard(true)}
+                  onClick={() => {
+                    setReplacePaymentMethodId(null);
+                    setShowAddCard(true);
+                  }}
                   className="flex items-center gap-1.5 text-sm font-medium text-[#4879f8] hover:text-[#3a6ae6]"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add payment method
                 </button>
               ) : (
-                <AddCardForm onClose={() => setShowAddCard(false)} />
+                <AddCardForm
+                  replacePaymentMethodId={replacePaymentMethodId}
+                  onClose={() => {
+                    setShowAddCard(false);
+                    setReplacePaymentMethodId(null);
+                  }}
+                />
               )
+            )}
+
+            {paymentMethods.length > 0 && showAddCard && (
+              <AddCardForm
+                replacePaymentMethodId={replacePaymentMethodId}
+                onClose={() => {
+                  setShowAddCard(false);
+                  setReplacePaymentMethodId(null);
+                }}
+              />
             )}
           </div>
 
@@ -288,7 +367,10 @@ function BillingFormInner({
               )}
             </GlossyButton>
             <button
-              onClick={() => setIsEditingLimit(false)}
+              onClick={() => {
+                setSpendingLimitInput("");
+                setIsEditingLimit(false);
+              }}
               className="flex h-[40px] items-center rounded-[6px] border border-dash-border bg-dash-bg px-4 text-sm text-dash-text-body hover:bg-dash-bg-elevated"
             >
               Cancel
@@ -297,25 +379,35 @@ function BillingFormInner({
         ) : (
           <div className="flex items-center gap-3">
             <p className="text-sm tabular-nums text-dash-text-body">
-              {estimate?.current_usage !== undefined
-                ? `$${estimate.current_usage.toFixed(2)} used`
+              {hasSpendingLimit
+                ? `$${currentUsage.toFixed(2)} used / $${savedSpendingLimit.toFixed(2)} limit`
                 : "No limit set"}
-              {estimate?.projected_total !== undefined && (
+              {!hasSpendingLimit && estimate?.projected_total !== undefined && (
                 <span className="text-dash-text-faded">
                   {" "}
                   / ${estimate.projected_total.toFixed(2)} projected
                 </span>
               )}
             </p>
-            <button
-              onClick={() => {
-                setSpendingLimitInput("");
-                setIsEditingLimit(true);
-              }}
-              className="text-sm font-medium text-[#4879f8] hover:text-[#3a6ae6]"
-            >
-              Edit
-            </button>
+            {canEditSpendingLimit ? (
+              <button
+                onClick={() => {
+                  setSpendingLimitInput(
+                    typeof savedSpendingLimit === "number"
+                      ? String(savedSpendingLimit)
+                      : "5",
+                  );
+                  setIsEditingLimit(true);
+                }}
+                className="text-sm font-medium text-[#4879f8] hover:text-[#3a6ae6]"
+              >
+                {hasSpendingLimit ? "Edit" : "Set"}
+              </button>
+            ) : (
+              <span className="text-xs text-dash-text-extra-faded">
+                Only the workspace creator can update this limit
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -527,9 +619,13 @@ function formatCardType(cardType?: string): string {
 function PaymentMethodRow({
   method,
   isDefault,
+  canRemove,
+  onChangeCard,
 }: {
   method: Record<string, any>;
   isDefault: boolean;
+  canRemove: boolean;
+  onChangeCard?: () => void;
 }) {
   const removeMutation = useRemovePaymentMethod();
   const setDefaultMutation = useSetDefaultPaymentMethod();
@@ -548,9 +644,6 @@ function PaymentMethodRow({
         <div className="flex flex-col gap-[2px]">
           <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
             {brand} •••• {last4}
-            {isDefault && (
-              <span className="ml-1.5 text-xs text-[#4879f8]">Default</span>
-            )}
           </p>
           <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
             Expires {expMonth}/{expYear}
@@ -558,6 +651,16 @@ function PaymentMethodRow({
         </div>
       </div>
       <div className="flex items-center gap-1.5">
+        {isDefault && onChangeCard && (
+          <button
+            type="button"
+            onClick={onChangeCard}
+            className="rounded-[4px] p-1.5 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-body"
+            title="Change card"
+          >
+            <PencilSimple className="h-3.5 w-3.5" weight="regular" />
+          </button>
+        )}
         {!isDefault && (
           <button
             type="button"
@@ -579,14 +682,24 @@ function PaymentMethodRow({
           type="button"
           disabled={removeMutation.isPending}
           onClick={() =>
-            removeMutation.mutate(method.id, {
-              onSuccess: () => toast.success("Payment method removed"),
-              onError: (err) =>
-                toast.error(err instanceof Error ? err.message : "Failed to remove payment method"),
-            })
+            canRemove
+              ? removeMutation.mutate(method.id, {
+                  onSuccess: () => toast.success("Payment method removed"),
+                  onError: (err) =>
+                    toast.error(err instanceof Error ? err.message : "Failed to remove payment method"),
+                })
+              : toast.error("You can't remove your payment method while subscribed to a paid plan")
           }
-          className="rounded-[4px] p-1.5 text-dash-text-faded transition-colors hover:bg-[#ef2f1f]/10 hover:text-[#ef2f1f] disabled:pointer-events-none disabled:opacity-40"
-          title="Remove"
+          className={`rounded-[4px] p-1.5 text-dash-text-faded transition-colors ${
+            canRemove
+              ? "hover:bg-[#ef2f1f]/10 hover:text-[#ef2f1f]"
+              : "opacity-40"
+          } disabled:pointer-events-none disabled:opacity-40`}
+          title={
+            canRemove
+              ? "Remove"
+              : "Active subscriptions require a payment method on file"
+          }
         >
           {removeMutation.isPending ? (
             <Spinner className="size-3.5" />
@@ -601,11 +714,18 @@ function PaymentMethodRow({
 
 /* ── Add card form (inline Stripe CardElement) ── */
 
-function AddCardForm({ onClose }: { onClose: () => void }) {
+function AddCardForm({
+  onClose,
+  replacePaymentMethodId,
+}: {
+  onClose: () => void;
+  replacePaymentMethodId?: string | null;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const setupIntentMutation = useCreateSetupIntent();
   const addMethodMutation = useAddPaymentMethod();
+  const removeMethodMutation = useRemovePaymentMethod();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cardError, setCardError] = useState(false);
   const { theme } = useTheme();
@@ -669,7 +789,26 @@ function AddCardForm({ onClose }: { onClose: () => void }) {
 
       await addMethodMutation.mutateAsync(paymentMethodId);
 
-      toast.success("Payment method added successfully");
+      if (
+        replacePaymentMethodId &&
+        replacePaymentMethodId !== paymentMethodId
+      ) {
+        try {
+          await removeMethodMutation.mutateAsync(replacePaymentMethodId);
+        } catch (removeError) {
+          toast.error(
+            removeError instanceof Error
+              ? removeError.message
+              : "New card added, but the old card could not be removed",
+          );
+        }
+      }
+
+      toast.success(
+        replacePaymentMethodId
+          ? "Payment method updated successfully"
+          : "Payment method added successfully",
+      );
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add payment method");
@@ -689,7 +828,7 @@ function AddCardForm({ onClose }: { onClose: () => void }) {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-px pb-px">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-dash-text-strong">
-            Add a new card
+            {replacePaymentMethodId ? "Change card" : "Add a new card"}
           </p>
           <button
             type="button"

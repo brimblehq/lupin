@@ -8,6 +8,8 @@ export interface DrawerUserProfile {
   email: string;
   avatarUrl?: string;
   buildsEnabled?: boolean;
+  buildDisabledBy?: string | null;
+  spendingLimit?: number | null;
   notifications?: {
     mute: boolean;
     email: boolean;
@@ -32,6 +34,8 @@ export function mapSettingsSnapshotToDrawerProfile(
     email: snapshot.profile.email,
     avatarUrl: snapshot.profile.avatarUrl,
     buildsEnabled: !snapshot.profile.buildDisabled,
+    buildDisabledBy: snapshot.profile.buildDisabledBy ?? null,
+    spendingLimit: snapshot.profile.spendingLimit ?? null,
     notifications: snapshot.profile.notifications,
     apiKey: snapshot.profile.apiKey,
     subscriptionPlanType: snapshot.profile.subscription?.planType,

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { Drawer } from "vaul";
 import { cn } from "@brimble/ui";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -19,6 +19,7 @@ import {
   Send,
 } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateSessionCache } from "@/lib/auth-guards";
 import { InviteMembersModal } from "../settings/invite-members-modal";
 import { WarningModal } from "./warning-modal";
 import { GlossyButton } from "./glossy-button";
@@ -38,6 +39,7 @@ import {
   updateSettingsWebhooksServerFn,
 } from "@/server/settings/actions";
 import { BillingForm } from "../settings/billing-form";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 import type { PaymentMethod } from "@/backend/payments";
 import {
   getWorkspaceTeamMembersServerFn,
@@ -1155,6 +1157,7 @@ export function UserProfileDrawer({
   initialSnapshot = null,
   initialWorkspaceTeamMembers = null,
   initialPaymentMethods = null,
+  initialInvoices = null,
   requestedTab,
 }: {
   open: boolean;
@@ -1162,9 +1165,9 @@ export function UserProfileDrawer({
   initialSnapshot?: SettingsSidebarSnapshot | null;
   initialWorkspaceTeamMembers?: TeamDetails | null;
   initialPaymentMethods?: PaymentMethod[] | null;
+  initialInvoices?: any;
   requestedTab?: ProfileTab;
 }) {
-  const navigate = useNavigate();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const logout = useServerFn(logoutServerFn);
   const getSettingsSnapshot = useServerFn(
@@ -1383,13 +1386,15 @@ export function UserProfileDrawer({
     }
 
     setIsSigningOut(true);
+    invalidateSessionCache();
 
     try {
       await logout();
-      onOpenChange(false);
-      window.location.href = "/login";
     } catch {
-      window.location.href = "/login";
+      // Ignore logout failures. Cookie clearing is handled server-side.
+    } finally {
+      onOpenChange(false);
+      window.location.replace("/login");
     }
   }
 
@@ -1821,27 +1826,41 @@ export function UserProfileDrawer({
                     Notification settings are unavailable right now.
                   </div>
                 )}
-              {activeTab === ProfileTab.Billing && profile && (
+              {activeTab === ProfileTab.Billing && profile && hasActiveWorkspace && !workspaceTeam && (
+                <div className="text-sm text-dash-text-faded">
+                  Loading workspace billing…
+                </div>
+              )}
+              {activeTab === ProfileTab.Billing && profile && (!hasActiveWorkspace || workspaceTeam) && (
                 <BillingForm
                   profile={profile}
                   initialPaymentMethods={initialPaymentMethods}
-                  initialInvoices={snapshot?.billing?.invoices ? {
-                    items: snapshot.billing.invoices.items.map((inv) => ({
-                      id: inv.id,
-                      number: inv.description,
-                      total: inv.total != null ? `$${Number(inv.total / 100).toFixed(2)}` : undefined,
-                      status: inv.due ? "open" : "paid",
-                      date: inv.createdAt ?? "",
-                      invoice_pdf: inv.downloadLink,
-                    })),
-                    next_cursor: null,
-                    previous_cursor: null,
-                    has_more: (snapshot.billing.invoices.totalPages ?? 1) > 1,
-                    per_page: snapshot.billing.invoices.limit ?? 10,
-                  } : undefined}
+                  initialInvoices={hasActiveWorkspace ? undefined : initialInvoices}
+                  initialSpendingStats={snapshot?.billing.spending}
                   hidePaymentMethods={hasActiveWorkspace}
                   hideCurrentPlan={hasActiveWorkspace}
-                  teamId={activeWorkspaceSlug || undefined}
+                  teamId={hasActiveWorkspace ? workspaceTeam?.id : undefined}
+                  workspaceTeam={hasActiveWorkspace ? workspaceTeam : undefined}
+                  onSpendingLimitSaved={async () => {
+                    await refreshSettings();
+
+                    if (!activeWorkspaceSlug) {
+                      return;
+                    }
+
+                    try {
+                      const nextTeam = await getWorkspaceTeamMembers({
+                        data: { workspace: activeWorkspaceSlug },
+                      });
+
+                      setWorkspaceTeamMembersCache((prev) => ({
+                        ...prev,
+                        [activeWorkspaceSlug]: nextTeam,
+                      }));
+                    } catch {
+                      // Keep the current cached team state if refresh fails.
+                    }
+                  }}
                 />
               )}
               {activeTab === ProfileTab.Billing && !profile && !isLoadingSettings && (
@@ -2353,8 +2372,7 @@ function NotificationsForm({
   const inputClass =
     "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
 
-  const planType = profile.subscriptionPlanType?.toLowerCase();
-  const isFreePlan = !planType || planType === "free" || planType === "free_plan";
+  const { webhookEnabled } = usePlanGate();
 
   return (
     <div className="flex flex-col gap-[30px]">
@@ -2378,7 +2396,7 @@ function NotificationsForm({
 
       <hr className="-ml-8 border-dash-border-soft" />
 
-      {isFreePlan ? (
+      {!webhookEnabled ? (
         <div className="flex max-w-[488px] flex-col gap-3">
           <span className="text-sm font-medium leading-5 text-dash-text-strong">
             Webhooks & Event Notifications
@@ -2521,7 +2539,7 @@ function NotificationsForm({
           loading={isSaving}
           loadingLabel="Saving..."
           onClick={async () => {
-            const selectedEvents = isFreePlan
+            const selectedEvents = !webhookEnabled
               ? []
               : Object.entries(eventToggles)
                   .filter(([, enabled]) => enabled)
@@ -2533,9 +2551,9 @@ function NotificationsForm({
               await onSave?.({
                 emailNotifications: emailNotifs,
                 mute: profile.notifications?.mute ?? false,
-                webhookUrl: isFreePlan ? null : (webhookUrl.trim() || null),
-                discordUrl: isFreePlan ? null : (discordUrl.trim() || null),
-                slackUrl: isFreePlan ? null : (slackUrl.trim() || null),
+                webhookUrl: !webhookEnabled ? null : (webhookUrl.trim() || null),
+                discordUrl: !webhookEnabled ? null : (discordUrl.trim() || null),
+                slackUrl: !webhookEnabled ? null : (slackUrl.trim() || null),
                 events: selectedEvents,
               });
             } finally {

@@ -4,6 +4,7 @@ import { SUBSCRIPTION_PLAN_TYPE } from "@brimble/models/dist/enum";
 import { AreaChart, Area, YAxis, ResponsiveContainer } from "recharts";
 import { DashButton } from "../shared/dash-button";
 import { ChangePlanModal } from "../shared/change-plan-modal";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 import type { PaymentMethod } from "@/backend/payments";
 import type { OverviewSummary } from "@/backend/overview";
 import type { BandwidthSummary } from "@/backend/bandwidth";
@@ -84,7 +85,9 @@ export function StatsRow({
 }) {
   const [changePlanOpen, setChangePlanOpen] = useState(false);
   const plan = getPlanInfo(planType, isTeamWorkspace);
+  const { projectLimit: specProjectLimit } = usePlanGate();
   const canChangePlan = plan.label !== "TEAM";
+  const hasUnlimitedProjects = isTeamWorkspace || specProjectLimit === null;
   const totalProjects = overview?.total?.project ?? 0;
   const bandwidthChartData =
     bandwidth?.results?.map((point) => ({
@@ -184,7 +187,7 @@ export function StatsRow({
           <div className="flex items-center gap-2.5">
             <p className="text-xl tracking-[-0.03px] text-dash-text-strong">
               {totalProjects}
-              {plan.unlimitedProjects ? (
+              {hasUnlimitedProjects ? (
                 <span className="text-dash-text-extra-faded">
                   /
                   <span className="ml-0.5 inline-flex align-middle">
@@ -192,7 +195,7 @@ export function StatsRow({
                   </span>
                 </span>
               ) : (
-                <span className="text-dash-text-extra-faded">/10</span>
+                <span className="text-dash-text-extra-faded">/{specProjectLimit}</span>
               )}
             </p>
           </div>

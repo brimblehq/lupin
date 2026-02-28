@@ -13,6 +13,7 @@ import {
   cancelSubscriptionServerFn,
   purchaseServerFn,
   updateSpendingLimitServerFn,
+  updateTeamSpendingLimitServerFn,
 } from "@/server/payments/actions";
 
 /* ── Query key factory ── */
@@ -57,7 +58,11 @@ const purchase = purchaseServerFn as unknown as (args: {
 }) => Promise<any>;
 
 const updateLimit = updateSpendingLimitServerFn as unknown as (args: {
-  data: { monthly_limit: number };
+  data: { spending_limit: number };
+}) => Promise<any>;
+
+const updateTeamLimit = updateTeamSpendingLimitServerFn as unknown as (args: {
+  data: { team_id: string; spending_limit: number };
 }) => Promise<any>;
 
 /* ── Queries ── */
@@ -86,11 +91,12 @@ export function useBillEstimate() {
 
 export function useInvoices(cursor?: string | null, teamId?: string, initialData?: any) {
   const isFirstPage = !cursor;
+  const hasInitialData = isFirstPage && initialData?.items?.length > 0;
   return useQuery({
     queryKey: paymentKeys.invoices(cursor ?? null, teamId),
     queryFn: () => getInvoices({ data: { cursor: cursor ?? null, ...(teamId ? { team_id: teamId } : {}) } }),
     placeholderData: (prev: any) => prev,
-    ...(initialData && isFirstPage ? { initialData } : {}),
+    ...(hasInitialData ? { initialData } : {}),
   });
 }
 
@@ -181,11 +187,15 @@ export function usePurchase() {
   });
 }
 
-export function useUpdateSpendingLimit() {
+export function useUpdateSpendingLimit(teamId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (monthlyLimit: number) =>
-      updateLimit({ data: { monthly_limit: monthlyLimit } }),
+    mutationFn: (spendingLimit: number) =>
+      teamId
+        ? updateTeamLimit({
+            data: { team_id: teamId, spending_limit: spendingLimit },
+          })
+        : updateLimit({ data: { spending_limit: spendingLimit } }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: paymentKeys.estimate() });
     },

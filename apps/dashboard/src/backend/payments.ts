@@ -13,6 +13,7 @@ import type {
   PurchaseInput,
   PurchaseResult,
   UpdateSpendingLimitInput,
+  UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
 } from "./payments/types";
 
@@ -32,6 +33,7 @@ export type {
   PurchaseInput,
   PurchaseResult,
   UpdateSpendingLimitInput,
+  UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
 } from "./payments/types";
 
@@ -194,10 +196,22 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
     },
 
     async updateSpendingLimit(input: UpdateSpendingLimitInput): Promise<void> {
-      await client.request(`${base}/spending-limit`, {
+      await client.request(`${base}/payment/spending-limit`, {
         method: "PUT",
-        body: { monthly_limit: input.monthly_limit },
+        body: { spending_limit: input.spending_limit },
       });
+    },
+
+    async updateTeamSpendingLimit(
+      input: UpdateTeamSpendingLimitInput,
+    ): Promise<void> {
+      await client.request(
+        `${base}/payment/spending-limit/team/${encodeURIComponent(input.team_id)}`,
+        {
+          method: "PUT",
+          body: { spending_limit: input.spending_limit },
+        },
+      );
     },
 
     async updateTeamSubscription(input: UpdateTeamSubscriptionInput): Promise<void> {

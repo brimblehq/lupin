@@ -19,8 +19,25 @@ export interface OverageRates {
   buildMinutesPerMin: number;
 }
 
+export interface PlanSpecs {
+  projectLimit: number | null; // null = unlimited
+  webhookEnabled: boolean;
+  customDomain: boolean;
+  deployPrivateOrganization: boolean;
+  autoscalingEnabled: boolean;
+  analytics: boolean;
+  pullRequestPreview: boolean;
+  buildMinutes: number;
+  bandwidth: number;
+  storage: number;
+  concurrentBuilds: number;
+  logRetention: number;
+  supportLevel: string;
+}
+
 export interface Pricing {
   plans: PlanPrice[];
   team: TeamSpecs;
   overage: OverageRates;
+  specs: Record<string, PlanSpecs>;
 }

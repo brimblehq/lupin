@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Github, ArrowLeft, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -204,7 +204,6 @@ function OtpStep({
 /* ─── Page ─── */
 
 function LoginPage() {
-  const navigate = useNavigate();
   const requestLoginOtp = useServerFn(requestLoginOtpServerFn);
   const resendAuthCode = useServerFn(resendAuthCodeServerFn);
   const verifyEmailCode = useServerFn(verifyEmailCodeServerFn);
@@ -244,7 +243,8 @@ function LoginPage() {
         `Welcome back${response.user.firstName ? `, ${response.user.firstName}` : ""}`,
       );
       invalidateSessionCache();
-      await navigate({ to: "/" });
+      window.location.replace("/");
+      return;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "OAuth sign in failed");
     } finally {
@@ -275,7 +275,8 @@ function LoginPage() {
         `Welcome back${response.user.firstName ? `, ${response.user.firstName}` : ""}`,
       );
       invalidateSessionCache();
-      await navigate({ to: "/" });
+      window.location.replace("/");
+      return;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Verification failed");
     } finally {

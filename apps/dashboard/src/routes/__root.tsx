@@ -10,7 +10,7 @@ import { DashboardLayout } from "../components/layout/dashboard-layout";
 import { enforceRouteAuth } from "../lib/auth-guards";
 import { getSettingsSidebarSnapshotServerFn } from "@/server/settings/actions";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
-import { getPaymentMethodsServerFn } from "@/server/payments/actions";
+import { getPaymentMethodsServerFn, getPaymentInvoicesServerFn } from "@/server/payments/actions";
 import { getSubscriptionSpecsServerFn } from "@/server/pricing/actions";
 import type { PaymentMethod } from "@/backend/payments";
 import type { Pricing } from "@/types/pricing";
@@ -83,6 +83,7 @@ export const Route = createRootRoute({
         workspaceTeamMembers: null as TeamDetails | null,
         tooltipMessages: null as AppTooltipMessage[] | null,
         tags: null as BackendTag[] | null,
+        invoices: null as any,
         pricing: DEFAULT_PRICING as Pricing,
       };
     }
@@ -100,7 +101,7 @@ export const Route = createRootRoute({
 
     const shouldPreloadWorkspaceTeamMembers = typeof window === "undefined";
 
-    const [settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags, paymentMethods, pricingResult] =
+    const [settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags, paymentMethods, invoices, pricingResult] =
       await Promise.allSettled([
       (getSettingsSidebarSnapshotServerFn as unknown as (input: {
         data?: { workspace?: string };
@@ -136,6 +137,9 @@ export const Route = createRootRoute({
         data: { workspace },
       }),
       (getPaymentMethodsServerFn as unknown as () => Promise<PaymentMethod[]>)(),
+      (getPaymentInvoicesServerFn as unknown as (input: { data?: { cursor?: string | null; per_page?: number } }) => Promise<any>)({
+        data: { cursor: null, per_page: 10 },
+      }),
       (getSubscriptionSpecsServerFn as unknown as () => Promise<Pricing>)(),
     ]);
 
@@ -159,6 +163,9 @@ export const Route = createRootRoute({
     }
     if (tags.status === "rejected") {
       console.error("[root loader] tags failed:", tags.reason);
+    }
+    if (invoices.status === "rejected") {
+      console.error("[root loader] invoices failed:", invoices.reason);
     }
     if (pricingResult.status === "rejected") {
       console.error("[root loader] pricing specs failed:", pricingResult.reason);
@@ -197,6 +204,10 @@ export const Route = createRootRoute({
         paymentMethods.status === "fulfilled"
           ? paymentMethods.value
           : null as PaymentMethod[] | null,
+      invoices:
+        invoices.status === "fulfilled"
+          ? invoices.value
+          : null as any,
       pricing:
         pricingResult.status === "fulfilled"
           ? pricingResult.value
@@ -228,7 +239,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  const { settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags, paymentMethods, pricing } =
+  const { settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags, paymentMethods, invoices, pricing } =
     Route.useLoaderData();
 
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
@@ -271,6 +282,7 @@ function RootComponent() {
       initialWorkspaceTeamMembers={workspaceTeamMembers}
       initialTooltipMessages={tooltipMessages}
       initialPaymentMethods={paymentMethods}
+      initialInvoices={invoices}
       initialPricing={pricing}
     >
       <Outlet />

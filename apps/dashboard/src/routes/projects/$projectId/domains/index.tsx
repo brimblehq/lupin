@@ -23,6 +23,8 @@ import {
 } from "@/server/domains/actions";
 import { formatRelativeTime } from "@/utils/dashboard";
 import { shouldShowProjectDomainsTab } from "@/utils/project-capabilities";
+import { usePlanGate } from "@/hooks/use-plan-gate";
+import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -159,12 +161,27 @@ function ProjectDomainsPage() {
   const search = Route.useSearch();
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const { settingsSnapshot } = RootRoute.useLoaderData() as any;
+  const { customDomain } = usePlanGate();
   if (!shouldShowProjectDomainsTab(project)) {
     return (
       <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
         <TabHeader title="Project domains">
           Domains are not available for this project type.
         </TabHeader>
+      </div>
+    );
+  }
+
+  if (!customDomain) {
+    return (
+      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
+        <TabHeader title="Project domains">
+          Connect your own domain to this project.
+        </TabHeader>
+        <PlanUpgradePrompt
+          feature="Custom Domains"
+          description="Custom domains allow you to serve your project on your own domain. Upgrade your plan to connect a custom domain."
+        />
       </div>
     );
   }

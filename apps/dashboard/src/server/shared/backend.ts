@@ -30,7 +30,10 @@ export async function withTokenRefresh<T>(
       const session = await api.auth.refreshTokens(refreshToken);
       setServerAuthCookies(session);
 
-      const freshApi = getServerBackendApi();
+      const freshApi = createBackendApi({
+        baseUrl: config.apiUrl,
+        getAccessToken: () => session.accessToken ?? null,
+      });
       return await fn(freshApi);
     } catch {
       clearServerAuthCookies();

@@ -103,6 +103,7 @@ export const Route = createFileRoute("/projects/")({
         total: result.total,
         overallTotalProjects: result.overallTotalProjects,
       },
+      workspace: deps.workspace,
     };
   },
   component: ProjectsPage,
@@ -120,6 +121,9 @@ function ProjectsPage() {
   const [isStatusFilterChanging, setIsStatusFilterChanging] = useState(false);
   const activeProjectType = search.type ?? "all";
   const activeStatus = search.status ?? "all";
+  const requestedWorkspace = search.workspace?.trim().toLowerCase() || undefined;
+  const loadedWorkspace = loaderData.workspace?.trim().toLowerCase() || undefined;
+  const isWorkspaceSwitching = requestedWorkspace !== loadedWorkspace;
 
   const refreshSignal = useTagsStore((s) => s._refreshSignal);
   const tags = useTagsStore((s) => s.tags);
@@ -148,6 +152,22 @@ function ProjectsPage() {
     setIsFilterChanging(false);
     setIsStatusFilterChanging(false);
   }, [loaderData]);
+
+  useEffect(() => {
+    if (!isWorkspaceSwitching) {
+      return;
+    }
+
+    setProjects([]);
+    setPagination((prev) => ({
+      ...prev,
+      currentPage: search.page ?? 1,
+      total: 0,
+      overallTotalProjects: 0,
+    }));
+    setIsFilterChanging(false);
+    setIsStatusFilterChanging(false);
+  }, [isWorkspaceSwitching, search.page]);
 
   useEffect(() => {
     setSearchQuery(search.q ?? "");

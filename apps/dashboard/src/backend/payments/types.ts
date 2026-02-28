@@ -89,7 +89,12 @@ export interface PurchaseInput {
 }
 
 export interface UpdateSpendingLimitInput {
-  monthly_limit: number;
+  spending_limit: number;
+}
+
+export interface UpdateTeamSpendingLimitInput {
+  team_id: string;
+  spending_limit: number;
 }
 
 export interface UpdateTeamSubscriptionInput {
@@ -126,6 +131,7 @@ export interface PaymentsApi {
   }): Promise<InvoicePage>;
   purchase(input: PurchaseInput): Promise<PurchaseResult>;
   updateSpendingLimit(input: UpdateSpendingLimitInput): Promise<void>;
+  updateTeamSpendingLimit(input: UpdateTeamSpendingLimitInput): Promise<void>;
   updateTeamSubscription(input: UpdateTeamSubscriptionInput): Promise<void>;
   getSubscriptionSpecs(): Promise<any>;
 }

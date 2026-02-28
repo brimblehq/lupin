@@ -1,18 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
 import { withTokenRefresh } from "@/server/shared/backend";
 import { DEFAULT_PRICING } from "@/utils/default-pricing";
-import type { Pricing } from "@/types/pricing";
+import type { Pricing, PlanSpecs } from "@/types/pricing";
+
+const SPECS_TTL = 10 * 60_000; // 10 minutes
+let specsCache: { data: Pricing; ts: number } | null = null;
 
 export const getSubscriptionSpecsServerFn = createServerFn({
   method: "GET",
 }).handler(async (): Promise<Pricing> => {
+  if (specsCache && Date.now() - specsCache.ts < SPECS_TTL) {
+    return specsCache.data;
+  }
+
   try {
     const res = await withTokenRefresh((api) =>
       api.payments.getSubscriptionSpecs(),
     );
-    return normalizePricing(res);
+    const data = normalizePricing(res);
+    specsCache = { data, ts: Date.now() };
+    return data;
   } catch {
-    return DEFAULT_PRICING;
+    return specsCache?.data ?? DEFAULT_PRICING;
   }
 });
 
@@ -57,5 +66,41 @@ function normalizePricing(raw: any): Pricing {
 
   const overage = DEFAULT_PRICING.overage;
 
-  return { plans, team, overage };
+  const specsMap: Record<string, PlanSpecs> = {};
+  for (const key of ["free", "hacker", "developer", "team"] as const) {
+    if (specs[key]) {
+      specsMap[key] = normalizePlanSpecs(specs[key]);
+    }
+  }
+
+  return { plans, team, overage, specs: { ...DEFAULT_PRICING.specs, ...specsMap } };
+}
+
+/** Parse a value that may be a boolean, string "true"/"false", or number 0/1. */
+function toBool(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return value.toLowerCase() === "true";
+  if (typeof value === "number") return value !== 0;
+  return fallback;
+}
+
+function normalizePlanSpecs(raw: any): PlanSpecs {
+  return {
+    projectLimit:
+      raw?.project_limit === -1 || raw?.project_limit === "unlimited"
+        ? null
+        : Number(raw?.project_limit ?? 3),
+    webhookEnabled: toBool(raw?.webhook_enabled),
+    customDomain: toBool(raw?.custom_domain),
+    deployPrivateOrganization: toBool(raw?.deploy_private_organization),
+    autoscalingEnabled: toBool(raw?.autoscaling_enabled),
+    analytics: toBool(raw?.analytics),
+    pullRequestPreview: toBool(raw?.pull_request_preview),
+    buildMinutes: Number(raw?.build_minutes ?? 0),
+    bandwidth: Number(raw?.bandwidth ?? 0),
+    storage: Number(raw?.storage ?? 0),
+    concurrentBuilds: Number(raw?.concurrent_builds ?? 1),
+    logRetention: Number(raw?.log_retention ?? 1),
+    supportLevel: String(raw?.support ?? "community"),
+  };
 }

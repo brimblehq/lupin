@@ -2,7 +2,7 @@ import { PageHeader } from "../shared/page-header";
 import { ProjectCard } from "../shared/project-card";
 import type { Project } from "../shared/project-card";
 import { CreateProjectCard } from "../shared/create-project-card";
-import { SUBSCRIPTION_PLAN_TYPE } from "@brimble/models/dist/enum";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 
 function getCreateCardSpan(projectCount: number) {
   const smRemaining = projectCount % 2 === 0 ? 2 : 2 - (projectCount % 2);
@@ -19,17 +19,16 @@ function getCreateCardSpan(projectCount: number) {
 export function DeployedProjects({
   projects,
   totalProjects,
-  planType,
   isTeamWorkspace,
 }: {
   projects: Project[];
   totalProjects?: number;
-  planType?: string;
   isTeamWorkspace?: boolean;
 }) {
+  const { projectLimit } = usePlanGate();
   const usageCopy = getProjectsUsageCopy({
     totalProjects: totalProjects ?? projects.length,
-    planType,
+    projectLimit,
     isTeamWorkspace,
   });
 
@@ -51,30 +50,21 @@ export function DeployedProjects({
 
 function getProjectsUsageCopy({
   totalProjects,
-  planType,
+  projectLimit,
   isTeamWorkspace,
 }: {
   totalProjects: number;
-  planType?: string;
+  projectLimit: number | null;
   isTeamWorkspace?: boolean;
 }) {
   if (isTeamWorkspace) {
     return `Manage your projects from one place. Your team currently has ${totalProjects} project${totalProjects === 1 ? "" : "s"}.`;
   }
 
-  const key = (planType ?? "").toUpperCase();
-  const hasUnlimitedProjects =
-    key === SUBSCRIPTION_PLAN_TYPE.DeveloperPlan ||
-    key === "PRO" ||
-    key === "PRO_PLAN" ||
-    key === SUBSCRIPTION_PLAN_TYPE.TeamPlan ||
-    key === "TEAM";
-
-  if (hasUnlimitedProjects) {
+  if (projectLimit === null) {
     return `Manage your projects from one place. You currently have ${totalProjects} project${totalProjects === 1 ? "" : "s"} on your plan.`;
   }
 
-  const projectLimit = 10;
   return (
     <>
       Manage your apps, APIs, workers, and databases from one place. You have used{" "}

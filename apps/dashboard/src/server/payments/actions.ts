@@ -5,6 +5,7 @@ import type {
   SwapPlanInput,
   PurchaseInput,
   UpdateSpendingLimitInput,
+  UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
 } from "@/backend/payments";
 import { withTokenRefresh } from "@/server/shared/backend";
@@ -138,6 +139,17 @@ export const updateSpendingLimitServerFn = createServerFn({
 
   return withTokenRefresh(async (api) => {
     await api.payments.updateSpendingLimit(input);
+    return { ok: true } as const;
+  });
+});
+
+export const updateTeamSpendingLimitServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const input = data as unknown as UpdateTeamSpendingLimitInput;
+
+  return withTokenRefresh(async (api) => {
+    await api.payments.updateTeamSpendingLimit(input);
     return { ok: true } as const;
   });
 });

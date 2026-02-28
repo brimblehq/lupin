@@ -26,6 +26,7 @@ import type { AppTooltipMessage } from "@/backend/messages";
 import type { PaymentMethod } from "@/backend/payments";
 import type { Pricing } from "@/types/pricing";
 import { PricingProvider } from "@/contexts/pricing-context";
+import { PlanTypeProvider } from "@/contexts/plan-type-context";
 import { DEFAULT_PRICING } from "@/utils/default-pricing";
 import { ProfileTab } from "../../types/enums";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
@@ -243,6 +244,7 @@ export function DashboardLayout({
   initialWorkspaceTeamMembers,
   initialTooltipMessages,
   initialPaymentMethods,
+  initialInvoices,
   initialPricing,
 }: {
   children: ReactNode;
@@ -253,6 +255,7 @@ export function DashboardLayout({
   initialWorkspaceTeamMembers?: TeamDetails | null;
   initialTooltipMessages?: AppTooltipMessage[] | null;
   initialPaymentMethods?: PaymentMethod[] | null;
+  initialInvoices?: any;
   initialPricing?: Pricing;
 }) {
   const pathname = useRouterState({
@@ -401,15 +404,18 @@ export function DashboardLayout({
   }, [dismissedSnackbarKeys, tooltipMessages]);
 
   const pricing = initialPricing ?? DEFAULT_PRICING;
+  const planType = initialSettingsSnapshot?.profile?.subscription?.planType;
 
   if (isAuthRoute || isCatchAll) {
     return (
       <QueryClientProvider client={dashboardQueryClient}>
       <PricingProvider value={pricing}>
+      <PlanTypeProvider value={planType}>
       <TooltipProvider>
         <DashToaster />
         {children}
       </TooltipProvider>
+      </PlanTypeProvider>
       </PricingProvider>
       </QueryClientProvider>
     );
@@ -418,6 +424,7 @@ export function DashboardLayout({
   return (
     <QueryClientProvider client={dashboardQueryClient}>
     <PricingProvider value={pricing}>
+    <PlanTypeProvider value={planType}>
     <ScoutBarProvider>
     <TooltipProvider>
       <DashToaster />
@@ -561,10 +568,12 @@ export function DashboardLayout({
           requestedTab={profileRequestedTab}
           initialSnapshot={initialSettingsSnapshot ?? null}
           initialPaymentMethods={initialPaymentMethods ?? null}
+          initialInvoices={initialInvoices ?? null}
         />
       </div>
     </TooltipProvider>
     </ScoutBarProvider>
+    </PlanTypeProvider>
     </PricingProvider>
     </QueryClientProvider>
   );

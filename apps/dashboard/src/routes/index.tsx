@@ -75,11 +75,16 @@ function DashboardHome() {
   };
   const planType = settingsSnapshot?.profile?.subscription?.planType;
   const workspaceSlug = search.workspace?.trim().toLowerCase();
+  const loaderWorkspaceSlug = workspace?.trim().toLowerCase();
+  const isWorkspaceSwitching = workspaceSlug !== (loaderWorkspaceSlug || undefined);
   const isTeamWorkspace = Boolean(
     workspaceSlug && workspaces?.items?.some((item) => item.slug === workspaceSlug),
   );
+  const visibleProjects = isWorkspaceSwitching ? [] : projects;
+  const visibleOverview = isWorkspaceSwitching ? null : overview;
+  const visibleBandwidth = isWorkspaceSwitching ? null : bandwidth;
 
-  const deployedProjects: ProjectCardProject[] = projects.slice(0, 4).map((project) => ({
+  const deployedProjects: ProjectCardProject[] = visibleProjects.slice(0, 4).map((project) => ({
     name: project.name,
     slug: project.slug || project.name,
     id: project.id,
@@ -94,8 +99,8 @@ function DashboardHome() {
     <div className="max-w-[1000px]">
       <WelcomeSection />
       <StatsRow
-        overview={overview}
-        bandwidth={bandwidth}
+        overview={visibleOverview}
+        bandwidth={visibleBandwidth}
         planType={planType}
         isTeamWorkspace={isTeamWorkspace}
         initialPaymentMethods={initialPaymentMethods}
@@ -103,8 +108,7 @@ function DashboardHome() {
       <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
       <DeployedProjects
         projects={deployedProjects}
-        totalProjects={overview?.total?.project ?? projects.length}
-        planType={planType}
+        totalProjects={visibleOverview?.total?.project ?? visibleProjects.length}
         isTeamWorkspace={isTeamWorkspace}
       />
       <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />

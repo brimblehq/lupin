@@ -14,6 +14,8 @@ import {
 } from "@/server/observability/actions";
 import { normalizeMemoryGbValue } from "@/utils/project-configuration";
 import { isDatabaseProject, shouldShowProjectObservabilityTab } from "@/utils/project-capabilities";
+import { usePlanGate } from "@/hooks/use-plan-gate";
+import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -625,6 +627,7 @@ function ObservabilityPage() {
     );
   }
   const { metrics, grafanaUrl } = Route.useLoaderData();
+  const { analytics: analyticsEnabled } = usePlanGate();
   const [section, setSection] = useState<"metrics" | "analytics">("metrics");
 
   return (
@@ -661,8 +664,13 @@ function ObservabilityPage() {
           grafanaUrl={grafanaUrl}
           workspace={workspace}
         />
-      ) : (
+      ) : analyticsEnabled ? (
         <AppAnalytics />
+      ) : (
+        <PlanUpgradePrompt
+          feature="App Analytics"
+          description="App Analytics provides detailed insights into your application's usage patterns. Upgrade your plan to access analytics."
+        />
       )}
     </div>
   );

@@ -6,6 +6,8 @@ export interface SettingsUserProfile {
   lastName: string;
   avatarUrl?: string;
   buildDisabled: boolean;
+  buildDisabledBy?: string | null;
+  spendingLimit?: number | null;
   apiKey?: string;
   notifications: {
     mute: boolean;

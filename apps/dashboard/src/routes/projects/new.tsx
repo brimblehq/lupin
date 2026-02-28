@@ -63,6 +63,7 @@ import type {
   RepositoryFrameworkDefaults,
 } from "@/backend/repositories";
 import type { Project } from "@/backend/projects";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 
 export const Route = createFileRoute("/projects/new")({
   component: NewProjectPage,
@@ -479,6 +480,7 @@ function Phase2GitRepoSelect({
   onSelect: (repo: GithubRepoListItem) => void;
 }) {
   const { Icon: ProviderIcon } = provider;
+  const { deployPrivateOrganization } = usePlanGate();
   const [selectedInstallationId, setSelectedInstallationId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [orgOpen, setOrgOpen] = useState(false);
@@ -600,14 +602,19 @@ function Phase2GitRepoSelect({
                     transition={{ duration: 0.2, ease }}
                     className="absolute left-0 top-full z-50 mt-1 w-full overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
                   >
-                    {accounts.map((account) => (
+                    {accounts.map((account) => {
+                      const isOrg = String(account.type ?? "").toLowerCase() === "organization";
+                      const locked = isOrg && !deployPrivateOrganization;
+                      return (
                       <button
                         key={String(account.id ?? account.installationId ?? account.username ?? account.name)}
                         onClick={() => {
+                          if (locked) return;
                           setSelectedInstallationId(String(account.installationId ?? ""));
                           setOrgOpen(false);
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+                        disabled={locked}
+                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors ${locked ? "cursor-not-allowed text-dash-text-extra-faded" : "text-dash-text-body hover:bg-dash-bg-elevated"}`}
                       >
                         {account.avatar ? (
                           <img
@@ -627,8 +634,14 @@ function Phase2GitRepoSelect({
                         <span className="truncate">
                           {account.name || account.username || "GitHub Account"}
                         </span>
+                        {locked && (
+                          <span className="ml-auto shrink-0 rounded bg-dash-bg px-1.5 py-0.5 text-[10px] font-medium text-dash-text-faded">
+                            Upgrade
+                          </span>
+                        )}
                       </button>
-                    ))}
+                      );
+                    })}
                   </motion.div>
                 )}
               </AnimatePresence>

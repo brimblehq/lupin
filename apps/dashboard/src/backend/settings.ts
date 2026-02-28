@@ -70,6 +70,14 @@ function mapProfile(payload: any): SettingsUserProfile {
     lastName,
     avatarUrl: data?.avatar,
     buildDisabled: Boolean(data?.build_disabled),
+    buildDisabledBy:
+      typeof data?.build_disabled_by === "string"
+        ? data.build_disabled_by
+        : null,
+    spendingLimit:
+      data?.spending_limit === null || data?.spending_limit === undefined
+        ? null
+        : Number(data.spending_limit),
     apiKey: data?.api_key,
     notifications: {
       mute: Boolean(data?.notifications?.mute),
@@ -142,7 +150,7 @@ function mapProviders(payload: any): SettingsPaymentProvider[] {
 function mapSpendingStats(payload: any): SettingsSpendingStats {
   const data = unwrapData<any>(payload) ?? {};
   return {
-    used: Number(data?.used ?? 0),
+    used: Number(data?.used ?? data?.forecasted_amount ?? 0),
     spendingLimit: Number(data?.spending_limit ?? 0),
   };
 }
@@ -294,7 +302,12 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
       await Promise.all([
         client.request(endpoints.paymentCards, { method: "GET" }),
         client.request(endpoints.paymentProviders, { method: "GET" }),
-        client.request(endpoints.paymentStats, { method: "GET" }),
+        client.request(endpoints.paymentStats, {
+          method: "GET",
+          query: {
+            ...(subscriptionId ? { subscriptionId } : {}),
+          },
+        }),
         client.request(endpoints.paymentInvoices, {
           method: "GET",
           query: {
