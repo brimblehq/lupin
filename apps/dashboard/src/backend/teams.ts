@@ -4,6 +4,7 @@ import {
   asRecord,
   asStringOrNumber,
   pickBoolean,
+  pickNumber,
   pickNonEmptyString,
   pickString,
 } from "./normalize";
@@ -28,7 +29,11 @@ export interface TeamMember {
 export interface TeamDetails {
   id: string;
   name: string;
+  description?: string;
   avatarUrl?: string;
+  buildDisabled?: boolean;
+  seatCount?: number;
+  concurrentBuilds?: number;
   isCreator?: boolean;
   subscriptionId?: string;
   members: TeamMember[];
@@ -36,6 +41,11 @@ export interface TeamDetails {
 
 export interface TeamsApi {
   getByName(teamName: string): Promise<TeamDetails>;
+  update(teamId: string, input: {
+    name?: string;
+    description?: string;
+    avatarUrl?: string;
+  }): Promise<{ ok: true }>;
   inviteMembers(input: {
     teamId: string;
     members: string[];
@@ -106,12 +116,25 @@ export function createTeamsApi(client: ApiClient): TeamsApi {
       });
 
       const root = asRecord(extractTeamRoot(response)) ?? {};
+      const subscriptionRow = asRecord(root.subscription);
+      const subscriptionSpecs =
+        asRecord(subscriptionRow?.specifications) ??
+        asRecord(root.specifications);
       const rawMembers = Array.isArray(root.members) ? root.members : [];
 
       return {
         id: String(asStringOrNumber(root.id) ?? asStringOrNumber(root._id) ?? ""),
         name: pickString(root, "name") ?? teamName,
+        description: pickString(root, "description") || undefined,
         avatarUrl: pickString(root, "avatar", "avatarUrl", "avatar_url"),
+        buildDisabled: pickBoolean(root, "build_disabled", "buildDisabled"),
+        seatCount: pickNumber(subscriptionSpecs, "members", "member_count", "seats"),
+        concurrentBuilds: pickNumber(
+          subscriptionSpecs,
+          "concurrent_builds",
+          "concurrentBuilds",
+          "builds",
+        ),
         isCreator: pickBoolean(root, "isCreator"),
         subscriptionId:
           pickString(asRecord(root.subscription), "_id", "id") ??
@@ -120,6 +143,23 @@ export function createTeamsApi(client: ApiClient): TeamsApi {
           .map(mapTeamMember)
           .filter((member): member is TeamMember => member !== null),
       };
+    },
+
+    async update(teamId, input) {
+      await client.request<any>(`/core/v1/teams/${encodeURIComponent(teamId)}`, {
+        method: "PATCH",
+        body: {
+          ...(input.name?.trim() ? { name: input.name.trim() } : {}),
+          ...(typeof input.description === "string"
+            ? { description: input.description.trim() || null }
+            : {}),
+          ...(typeof input.avatarUrl === "string"
+            ? { avatar: input.avatarUrl.trim() || null }
+            : {}),
+        },
+      });
+
+      return { ok: true } as const;
     },
 
     async inviteMembers(input) {

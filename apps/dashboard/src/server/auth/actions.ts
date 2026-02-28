@@ -66,8 +66,8 @@ export const verifyEmailCodeServerFn = createServerFn({ method: "POST" }).handle
 );
 
 export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {
-  await getServerBackendApi().auth.logout();
   clearServerAuthCookies();
+  await getServerBackendApi().auth.logout().catch(() => {});
   return { ok: true } as const;
 });
 

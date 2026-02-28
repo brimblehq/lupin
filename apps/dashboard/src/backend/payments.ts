@@ -8,7 +8,6 @@ import type {
   Subscription,
   CreateSubscriptionInput,
   SwapPlanInput,
-  PlanSpec,
   BillEstimate,
   InvoicePage,
   PurchaseInput,
@@ -26,7 +25,6 @@ export type {
   Subscription,
   CreateSubscriptionInput,
   SwapPlanInput,
-  PlanSpec,
   BillEstimate,
   BillEstimateLineItem,
   Invoice,
@@ -102,11 +100,12 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
     },
 
     async createSubscription(input: CreateSubscriptionInput): Promise<Subscription> {
-      const res = await client.request<any>(`${base}/subscriptions`, {
+      const res = await client.request<any>(`${base}/subscription/create`, {
         method: "POST",
         body: {
-          plan_id: input.plan_id,
-          payment_method_id: input.payment_method_id,
+          type: input.type,
+          accept_terms: input.accept_terms,
+          ...(input.payment_method ? { payment_method: input.payment_method } : {}),
         },
         headers: { "Idempotency-Key": generateIdempotencyKey() },
       });
@@ -114,9 +113,9 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
     },
 
     async swapPlan(input: SwapPlanInput): Promise<Subscription> {
-      const res = await client.request<any>(`${base}/subscriptions/swap`, {
-        method: "PUT",
-        body: { plan_id: input.plan_id },
+      const res = await client.request<any>(`${base}/subscription/swap`, {
+        method: "POST",
+        body: { target_plan: input.target_plan },
       });
       return unwrapData<Subscription>(res);
     },
@@ -127,14 +126,6 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       });
     },
 
-    async listPlans(): Promise<PlanSpec[]> {
-      const res = await client.request<any>(`${base}/plans`, {
-        method: "GET",
-      });
-      const data = unwrapData<any>(res);
-      return Array.isArray(data) ? data : (data?.plans ?? []);
-    },
-
     async getBillEstimate(): Promise<BillEstimate> {
       const res = await client.request<any>(`${base}/billing/estimate`, {
         method: "GET",
@@ -142,19 +133,46 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       return unwrapData<BillEstimate>(res);
     },
 
-    async listInvoices(page = 1, perPage = 10): Promise<InvoicePage> {
-      const res = await client.request<any>(`${base}/invoices`, {
+    async listInvoices(input = {}): Promise<InvoicePage> {
+      const perPage = typeof input.per_page === "number" ? input.per_page : 10;
+      const res = await client.request<any>(`${base}/payment/invoices`, {
         method: "GET",
-        query: { page, per_page: perPage },
+        query: {
+          per_page: perPage,
+          ...(input.cursor ? { cursor: input.cursor } : {}),
+          ...(input.team_id ? { team_id: input.team_id } : {}),
+        },
       });
       const data = unwrapData<any>(res);
-      const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+      const rawInvoices = Array.isArray(data?.invoices)
+        ? data.invoices
+        : Array.isArray(data)
+          ? data
+          : [];
+
+      const items = rawInvoices.map((invoice: any) => ({
+        id: String(invoice?.id ?? ""),
+        number:
+          typeof invoice?.number === "string" ? invoice.number : undefined,
+        total: typeof invoice?.total === "string" ? invoice.total : undefined,
+        status: String(invoice?.status ?? "open") as InvoicePage["items"][number]["status"],
+        date: typeof invoice?.date === "string" ? invoice.date : "",
+        invoice_pdf:
+          typeof invoice?.invoice_pdf === "string"
+            ? invoice.invoice_pdf
+            : undefined,
+      }));
+
       return {
         items,
-        page: Number(data?.page ?? page),
+        next_cursor:
+          typeof data?.next_cursor === "string" ? data.next_cursor : null,
+        previous_cursor:
+          typeof data?.previous_cursor === "string"
+            ? data.previous_cursor
+            : null,
+        has_more: Boolean(data?.has_more),
         per_page: Number(data?.per_page ?? perPage),
-        total: Number(data?.total ?? items.length),
-        total_pages: Number(data?.total_pages ?? 1),
       };
     },
 
@@ -190,6 +208,13 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
           ...(input.concurrent_builds !== undefined ? { concurrent_builds: input.concurrent_builds } : {}),
         },
       });
+    },
+
+    async getSubscriptionSpecs(): Promise<any> {
+      const res = await client.request<any>(`${base}/subscription-specifications`, {
+        method: "GET",
+      });
+      return unwrapData<any>(res);
     },
   };
 }

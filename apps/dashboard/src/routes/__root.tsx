@@ -10,6 +10,11 @@ import { DashboardLayout } from "../components/layout/dashboard-layout";
 import { enforceRouteAuth } from "../lib/auth-guards";
 import { getSettingsSidebarSnapshotServerFn } from "@/server/settings/actions";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
+import { getPaymentMethodsServerFn } from "@/server/payments/actions";
+import { getSubscriptionSpecsServerFn } from "@/server/pricing/actions";
+import type { PaymentMethod } from "@/backend/payments";
+import type { Pricing } from "@/types/pricing";
+import { DEFAULT_PRICING } from "@/utils/default-pricing";
 import { listWorkspacesServerFn } from "@/server/workspaces/actions";
 import type { ApiListResponse } from "@/backend";
 import type { Workspace } from "@/backend/workspaces";
@@ -78,6 +83,7 @@ export const Route = createRootRoute({
         workspaceTeamMembers: null as TeamDetails | null,
         tooltipMessages: null as AppTooltipMessage[] | null,
         tags: null as BackendTag[] | null,
+        pricing: DEFAULT_PRICING as Pricing,
       };
     }
 
@@ -94,7 +100,7 @@ export const Route = createRootRoute({
 
     const shouldPreloadWorkspaceTeamMembers = typeof window === "undefined";
 
-    const [settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags] =
+    const [settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags, paymentMethods, pricingResult] =
       await Promise.allSettled([
       (getSettingsSidebarSnapshotServerFn as unknown as (input: {
         data?: { workspace?: string };
@@ -129,6 +135,8 @@ export const Route = createRootRoute({
       }) => Promise<BackendTag[]>)({
         data: { workspace },
       }),
+      (getPaymentMethodsServerFn as unknown as () => Promise<PaymentMethod[]>)(),
+      (getSubscriptionSpecsServerFn as unknown as () => Promise<Pricing>)(),
     ]);
 
     if (settingsSnapshot.status === "rejected") {
@@ -151,6 +159,9 @@ export const Route = createRootRoute({
     }
     if (tags.status === "rejected") {
       console.error("[root loader] tags failed:", tags.reason);
+    }
+    if (pricingResult.status === "rejected") {
+      console.error("[root loader] pricing specs failed:", pricingResult.reason);
     }
 
     return {
@@ -182,6 +193,14 @@ export const Route = createRootRoute({
         tags.status === "fulfilled"
           ? tags.value
           : null as BackendTag[] | null,
+      paymentMethods:
+        paymentMethods.status === "fulfilled"
+          ? paymentMethods.value
+          : null as PaymentMethod[] | null,
+      pricing:
+        pricingResult.status === "fulfilled"
+          ? pricingResult.value
+          : DEFAULT_PRICING as Pricing,
     };
   },
   component: RootComponent,
@@ -209,7 +228,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  const { settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags } =
+  const { settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags, paymentMethods, pricing } =
     Route.useLoaderData();
 
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
@@ -251,6 +270,8 @@ function RootComponent() {
       initialOnboardingProjects={onboardingProjects}
       initialWorkspaceTeamMembers={workspaceTeamMembers}
       initialTooltipMessages={tooltipMessages}
+      initialPaymentMethods={paymentMethods}
+      initialPricing={pricing}
     >
       <Outlet />
     </DashboardLayout>

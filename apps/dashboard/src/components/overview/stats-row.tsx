@@ -4,6 +4,7 @@ import { SUBSCRIPTION_PLAN_TYPE } from "@brimble/models/dist/enum";
 import { AreaChart, Area, YAxis, ResponsiveContainer } from "recharts";
 import { DashButton } from "../shared/dash-button";
 import { ChangePlanModal } from "../shared/change-plan-modal";
+import type { PaymentMethod } from "@/backend/payments";
 import type { OverviewSummary } from "@/backend/overview";
 import type { BandwidthSummary } from "@/backend/bandwidth";
 
@@ -73,11 +74,13 @@ export function StatsRow({
   bandwidth,
   planType,
   isTeamWorkspace,
+  initialPaymentMethods,
 }: {
   overview?: OverviewSummary | null;
   bandwidth?: BandwidthSummary | null;
   planType?: string;
   isTeamWorkspace?: boolean;
+  initialPaymentMethods?: PaymentMethod[] | null;
 }) {
   const [changePlanOpen, setChangePlanOpen] = useState(false);
   const plan = getPlanInfo(planType, isTeamWorkspace);
@@ -214,9 +217,7 @@ export function StatsRow({
         open={changePlanOpen}
         onOpenChange={setChangePlanOpen}
         currentPlan={plan.displayName}
-        onChangePlan={() => {
-          setChangePlanOpen(false);
-        }}
+        initialPaymentMethods={initialPaymentMethods}
       />
     </div>
   );

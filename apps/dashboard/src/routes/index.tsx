@@ -14,6 +14,7 @@ import type { OverviewSummary } from "@/backend/overview";
 import type { BandwidthSummary } from "@/backend/bandwidth";
 import type { McpServerListResult } from "@/backend/mcp";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
+import type { PaymentMethod } from "@/backend/payments";
 import type { Project as ProjectCardProject } from "../components/shared/project-card";
 import { formatRelativeTime } from "@/utils/dashboard";
 import { mapMcpTemplateToAddon } from "@/utils/discover-mcp";
@@ -67,9 +68,10 @@ export const Route = createFileRoute("/")({
 function DashboardHome() {
   const search = Route.useSearch();
   const { projects, overview, bandwidth, featuredAddons, workspace } = Route.useLoaderData();
-  const { settingsSnapshot, workspaces } = rootRoute.useLoaderData() as {
+  const { settingsSnapshot, workspaces, paymentMethods: initialPaymentMethods } = rootRoute.useLoaderData() as {
     settingsSnapshot: SettingsSidebarSnapshot | null;
     workspaces: { items: Array<{ slug?: string }> };
+    paymentMethods: PaymentMethod[] | null;
   };
   const planType = settingsSnapshot?.profile?.subscription?.planType;
   const workspaceSlug = search.workspace?.trim().toLowerCase();
@@ -96,6 +98,7 @@ function DashboardHome() {
         bandwidth={bandwidth}
         planType={planType}
         isTeamWorkspace={isTeamWorkspace}
+        initialPaymentMethods={initialPaymentMethods}
       />
       <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
       <DeployedProjects

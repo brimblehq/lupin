@@ -1,36 +1,55 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "./modal";
 import { Dropdown } from "./dropdown";
+import { usePricing } from "@/contexts/pricing-context";
+import {
+  usePaymentMethods,
+  useSubscription,
+  useCreateSubscription,
+  useSwapPlan,
+} from "@/hooks/use-payments";
+import type { PaymentMethod } from "@/backend/payments";
 
-export const billingPlans = [
-  { name: "Free", price: 0, planId: "free" },
-  { name: "Hacker", price: 5, planId: "hacker" },
-  { name: "Pro", price: 15, planId: "developer" },
-];
+const PLAN_ID_TO_API_TYPE: Record<string, string> = {
+  hacker: "HACKER_PLAN",
+  developer: "DEVELOPER_PLAN",
+};
 
 export function ChangePlanModal({
   open,
   onOpenChange,
   currentPlan,
-  defaultPaymentMethodId,
-  hasPaymentMethod = false,
-  hasSubscription = false,
-  isPending = false,
-  onConfirm,
-  onChangePlan,
+  initialPaymentMethods,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentPlan: string;
-  defaultPaymentMethodId?: string;
-  hasPaymentMethod?: boolean;
-  hasSubscription?: boolean;
-  isPending?: boolean;
-  onConfirm: (planId: string, isNew: boolean) => void;
-  onChangePlan: (plan: string) => void;
+  initialPaymentMethods?: PaymentMethod[] | null;
 }) {
   const [selectedPlan, setSelectedPlan] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const pricing = usePricing();
+
+  const { data: paymentMethods = [] } = usePaymentMethods(initialPaymentMethods ?? undefined);
+  const { data: subscription } = useSubscription();
+  const createSubscription = useCreateSubscription();
+  const swapPlan = useSwapPlan();
+
+  const defaultMethod = paymentMethods.find((m: any) => m.is_default) ?? paymentMethods[0];
+  const hasPaymentMethod = paymentMethods.length > 0;
+  const hasSubscription = subscription !== null && subscription !== undefined;
+  const isPending = createSubscription.isPending || swapPlan.isPending;
+
+  const billingPlans = useMemo(
+    () =>
+      pricing.plans.map((p) => ({
+        name: p.name,
+        price: p.amount,
+        planId: p.id,
+      })),
+    [pricing.plans],
+  );
 
   const currentIdx = billingPlans.findIndex((p) => p.name === currentPlan);
   const selectedIdx = billingPlans.findIndex((p) => p.name === selectedPlan);
@@ -58,24 +77,64 @@ export function ChangePlanModal({
   function handleConfirm() {
     if (!selectedObj) return;
 
+    const apiType = PLAN_ID_TO_API_TYPE[selectedObj.planId];
+    if (!apiType) {
+      toast.error("Cannot change to this plan.");
+      return;
+    }
+
     if (needsPaymentMethod) {
       toast.error("Please add a payment method first before upgrading.");
       return;
     }
 
-    if (!hasSubscription && !defaultPaymentMethodId && selectedObj.price > 0) {
+    if (!hasSubscription && !defaultMethod?.id && selectedObj.price > 0) {
       toast.error("Please add a payment method first.");
       return;
     }
 
-    onConfirm(selectedObj.planId, !hasSubscription);
+    if (!hasSubscription) {
+      createSubscription.mutate(
+        {
+          type: apiType,
+          accept_terms: true,
+          ...(defaultMethod?.id ? { payment_method: defaultMethod.id } : {}),
+        },
+        {
+          onSuccess: () => {
+            toast.success("Subscription created");
+            setSelectedPlan("");
+            setAcceptedTerms(false);
+            onOpenChange(false);
+          },
+          onError: (err) => {
+            toast.error(err instanceof Error ? err.message : "Failed to create subscription");
+          },
+        },
+      );
+    } else {
+      swapPlan.mutate(apiType, {
+        onSuccess: () => {
+          toast.success("Plan changed");
+          setSelectedPlan("");
+          setAcceptedTerms(false);
+          onOpenChange(false);
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "Failed to change plan");
+        },
+      });
+    }
   }
 
   return (
     <Modal
       open={open}
       onOpenChange={(v) => {
-        if (!v) setSelectedPlan("");
+        if (!v) {
+          setSelectedPlan("");
+          setAcceptedTerms(false);
+        }
         onOpenChange(v);
       }}
       width={420}
@@ -102,7 +161,9 @@ export function ChangePlanModal({
           <div className="flex flex-col gap-2">
             <p className="text-sm leading-5 text-dash-text-faded">
               {isUpgrade
-                ? `You'll be charged $${selectedObj.price}/mo, up from $${currentObj.price}/mo. Changes take effect immediately.`
+                ? currentObj.price === 0
+                  ? `You'll be charged $${selectedObj.price}/mo. Changes take effect immediately.`
+                  : `You'll be charged $${selectedObj.price}/mo, up from $${currentObj.price}/mo. Changes take effect immediately.`
                 : `Your plan will change to ${selectedObj.name} (${selectedObj.price === 0 ? "Free" : `$${selectedObj.price}/mo`}) at the end of your billing period.`}
             </p>
             {needsPaymentMethod && (
@@ -122,6 +183,37 @@ export function ChangePlanModal({
           </div>
         )}
 
+        {selectedObj && !needsPaymentMethod && (
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-dash-border accent-[#4879f8]"
+            />
+            <span className="text-sm leading-5 text-dash-text-faded">
+              I agree to the{" "}
+              <a
+                href="https://brimble.io/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#4879f8] hover:underline"
+              >
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a
+                href="https://brimble.io/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#4879f8] hover:underline"
+              >
+                Privacy Policy
+              </a>
+            </span>
+          </label>
+        )}
+
         <a
           href="/pricing"
           target="_blank"
@@ -135,7 +227,7 @@ export function ChangePlanModal({
       <ModalFooter>
         <ModalCancelButton />
         <ModalContinueButton
-          disabled={!selectedPlan || isPending || needsPaymentMethod}
+          disabled={!selectedPlan || isPending || needsPaymentMethod || !acceptedTerms}
           loading={isPending}
           loadingLabel="Processing..."
           onClick={handleConfirm}

@@ -68,6 +68,32 @@ export const inviteWorkspaceTeamMembersServerFn = createServerFn({
   return getServerBackendApi().teams.inviteMembers({ teamId, members });
 });
 
+export const updateWorkspaceTeamProfileServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        name?: string;
+        description?: string;
+        avatarUrl?: string;
+      }
+    | undefined;
+
+  const { teamId } = await resolveWorkspaceTeam(payload?.workspace);
+  const name = payload?.name?.trim();
+
+  if (!name) {
+    throw new Error("Workspace name is required");
+  }
+
+  return getServerBackendApi().teams.update(teamId, {
+    name,
+    description: payload?.description,
+    avatarUrl: payload?.avatarUrl,
+  });
+});
+
 export const resendWorkspaceTeamInviteServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {

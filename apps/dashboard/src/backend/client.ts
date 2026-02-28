@@ -188,6 +188,7 @@ export function createBackendClient(config: BackendClientConfig): BackendClient 
       } catch (error) {
         const axiosError = error as AxiosError<any>;
         const payload = axiosError.response?.data;
+        console.error("[backend-client] error response:", JSON.stringify({ status: axiosError.response?.status, data: payload }, null, 2));
         throw new BackendApiError({
           code:
             typeof (payload as any)?.code === "string"

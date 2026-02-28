@@ -818,7 +818,7 @@ function CreateDropdown() {
                         }) as any,
                       });
                     }
-                    if (item.label === "Create team") {
+                    if (item.label === "New workspace") {
                       navigate({
                         to: withWorkspaceQuery({
                           pathname: "/workspace/new",

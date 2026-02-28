@@ -1,6 +1,7 @@
 import { type ReactNode, useState, useCallback, useEffect, useMemo } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
 import { Moon, Sun } from "lucide-react";
 import { cn } from "@brimble/ui";
@@ -22,8 +23,23 @@ import type { Workspace } from "@/backend/workspaces";
 import type { Project } from "@/backend/projects";
 import type { TeamDetails } from "@/backend/teams";
 import type { AppTooltipMessage } from "@/backend/messages";
+import type { PaymentMethod } from "@/backend/payments";
+import type { Pricing } from "@/types/pricing";
+import { PricingProvider } from "@/contexts/pricing-context";
+import { DEFAULT_PRICING } from "@/utils/default-pricing";
 import { ProfileTab } from "../../types/enums";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
+
+const dashboardQueryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60_000,
+      gcTime: 10 * 60_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const mobileNavItemBase =
   "flex w-full items-center gap-3 px-5 py-4 text-sm tracking-[-0.09px] transition-colors";
@@ -226,6 +242,8 @@ export function DashboardLayout({
   initialOnboardingProjects,
   initialWorkspaceTeamMembers,
   initialTooltipMessages,
+  initialPaymentMethods,
+  initialPricing,
 }: {
   children: ReactNode;
   initialSettingsSnapshot?: SettingsSidebarSnapshot | null;
@@ -234,6 +252,8 @@ export function DashboardLayout({
   initialOnboardingProjects?: ApiListResponse<Project> | null;
   initialWorkspaceTeamMembers?: TeamDetails | null;
   initialTooltipMessages?: AppTooltipMessage[] | null;
+  initialPaymentMethods?: PaymentMethod[] | null;
+  initialPricing?: Pricing;
 }) {
   const pathname = useRouterState({
     select: (s) => s.location.pathname,
@@ -272,7 +292,7 @@ export function DashboardLayout({
     },
   });
   const navigate = useNavigate();
-  const isAuthRoute = /^\/(login|signup)$/.test(layoutPathname);
+  const isAuthRoute = /^\/(login|signup)$/.test(layoutPathname) || /^\/(login|signup)$/.test(pathname);
   const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace)?(\/|$)/;
   const isCatchAll = layoutPathname !== "/" && !knownPrefixes.test(layoutPathname);
   const resolvedIsFullWidth = isFullWidthLayoutPath(layoutPathname);
@@ -380,16 +400,24 @@ export function DashboardLayout({
       .slice(0, 2);
   }, [dismissedSnackbarKeys, tooltipMessages]);
 
+  const pricing = initialPricing ?? DEFAULT_PRICING;
+
   if (isAuthRoute || isCatchAll) {
     return (
+      <QueryClientProvider client={dashboardQueryClient}>
+      <PricingProvider value={pricing}>
       <TooltipProvider>
         <DashToaster />
         {children}
       </TooltipProvider>
+      </PricingProvider>
+      </QueryClientProvider>
     );
   }
 
   return (
+    <QueryClientProvider client={dashboardQueryClient}>
+    <PricingProvider value={pricing}>
     <ScoutBarProvider>
     <TooltipProvider>
       <DashToaster />
@@ -532,9 +560,12 @@ export function DashboardLayout({
           onOpenChange={setProfileOpen}
           requestedTab={profileRequestedTab}
           initialSnapshot={initialSettingsSnapshot ?? null}
+          initialPaymentMethods={initialPaymentMethods ?? null}
         />
       </div>
     </TooltipProvider>
     </ScoutBarProvider>
+    </PricingProvider>
+    </QueryClientProvider>
   );
 }

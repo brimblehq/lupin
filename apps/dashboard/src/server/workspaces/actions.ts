@@ -43,6 +43,7 @@ export const createWorkspaceServerFn = createServerFn({
           concurrent_builds?: number;
         };
         accept_terms?: boolean;
+        payment_method?: string;
       }
     | undefined;
 
@@ -65,7 +66,7 @@ export const createWorkspaceServerFn = createServerFn({
     : [];
   const image = payload?.image?.trim() || null;
 
-  return getServerBackendApi().workspaces.create({
+  const body = {
     team_name: teamName,
     type: "TEAM_PLAN",
     members,
@@ -76,5 +77,13 @@ export const createWorkspaceServerFn = createServerFn({
       concurrent_builds: Math.floor(concurrentBuilds),
     },
     accept_terms: payload?.accept_terms !== false,
-  });
+    ...(payload?.payment_method ? { payment_method: payload.payment_method } : {}),
+  };
+  console.log("[createWorkspace] request body:", JSON.stringify(body, null, 2));
+  try {
+    return await getServerBackendApi().workspaces.create(body);
+  } catch (err: any) {
+    console.error("[createWorkspace] full error:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
+    throw err;
+  }
 });

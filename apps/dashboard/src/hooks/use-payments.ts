@@ -4,7 +4,6 @@ import {
   getSubscriptionServerFn,
   getBillEstimateServerFn,
   getPaymentInvoicesServerFn,
-  getPlanSpecsServerFn,
   createSetupIntentServerFn,
   addPaymentMethodServerFn,
   removePaymentMethodServerFn,
@@ -23,14 +22,14 @@ export const paymentKeys = {
   methods: () => [...paymentKeys.all, "methods"] as const,
   subscription: () => [...paymentKeys.all, "subscription"] as const,
   estimate: () => [...paymentKeys.all, "estimate"] as const,
-  invoices: (page: number) => [...paymentKeys.all, "invoices", page] as const,
-  plans: () => [...paymentKeys.all, "plans"] as const,
+  invoices: (cursor: string | null, teamId?: string) =>
+    [...paymentKeys.all, "invoices", cursor ?? "first", teamId ?? "personal"] as const,
 };
 
 /* ── Typed server function callers ── */
 
 const getInvoices = getPaymentInvoicesServerFn as unknown as (args: {
-  data: { page?: number; per_page?: number };
+  data: { cursor?: string | null; per_page?: number; team_id?: string };
 }) => Promise<any>;
 
 const addMethod = addPaymentMethodServerFn as unknown as (args: {
@@ -46,11 +45,11 @@ const setDefault = setDefaultPaymentMethodServerFn as unknown as (args: {
 }) => Promise<any>;
 
 const createSub = createSubscriptionServerFn as unknown as (args: {
-  data: { plan_id: string; payment_method_id: string };
+  data: { type: string; payment_method?: string; accept_terms: boolean };
 }) => Promise<any>;
 
 const swap = swapPlanServerFn as unknown as (args: {
-  data: { plan_id: string };
+  data: { target_plan: string };
 }) => Promise<any>;
 
 const purchase = purchaseServerFn as unknown as (args: {
@@ -63,10 +62,11 @@ const updateLimit = updateSpendingLimitServerFn as unknown as (args: {
 
 /* ── Queries ── */
 
-export function usePaymentMethods() {
+export function usePaymentMethods(initialData?: any[]) {
   return useQuery({
     queryKey: paymentKeys.methods(),
     queryFn: () => getPaymentMethodsServerFn(),
+    ...(initialData ? { initialData } : {}),
   });
 }
 
@@ -84,18 +84,11 @@ export function useBillEstimate() {
   });
 }
 
-export function useInvoices(page: number) {
+export function useInvoices(cursor?: string | null, teamId?: string) {
   return useQuery({
-    queryKey: paymentKeys.invoices(page),
-    queryFn: () => getInvoices({ data: { page } }),
+    queryKey: paymentKeys.invoices(cursor ?? null, teamId),
+    queryFn: () => getInvoices({ data: { cursor: cursor ?? null, ...(teamId ? { team_id: teamId } : {}) } }),
     placeholderData: (prev: any) => prev,
-  });
-}
-
-export function usePlanSpecs() {
-  return useQuery({
-    queryKey: paymentKeys.plans(),
-    queryFn: () => getPlanSpecsServerFn(),
   });
 }
 
@@ -143,7 +136,7 @@ export function useSetDefaultPaymentMethod() {
 export function useCreateSubscription() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { plan_id: string; payment_method_id: string }) =>
+    mutationFn: (input: { type: string; payment_method?: string; accept_terms: boolean }) =>
       createSub({ data: input }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: paymentKeys.subscription() });
@@ -156,7 +149,7 @@ export function useCreateSubscription() {
 export function useSwapPlan() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (planId: string) => swap({ data: { plan_id: planId } }),
+    mutationFn: (targetPlan: string) => swap({ data: { target_plan: targetPlan } }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: paymentKeys.subscription() });
       void qc.invalidateQueries({ queryKey: paymentKeys.estimate() });
@@ -181,7 +174,7 @@ export function usePurchase() {
       purchase({ data: input }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: paymentKeys.estimate() });
-      void qc.invalidateQueries({ queryKey: paymentKeys.invoices(1) });
+      void qc.invalidateQueries({ queryKey: [...paymentKeys.all, "invoices"] });
     },
   });
 }

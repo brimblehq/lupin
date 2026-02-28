@@ -24,6 +24,7 @@ import {
   createWorkspaceServerFn,
   verifyWorkspacePromoCodeServerFn,
 } from "@/server/workspaces/actions";
+import { getPaymentMethodsServerFn } from "@/server/payments/actions";
 import {
   buildCreateWorkspacePayload,
   extractInvitedEmails,
@@ -40,6 +41,8 @@ import {
 } from "@/utils/workspace-create";
 import type { Workspace } from "@/backend/workspaces";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
+import { usePricing } from "@/contexts/pricing-context";
+import { calculateTeamBilling } from "@/utils/team-billing";
 
 export const Route = createFileRoute("/workspace/new")({
   component: NewWorkspacePage,
@@ -55,8 +58,6 @@ const inputClass =
 type Phase = 1 | 2 | 3;
 
 const teamSizeOptions = [3, 5, 10, 15, 25, 50];
-const COST_PER_MEMBER = 5;
-const COST_PER_BUILD = 7.5;
 
 const roles = ["Member", "Administrator"];
 
@@ -416,10 +417,14 @@ function Phase2Config({
   onSubmit,
   onVerifyPromo,
   initialValues,
+  costPerMember,
+  costPerBuild,
 }: {
   onSubmit: (config: TeamConfig) => void;
   onVerifyPromo: (code: string) => Promise<{ valid: boolean; reference?: string }>;
   initialValues: WorkspaceConfigStepValues;
+  costPerMember: number;
+  costPerBuild: number;
 }) {
   const [promoStatus, setPromoStatus] = useState<"idle" | "verifying" | "valid" | "invalid">("idle");
 
@@ -451,8 +456,8 @@ function Phase2Config({
         }}
       >
         {({ values, setFieldValue, handleSubmit }) => {
-          const seatCost = values.teamSize * COST_PER_MEMBER;
-          const buildCost = values.concurrentBuilds * COST_PER_BUILD;
+          const seatCost = values.teamSize * costPerMember;
+          const buildCost = values.concurrentBuilds * costPerBuild;
           const totalCost = seatCost + buildCost;
 
           return (
@@ -468,7 +473,7 @@ function Phase2Config({
                   renderOption={(v) => `${v} Members`}
                 />
                 <InfoBanner>
-                  Seat pricing: ${COST_PER_MEMBER}/member/mo
+                  Seat pricing: ${costPerMember}/member/mo
                   <br />
                   <span className="font-medium">
                     {values.teamSize} {values.teamSize === 1 ? "member" : "members"} = ${seatCost}/mo
@@ -486,12 +491,12 @@ function Phase2Config({
                   max={WORKSPACE_MAX_BUILDS}
                   onChange={(v) => setFieldValue("concurrentBuilds", v)}
                   renderValue={(v) => {
-                    const cost = v * COST_PER_BUILD;
+                    const cost = v * costPerBuild;
                     return `${v} ${v === 1 ? "Build" : "Builds"} — $${cost % 1 === 0 ? cost : cost.toFixed(2)}`;
                   }}
                 />
                 <InfoBanner>
-                  Build pricing: ${COST_PER_BUILD}/build container/mo
+                  Build pricing: ${costPerBuild}/build container/mo
                   <br />
                   <span className="font-medium">
                     Estimated total: ${totalCost % 1 === 0 ? totalCost : totalCost.toFixed(2)}/mo
@@ -578,15 +583,21 @@ let inviteNextId = 1;
 function Phase3Invite({
   workspaceName,
   teamSize,
+  concurrentBuilds,
   initialValues,
   creating,
   onSubmit,
+  costPerMember,
+  costPerBuild,
 }: {
   workspaceName: string;
   teamSize: number;
+  concurrentBuilds: number;
   initialValues: WorkspaceInviteStepValues;
   creating?: boolean;
   onSubmit: (rows: WorkspaceInviteRow[]) => Promise<void> | void;
+  costPerMember: number;
+  costPerBuild: number;
 }) {
   return (
     <motion.div
@@ -683,24 +694,42 @@ function Phase3Invite({
                 Add another
               </button>
 
-              {filled > 0 && (
-                <div className="mt-4 rounded-[4px] bg-dash-bg-elevated px-4 py-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-dash-text-faded">
-                      {filled} of {teamSize} seats used
-                    </span>
-                    {filled > teamSize && (
-                      <span className="text-[#f5a623] text-xs">
-                        Exceeds team size — additional seats will be charged
-                      </span>
+              {(() => {
+                const seatsCost = teamSize * costPerMember;
+                const buildsCost = concurrentBuilds * costPerBuild;
+                const total = seatsCost + buildsCost;
+                return (
+                  <div className="mt-5 rounded-[6px] bg-dash-bg-elevated px-4 py-3.5">
+                    <p className="mb-2.5 text-xs font-medium uppercase tracking-wide text-dash-text-extra-faded">
+                      Billing summary
+                    </p>
+                    <div className="flex flex-col gap-1.5 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-dash-text-faded">{teamSize} team {teamSize === 1 ? "seat" : "seats"} &times; ${costPerMember}/mo</span>
+                        <span className="text-dash-text-strong">${seatsCost.toFixed(2)}</span>
+                      </div>
+                      {concurrentBuilds > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-dash-text-faded">{concurrentBuilds} concurrent {concurrentBuilds === 1 ? "build" : "builds"} &times; ${costPerBuild}/mo</span>
+                          <span className="text-dash-text-strong">${buildsCost.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="mt-1.5 flex items-center justify-between border-t border-dash-border pt-2">
+                        <span className="text-sm font-medium text-dash-text-strong">Total</span>
+                        <span className="text-sm font-semibold text-dash-text-strong">${total.toFixed(2)}/mo</span>
+                      </div>
+                    </div>
+                    {filled > 0 && filled > teamSize && (
+                      <p className="mt-2 text-xs text-[#f5a623]">
+                        You've invited {filled} members but only have {teamSize} seats — additional seats will be charged.
+                      </p>
                     )}
+                    <p className="mt-2 text-xs text-dash-text-extra-faded">
+                      Your card will be charged immediately upon creating the workspace.
+                    </p>
                   </div>
-                </div>
-              )}
-
-              <p className="mt-5 text-center text-xs text-dash-text-extra-faded">
-                Your card will be charged immediately upon creating the workspace.
-              </p>
+                );
+              })()}
               <div className="mt-3 flex gap-3">
                 <GlossyButton type="submit" variant="blue" fullWidth loading={busy} loadingLabel="Creating...">
                   Create Workspace
@@ -717,6 +746,7 @@ function Phase3Invite({
 /* ─── Main Page ─── */
 
 function NewWorkspacePage() {
+  const pricing = usePricing();
   const navigate = useNavigate({ from: "/workspace/new" });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const createWorkspace = useServerFn(createWorkspaceServerFn as any) as (args: {
@@ -735,6 +765,14 @@ function NewWorkspacePage() {
     { id: inviteNextId++, email: "", role: "Member" },
   ]);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [defaultPaymentMethod, setDefaultPaymentMethod] = useState<string | null>(null);
+
+  useEffect(() => {
+    getPaymentMethodsServerFn().then((methods: any[]) => {
+      const defaultPm = methods.find((m: any) => m.is_default) ?? methods[0];
+      if (defaultPm?.id) setDefaultPaymentMethod(defaultPm.id);
+    }).catch(() => {});
+  }, []);
 
   function handleNameSubmit(name: string, slug: string, imageUrl: string) {
     setWorkspaceName(name);
@@ -780,6 +818,7 @@ function NewWorkspacePage() {
       promoCode: teamConfig.promoCode,
       startupCodeReference: teamConfig.startupCodeReference,
       invitedEmails: extractInvitedEmails(rows),
+      paymentMethod: defaultPaymentMethod ?? undefined,
     });
 
     try {
@@ -855,6 +894,8 @@ function NewWorkspacePage() {
                 key="phase2"
                 onSubmit={handleConfigSubmit}
                 onVerifyPromo={handleVerifyPromo}
+                costPerMember={pricing.team.costPerMember}
+                costPerBuild={pricing.team.costPerBuild}
                 initialValues={{
                   teamSize: teamConfig?.teamSize ?? 3,
                   concurrentBuilds: teamConfig?.concurrentBuilds ?? 2,
@@ -873,6 +914,9 @@ function NewWorkspacePage() {
               key="phase3"
               workspaceName={workspaceName}
               teamSize={teamConfig?.teamSize ?? 3}
+              concurrentBuilds={teamConfig?.concurrentBuilds ?? 1}
+              costPerMember={pricing.team.costPerMember}
+              costPerBuild={pricing.team.costPerBuild}
               initialValues={{ invites: inviteRows }}
               creating={creatingWorkspace}
               onSubmit={async (rows) => {

@@ -105,6 +105,7 @@ export function buildCreateWorkspacePayload(input: {
   promoCode?: string;
   startupCodeReference?: string;
   invitedEmails: string[];
+  paymentMethod?: string;
 }) {
   return {
     team_name: input.workspaceName.trim(),
@@ -118,5 +119,6 @@ export function buildCreateWorkspacePayload(input: {
       concurrent_builds: input.concurrentBuilds,
     },
     accept_terms: true,
-  } as const;
+    ...(input.paymentMethod ? { payment_method: input.paymentMethod } : {}),
+  };
 }

@@ -4,12 +4,14 @@ import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import type { StripeCardElementOptions } from "@stripe/stripe-js";
 import { motion } from "motion/react";
 import { useTheme } from "@/hooks/use-theme";
+import { usePricing } from "@/contexts/pricing-context";
 import { Theme } from "@/types/enums";
-import { Plus, Trash2, Star, X } from "lucide-react";
+import { Plus, Star, X, CreditCard } from "lucide-react";
+import { FolderTrashIcon } from "../shared/folder-trash-icon";
 import { PaymentProvider } from "@/providers/payment-provider";
 import { GlossyButton } from "../shared/glossy-button";
 import { Spinner } from "../shared/spinner";
-import { NumberPagination } from "../shared/pagination";
+import { CursorPagination } from "../shared/pagination";
 import { WarningModal } from "../shared/warning-modal";
 import { ChangePlanModal } from "../shared/change-plan-modal";
 import {
@@ -21,42 +23,72 @@ import {
   useAddPaymentMethod,
   useRemovePaymentMethod,
   useSetDefaultPaymentMethod,
-  useCreateSubscription,
-  useSwapPlan,
   useCancelSubscription,
   useUpdateSpendingLimit,
 } from "@/hooks/use-payments";
+import type { PaymentMethod } from "@/backend/payments";
 import type { DrawerUserProfile } from "@/utils/dashboard";
 
 type UserProfile = DrawerUserProfile;
+const settingsInputClass =
+  "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
 
-/* ── Wrapped billing form (provides QueryClient + Stripe Elements) ── */
+/* ── Wrapped billing form (provides Stripe Elements) ── */
 
-export function BillingForm({ profile }: { profile: UserProfile }) {
+export function BillingForm({
+  profile,
+  initialPaymentMethods,
+  hidePaymentMethods = false,
+  hideCurrentPlan = false,
+  teamId,
+}: {
+  profile: UserProfile;
+  initialPaymentMethods?: PaymentMethod[] | null;
+  hidePaymentMethods?: boolean;
+  hideCurrentPlan?: boolean;
+  teamId?: string;
+}) {
   return (
     <PaymentProvider>
-      <BillingFormInner profile={profile} />
+      <BillingFormInner
+        profile={profile}
+        initialPaymentMethods={initialPaymentMethods}
+        hidePaymentMethods={hidePaymentMethods}
+        hideCurrentPlan={hideCurrentPlan}
+        teamId={teamId}
+      />
     </PaymentProvider>
   );
 }
 
 /* ── Inner form (has access to hooks) ── */
 
-function BillingFormInner({ profile }: { profile: UserProfile }) {
+function BillingFormInner({
+  profile,
+  initialPaymentMethods,
+  hidePaymentMethods = false,
+  hideCurrentPlan = false,
+  teamId,
+}: {
+  profile: UserProfile;
+  initialPaymentMethods?: PaymentMethod[] | null;
+  hidePaymentMethods?: boolean;
+  hideCurrentPlan?: boolean;
+  teamId?: string;
+}) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [changePlanOpen, setChangePlanOpen] = useState(false);
   const [showAddCard, setShowAddCard] = useState(false);
+  const [invoiceCursor, setInvoiceCursor] = useState<string | null>(null);
   const [invoicePage, setInvoicePage] = useState(1);
   const [spendingLimitInput, setSpendingLimitInput] = useState("");
   const [isEditingLimit, setIsEditingLimit] = useState(false);
 
-  const { data: paymentMethods = [], isLoading: isLoadingMethods } = usePaymentMethods();
+  const { data: paymentMethods = [], isLoading: isLoadingMethods } = usePaymentMethods(initialPaymentMethods ?? undefined);
   const { data: subscription } = useSubscription();
   const { data: estimate } = useBillEstimate();
-  const { data: invoices } = useInvoices(invoicePage);
+  const { data: invoices } = useInvoices(invoiceCursor, teamId);
   const cancelMutation = useCancelSubscription();
-  const createSubscription = useCreateSubscription();
-  const swapPlan = useSwapPlan();
   const spendingLimitMutation = useUpdateSpendingLimit();
 
   const daysSinceFailure = profile.subscriptionDue ? 1 : 0;
@@ -74,14 +106,23 @@ function BillingFormInner({ profile }: { profile: UserProfile }) {
     currentPlan = "Team";
   }
 
-  const planPrices: Record<string, number> = { Free: 0, Hacker: 5, Pro: 15 };
-  const activePlanPrice = planPrices[currentPlan] ?? 0;
+  const pricing = usePricing();
+  const activePlanPrice = pricing.plans.find((p) => p.name === currentPlan)?.amount ?? 0;
   const canChangePlan = currentPlan !== "Team";
 
   const defaultMethod = paymentMethods.find((m) => m.is_default) ?? paymentMethods[0];
 
+  function normalizeCurrencyInput(raw: string) {
+    return raw.replace(/[^\d.]/g, "");
+  }
+
+  function toCurrencyValue(raw: string) {
+    const parsed = Number(normalizeCurrencyInput(raw));
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+
   function handleSaveSpendingLimit() {
-    const value = Number(spendingLimitInput);
+    const value = toCurrencyValue(spendingLimitInput);
     if (Number.isNaN(value) || value < 0) {
       toast.error("Enter a valid amount");
       return;
@@ -102,93 +143,105 @@ function BillingFormInner({ profile }: { profile: UserProfile }) {
       <PaymentFailureBanner daysSinceFailure={daysSinceFailure} />
 
       {/* ── Current plan ── */}
-      <div className="relative overflow-hidden rounded-[4px] bg-[#fcfcfc] dark:bg-[#121418]">
-        <div className="px-6 py-3 pr-[116px]">
-          <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body dark:text-dash-text-faded">
-            You are currently on the Brimble{" "}
-            <span className="text-dash-text-strong dark:text-dash-text-strong">
-              {currentPlan}
-            </span>{" "}
-            plan
-            {activePlanPrice > 0 ? (
-              <>
-                , you pay{" "}
-                <span className="text-dash-text-strong dark:text-dash-text-strong">
-                  ${activePlanPrice}
-                </span>{" "}
-                per month.
-              </>
-            ) : (
-              "."
+      {!hideCurrentPlan && (
+        <div className="relative overflow-hidden rounded-[4px] bg-[#fcfcfc] dark:bg-[#121418]">
+          <div className="px-6 py-3 pr-[116px]">
+            <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body dark:text-dash-text-faded">
+              You are currently on the Brimble{" "}
+              <span className="text-dash-text-strong dark:text-dash-text-strong">
+                {currentPlan}
+              </span>{" "}
+              plan
+              {activePlanPrice > 0 ? (
+                <>
+                  , you pay{" "}
+                  <span className="text-dash-text-strong dark:text-dash-text-strong">
+                    ${activePlanPrice}
+                  </span>{" "}
+                  per month.
+                </>
+              ) : (
+                "."
+              )}
+            </p>
+            {canChangePlan && (
+              <button
+                onClick={() => setChangePlanOpen(true)}
+                className="mt-1.5 text-sm font-medium text-[#4879f8] underline underline-offset-2 hover:text-[#3a6ae6]"
+              >
+                Change plan
+              </button>
             )}
-          </p>
-          {canChangePlan && (
-            <button
-              onClick={() => setChangePlanOpen(true)}
-              className="mt-1.5 text-sm font-medium text-[#4879f8] underline underline-offset-2 hover:text-[#3a6ae6]"
-            >
-              Change plan
-            </button>
-          )}
+          </div>
+          <div className="absolute inset-y-0 right-0 hidden w-[96px] overflow-hidden sm:block">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,#ffffff_0%,#ececec_48%,#f7f7f7_100%)] dark:bg-[radial-gradient(circle_at_72%_28%,rgba(72,121,248,0.18)_0%,rgba(28,33,42,0.65)_45%,rgba(18,20,24,0.95)_100%)]" />
+          </div>
         </div>
-        <div className="absolute inset-y-0 right-0 hidden w-[96px] overflow-hidden sm:block">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,#ffffff_0%,#ececec_48%,#f7f7f7_100%)] dark:bg-[radial-gradient(circle_at_72%_28%,rgba(72,121,248,0.18)_0%,rgba(28,33,42,0.65)_45%,rgba(18,20,24,0.95)_100%)]" />
-        </div>
-      </div>
+      )}
 
       {/* ── Usage / Bill estimate ── */}
       <UsageSection estimate={estimate} />
 
-      <hr className="-ml-8 border-dash-border-soft" />
+      {!hidePaymentMethods && (
+        <>
+          <hr className="-ml-8 border-dash-border-soft" />
 
-      {/* ── Payment methods ── */}
-      <div className="flex flex-col gap-[30px]">
-        <div className="flex items-center gap-[14px]">
-          <CardChip />
-          <div className="flex flex-col gap-[2px] py-2">
-            <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
-              Payment methods
-            </p>
-            <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
-              {paymentMethods.length > 0 ? "Connected • Powered by Stripe" : "No payment methods added yet"}
-            </p>
+          {/* ── Payment methods ── */}
+          <div className="flex flex-col gap-[30px]">
+            {paymentMethods.length === 0 && (
+              <div className="flex items-center gap-[14px]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-dash-bg-elevated">
+                  <CreditCard className="h-5 w-5 text-dash-text-faded" />
+                </div>
+                <div className="flex flex-col gap-[2px] py-2">
+                  <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
+                    Payment methods
+                  </p>
+                  <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
+                    No payment methods added yet
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {isLoadingMethods && !showAddCard && (
+              <div className="flex items-center gap-2">
+                <Spinner size="size-4" className="text-dash-text-faded" />
+                <span className="text-sm text-dash-text-faded">Loading payment methods...</span>
+              </div>
+            )}
+
+            {!isLoadingMethods && paymentMethods.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {paymentMethods.map((method) => (
+                  <PaymentMethodRow
+                    key={method.id}
+                    method={method}
+                    isDefault={method.id === defaultMethod?.id}
+                  />
+                ))}
+              </div>
+            )}
+
+            {paymentMethods.length === 0 && (
+              !showAddCard ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAddCard(true)}
+                  className="flex items-center gap-1.5 text-sm font-medium text-[#4879f8] hover:text-[#3a6ae6]"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add payment method
+                </button>
+              ) : (
+                <AddCardForm onClose={() => setShowAddCard(false)} />
+              )
+            )}
           </div>
-        </div>
 
-        {isLoadingMethods && !showAddCard && (
-          <div className="flex items-center gap-2">
-            <Spinner size="size-4" className="text-dash-text-faded" />
-            <span className="text-sm text-dash-text-faded">Loading payment methods...</span>
-          </div>
-        )}
-
-        {!isLoadingMethods && paymentMethods.length > 0 && (
-          <div className="flex flex-col gap-3">
-            {paymentMethods.map((method) => (
-              <PaymentMethodRow
-                key={method.id}
-                method={method}
-                isDefault={method.id === defaultMethod?.id}
-              />
-            ))}
-          </div>
-        )}
-
-        {!showAddCard ? (
-          <button
-            type="button"
-            onClick={() => setShowAddCard(true)}
-            className="flex items-center gap-1.5 text-sm font-medium text-[#4879f8] hover:text-[#3a6ae6]"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add payment method
-          </button>
-        ) : (
-          <AddCardForm onClose={() => setShowAddCard(false)} />
-        )}
-      </div>
-
-      <hr className="-ml-8 border-dash-border-soft" />
+          <hr className="-ml-8 border-dash-border-soft" />
+        </>
+      )}
 
       {/* ── Spending limit ── */}
       <div className="flex flex-col gap-4">
@@ -207,29 +260,31 @@ function BillingFormInner({ profile }: { profile: UserProfile }) {
                 $
               </span>
               <input
-                type="number"
-                min="0"
-                step="1"
+                type="text"
+                inputMode="decimal"
                 value={spendingLimitInput}
-                onChange={(e) => setSpendingLimitInput(e.target.value)}
-                className="input-base input-focus h-[34px] w-[140px] pl-6 pr-3 text-sm tabular-nums"
+                onChange={(e) =>
+                  setSpendingLimitInput(normalizeCurrencyInput(e.target.value))
+                }
+                className={`${settingsInputClass} h-[40px] w-[160px] pl-6 tabular-nums`}
                 placeholder="0"
               />
             </div>
-            <button
+            <GlossyButton
               onClick={handleSaveSpendingLimit}
-              disabled={spendingLimitMutation.isPending}
-              className="flex h-[34px] items-center rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:opacity-40"
+              disabled={spendingLimitMutation.isPending || spendingLimitInput.trim().length === 0}
+              variant="black"
+              className="h-[40px] rounded-[6px] px-4"
             >
               {spendingLimitMutation.isPending ? (
                 <Spinner size="size-3.5" className="text-white" />
               ) : (
                 "Save"
               )}
-            </button>
+            </GlossyButton>
             <button
               onClick={() => setIsEditingLimit(false)}
-              className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3 text-sm text-dash-text-body hover:bg-dash-bg-elevated"
+              className="flex h-[40px] items-center rounded-[6px] border border-dash-border bg-dash-bg px-4 text-sm text-dash-text-body hover:bg-dash-bg-elevated"
             >
               Cancel
             </button>
@@ -266,7 +321,16 @@ function BillingFormInner({ profile }: { profile: UserProfile }) {
       <InvoicesSection
         invoices={invoices}
         page={invoicePage}
-        onPageChange={setInvoicePage}
+        onNextPage={() => {
+          if (!invoices?.next_cursor) return;
+          setInvoiceCursor(invoices.next_cursor);
+          setInvoicePage((current) => current + 1);
+        }}
+        onPreviousPage={() => {
+          if (!invoices?.previous_cursor) return;
+          setInvoiceCursor(invoices.previous_cursor);
+          setInvoicePage((current) => Math.max(1, current - 1));
+        }}
       />
 
       <hr className="-ml-8 border-dash-border-soft" />
@@ -312,39 +376,7 @@ function BillingFormInner({ profile }: { profile: UserProfile }) {
         open={changePlanOpen}
         onOpenChange={setChangePlanOpen}
         currentPlan={currentPlan}
-        defaultPaymentMethodId={defaultMethod?.id}
-        hasPaymentMethod={paymentMethods.length > 0}
-        hasSubscription={subscription !== null && subscription !== undefined}
-        isPending={createSubscription.isPending || swapPlan.isPending}
-        onConfirm={(planId, isNew) => {
-          if (isNew) {
-            createSubscription.mutate(
-              { plan_id: planId, payment_method_id: defaultMethod?.id ?? "" },
-              {
-                onSuccess: () => {
-                  toast.success("Subscription created");
-                  setChangePlanOpen(false);
-                },
-                onError: (err) => {
-                  toast.error(err instanceof Error ? err.message : "Failed to create subscription");
-                },
-              },
-            );
-          } else {
-            swapPlan.mutate(planId, {
-              onSuccess: () => {
-                toast.success("Plan changed");
-                setChangePlanOpen(false);
-              },
-              onError: (err) => {
-                toast.error(err instanceof Error ? err.message : "Failed to change plan");
-              },
-            });
-          }
-        }}
-        onChangePlan={() => {
-          setChangePlanOpen(false);
-        }}
+        initialPaymentMethods={initialPaymentMethods}
       />
     </div>
   );
@@ -491,14 +523,15 @@ function PaymentMethodRow({
   method,
   isDefault,
 }: {
-  method: { id: string; type: string; card?: { brand: string; last4: string; exp_month: number; exp_year: number }; is_default: boolean };
+  method: Record<string, any>;
   isDefault: boolean;
 }) {
   const removeMutation = useRemovePaymentMethod();
   const setDefaultMutation = useSetDefaultPaymentMethod();
 
-  const card = method.card;
-  const brand = formatCardType(card?.brand ?? method.type);
+  // Card data may be nested under `.card` or flat on the method object
+  const card = method.card ?? method;
+  const brand = formatCardType(card?.brand ?? method.type ?? "card");
   const last4 = card?.last4 ?? "••••";
   const expMonth = card?.exp_month != null ? String(card.exp_month).padStart(2, "0") : "--";
   const expYear = card?.exp_year != null ? String(card.exp_year) : "----";
@@ -547,10 +580,14 @@ function PaymentMethodRow({
                 toast.error(err instanceof Error ? err.message : "Failed to remove payment method"),
             })
           }
-          className="rounded-[4px] p-1.5 text-dash-text-faded transition-colors hover:bg-[#ef2f1f]/10 hover:text-[#ef2f1f]"
+          className="rounded-[4px] p-1.5 text-dash-text-faded transition-colors hover:bg-[#ef2f1f]/10 hover:text-[#ef2f1f] disabled:pointer-events-none disabled:opacity-40"
           title="Remove"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          {removeMutation.isPending ? (
+            <Spinner className="size-3.5" />
+          ) : (
+            <FolderTrashIcon className="size-3.5" />
+          )}
         </button>
       </div>
     </div>
@@ -565,6 +602,7 @@ function AddCardForm({ onClose }: { onClose: () => void }) {
   const setupIntentMutation = useCreateSetupIntent();
   const addMethodMutation = useAddPaymentMethod();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cardError, setCardError] = useState(false);
   const { theme } = useTheme();
   const isDark = theme === Theme.Dark;
 
@@ -656,13 +694,16 @@ function AddCardForm({ onClose }: { onClose: () => void }) {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="input-base input-focus-within flex h-[50px] items-center overflow-hidden px-3 [&_.StripeElement]:w-full">
-          <CardElement options={cardOptions} />
+        <div className={`input-base flex h-[50px] items-center overflow-hidden px-3 [&_.StripeElement]:w-full ${cardError ? "!shadow-[0_0_0_1px_#ef2f1f,0_0_0_3px_rgba(239,47,31,0.15)]" : "input-focus-within"}`}>
+          <CardElement
+            options={cardOptions}
+            onChange={(e) => setCardError(!!e.error)}
+          />
         </div>
         <div className="flex items-center gap-2">
           <button
             type="submit"
-            disabled={isSubmitting || !stripe}
+            disabled={isSubmitting || !stripe || cardError}
             className="flex h-[34px] items-center rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
           >
             {isSubmitting ? (
@@ -692,13 +733,26 @@ function AddCardForm({ onClose }: { onClose: () => void }) {
 function InvoicesSection({
   invoices,
   page,
-  onPageChange,
+  onNextPage,
+  onPreviousPage,
 }: {
-  invoices?: { items: Array<{ id: string; amount_due: number; amount_paid: number; status: string; invoice_pdf?: string; created_at: string }>; total_pages: number } | null;
+  invoices?: {
+    items: Array<{
+      id: string;
+      number?: string;
+      total?: string;
+      status: string;
+      invoice_pdf?: string;
+      date: string;
+    }>;
+    next_cursor: string | null;
+    previous_cursor: string | null;
+    has_more: boolean;
+  } | null;
   page: number;
-  onPageChange: (page: number) => void;
+  onNextPage: () => void;
+  onPreviousPage: () => void;
 }) {
-  const totalPages = invoices?.total_pages ?? 1;
   const items = invoices?.items ?? [];
 
   return (
@@ -714,8 +768,8 @@ function InvoicesSection({
       <div className="flex flex-col gap-4">
         {items.map((invoice) => {
           let label = "Unknown date";
-          if (invoice.created_at) {
-            const parsed = new Date(invoice.created_at);
+          if (invoice.date) {
+            const parsed = new Date(invoice.date);
             if (!Number.isNaN(parsed.getTime())) {
               label = new Intl.DateTimeFormat("en-US", {
                 day: "numeric",
@@ -730,24 +784,29 @@ function InvoicesSection({
               key={invoice.id}
               className="flex items-center justify-between gap-4"
             >
-              <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
-                {label}
-              </p>
-              {invoice.invoice_pdf ? (
-                <a
-                  href={invoice.invoice_pdf}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-[8px] border border-dash-border bg-dash-bg px-3 py-1.5 text-sm leading-5 tracking-[-0.0224px] text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
-                >
-                  Download
-                </a>
-              ) : (
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <p className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+                  {invoice.number || "Invoice"}
+                </p>
+                <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
+                  {label}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
                 <span className="text-xs text-dash-text-extra-faded">
-                  {invoice.status === "paid" ? "paid" : invoice.status} •{" "}
-                  ${(invoice.amount_due / 100).toFixed(2)}
+                  {invoice.status} {invoice.total ? `• ${invoice.total}` : ""}
                 </span>
-              )}
+                {invoice.invoice_pdf ? (
+                  <a
+                    href={invoice.invoice_pdf}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-[8px] border border-dash-border bg-dash-bg px-3 py-1.5 text-sm leading-5 tracking-[-0.0224px] text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+                  >
+                    Download
+                  </a>
+                ) : null}
+              </div>
             </div>
           );
         })}
@@ -757,16 +816,14 @@ function InvoicesSection({
           </p>
         )}
       </div>
-      {totalPages > 1 && (
+      {(invoices?.next_cursor || invoices?.previous_cursor) && (
         <div className="flex justify-end pt-1">
-          <NumberPagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={(nextPage) => {
-              if (nextPage >= 1 && nextPage <= totalPages && nextPage !== page) {
-                onPageChange(nextPage);
-              }
-            }}
+          <CursorPagination
+            hasNextPage={Boolean(invoices?.next_cursor)}
+            hasPrevPage={Boolean(invoices?.previous_cursor)}
+            onNext={onNextPage}
+            onPrev={onPreviousPage}
+            label={`Page ${page}`}
           />
         </div>
       )}

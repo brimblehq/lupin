@@ -41,16 +41,13 @@ export const getBillEstimateServerFn = createServerFn({
 export const getPaymentInvoicesServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {
-  const payload = data as unknown as { page?: number; per_page?: number } | undefined;
-  const page = typeof payload?.page === "number" ? Math.max(1, Math.floor(payload.page)) : 1;
+  const payload = data as unknown as { cursor?: string | null; per_page?: number; team_id?: string } | undefined;
   const perPage = typeof payload?.per_page === "number" ? Math.max(1, Math.min(100, payload.per_page)) : 10;
-  return getServerBackendApi().payments.listInvoices(page, perPage);
-});
-
-export const getPlanSpecsServerFn = createServerFn({
-  method: "GET",
-}).handler(async () => {
-  return getServerBackendApi().payments.listPlans();
+  return getServerBackendApi().payments.listInvoices({
+    cursor: payload?.cursor?.trim() || null,
+    per_page: perPage,
+    ...(payload?.team_id ? { team_id: payload.team_id } : {}),
+  });
 });
 
 /* ── Mutations ── */

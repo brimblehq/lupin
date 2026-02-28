@@ -38,11 +38,13 @@ import {
   updateSettingsWebhooksServerFn,
 } from "@/server/settings/actions";
 import { BillingForm } from "../settings/billing-form";
+import type { PaymentMethod } from "@/backend/payments";
 import {
   getWorkspaceTeamMembersServerFn,
   inviteWorkspaceTeamMembersServerFn,
   removeWorkspaceTeamMemberServerFn,
   resendWorkspaceTeamInviteServerFn,
+  updateWorkspaceTeamProfileServerFn,
 } from "@/server/teams/actions";
 import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import type {
@@ -56,11 +58,8 @@ import {
   maskSecretWithAsterisks,
   type DrawerUserProfile,
 } from "@/utils/dashboard";
-import {
-  TEAM_CONCURRENT_BUILD_PRICE_MONTHLY,
-  TEAM_MEMBER_SEAT_PRICE_MONTHLY,
-  formatUsdMonthly,
-} from "@/utils/billing";
+import { formatUsdMonthly } from "@/utils/billing";
+import { usePricing } from "@/contexts/pricing-context";
 import { ProfileTab } from "../../types/enums";
 type UserProfile = DrawerUserProfile;
 
@@ -831,6 +830,214 @@ function ApiKeySection({
   );
 }
 
+function WorkspaceProfileForm({
+  team,
+  onSave,
+  onBuildsChange,
+  isSaving,
+}: {
+  team: TeamDetails;
+  onSave?: (data: {
+    name: string;
+    description?: string;
+    avatarUrl?: string;
+  }) => void | Promise<void>;
+  onBuildsChange?: (enabled: boolean) => Promise<void> | void;
+  isSaving?: boolean;
+}) {
+  const [name, setName] = useState(team.name || "");
+  const [description, setDescription] = useState(team.description || "");
+  const [avatarUrl, setAvatarUrl] = useState(team.avatarUrl || "");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [buildsEnabled, setBuildsEnabled] = useState(!(team.buildDisabled ?? false));
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const isDirty =
+    name !== (team.name || "") ||
+    description !== (team.description || "") ||
+    avatarUrl !== (team.avatarUrl || "");
+
+  const inputClass =
+    "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+
+  useEffect(() => {
+    setName(team.name || "");
+    setDescription(team.description || "");
+    setAvatarUrl(team.avatarUrl || "");
+  }, [team.avatarUrl, team.description, team.name]);
+
+  useEffect(() => {
+    setBuildsEnabled(!(team.buildDisabled ?? false));
+  }, [team.buildDisabled]);
+
+  async function handleAvatarFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "profile-photos");
+
+      const response = await axios.post(config.uploadUrl, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const nextAvatarUrl = response.data?.secure_url || response.data?.url;
+
+      if (typeof nextAvatarUrl === "string" && nextAvatarUrl.length > 0) {
+        setAvatarUrl(String(nextAvatarUrl));
+        toast.success("Photo uploaded. Click Save changes to confirm.");
+      } else {
+        toast.error("Upload succeeded but no image URL was returned.");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload image",
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
+  }
+
+  function handleSave() {
+    void onSave?.({
+      name: name.trim(),
+      description: description.trim(),
+      avatarUrl: avatarUrl || undefined,
+    });
+  }
+
+  const avatarSeed = team.name || "workspace";
+  const avatarSrc =
+    avatarUrl ||
+    `${config.avatarUrl}/initials/svg?seed=${encodeURIComponent(avatarSeed)}`;
+
+  return (
+    <div className="flex max-w-[488px] flex-col gap-8">
+      <div className="flex items-center gap-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+          className="hidden"
+          onChange={handleAvatarFileChange}
+        />
+        <div className="relative size-16 shrink-0 overflow-hidden rounded-full border border-dash-border-soft bg-dash-bg-elevated">
+          <img
+            src={avatarSrc}
+            alt="Workspace avatar"
+            className="h-full w-full object-cover"
+          />
+          {isUploadingAvatar && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/80 border-t-transparent" />
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingAvatar || Boolean(isSaving)}
+            className="flex h-[34px] w-fit items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-50"
+          >
+            {isUploadingAvatar ? "Uploading..." : "Upload photo"}
+          </button>
+          <span className="text-sm text-dash-text-faded">
+            Workspace logo
+          </span>
+        </div>
+      </div>
+
+      <hr className="border-dash-border-soft" />
+
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+            Workspace name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+            Workspace description
+          </label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <GlossyButton
+        variant="blue"
+        onClick={handleSave}
+        disabled={!isDirty || isUploadingAvatar || !name.trim()}
+        loading={Boolean(isSaving)}
+        loadingLabel="Saving..."
+      >
+        Save changes
+      </GlossyButton>
+
+      <hr className="border-dash-border-soft" />
+
+      <div className="flex flex-col gap-2">
+        <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+          Workspace ID
+        </label>
+        <div className="flex items-center rounded-[6px] border border-dash-border bg-dash-bg-elevated px-3 py-2.5">
+          <span className="flex-1 truncate text-sm text-dash-text-strong">
+            {team.id}
+          </span>
+          <CopyButton text={team.id} />
+        </div>
+      </div>
+
+      <hr className="border-dash-border-soft" />
+
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+            Builds
+          </span>
+          <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
+            Enable or disable builds for this workspace.
+          </span>
+        </div>
+        <Toggle
+          checked={buildsEnabled}
+          onChange={async (next) => {
+            setBuildsEnabled(next);
+            try {
+              await onBuildsChange?.(next);
+            } catch {
+              setBuildsEnabled(!next);
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ProfileNavSidebar({
   activeTab,
   onTabChange,
@@ -947,12 +1154,14 @@ export function UserProfileDrawer({
   onOpenChange,
   initialSnapshot = null,
   initialWorkspaceTeamMembers = null,
+  initialPaymentMethods = null,
   requestedTab,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialSnapshot?: SettingsSidebarSnapshot | null;
   initialWorkspaceTeamMembers?: TeamDetails | null;
+  initialPaymentMethods?: PaymentMethod[] | null;
   requestedTab?: ProfileTab;
 }) {
   const navigate = useNavigate();
@@ -966,6 +1175,16 @@ export function UserProfileDrawer({
   const getWorkspaceTeamMembers = useServerFn(
     getWorkspaceTeamMembersServerFn as any,
   ) as (args: { data: { workspace: string } }) => Promise<TeamDetails>;
+  const updateWorkspaceTeamProfile = useServerFn(
+    updateWorkspaceTeamProfileServerFn as any,
+  ) as (args: {
+    data: {
+      workspace: string;
+      name: string;
+      description?: string;
+      avatarUrl?: string;
+    };
+  }) => Promise<{ ok: true }>;
   const updateProfile = useServerFn(
     updateSettingsProfileServerFn as any,
   ) as (args: {
@@ -986,7 +1205,9 @@ export function UserProfileDrawer({
   }) => Promise<{ ok: true }>;
   const updateBuilds = useServerFn(
     updateSettingsBuildsServerFn as any,
-  ) as (args: { data: { buildDisabled: boolean } }) => Promise<{ ok: true }>;
+  ) as (args: {
+    data: { buildDisabled: boolean; workspace?: string };
+  }) => Promise<{ ok: true }>;
   const createApiKey = useServerFn(createSettingsApiKeyServerFn);
   const resetApiKey = useServerFn(resetSettingsApiKeyServerFn);
   const disconnectGitProvider = useServerFn(
@@ -1030,6 +1251,9 @@ export function UserProfileDrawer({
     return normalized ? normalized : null;
   })();
   const hasActiveWorkspace = Boolean(activeWorkspaceSlug);
+  const workspaceTeam = activeWorkspaceSlug
+    ? (workspaceTeamMembersCache[activeWorkspaceSlug] ?? null)
+    : null;
 
   const profile = mapSettingsSnapshotToDrawerProfile(snapshot);
 
@@ -1163,13 +1387,9 @@ export function UserProfileDrawer({
     try {
       await logout();
       onOpenChange(false);
-      await navigate({ to: "/login" });
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to sign out",
-      );
-    } finally {
-      setIsSigningOut(false);
+      window.location.href = "/login";
+    } catch {
+      window.location.href = "/login";
     }
   }
 
@@ -1228,7 +1448,79 @@ export function UserProfileDrawer({
                   Loading settings…
                 </div>
               ) : null}
-              {activeTab === ProfileTab.Profile && profile && (
+              {activeTab === ProfileTab.Profile &&
+                hasActiveWorkspace &&
+                workspaceTeam && (
+                <WorkspaceProfileForm
+                  team={workspaceTeam}
+                  isSaving={isSavingProfile}
+                  onSave={async (data) => {
+                    if (!activeWorkspaceSlug) {
+                      return;
+                    }
+
+                    setIsSavingProfile(true);
+                    try {
+                      await updateWorkspaceTeamProfile({
+                        data: {
+                          workspace: activeWorkspaceSlug,
+                          name: data.name,
+                          description: data.description,
+                          avatarUrl: data.avatarUrl,
+                        },
+                      });
+
+                      setWorkspaceTeamMembersCache((prev) => ({
+                        ...prev,
+                        [activeWorkspaceSlug]: {
+                          ...workspaceTeam,
+                          name: data.name,
+                          description: data.description || "",
+                          avatarUrl: data.avatarUrl,
+                        },
+                      }));
+
+                      toast.success("Workspace profile updated");
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to update workspace profile",
+                      );
+                    } finally {
+                      setIsSavingProfile(false);
+                    }
+                  }}
+                  onBuildsChange={async (enabled) => {
+                    if (!activeWorkspaceSlug) {
+                      return;
+                    }
+
+                    await updateBuilds({
+                      data: {
+                        workspace: activeWorkspaceSlug,
+                        buildDisabled: !enabled,
+                      },
+                    });
+
+                    setWorkspaceTeamMembersCache((prev) => ({
+                      ...prev,
+                      [activeWorkspaceSlug]: {
+                        ...workspaceTeam,
+                        buildDisabled: !enabled,
+                      },
+                    }));
+                  }}
+                />
+              )}
+              {activeTab === ProfileTab.Profile &&
+                hasActiveWorkspace &&
+                !workspaceTeam && (
+                <div className="text-sm text-dash-text-faded">
+                  Loading workspace profile…
+                </div>
+              )}
+              {activeTab === ProfileTab.Profile && !hasActiveWorkspace && profile && (
                 <ProfileForm
                   profile={profile}
                   isSaving={isSavingProfile}
@@ -1438,7 +1730,10 @@ export function UserProfileDrawer({
                   }}
                 />
               )}
-              {activeTab === ProfileTab.Profile && !profile && !isLoadingSettings && (
+              {activeTab === ProfileTab.Profile &&
+                !hasActiveWorkspace &&
+                !profile &&
+                !isLoadingSettings && (
                 <div className="text-sm text-dash-text-faded">
                   Profile settings are unavailable right now.
                 </div>
@@ -1527,7 +1822,13 @@ export function UserProfileDrawer({
                   </div>
                 )}
               {activeTab === ProfileTab.Billing && profile && (
-                <BillingForm profile={profile} />
+                <BillingForm
+                  profile={profile}
+                  initialPaymentMethods={initialPaymentMethods}
+                  hidePaymentMethods={hasActiveWorkspace}
+                  hideCurrentPlan={hasActiveWorkspace}
+                  teamId={activeWorkspaceSlug || undefined}
+                />
               )}
               {activeTab === ProfileTab.Billing && !profile && !isLoadingSettings && (
                 <div className="text-sm text-dash-text-faded">
@@ -2038,6 +2339,9 @@ function NotificationsForm({
   const inputClass =
     "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
 
+  const planType = profile.subscriptionPlanType?.toLowerCase();
+  const isFreePlan = !planType || planType === "free" || planType === "free_plan";
+
   return (
     <div className="flex flex-col gap-[30px]">
       {/* Email notifications */}
@@ -2060,158 +2364,173 @@ function NotificationsForm({
 
       <hr className="-ml-8 border-dash-border-soft" />
 
-      {/* Webhook URLs */}
-      <div className="flex max-w-[488px] flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
-            Discord webhook URL
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="url"
-              value={discordUrl}
-              onChange={(e) => setDiscordUrl(e.target.value)}
-              placeholder="https://discord.com/api/webhooks/..."
-              className={cn(inputClass, "flex-1")}
-            />
-            <button
-              onClick={() => handleTestWebhook(discordUrl, "discord")}
-              disabled={!discordUrl.trim() || testingWebhook === "discord"}
-              className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
-            >
-              <Send className="size-3.5" />
-              {testingWebhook === "discord" ? "Sending..." : "Test"}
-            </button>
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
-            Slack webhook URL
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="url"
-              value={slackUrl}
-              onChange={(e) => setSlackUrl(e.target.value)}
-              placeholder="https://hooks.slack.com/services/..."
-              className={cn(inputClass, "flex-1")}
-            />
-            <button
-              onClick={() => handleTestWebhook(slackUrl, "slack")}
-              disabled={!slackUrl.trim() || testingWebhook === "slack"}
-              className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
-            >
-              <Send className="size-3.5" />
-              {testingWebhook === "slack" ? "Sending..." : "Test"}
-            </button>
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
-            Custom webhook URL
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="url"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://your-server.com/webhook"
-              className={cn(inputClass, "flex-1")}
-            />
-            <button
-              onClick={() => handleTestWebhook(webhookUrl, "custom")}
-              disabled={!webhookUrl.trim() || testingWebhook === "custom"}
-              className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
-            >
-              <Send className="size-3.5" />
-              {testingWebhook === "custom" ? "Sending..." : "Test"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <hr className="-ml-8 border-dash-border-soft" />
-
-      {/* Event Notifications */}
-      <div className="flex max-w-[488px] flex-col gap-2">
-        {/* Section header */}
-        <div className="flex items-center justify-between pb-1">
-          <span className="text-sm font-medium leading-5 tracking-[-0.0224px] text-dash-text-strong">
-            Event Notifications
+      {isFreePlan ? (
+        <div className="flex max-w-[488px] flex-col gap-3">
+          <span className="text-sm font-medium leading-5 text-dash-text-strong">
+            Webhooks & Event Notifications
           </span>
-          <span className="text-[13px] text-dash-text-faded">
-            {enabledCount === totalCount
-              ? "All events enabled"
-              : `${enabledCount} of ${totalCount} enabled`}
-          </span>
+          <p className="text-sm leading-5 text-dash-text-faded">
+            Configure webhook integrations (Discord, Slack, custom) and fine-grained event notifications by upgrading to a paid plan.
+          </p>
         </div>
-
-        {/* All Events */}
-        <div className="flex items-center py-2">
-          <div className="flex items-center gap-2.5">
-            <Checkbox checked={allEvents} onChange={handleAllEventsToggle} />
-            <div className="flex flex-col">
-              <span className="text-sm font-medium leading-5 text-dash-text-strong">
-                All Events
-              </span>
-              <span className="text-[13px] leading-5 text-dash-text-faded">
-                Subscribe to all current and future events
-              </span>
+      ) : (
+        <>
+          {/* Webhook URLs */}
+          <div className="flex max-w-[488px] flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+                Discord webhook URL
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  value={discordUrl}
+                  onChange={(e) => setDiscordUrl(e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  className={cn(inputClass, "flex-1")}
+                />
+                <button
+                  onClick={() => handleTestWebhook(discordUrl, "discord")}
+                  disabled={!discordUrl.trim() || testingWebhook === "discord"}
+                  className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <Send className="size-3.5" />
+                  {testingWebhook === "discord" ? "Sending..." : "Test"}
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+                Slack webhook URL
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  value={slackUrl}
+                  onChange={(e) => setSlackUrl(e.target.value)}
+                  placeholder="https://hooks.slack.com/services/..."
+                  className={cn(inputClass, "flex-1")}
+                />
+                <button
+                  onClick={() => handleTestWebhook(slackUrl, "slack")}
+                  disabled={!slackUrl.trim() || testingWebhook === "slack"}
+                  className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <Send className="size-3.5" />
+                  {testingWebhook === "slack" ? "Sending..." : "Test"}
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+                Custom webhook URL
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  placeholder="https://your-server.com/webhook"
+                  className={cn(inputClass, "flex-1")}
+                />
+                <button
+                  onClick={() => handleTestWebhook(webhookUrl, "custom")}
+                  disabled={!webhookUrl.trim() || testingWebhook === "custom"}
+                  className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <Send className="size-3.5" />
+                  {testingWebhook === "custom" ? "Sending..." : "Test"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <hr className="border-dash-border-soft" />
+          <hr className="-ml-8 border-dash-border-soft" />
 
-        {/* Event groups */}
-        <div className="flex flex-col pt-1">
-          {groupsForUi.map((group, i) => (
-            <div key={group.key}>
-              <EventGroupCard
-                group={group}
-                groupEnabled={groupToggles[group.key] ?? false}
-                onGroupToggle={(v) => handleGroupToggle(group.key, v)}
-                eventStates={eventToggles}
-                onEventToggle={handleEventToggle}
-              />
-              {i < groupsForUi.length - 1 && (
-                <hr className="border-dash-border-soft" />
-              )}
+          {/* Event Notifications */}
+          <div className="flex max-w-[488px] flex-col gap-2">
+            {/* Section header */}
+            <div className="flex items-center justify-between pb-1">
+              <span className="text-sm font-medium leading-5 tracking-[-0.0224px] text-dash-text-strong">
+                Event Notifications
+              </span>
+              <span className="text-[13px] text-dash-text-faded">
+                {enabledCount === totalCount
+                  ? "All events enabled"
+                  : `${enabledCount} of ${totalCount} enabled`}
+              </span>
             </div>
-          ))}
-        </div>
 
-        {/* Save */}
-        <div className="flex justify-end pt-4">
-          <GlossyButton
-            className="px-6"
-            disabled={isSaving}
-            loading={isSaving}
-            loadingLabel="Saving..."
-            onClick={async () => {
-              const selectedEvents = Object.entries(eventToggles)
-                .filter(([, enabled]) => enabled)
-                .map(([key]) => key);
+            {/* All Events */}
+            <div className="flex items-center py-2">
+              <div className="flex items-center gap-2.5">
+                <Checkbox checked={allEvents} onChange={handleAllEventsToggle} />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium leading-5 text-dash-text-strong">
+                    All Events
+                  </span>
+                  <span className="text-[13px] leading-5 text-dash-text-faded">
+                    Subscribe to all current and future events
+                  </span>
+                </div>
+              </div>
+            </div>
 
-              setIsSaving(true);
+            <hr className="border-dash-border-soft" />
 
-              try {
-                await onSave?.({
-                  emailNotifications: emailNotifs,
-                  mute: profile.notifications?.mute ?? false,
-                  webhookUrl: webhookUrl.trim() || null,
-                  discordUrl: discordUrl.trim() || null,
-                  slackUrl: slackUrl.trim() || null,
-                  events: selectedEvents,
-                });
-              } finally {
-                setIsSaving(false);
-              }
-            }}
-          >
-            Save Settings
-          </GlossyButton>
-        </div>
+            {/* Event groups */}
+            <div className="flex flex-col pt-1">
+              {groupsForUi.map((group, i) => (
+                <div key={group.key}>
+                  <EventGroupCard
+                    group={group}
+                    groupEnabled={groupToggles[group.key] ?? false}
+                    onGroupToggle={(v) => handleGroupToggle(group.key, v)}
+                    eventStates={eventToggles}
+                    onEventToggle={handleEventToggle}
+                  />
+                  {i < groupsForUi.length - 1 && (
+                    <hr className="border-dash-border-soft" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Save */}
+      <div className="flex max-w-[488px] justify-end pt-4">
+        <GlossyButton
+          className="px-6"
+          disabled={isSaving}
+          loading={isSaving}
+          loadingLabel="Saving..."
+          onClick={async () => {
+            const selectedEvents = isFreePlan
+              ? []
+              : Object.entries(eventToggles)
+                  .filter(([, enabled]) => enabled)
+                  .map(([key]) => key);
+
+            setIsSaving(true);
+
+            try {
+              await onSave?.({
+                emailNotifications: emailNotifs,
+                mute: profile.notifications?.mute ?? false,
+                webhookUrl: isFreePlan ? null : (webhookUrl.trim() || null),
+                discordUrl: isFreePlan ? null : (discordUrl.trim() || null),
+                slackUrl: isFreePlan ? null : (slackUrl.trim() || null),
+                events: selectedEvents,
+              });
+            } finally {
+              setIsSaving(false);
+            }
+          }}
+        >
+          Save Settings
+        </GlossyButton>
       </div>
     </div>
   );
@@ -2397,6 +2716,7 @@ function MembersForm({
   currentUser?: Pick<UserProfile, "uniqueId" | "email"> | null;
 }) {
   const [inviteOpen, setInviteOpen] = useState(false);
+  const pricing = usePricing();
   const getTeamMembers = useServerFn(
     getWorkspaceTeamMembersServerFn as any,
   ) as (args: { data: { workspace: string } }) => Promise<TeamDetails>;
@@ -2426,6 +2746,8 @@ function MembersForm({
 
   const members = mapActiveMembers(team);
   const pendingInvites = mapPendingInvites(team);
+  const configuredSeats = team?.seatCount ?? 0;
+  const billableSeats = Math.max(configuredSeats, members.length);
   const currentUserTeamMember = team?.members.find((member) => {
     const memberUserId = member.userId?.trim();
     const currentUserId = currentUser?.uniqueId?.trim();
@@ -2699,23 +3021,23 @@ function MembersForm({
             Seat usage
           </span>
           <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
-            {members.length} seats &times;{" "}
-            {formatUsdMonthly(TEAM_MEMBER_SEAT_PRICE_MONTHLY)}/seat/month
+            {billableSeats} seats &times;{" "}
+            {formatUsdMonthly(pricing.team.costPerMember)}/seat/month
           </span>
           <span className="text-xs leading-4 tracking-[-0.02px] text-dash-text-extra-faded">
             Team billing also includes concurrent builds at{" "}
-            {formatUsdMonthly(TEAM_CONCURRENT_BUILD_PRICE_MONTHLY)}/build/month.
+            {formatUsdMonthly(pricing.team.costPerBuild)}/build/month.
           </span>
         </div>
         <span className="text-lg font-medium text-dash-text-strong">
-          {formatUsdMonthly(members.length * TEAM_MEMBER_SEAT_PRICE_MONTHLY)}/mo
+          {formatUsdMonthly(billableSeats * pricing.team.costPerMember)}/mo
         </span>
       </div>
 
       <InviteMembersModal
         open={inviteOpen}
         onOpenChange={setInviteOpen}
-        currentSeats={members.length}
+        currentSeats={billableSeats}
         onInvite={async (emails) => {
           await inviteTeamMembers({ data: { workspace, members: emails } });
           toast.success(

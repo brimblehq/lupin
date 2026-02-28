@@ -33,6 +33,24 @@ async function resolveWorkspaceSubscriptionId(backend: ReturnType<typeof getServ
   }
 }
 
+async function resolveWorkspaceTeamId(
+  backend: ReturnType<typeof getServerBackendApi>,
+  workspace?: string,
+) {
+  const workspaceSlug = workspace?.trim().toLowerCase();
+  if (!workspaceSlug) {
+    return undefined;
+  }
+
+  try {
+    const teams = await backend.workspaces.list();
+    const match = teams.items.find((item) => item.slug === workspaceSlug);
+    return match?.id?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const getSettingsSidebarSnapshotServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {
@@ -84,8 +102,13 @@ export const updateSettingsNotificationsServerFn = createServerFn({
 export const updateSettingsBuildsServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
-  const input = data as unknown as UpdateSettingsBuildsInput;
-  await getServerBackendApi().settings.updateBuilds(input);
+  const payload = data as unknown as UpdateSettingsBuildsInput & { workspace?: string };
+  const backend = getServerBackendApi();
+  const teamId = await resolveWorkspaceTeamId(backend, payload.workspace);
+  await backend.settings.updateBuilds({
+    buildDisabled: payload.buildDisabled,
+    ...(teamId ? { teamId } : {}),
+  });
   return { ok: true } as const;
 });
 

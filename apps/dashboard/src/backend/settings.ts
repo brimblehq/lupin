@@ -351,6 +351,7 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
     async updateBuilds(input) {
       await client.request(endpoints.builds, {
         method: "PUT",
+        query: input.teamId ? { team_id: input.teamId } : undefined,
         body: { build_disabled: Boolean(input.buildDisabled) },
       });
     },

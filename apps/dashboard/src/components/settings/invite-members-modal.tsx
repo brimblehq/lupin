@@ -8,7 +8,8 @@ import {
   ModalCancelButton,
   ModalContinueButton,
 } from "../shared/modal";
-import { TEAM_MEMBER_SEAT_PRICE_MONTHLY, formatUsdMonthly } from "@/utils/billing";
+import { formatUsdMonthly } from "@/utils/billing";
+import { usePricing } from "@/contexts/pricing-context";
 
 interface InviteRow {
   id: number;
@@ -99,10 +100,12 @@ export function InviteMembersModal({
     );
   }
 
+  const pricing = usePricing();
+  const seatPrice = pricing.team.costPerMember;
   const filledRows = rows.filter((r) => r.email.trim().length > 0);
   const newSeats = filledRows.length;
-  const addedCost = newSeats * TEAM_MEMBER_SEAT_PRICE_MONTHLY;
-  const newTotal = (currentSeats + newSeats) * TEAM_MEMBER_SEAT_PRICE_MONTHLY;
+  const addedCost = newSeats * seatPrice;
+  const newTotal = (currentSeats + newSeats) * seatPrice;
 
   useEffect(() => {
     if (!open) {
@@ -183,7 +186,7 @@ export function InviteMembersModal({
               <div className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-dash-text-faded">
-                    {newSeats} new {newSeats === 1 ? "seat" : "seats"} &times; {formatUsdMonthly(TEAM_MEMBER_SEAT_PRICE_MONTHLY)}/seat
+                    {newSeats} new {newSeats === 1 ? "seat" : "seats"} &times; {formatUsdMonthly(seatPrice)}/seat
                   </span>
                   <span className="text-sm font-medium text-dash-text-strong">
                     +{formatUsdMonthly(addedCost)}/month

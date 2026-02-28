@@ -27,37 +27,23 @@ export interface Subscription {
   payment_method?: string;
 }
 
-/* ── Plan specs ── */
-
-export interface PlanSpec {
-  id: string;
-  name: string;
-  amount: number;
-  currency: string;
-  interval: "month" | "year";
-  features: string[];
-}
-
 /* ── Invoices ── */
 
 export interface Invoice {
   id: string;
-  amount_due: number;
-  amount_paid: number;
-  currency: string;
+  number?: string;
+  total?: string;
   status: "draft" | "open" | "paid" | "void" | "uncollectible";
-  period_start: string;
-  period_end: string;
+  date: string;
   invoice_pdf?: string;
-  created_at: string;
 }
 
 export interface InvoicePage {
   items: Invoice[];
-  page: number;
+  next_cursor: string | null;
+  previous_cursor: string | null;
+  has_more: boolean;
   per_page: number;
-  total: number;
-  total_pages: number;
 }
 
 /* ── Bill estimate ── */
@@ -88,12 +74,13 @@ export interface AddPaymentMethodInput {
 }
 
 export interface CreateSubscriptionInput {
-  plan_id: string;
-  payment_method_id: string;
+  type: string;
+  payment_method?: string;
+  accept_terms: boolean;
 }
 
 export interface SwapPlanInput {
-  plan_id: string;
+  target_plan: string;
 }
 
 export interface PurchaseInput {
@@ -131,10 +118,14 @@ export interface PaymentsApi {
   createSubscription(input: CreateSubscriptionInput): Promise<Subscription>;
   swapPlan(input: SwapPlanInput): Promise<Subscription>;
   cancelSubscription(): Promise<void>;
-  listPlans(): Promise<PlanSpec[]>;
   getBillEstimate(): Promise<BillEstimate>;
-  listInvoices(page?: number, perPage?: number): Promise<InvoicePage>;
+  listInvoices(input?: {
+    cursor?: string | null;
+    per_page?: number;
+    team_id?: string;
+  }): Promise<InvoicePage>;
   purchase(input: PurchaseInput): Promise<PurchaseResult>;
   updateSpendingLimit(input: UpdateSpendingLimitInput): Promise<void>;
   updateTeamSubscription(input: UpdateTeamSubscriptionInput): Promise<void>;
+  getSubscriptionSpecs(): Promise<any>;
 }

@@ -23,7 +23,8 @@ import {
   searchDomainSaleServerFn,
   purchaseDomainServerFn,
 } from "../../server/domains/actions";
-import type { SettingsPaymentCard } from "../../backend/settings/types";
+import { usePaymentMethods } from "@/hooks/use-payments";
+import type { PaymentMethod } from "@/backend/payments";
 import { getWorkspaceFromSearch } from "@/utils/topbar-navigation";
 
 const rootRoute = getRouteApi("__root__");
@@ -171,8 +172,14 @@ function BuyDomainPage() {
       autoRenewal: boolean;
     };
   }) => Promise<{ success: boolean }>;
-  const { settingsSnapshot } = rootRoute.useLoaderData() as any;
-  const cards: SettingsPaymentCard[] = settingsSnapshot?.billing?.cards ?? [];
+  const { paymentMethods: initialPaymentMethods } = rootRoute.useLoaderData() as { paymentMethods?: PaymentMethod[] | null };
+  const { data: paymentMethods = [] } = usePaymentMethods(initialPaymentMethods ?? undefined);
+  const cards = paymentMethods.map((m: any) => ({
+    id: m.id,
+    cardType: m.card?.brand ?? m.brand,
+    last4: m.card?.last4 ?? m.last4,
+    preferred: m.is_default,
+  }));
   const workspace = getWorkspaceFromSearch({ searchStr });
 
   const [query, setQuery] = useState("");

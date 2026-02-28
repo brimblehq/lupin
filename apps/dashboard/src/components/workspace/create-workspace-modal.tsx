@@ -10,13 +10,13 @@ import {
 } from "../shared/modal";
 import { Dropdown } from "../shared/dropdown";
 import { WorkspaceStep } from "../../types/enums";
+import { usePricing } from "@/contexts/pricing-context";
 
 const inputClass =
   "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
 
-const teamSizeOptions = [3, 5, 10, 15, 25, 50];
-const COST_PER_MEMBER = 5;
-const COST_PER_BUILD = 7.5;
+const teamSizeOptions = Array.from({ length: 48 }, (_, i) => i + 3);
+
 const MIN_BUILDS = 1;
 const MAX_BUILDS = 10;
 
@@ -144,6 +144,8 @@ function StepConfig({
   onConcurrentBuildsChange,
   onPromoCodeChange,
   onVerifyPromo,
+  costPerMember,
+  costPerBuild,
 }: {
   teamSize: number;
   concurrentBuilds: number;
@@ -153,9 +155,11 @@ function StepConfig({
   onConcurrentBuildsChange: (v: number) => void;
   onPromoCodeChange: (v: string) => void;
   onVerifyPromo: () => void;
+  costPerMember: number;
+  costPerBuild: number;
 }) {
-  const seatCost = teamSize * COST_PER_MEMBER;
-  const buildCost = concurrentBuilds * COST_PER_BUILD;
+  const seatCost = teamSize * costPerMember;
+  const buildCost = concurrentBuilds * costPerBuild;
   const totalCost = seatCost + buildCost;
 
   return (
@@ -172,7 +176,7 @@ function StepConfig({
           renderOption={(v) => `${v} Members`}
         />
         <InfoBanner>
-          Seat pricing: ${COST_PER_MEMBER}/member/mo
+          Seat pricing: ${costPerMember}/member/mo
           <br />
           <span className="font-medium">
             {teamSize} {teamSize === 1 ? "member" : "members"} = ${seatCost}/mo
@@ -191,12 +195,12 @@ function StepConfig({
           max={MAX_BUILDS}
           onChange={onConcurrentBuildsChange}
           renderValue={(v) => {
-            const cost = v * COST_PER_BUILD;
+            const cost = v * costPerBuild;
             return `${v} ${v === 1 ? "Build" : "Builds"} — $${cost % 1 === 0 ? cost : cost.toFixed(2)}`;
           }}
         />
         <InfoBanner>
-          Build pricing: ${COST_PER_BUILD}/build container/mo
+          Build pricing: ${costPerBuild}/build container/mo
           <br />
           <span className="font-medium">
             Estimated total: $
@@ -417,7 +421,10 @@ function StepDone({ name }: { name: string }) {
 
 /* ─── Modal Container ─── */
 
-const stepDescriptions: Record<WorkspaceStep, { title: string; description: string }> = {
+const stepDescriptions: Record<
+  WorkspaceStep,
+  { title: string; description: string }
+> = {
   [WorkspaceStep.Name]: {
     title: "Create workspace",
     description: "Set up a new workspace for your team.",
@@ -442,6 +449,7 @@ export function CreateWorkspaceModal({
   open,
   onOpenChange,
 }: CreateWorkspaceModalProps) {
+  const pricing = usePricing();
   const [step, setStep] = useState<WorkspaceStep>(WorkspaceStep.Name);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -486,7 +494,12 @@ export function CreateWorkspaceModal({
     setPromoStatus("idle");
   }
 
-  const steps: WorkspaceStep[] = [WorkspaceStep.Name, WorkspaceStep.Config, WorkspaceStep.Invite, WorkspaceStep.Done];
+  const steps: WorkspaceStep[] = [
+    WorkspaceStep.Name,
+    WorkspaceStep.Config,
+    WorkspaceStep.Invite,
+    WorkspaceStep.Done,
+  ];
   const stepIdx = steps.indexOf(step);
 
   function next() {
@@ -518,14 +531,16 @@ export function CreateWorkspaceModal({
       {/* Step indicator */}
       {step !== WorkspaceStep.Done && (
         <div className="flex items-center gap-1.5 px-6 pt-4">
-          {[WorkspaceStep.Name, WorkspaceStep.Config, WorkspaceStep.Invite].map((s, i) => (
-            <div
-              key={s}
-              className={`h-[3px] flex-1 rounded-full transition-colors ${
-                i <= stepIdx ? "bg-[#4879f8]" : "bg-dash-border"
-              }`}
-            />
-          ))}
+          {[WorkspaceStep.Name, WorkspaceStep.Config, WorkspaceStep.Invite].map(
+            (s, i) => (
+              <div
+                key={s}
+                className={`h-[3px] flex-1 rounded-full transition-colors ${
+                  i <= stepIdx ? "bg-[#4879f8]" : "bg-dash-border"
+                }`}
+              />
+            ),
+          )}
         </div>
       )}
 
@@ -555,6 +570,8 @@ export function CreateWorkspaceModal({
               onConcurrentBuildsChange={setConcurrentBuilds}
               onPromoCodeChange={handlePromoCodeChange}
               onVerifyPromo={handleVerifyPromo}
+              costPerMember={pricing.team.costPerMember}
+              costPerBuild={pricing.team.costPerBuild}
             />
           )}
           {step === WorkspaceStep.Invite && (

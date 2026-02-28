@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Github, ArrowLeft, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { invalidateSessionCache } from "../lib/auth-guards";
 import { toast } from "sonner";
 import {
   AuthDivider,
@@ -257,6 +258,7 @@ function SignupPage() {
       toast.success(
         `Welcome${response.user.firstName ? `, ${response.user.firstName}` : ""}`,
       );
+      invalidateSessionCache();
       await navigate({ to: "/" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "OAuth sign up failed");
@@ -295,6 +297,7 @@ function SignupPage() {
     try {
       await verifyEmailCode({ data: { email, code: otp } });
       toast.success("Account created successfully");
+      invalidateSessionCache();
       await navigate({ to: "/" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Verification failed");

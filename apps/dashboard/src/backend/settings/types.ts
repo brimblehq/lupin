@@ -32,6 +32,7 @@ export interface UpdateSettingsNotificationsInput {
 
 export interface UpdateSettingsBuildsInput {
   buildDisabled: boolean;
+  teamId?: string;
 }
 
 export interface SettingsApiKeyResult {
