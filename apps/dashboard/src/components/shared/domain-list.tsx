@@ -303,7 +303,6 @@ function EditDomainModal({
     redirect: { url: string; status: number } | null;
   }) => Promise<void>;
 }) {
-  const [name, setName] = useState(domain.name);
   let initialProject = "";
   if (domain.projectId) {
     initialProject = domain.projectId;
@@ -325,7 +324,7 @@ function EditDomainModal({
   const [saving, setSaving] = useState(false);
 
   const inputClass =
-    "input-base input-focus px-2 py-1.5 text-[13px] leading-5 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded";
+    "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded";
 
   async function handleSave() {
     if (redirectUrl && !isValidRedirectUrl(redirectUrl)) {
@@ -334,8 +333,6 @@ function EditDomainModal({
     }
 
     setRedirectUrlError("");
-
-    const nextName = name.trim();
     const nextRedirect = redirectUrl.trim()
       ? {
           url: redirectUrl.trim(),
@@ -352,7 +349,7 @@ function EditDomainModal({
       setSaving(true);
       await onSave({
         domain,
-        name: nextName,
+        name: domain.name,
         projectId: project || undefined,
         redirect: nextRedirect,
       });
@@ -377,10 +374,10 @@ function EditDomainModal({
           </label>
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={domain.name}
             placeholder="example.com"
-            className={inputClass}
+            className={`${inputClass} cursor-not-allowed opacity-80`}
+            readOnly
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -457,7 +454,7 @@ function EditDomainModal({
         <ModalCancelButton />
         <ModalContinueButton
           onClick={handleSave}
-          disabled={!name.trim() || Boolean(redirectUrlError) || saving}
+          disabled={Boolean(redirectUrlError) || saving}
           loading={saving}
           loadingLabel="Saving..."
         >

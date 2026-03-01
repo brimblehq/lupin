@@ -113,6 +113,7 @@ export interface DomainsApi {
   add(input: AddDomainInput): Promise<DomainRecord>;
   update(input: UpdateDomainInput): Promise<DomainRecord>;
   transfer(input: { domainId: string; projectId: string; teamId?: string }): Promise<void>;
+  transferOut(domainName: string, teamId?: string): Promise<{ domainName: string; authCode: string; unlocked: boolean }>;
   searchSale(domainName: string): Promise<SearchDomainResult[]>;
   purchaseSale(input: PurchaseDomainInput): Promise<void>;
   renewSale(input: RenewDomainInput): Promise<void>;
@@ -440,11 +441,19 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
 
       const root = response?.data?.data ?? response?.data ?? response ?? {};
       const mapped = mapDomainRecord(root);
-      if (!mapped) {
-        throw new Error("Invalid domain response");
+      if (mapped) {
+        return mapped;
       }
 
-      return mapped;
+      // Some backends return a minimal/empty response on PATCH success.
+      // Fall back to a synthetic record built from the input so callers
+      // aren't blocked by a missing `name` field in the response.
+      return {
+        id: input.id,
+        name: input.name ?? "",
+        active: pickBoolean(root, "active", "enabled") ?? true,
+        redirect: input.redirect ?? null,
+      } satisfies DomainRecord;
     },
 
     async transfer(input) {
@@ -457,6 +466,22 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
           },
         },
       );
+    },
+
+    async transferOut(domainName, teamId) {
+      const response = await client.request<any>(
+        `${listEndpoint}/${encodeURIComponent(domainName)}/transfer-out`,
+        {
+          method: "POST",
+          body: { teamId },
+        },
+      );
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      return {
+        domainName: root.domainName ?? domainName,
+        authCode: root.authCode ?? "",
+        unlocked: Boolean(root.unlocked),
+      };
     },
 
     async searchSale(domainName) {

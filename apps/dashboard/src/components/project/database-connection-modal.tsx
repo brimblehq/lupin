@@ -211,7 +211,7 @@ export function DatabaseConnectionModal({
                 ) : (
                   <Eye className="size-3" />
                 )}
-                <span>{decryptingUri ? "Decrypting..." : revealed ? "Hide" : "Reveal"}</span>
+                <span>{decryptingUri ? "Preparing connection details..." : revealed ? "Hide" : "Reveal"}</span>
               </button>
               <button
                 onClick={() => { void handleCopyUri(); }}

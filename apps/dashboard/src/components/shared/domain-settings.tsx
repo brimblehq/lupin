@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Share2, Reply, Plus, AlertCircle, ChevronDown, Pencil } from "lucide-react";
+import { Copy, Share2, Reply, Plus, AlertCircle, ChevronDown, Pencil, RefreshCw, ArrowUpRight } from "lucide-react";
 import { CheckCircle, ShieldCheck } from "@phosphor-icons/react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
@@ -8,7 +8,6 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { FolderTrashIcon } from "./folder-trash-icon";
 import { GlossyButton } from "./glossy-button";
-import { Dropdown } from "./dropdown";
 import {
   Modal,
   ModalCancelButton,
@@ -22,18 +21,13 @@ import { WarningModal } from "./warning-modal";
 import {
   createDomainDnsRecordServerFn,
   deleteDomainDnsRecordServerFn,
+  refreshDomainStatusServerFn,
   renewDomainSaleServerFn,
+  transferOutServerFn,
   updateDomainDnsRecordServerFn,
 } from "@/server/domains/actions";
 
 const dnsRecordTypes = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"];
-const transferProviders = [
-  { id: "namecheap", label: "Namecheap", url: "https://www.namecheap.com/domains/transfer/" },
-  { id: "godaddy", label: "GoDaddy", url: "https://www.godaddy.com/domains/domain-transfer" },
-  { id: "cloudflare", label: "Cloudflare Registrar", url: "https://dash.cloudflare.com/?to=/:account/domains/transfer" },
-  { id: "porkbun", label: "Porkbun", url: "https://porkbun.com/transfer" },
-  { id: "other", label: "Other provider", url: "" },
-] as const;
 
 export interface DnsRecord {
   id?: string;
@@ -57,6 +51,7 @@ export interface DomainInfo {
   nameserverWarning?: string;
   purchased?: boolean;
   isExpired?: boolean;
+  active?: boolean;
   renewalPrice?: number;
   renewalDuration?: number;
   autoRenewal?: boolean;
@@ -345,7 +340,6 @@ export function DomainSettings({
   const [renewDuration, setRenewDuration] = useState(domain.renewalDuration || 1);
   const [renewAutoRenew, setRenewAutoRenew] = useState(Boolean(domain.autoRenewal));
   const [transferOutOpen, setTransferOutOpen] = useState(false);
-  const [transferProvider, setTransferProvider] = useState<string>("namecheap");
   const [transferChecklist, setTransferChecklist] = useState({
     unlocked: false,
     registrantEmailReady: false,
@@ -354,6 +348,11 @@ export function DomainSettings({
   const [transferStep, setTransferStep] = useState<"setup" | "auth-code">("setup");
   const [transferAuthCode, setTransferAuthCode] = useState<string>("");
   const [transferAuthLoading, setTransferAuthLoading] = useState(false);
+  const [domainActive, setDomainActive] = useState(Boolean(domain.active));
+  const [refreshingStatus, setRefreshingStatus] = useState(false);
+  const refreshDomainStatus = useServerFn(refreshDomainStatusServerFn as any) as (args: {
+    data: { workspace?: string; domainName: string };
+  }) => Promise<{ active?: boolean } | null>;
   const createDnsRecord = useServerFn(createDomainDnsRecordServerFn as any) as (args: {
     data: {
       workspace?: string;
@@ -375,10 +374,17 @@ export function DomainSettings({
   const renewDomain = useServerFn(renewDomainSaleServerFn as any) as (args: {
     data: { workspace?: string; domainId: string; duration?: number; autoRenew?: boolean };
   }) => Promise<{ success: boolean }>;
+  const transferOut = useServerFn(transferOutServerFn as any) as (args: {
+    data: { workspace?: string; domainName: string };
+  }) => Promise<{ domainName: string; authCode: string; unlocked: boolean }>;
 
   useEffect(() => {
     setRecords(domain.dnsRecords);
   }, [domain.dnsRecords]);
+
+  useEffect(() => {
+    setDomainActive(Boolean(domain.active));
+  }, [domain.active]);
 
   useEffect(() => {
     setRenewDuration(domain.renewalDuration || 1);
@@ -537,38 +543,35 @@ export function DomainSettings({
 
   const renewalUnitPrice = Number(domain.renewalPrice ?? 0);
   const totalRenewalPrice = renewalUnitPrice * renewDuration;
-  const selectedTransferProvider = transferProviders.find(
-    (provider) => provider.id === transferProvider,
-  ) ?? transferProviders[0];
   const canContinueTransfer =
     transferChecklist.unlocked
     && transferChecklist.registrantEmailReady
     && transferChecklist.understandDnsImpact;
 
-  function openTransferProviderSite() {
-    if (selectedTransferProvider.url) {
-      window.open(selectedTransferProvider.url, "_blank", "noopener,noreferrer");
-      return;
-    }
 
-    const subject = encodeURIComponent(`Domain transfer-out request: ${domain.domainName}`);
-    const body = encodeURIComponent(
-      [
-        "Hi Brimble team,",
-        "",
-        `I want to transfer my domain "${domain.domainName}" to another registrar.`,
-        `Destination provider: ${selectedTransferProvider.label}`,
-        "",
-        "Please share the next steps and authorization (EPP) code if available.",
-      ].join("\n"),
-    );
-    window.location.href = `mailto:hello@brimble.app?subject=${subject}&body=${body}`;
+  async function handleCheckDnsStatus() {
+    try {
+      setRefreshingStatus(true);
+      const result = await refreshDomainStatus({
+        data: { workspace, domainName: domain.domainName },
+      });
+      const isActive = Boolean(result?.active);
+      setDomainActive(isActive);
+      if (isActive) {
+        toast.success("DNS has propagated — your domain is active!");
+      } else {
+        toast("DNS hasn't propagated yet. This can take up to 48 hours.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to check domain status");
+    } finally {
+      setRefreshingStatus(false);
+    }
   }
 
   async function requestTransferAuthCode() {
-    // TODO: Replace with the server function once the EPP endpoint is available.
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    return `EPP-${domain.domainId.slice(0, 6).toUpperCase()}-${domain.domainName.split(".")[0].slice(0, 4).toUpperCase()}`;
+    const result = await transferOut({ data: { workspace, domainName: domain.domainName } });
+    return result.authCode;
   }
 
   async function handleContinueTransfer() {
@@ -600,9 +603,15 @@ export function DomainSettings({
           >
             Back
           </Link>
-          <span className="text-sm font-medium text-dash-text-body">
+          <a
+            href={`https://${domain.domainName}`}
+            target="_blank"
+            rel="noreferrer"
+            className="group flex items-center gap-1 text-sm font-medium text-dash-text-body transition-colors hover:text-dash-text-strong"
+          >
             {domain.domainName}
-          </span>
+            <ArrowUpRight className="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+          </a>
         </div>
         <div className="flex items-center gap-4 px-3.5">
           <button className="text-dash-text-faded transition-colors hover:text-dash-text-strong">
@@ -648,6 +657,33 @@ export function DomainSettings({
               Renew now
             </GlossyButton>
           </div>
+        )}
+
+        {/* Domain status banner */}
+        {!domain.isExpired && !domain.nameserverWarning && (
+          domainActive ? (
+            <div className="flex items-center gap-3 rounded-[4px] bg-[#f0fdf4] px-4 py-3 dark:bg-[#162317]">
+              <CheckCircle className="size-5 shrink-0 text-[#34d399]" weight="fill" />
+              <span className="text-sm text-dash-text-body">
+                Domain is active — DNS has propagated and your settings are live.
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-[4px] bg-[#fffbeb] px-4 py-3 dark:bg-[#2a2518]">
+              <AlertCircle className="size-5 shrink-0 text-[#e89c30]" />
+              <span className="text-sm text-dash-text-body">
+                DNS is still propagating. This can take up to 48 hours.
+              </span>
+              <button
+                onClick={handleCheckDnsStatus}
+                disabled={refreshingStatus}
+                className="ml-auto flex shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-2.5 py-1.5 text-xs font-medium text-dash-text-body transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-50"
+              >
+                <RefreshCw className={`size-3 ${refreshingStatus ? "animate-spin" : ""}`} />
+                {refreshingStatus ? "Checking..." : "Check status"}
+              </button>
+            </div>
+          )
         )}
 
         {/* DNS Records section */}
@@ -898,7 +934,7 @@ export function DomainSettings({
           description={
             transferStep === "setup"
               ? `Prepare transfer-out for ${domain.domainName}`
-              : `Use this code when ${selectedTransferProvider.label} asks for domain authorization`
+              : `Use this code when your new registrar asks for domain authorization`
           }
         />
 
@@ -920,19 +956,6 @@ export function DomainSettings({
                     </span>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm text-dash-text-faded">Destination provider</label>
-                <Dropdown
-                  value={transferProvider}
-                  options={transferProviders.map((provider) => ({
-                    id: provider.id,
-                    label: provider.label,
-                  }))}
-                  onChange={setTransferProvider}
-                  placeholder="Select a provider..."
-                />
               </div>
 
               <div className="rounded-[8px] border border-dash-border bg-dash-bg-elevated px-4 py-3">
@@ -1005,12 +1028,6 @@ export function DomainSettings({
                       {domain.domainName}
                     </span>
                   </div>
-                  <div className="flex flex-col text-right">
-                    <span className="text-xs text-dash-text-faded">Provider</span>
-                    <span className="text-sm font-medium text-dash-text-strong">
-                      {selectedTransferProvider.label}
-                    </span>
-                  </div>
                 </div>
               </div>
 
@@ -1035,7 +1052,7 @@ export function DomainSettings({
                 </div>
 
                 <p className="mt-2.5 text-xs leading-4 text-dash-text-faded">
-                  Paste this code at {selectedTransferProvider.label} when they request domain authorization.
+                  Paste this code at your new registrar when they request domain authorization.
                 </p>
               </div>
             </>
@@ -1054,7 +1071,7 @@ export function DomainSettings({
                       `Domain transfer support request: ${domain.domainName}`,
                     );
                     const body = encodeURIComponent(
-                      `Hi Brimble team,\n\nI need help transferring ${domain.domainName} to ${selectedTransferProvider.label}.\nPlease share the required steps / EPP code.\n`,
+                      `Hi Brimble team,\n\nI need help transferring ${domain.domainName} to another registrar.\nPlease share the required steps / EPP code.\n`,
                     );
                     window.location.href = `mailto:hello@brimble.app?subject=${subject}&body=${body}`;
                   }}
@@ -1084,13 +1101,11 @@ export function DomainSettings({
             ) : (
               <ModalContinueButton
                 onClick={() => {
-                  openTransferProviderSite();
                   setTransferOutOpen(false);
                   resetTransferModalState();
-                  toast.success(`Opened ${selectedTransferProvider.label} transfer page`);
                 }}
               >
-                Open {selectedTransferProvider.label}
+                Done
               </ModalContinueButton>
             )}
           </div>

@@ -2,11 +2,13 @@ import { useState } from "react";
 import {
   createFileRoute,
   getRouteApi,
+  useRouter,
   useRouterState,
 } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { Search, Globe } from "lucide-react";
+import { CheckCircle } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Dropdown } from "../../components/shared/dropdown";
 import { GlossyButton } from "../../components/shared/glossy-button";
@@ -25,7 +27,7 @@ import {
 } from "../../server/domains/actions";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import type { PaymentMethod } from "@/backend/payments";
-import { getWorkspaceFromSearch } from "@/utils/topbar-navigation";
+import { getWorkspaceFromSearch, withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -102,10 +104,12 @@ function formatCardType(cardType?: string): string {
 function DomainResultCard({
   result,
   index,
+  isExactMatch,
   onSelect,
 }: {
   result: DomainResult;
   index: number;
+  isExactMatch?: boolean;
   onSelect: () => void;
 }) {
   const { base, tld } = splitDomain(result.domainName);
@@ -123,9 +127,12 @@ function DomainResultCard({
           : "cursor-default opacity-50"
       }`}
     >
-      <span className="text-sm text-dash-text-body">
+      <span className="flex items-center gap-1.5 text-sm text-dash-text-body">
         {base}.
         <span className="font-medium text-dash-text-strong">{tld}</span>
+        {isExactMatch && result.available && (
+          <CheckCircle size={15} weight="fill" className="text-[#4879f8]" />
+        )}
       </span>
       {result.available ? (
         <span className="rounded-full bg-[#34d399]/10 px-2.5 py-0.5 text-xs font-medium text-[#34d399]">
@@ -157,6 +164,7 @@ function CardChip() {
 /* ─── Main Page ─── */
 
 function BuyDomainPage() {
+  const router = useRouter();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const searchDomains = useServerFn(searchDomainSaleServerFn as any) as (args: {
     data: { name: string };
@@ -184,6 +192,7 @@ function BuyDomainPage() {
 
   const [query, setQuery] = useState("");
   const [searchedQuery, setSearchedQuery] = useState("");
+  const [searchedDomain, setSearchedDomain] = useState("");
   const [results, setResults] = useState<DomainResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -213,6 +222,7 @@ function BuyDomainPage() {
 
     setSearching(true);
     setSearchedQuery(name.replace(/\.[a-z]+$/, ""));
+    setSearchedDomain(name);
     setHasSearched(true);
     setPage(0);
 
@@ -258,6 +268,10 @@ function BuyDomainPage() {
 
       toast.success(`${purchaseTarget.domainName} purchased successfully!`);
       setPurchaseTarget(null);
+      const detailPath = `/domains/${encodeURIComponent(purchaseTarget.domainName)}`;
+      router.navigate({
+        to: withWorkspaceQuery({ pathname: detailPath, searchStr }) as any,
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Purchase failed");
     } finally {
@@ -373,6 +387,7 @@ function BuyDomainPage() {
                     key={result.domainName}
                     result={result}
                     index={i}
+                    isExactMatch={result.domainName === searchedDomain}
                     onSelect={() => handleOpenPurchase(result)}
                   />
                 ))}

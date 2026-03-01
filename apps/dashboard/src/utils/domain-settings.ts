@@ -110,6 +110,7 @@ export function mapDomainDetailsToDomainInfo(domain: DomainDetailsRecord): Domai
     nameservers: displayNameservers,
     nameserverWarning: buildNameserverWarning(domain),
     purchased: domain.purchased,
+    active: domain.active,
     isExpired: domain.isExpired ?? isDateExpired(domain.expiresAt),
     renewalPrice: domain.renewalPrice,
     renewalDuration: domain.renewalDuration,

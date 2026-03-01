@@ -5,7 +5,7 @@ import type { StripeCardElementOptions } from "@stripe/stripe-js";
 import { motion } from "motion/react";
 import { useTheme } from "@/hooks/use-theme";
 import { usePricing } from "@/contexts/pricing-context";
-import { PencilSimple } from "@phosphor-icons/react";
+import { ArrowSquareOut, PencilSimple } from "@phosphor-icons/react";
 import { Theme } from "@/types/enums";
 import { Plus, Star, X, CreditCard } from "lucide-react";
 import { FolderTrashIcon } from "../shared/folder-trash-icon";
@@ -901,6 +901,8 @@ function InvoicesSection({
       status: string;
       invoice_pdf?: string;
       date: string;
+      source?: "subscription" | "purchase";
+      type?: string;
     }>;
     next_cursor: string | null;
     previous_cursor: string | null;
@@ -936,6 +938,16 @@ function InvoicesSection({
             }
           }
 
+          const isPurchase =
+            invoice.source === "purchase" ||
+            (!invoice.source && invoice.number?.startsWith("BRIMBLE-"));
+
+          const displayNumber = invoice.number
+            ? invoice.number.length > 20
+              ? `${invoice.number.slice(0, 16)}...${invoice.number.slice(-4)}`
+              : invoice.number
+            : "Invoice";
+
           return (
             <div
               key={invoice.id}
@@ -943,7 +955,7 @@ function InvoicesSection({
             >
               <div className="flex min-w-0 flex-col gap-0.5">
                 <p className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
-                  {invoice.number || "Invoice"}
+                  {displayNumber}
                 </p>
                 <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
                   {label}
@@ -954,14 +966,26 @@ function InvoicesSection({
                   {invoice.status} {invoice.total ? `• ${invoice.total}` : ""}
                 </span>
                 {invoice.invoice_pdf ? (
-                  <a
-                    href={invoice.invoice_pdf}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-[8px] border border-dash-border bg-dash-bg px-3 py-1.5 text-sm leading-5 tracking-[-0.0224px] text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
-                  >
-                    Download
-                  </a>
+                  isPurchase ? (
+                    <a
+                      href={invoice.invoice_pdf}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 rounded-[8px] border border-dash-border bg-dash-bg px-3 py-1.5 text-sm leading-5 tracking-[-0.0224px] text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+                    >
+                      View receipt
+                      <ArrowSquareOut className="size-3.5" weight="regular" />
+                    </a>
+                  ) : (
+                    <a
+                      href={invoice.invoice_pdf}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-[8px] border border-dash-border bg-dash-bg px-3 py-1.5 text-sm leading-5 tracking-[-0.0224px] text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+                    >
+                      Download
+                    </a>
+                  )
                 ) : null}
               </div>
             </div>

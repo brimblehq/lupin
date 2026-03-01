@@ -477,4 +477,25 @@ export const deleteDomainDnsRecordServerFn = createServerFn({
   });
 });
 
+export const transferOutServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        domainName: string;
+      }
+    | undefined;
+
+  const domainName = payload?.domainName?.trim();
+  if (!domainName) {
+    throw new Error("Domain name is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
+    return api.domains.transferOut(domainName, teamId);
+  });
+});
+
 export type { DomainDetailsRecord, DomainRecord, PaginatedDomainsResponse };

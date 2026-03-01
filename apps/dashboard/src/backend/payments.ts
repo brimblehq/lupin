@@ -165,6 +165,11 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
           typeof invoice?.invoice_pdf === "string"
             ? invoice.invoice_pdf
             : undefined,
+        source:
+          invoice?.source === "subscription" || invoice?.source === "purchase"
+            ? invoice.source
+            : undefined,
+        type: typeof invoice?.type === "string" ? invoice.type : undefined,
       }));
 
       return {

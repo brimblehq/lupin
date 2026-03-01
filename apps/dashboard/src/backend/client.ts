@@ -118,17 +118,39 @@ export function createBackendClient(config: BackendClientConfig): BackendClient 
     return url.toString();
   };
 
-  const getErrorMessage = (payload: any, fallback: string) => {
-    if (!payload) return fallback;
-    if (typeof payload === "string") return payload;
-    if (typeof payload?.error === "string") return payload.error;
-    if (typeof payload?.message === "string") return payload.message;
-    if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-      const first = payload.errors[0];
-      if (typeof first?.msg === "string") return first.msg;
-      if (typeof first?.message === "string") return first.message;
+  const humanizeMessage = (raw: string): string => {
+    const lower = raw.toLowerCase();
+    if (
+      lower.includes("timeout") ||
+      lower.includes("timed out") ||
+      lower.includes("etimedout") ||
+      lower.includes("econnaborted") ||
+      lower.includes("upstream request")
+    ) {
+      return "The request took too long to complete. Please try again.";
     }
-    return fallback;
+    if (lower.includes("network error") || lower.includes("econnrefused") || lower.includes("enotfound")) {
+      return "Unable to reach the server. Please check your connection and try again.";
+    }
+    if (lower.includes("econnreset") || lower.includes("socket hang up")) {
+      return "The connection was interrupted. Please try again.";
+    }
+    return raw;
+  };
+
+  const getErrorMessage = (payload: any, fallback: string) => {
+    let message = fallback;
+    if (payload) {
+      if (typeof payload === "string") message = payload;
+      else if (typeof payload?.error === "string") message = payload.error;
+      else if (typeof payload?.message === "string") message = payload.message;
+      else if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+        const first = payload.errors[0];
+        if (typeof first?.msg === "string") message = first.msg;
+        else if (typeof first?.message === "string") message = first.message;
+      }
+    }
+    return humanizeMessage(message);
   };
 
   return {
