@@ -25,6 +25,7 @@ import {
   searchDomainSaleServerFn,
   purchaseDomainServerFn,
 } from "../../server/domains/actions";
+import { getPaymentMethodsServerFn } from "@/server/payments/actions";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import type { PaymentMethod } from "@/backend/payments";
 import { getWorkspaceFromSearch, withWorkspaceQuery } from "@/utils/topbar-navigation";
@@ -251,11 +252,19 @@ function BuyDomainPage() {
   }
 
   async function handlePurchase() {
-    if (!purchaseTarget || !defaultCard || purchasing) return;
+    if (!purchaseTarget || purchasing) return;
 
     setPurchasing(true);
 
     try {
+      const latestMethods = await getPaymentMethodsServerFn();
+      const methods = Array.isArray(latestMethods) ? latestMethods : [];
+      const latestDefaultMethod = methods.find((method: any) => method.is_default) ?? methods[0];
+      if (!latestDefaultMethod?.id) {
+        toast.error("Add a payment method before purchasing a domain.");
+        return;
+      }
+
       await purchaseDomain({
         data: {
           ...(workspace ? { workspace } : {}),
@@ -554,7 +563,7 @@ function BuyDomainPage() {
           <GlossyButton
             variant="blue"
             onClick={handlePurchase}
-            disabled={!defaultCard || purchasing}
+            disabled={purchasing}
             loading={purchasing}
             loadingLabel="Purchasing..."
           >

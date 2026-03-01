@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
+import { FolderOpen } from "@phosphor-icons/react";
 import { PageHeader } from "../../components/shared/page-header";
 import { ProjectCard } from "../../components/shared/project-card";
 import type { Project } from "../../components/shared/project-card";
@@ -379,8 +380,9 @@ function ProjectsPage() {
           </div>
 
           {filteredProjects.length === 0 ? (
-            <div className="mt-4 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3 text-sm text-dash-text-faded">
-              {emptyStateMessage}
+            <div className="mt-4 flex flex-col items-center justify-center py-10">
+              <FolderOpen size={40} weight="fill" className="text-dash-text-faded/50 mb-2" />
+              <span className="text-sm text-dash-text-faded">{emptyStateMessage}</span>
             </div>
           ) : null}
         </motion.div>

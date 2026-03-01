@@ -663,7 +663,13 @@ function Phase3Invite({
                   <div key={row.id}>
                     <div className="flex items-center gap-2">
                       <input
-                        type="email"
+                        type="text"
+                        inputMode="email"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        name={`workspace-invite-email-${row.id}`}
                         placeholder="colleague@company.com"
                         value={row.email}
                         onChange={(e) => updateRow(row.id, "email", e.target.value)}
@@ -775,13 +781,16 @@ function NewWorkspacePage() {
     { id: inviteNextId++, email: "", role: "Member" },
   ]);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
-  const [defaultPaymentMethod, setDefaultPaymentMethod] = useState<string | null>(null);
   const [hasPaymentMethod, setHasPaymentMethod] = useState<boolean | null>(null);
 
+  async function fetchLatestPaymentMethods() {
+    const methods = await getPaymentMethodsServerFn();
+    return Array.isArray(methods) ? methods : [];
+  }
+
   useEffect(() => {
-    getPaymentMethodsServerFn().then((methods: any[]) => {
+    fetchLatestPaymentMethods().then((methods: any[]) => {
       const defaultPm = methods.find((m: any) => m.is_default) ?? methods[0];
-      if (defaultPm?.id) setDefaultPaymentMethod(defaultPm.id);
       setHasPaymentMethod(Array.isArray(methods) && methods.length > 0);
     }).catch(() => {
       setHasPaymentMethod(false);
@@ -824,6 +833,21 @@ function NewWorkspacePage() {
       return;
     }
 
+    let latestDefaultPaymentMethod: string | undefined;
+    try {
+      const methods = await fetchLatestPaymentMethods();
+      const defaultPm = methods.find((m: any) => m.is_default) ?? methods[0];
+      latestDefaultPaymentMethod = defaultPm?.id;
+      setHasPaymentMethod(methods.length > 0);
+    } catch {
+      setHasPaymentMethod(false);
+    }
+
+    if (!latestDefaultPaymentMethod) {
+      toast.error("Add a payment method before creating a workspace.");
+      return;
+    }
+
     const payload = buildCreateWorkspacePayload({
       workspaceName,
       imageUrl: workspaceImageUrl,
@@ -832,7 +856,7 @@ function NewWorkspacePage() {
       promoCode: teamConfig.promoCode,
       startupCodeReference: teamConfig.startupCodeReference,
       invitedEmails: extractInvitedEmails(rows),
-      paymentMethod: defaultPaymentMethod ?? undefined,
+      paymentMethod: latestDefaultPaymentMethod,
     });
 
     try {

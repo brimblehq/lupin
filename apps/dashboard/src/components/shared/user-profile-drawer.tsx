@@ -3075,6 +3075,7 @@ function MembersForm({
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         currentSeats={billableSeats}
+        currentUserEmail={currentUser?.email ?? null}
         onInvite={async (emails) => {
           await inviteTeamMembers({ data: { workspace, members: emails } });
           toast.success(

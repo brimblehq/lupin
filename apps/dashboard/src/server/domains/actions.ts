@@ -491,4 +491,43 @@ export const transferOutServerFn = createServerFn({
   });
 });
 
+export const transferInServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        name: string;
+        authCode: string;
+        duration?: number;
+        privacyEnabled?: boolean;
+        autoRenewal?: boolean;
+        projectId?: string;
+      }
+    | undefined;
+
+  const name = payload?.name?.trim().toLowerCase();
+  if (!name) {
+    throw new Error("Domain name is required");
+  }
+
+  const authCode = payload?.authCode?.trim();
+  if (!authCode) {
+    throw new Error("Auth code is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
+    return api.domains.transferIn({
+      name,
+      authCode,
+      duration: payload?.duration ?? 1,
+      privacyEnabled: Boolean(payload?.privacyEnabled),
+      autoRenewal: Boolean(payload?.autoRenewal),
+      projectId: payload?.projectId,
+      teamId,
+    });
+  });
+});
+
 export type { DomainDetailsRecord, DomainRecord, PaginatedDomainsResponse };

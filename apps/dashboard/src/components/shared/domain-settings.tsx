@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Share2, Reply, Plus, AlertCircle, ChevronDown, Pencil, RefreshCw, ArrowUpRight } from "lucide-react";
-import { CheckCircle, ShieldCheck, Warning } from "@phosphor-icons/react";
+import { Copy, Plus, AlertCircle, ChevronDown, Pencil, RefreshCw, ArrowUpRight } from "lucide-react";
+import { CheckCircle, FolderOpen, ShieldCheck, Warning } from "@phosphor-icons/react";
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -22,11 +22,14 @@ import { Dropdown } from "./dropdown";
 import {
   createDomainDnsRecordServerFn,
   deleteDomainDnsRecordServerFn,
+  listDomainProjectsServerFn,
   refreshDomainStatusServerFn,
   renewDomainSaleServerFn,
+  transferDomainServerFn,
   transferOutServerFn,
   updateDomainDnsRecordServerFn,
 } from "@/server/domains/actions";
+import { getPaymentMethodsServerFn } from "@/server/payments/actions";
 
 const dnsRecordTypes = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"];
 
@@ -260,7 +263,7 @@ function AddDnsRecordModal({
                         <p className="text-sm leading-6 text-dash-text-body">
                           <span className="font-semibold">
                             {name.trim()
-                              ? name.trim() === "@"
+                              ? name.trim() === "@" || name.trim().endsWith(`.${domainName}`) || name.trim() === domainName
                                 ? domainName
                                 : `${name.trim()}.${domainName}`
                               : `[name].${domainName}`}
@@ -356,6 +359,11 @@ export function DomainSettings({
   const [transferAuthLoading, setTransferAuthLoading] = useState(false);
   const [domainActive, setDomainActive] = useState(Boolean(domain.active));
   const [refreshingStatus, setRefreshingStatus] = useState(false);
+  const [linkProjectOpen, setLinkProjectOpen] = useState(false);
+  const [linkProjectList, setLinkProjectList] = useState<{ id: string; name: string }[]>([]);
+  const [linkProjectLoading, setLinkProjectLoading] = useState(false);
+  const [linkProjectSelected, setLinkProjectSelected] = useState<string | null>(null);
+  const [linkProjectSubmitting, setLinkProjectSubmitting] = useState(false);
 
   const expiringSoon = (() => {
     if (domain.isExpired || !domain.expiresAt) return false;
@@ -391,6 +399,42 @@ export function DomainSettings({
   const transferOut = useServerFn(transferOutServerFn as any) as (args: {
     data: { workspace?: string; domainName: string };
   }) => Promise<{ domainName: string; authCode: string; unlocked: boolean }>;
+  const transferToProject = useServerFn(transferDomainServerFn as any) as (args: {
+    data: { workspace?: string; domainId: string; projectId: string };
+  }) => Promise<{ success: boolean }>;
+
+  async function handleOpenLinkProject() {
+    setLinkProjectOpen(true);
+    setLinkProjectLoading(true);
+    try {
+      const result = await (listDomainProjectsServerFn as any)({
+        data: { workspace },
+      });
+      setLinkProjectList(
+        (result?.items ?? []).map((p: any) => ({ id: String(p.id ?? p._id), name: p.name ?? "" })),
+      );
+    } catch {
+      toast.error("Failed to load projects");
+    } finally {
+      setLinkProjectLoading(false);
+    }
+  }
+
+  async function handleLinkProject() {
+    if (!linkProjectSelected || linkProjectSubmitting) return;
+    setLinkProjectSubmitting(true);
+    try {
+      await transferToProject({
+        data: { workspace, domainId: domain.domainId, projectId: linkProjectSelected },
+      });
+      toast.success("Domain linked to project");
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to link domain to project");
+    } finally {
+      setLinkProjectSubmitting(false);
+    }
+  }
 
   useEffect(() => {
     setRecords(domain.dnsRecords);
@@ -632,18 +676,20 @@ export function DomainSettings({
           </a>
         </div>
         <div className="flex items-center gap-4 px-3.5">
-          <button className="text-dash-text-faded transition-colors hover:text-dash-text-strong">
-            <Share2 className="size-4" />
-          </button>
-          <button className="text-dash-text-faded transition-colors hover:text-dash-text-strong">
-            <Reply className="size-4" />
-          </button>
-          <button
-            onClick={() => setDeleteOpen(true)}
-            className="transition-opacity hover:opacity-70"
-          >
-            <FolderTrashIcon className="size-4" />
-          </button>
+          {domain.purchased ? (
+            <SimpleTooltip content="Purchased domains cannot be deleted" side="bottom">
+              <span className="cursor-not-allowed opacity-40">
+                <FolderTrashIcon className="size-4" />
+              </span>
+            </SimpleTooltip>
+          ) : (
+            <button
+              onClick={() => setDeleteOpen(true)}
+              className="transition-opacity hover:opacity-70"
+            >
+              <FolderTrashIcon className="size-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -673,7 +719,13 @@ export function DomainSettings({
                     {domain.connectedProjectName}
                   </Link>
                 ) : (
-                  "Not linked"
+                  <button
+                    type="button"
+                    onClick={handleOpenLinkProject}
+                    className="text-[#4879f8] underline-offset-2 transition-colors hover:underline"
+                  >
+                    Link to project
+                  </button>
                 )
               }
             />
@@ -985,6 +1037,64 @@ export function DomainSettings({
       />
 
       {/* Delete Domain Modal */}
+      <Modal
+        open={linkProjectOpen}
+        onOpenChange={(open) => {
+          setLinkProjectOpen(open);
+          if (!open) {
+            setLinkProjectSelected(null);
+            setLinkProjectList([]);
+          }
+        }}
+        width={420}
+      >
+        <ModalHeader
+          title="Link to project"
+          description="Select a project to connect this domain to"
+        />
+        <div className="max-h-[280px] overflow-y-auto">
+          {linkProjectLoading ? (
+            <div className="flex h-20 items-center justify-center">
+              <RefreshCw className="size-4 animate-spin text-dash-text-faded" />
+            </div>
+          ) : linkProjectList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              <FolderOpen size={40} weight="fill" className="text-dash-text-faded/50 mb-2" />
+              <span className="text-sm text-dash-text-faded">No projects found</span>
+            </div>
+          ) : (
+            linkProjectList.map((project) => (
+              <button
+                key={project.id}
+                onClick={() => setLinkProjectSelected(project.id)}
+                className={`flex w-full items-center gap-3 px-6 py-3 transition-colors hover:bg-dash-bg-elevated ${
+                  linkProjectSelected === project.id ? "bg-dash-bg-elevated" : ""
+                }`}
+              >
+                <img src="/icons/folder-open.svg" alt="" className="size-4 shrink-0" />
+                <span className="flex-1 text-left text-sm text-dash-text-strong">{project.name}</span>
+                {linkProjectSelected === project.id && (
+                  <span className="flex size-[14px] items-center justify-center rounded-full bg-[#008cff] shadow-[0px_1px_2px_rgba(0,110,225,0.5),0px_0px_0px_1px_#006ee1]">
+                    <span className="size-[6px] rounded-full bg-white" />
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+        <ModalFooter>
+          <ModalCancelButton />
+          <ModalContinueButton
+            onClick={() => void handleLinkProject()}
+            disabled={!linkProjectSelected || linkProjectSubmitting}
+            loading={linkProjectSubmitting}
+            loadingLabel="Linking..."
+          >
+            Link project
+          </ModalContinueButton>
+        </ModalFooter>
+      </Modal>
+
       <WarningModal
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -1221,6 +1331,13 @@ export function DomainSettings({
         confirmDisabled={!domain.domainId}
         onConfirm={async () => {
           try {
+            const latestMethods = await getPaymentMethodsServerFn();
+            const methods = Array.isArray(latestMethods) ? latestMethods : [];
+            const latestDefaultMethod = methods.find((method: any) => method.is_default) ?? methods[0];
+            if (!latestDefaultMethod?.id) {
+              throw new Error("Add a payment method before renewing this domain.");
+            }
+
             await renewDomain({
               data: {
                 ...(workspace ? { workspace } : {}),

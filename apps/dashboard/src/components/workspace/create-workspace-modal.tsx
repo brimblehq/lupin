@@ -348,7 +348,13 @@ function StepInvite({
         {rows.map((row) => (
           <div key={row.id} className="flex items-center gap-2">
             <input
-              type="email"
+              type="text"
+              inputMode="email"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              name={`workspace-invite-email-${row.id}`}
               placeholder="Enter email address"
               value={row.email}
               onChange={(e) => updateRow(row.id, "email", e.target.value)}

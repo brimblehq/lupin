@@ -72,6 +72,7 @@ interface InviteMembersModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentSeats?: number;
+  currentUserEmail?: string | null;
   onInvite?: (emails: string[]) => Promise<void> | void;
 }
 
@@ -79,6 +80,7 @@ export function InviteMembersModal({
   open,
   onOpenChange,
   currentSeats = 3,
+  currentUserEmail,
   onInvite,
 }: InviteMembersModalProps) {
   const [rows, setRows] = useState<InviteRow[]>([
@@ -103,6 +105,15 @@ export function InviteMembersModal({
   const pricing = usePricing();
   const seatPrice = pricing.team.costPerMember;
   const filledRows = rows.filter((r) => r.email.trim().length > 0);
+  const normalizedCurrentUserEmail = currentUserEmail?.trim().toLowerCase() ?? "";
+  const selfInviteRowIds = new Set(
+    rows
+      .filter((row) => {
+        const normalizedEmail = row.email.trim().toLowerCase();
+        return Boolean(normalizedEmail && normalizedCurrentUserEmail && normalizedEmail === normalizedCurrentUserEmail);
+      })
+      .map((row) => row.id),
+  );
   const newSeats = filledRows.length;
   const addedCost = newSeats * seatPrice;
   const newTotal = (currentSeats + newSeats) * seatPrice;
@@ -115,6 +126,10 @@ export function InviteMembersModal({
   }, [open]);
 
   async function handleSubmit() {
+    if (selfInviteRowIds.size > 0) {
+      return;
+    }
+
     const emails = filledRows.map((row) => row.email.trim());
     if (!emails.length || isSubmitting) {
       return;
@@ -141,24 +156,41 @@ export function InviteMembersModal({
         {/* Invite rows */}
         <div className="flex flex-col gap-3">
           {rows.map((row) => (
-            <div key={row.id} className="flex items-center gap-2">
-              <input
-                type="email"
-                placeholder="colleague@company.com"
-                value={row.email}
-                onChange={(e) => updateRow(row.id, "email", e.target.value)}
-                className="input-base input-focus flex-1 px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]"
-              />
-              <RoleDropdown
-                value={row.role}
-                onChange={(v) => updateRow(row.id, "role", v)}
-              />
-              <button
-                onClick={() => removeRow(row.id)}
-                className="flex size-[38px] shrink-0 items-center justify-center rounded-[6px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
-              >
-                <X className="size-4" />
-              </button>
+            <div key={row.id} className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  inputMode="email"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  name={`invite-email-${row.id}`}
+                  placeholder="colleague@company.com"
+                  value={row.email}
+                  onChange={(e) => updateRow(row.id, "email", e.target.value)}
+                  className={
+                    selfInviteRowIds.has(row.id)
+                      ? "flex-1 rounded-[6px] px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] shadow-[0px_0px_0px_1px_#e1291d,0px_0px_0px_3px_rgba(225,41,29,0.15)] outline-none"
+                      : "input-base input-focus flex-1 px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]"
+                  }
+                />
+                <RoleDropdown
+                  value={row.role}
+                  onChange={(v) => updateRow(row.id, "role", v)}
+                />
+                <button
+                  onClick={() => removeRow(row.id)}
+                  className="flex size-[38px] shrink-0 items-center justify-center rounded-[6px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              {selfInviteRowIds.has(row.id) ? (
+                <p className="text-xs text-[#e1291d]">
+                  You can&apos;t invite yourself to this workspace.
+                </p>
+              ) : null}
             </div>
           ))}
         </div>
@@ -183,8 +215,8 @@ export function InviteMembersModal({
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               className="overflow-hidden"
             >
-              <div className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3">
-                <div className="flex items-center justify-between">
+              <div className="px-1 py-1">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4">
                   <span className="text-sm text-dash-text-faded">
                     {newSeats} new {newSeats === 1 ? "seat" : "seats"} &times; {formatUsdMonthly(seatPrice)}/seat
                   </span>
@@ -192,7 +224,7 @@ export function InviteMembersModal({
                     +{formatUsdMonthly(addedCost)}/month
                   </span>
                 </div>
-                <div className="mt-1 flex items-center justify-between border-t border-dash-border-soft pt-2">
+                <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-t border-dash-border-soft pt-2">
                   <span className="text-xs text-dash-text-faded">
                     New seat subtotal ({currentSeats + newSeats} seats)
                   </span>
@@ -209,7 +241,7 @@ export function InviteMembersModal({
       <ModalFooter>
         <ModalCancelButton />
         <ModalContinueButton
-          disabled={newSeats === 0}
+          disabled={newSeats === 0 || selfInviteRowIds.size > 0}
           loading={isSubmitting}
           loadingLabel="Sending..."
           onClick={() => {

@@ -99,6 +99,24 @@ export interface PurchaseDomainInput {
   teamId?: string;
 }
 
+export interface TransferInInput {
+  name: string;
+  authCode: string;
+  duration: number;
+  privacyEnabled: boolean;
+  autoRenewal: boolean;
+  projectId?: string;
+  teamId?: string;
+}
+
+export interface TransferInResult {
+  domainName: string;
+  status: string;
+  nameservers: string[];
+  renewalPrice: number;
+  reversed: boolean;
+}
+
 export interface RenewDomainInput {
   id: string;
   duration: number;
@@ -117,6 +135,7 @@ export interface DomainsApi {
   update(input: UpdateDomainInput): Promise<DomainRecord>;
   transfer(input: { domainId: string; projectId: string; teamId?: string }): Promise<void>;
   transferOut(domainName: string, teamId?: string): Promise<{ domainName: string; authCode: string; unlocked: boolean }>;
+  transferIn(input: TransferInInput): Promise<TransferInResult>;
   searchSale(domainName: string): Promise<SearchDomainResult[]>;
   purchaseSale(input: PurchaseDomainInput): Promise<void>;
   renewSale(input: RenewDomainInput): Promise<{ domain: string; renewal_date: string; reference: string }>;
@@ -492,6 +511,30 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
         domainName: root.domainName ?? domainName,
         authCode: root.authCode ?? "",
         unlocked: Boolean(root.unlocked),
+      };
+    },
+
+    async transferIn(input) {
+      const response = await client.request<any>("/core/v1/domains/sale/transfer-in", {
+        method: "POST",
+        body: {
+          name: input.name,
+          authCode: input.authCode,
+          duration: input.duration,
+          privacyEnabled: input.privacyEnabled,
+          autoRenewal: input.autoRenewal,
+          projectId: input.projectId,
+          teamId: input.teamId,
+        },
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      return {
+        domainName: root.domainName ?? input.name,
+        status: root.status ?? "pending",
+        nameservers: Array.isArray(root.nameservers) ? root.nameservers : [],
+        renewalPrice: root.renewalPrice ?? 0,
+        reversed: Boolean(root.reversed),
       };
     },
 

@@ -307,7 +307,7 @@ function WorkspaceSwitcher({
                   setOpen(false);
                   navigateWithWorkspace();
                 }}
-                className={`flex w-full items-center gap-2 rounded px-px py-1 transition-colors hover:bg-dash-bg-elevated ${
+                className={`flex w-full items-center gap-2.5 rounded-[4px] px-2 py-2 transition-colors hover:bg-dash-bg-elevated ${
                   !activeTeam ? "bg-dash-bg-elevated" : ""
                 }`}
               >
@@ -330,40 +330,42 @@ function WorkspaceSwitcher({
                   Teams
                 </span>
               </div>
-              {filteredTeams.length > 0 ? (
-                filteredTeams.map((team) => {
-                  return (
-                    <button
-                      key={team.id || team.name}
-                      onClick={() => {
-                        setOpen(false);
-                        if (team.slug) {
-                          navigateWithWorkspace(team.slug);
-                        }
-                      }}
-                      className={`flex w-full items-center gap-2 rounded px-px py-1 transition-colors hover:bg-dash-bg-elevated ${
-                        activeTeam?.slug === team.slug
-                          ? "bg-dash-bg-elevated"
-                          : ""
-                      }`}
-                    >
-                      <Avatar
-                        src={team.avatarUrl}
-                        fallbackSeed={team.name}
-                        alt=""
-                        className="size-6 shrink-0 rounded-full object-cover"
-                      />
-                      <span className="text-sm text-dash-text-body dark:text-dash-text-strong">
-                        {`${toTitleCase(team.name)}'s Workspace`}
-                      </span>
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="px-px py-1 text-sm text-dash-text-extra-faded">
-                  No teams found
-                </div>
-              )}
+              <div className="flex flex-col gap-0.5">
+                {filteredTeams.length > 0 ? (
+                  filteredTeams.map((team) => {
+                    return (
+                      <button
+                        key={team.id || team.name}
+                        onClick={() => {
+                          setOpen(false);
+                          if (team.slug) {
+                            navigateWithWorkspace(team.slug);
+                          }
+                        }}
+                        className={`flex w-full items-center gap-2.5 rounded-[4px] px-2 py-2 transition-colors hover:bg-dash-bg-elevated ${
+                          activeTeam?.slug === team.slug
+                            ? "bg-dash-bg-elevated"
+                            : ""
+                        }`}
+                      >
+                        <Avatar
+                          src={team.avatarUrl}
+                          fallbackSeed={team.name}
+                          alt=""
+                          className="size-6 shrink-0 rounded-full object-cover"
+                        />
+                        <span className="text-sm text-dash-text-body dark:text-dash-text-strong">
+                          {`${toTitleCase(team.name)}'s Workspace`}
+                        </span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="px-2 py-2 text-sm text-dash-text-extra-faded">
+                    No teams found
+                  </div>
+                )}
+              </div>
             </div>
             {/* Home + Create workspace */}
             <div className="flex flex-col border-t-[0.5px] border-dash-border bg-dash-bg-elevated">
