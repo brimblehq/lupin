@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import { FolderOpen } from "@phosphor-icons/react";
+import { Formik, Form as FormikForm } from "formik";
+import * as Yup from "yup";
 import { PageHeader } from "../../components/shared/page-header";
 import { ProjectCard } from "../../components/shared/project-card";
 import type { Project } from "../../components/shared/project-card";
@@ -10,11 +13,36 @@ import { NumberPagination } from "../../components/shared/pagination";
 import { TagFilterBar } from "../../components/projects/tag-filter-bar";
 import { SearchFilterBar } from "../../components/shared/search-filter-bar";
 import { FilterDropdown, type FilterOption } from "../../components/shared/filter-dropdown";
+import { Modal, ModalHeader } from "../../components/shared/modal";
+import { GlossyButton } from "../../components/shared/glossy-button";
+import { hapticToast as toast } from "@/utils/haptic-toast";
 import { listProjectsPageServerFn } from "@/server/projects/actions";
+import {
+  createProjectEnvironmentServerFn,
+  deleteProjectEnvironmentServerFn,
+  getProjectEnvironmentDetailsServerFn,
+  listProjectEnvironmentsServerFn,
+  updateProjectEnvironmentServerFn,
+} from "@/server/environments/actions";
+import type { ProjectEnvironment } from "@/backend/environments";
 import type { Project as BackendProject, PaginatedProjectsResponse } from "@/backend/projects";
 import { formatRelativeTime } from "@/utils/dashboard";
 import { parsePositivePageSearchValue, parseTextSearchValue, parseWorkspaceSearchValue, workspacePageLoaderDeps } from "@/utils/workspace-route-search";
 import { useTagsStore } from "@/hooks/use-tags-store";
+
+const environmentFormSchema = Yup.object({
+  name: Yup.string()
+    .trim()
+    .min(3, "Name should be at least 3 characters")
+    .max(64, "Name should be less than 65 characters")
+    .matches(/^[a-zA-Z][a-zA-Z _-]*$/, "Only letters, spaces, hyphens, and underscores")
+    .required("Environment name is required"),
+  inheritFrom: Yup.string().trim().default(""),
+});
+
+const deleteEnvironmentFormSchema = Yup.object({
+  moveTo: Yup.string().trim().required("Move target is required"),
+});
 
 function mapBackendProject(project: BackendProject): Project {
   return {
@@ -54,12 +82,20 @@ export const Route = createFileRoute("/projects/")({
   staleTime: 30_000,
   preloadStaleTime: 30_000,
   validateSearch: (search: Record<string, unknown>) => {
-    const next: { page?: number; workspace?: string; q?: string; type?: string; status?: string } = {};
+    const next: {
+      page?: number;
+      workspace?: string;
+      q?: string;
+      type?: string;
+      status?: string;
+      environmentId?: string;
+    } = {};
     const page = parsePositivePageSearchValue(search.page);
     const workspace = parseWorkspaceSearchValue(search.workspace);
     const q = parseTextSearchValue(search.q);
     const type = parseTextSearchValue(search.type);
     const status = parseTextSearchValue(search.status);
+    const environmentId = parseTextSearchValue(search.environmentId);
     if (page) {
       next.page = page;
     }
@@ -75,6 +111,9 @@ export const Route = createFileRoute("/projects/")({
     if (status) {
       next.status = status;
     }
+    if (environmentId) {
+      next.environmentId = environmentId;
+    }
 
     return next;
   },
@@ -83,22 +122,42 @@ export const Route = createFileRoute("/projects/")({
     q: parseTextSearchValue(search.q),
     type: parseTextSearchValue(search.type),
     status: parseTextSearchValue(search.status),
+    environmentId: parseTextSearchValue(search.environmentId),
   }),
   loader: async ({ deps }) => {
-    const result = await (listProjectsPageServerFn as unknown as (input: {
-      data: { page?: number; workspace?: string; q?: string; serviceType?: string; status?: string };
-    }) => Promise<PaginatedProjectsResponse>)({
-      data: {
-        page: deps.page,
-        workspace: deps.workspace,
-        q: deps.q,
-        serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
-        status: deps.status && deps.status !== "all" ? deps.status : undefined,
-      },
-    });
+    const [result, environments] = await Promise.all([
+      (listProjectsPageServerFn as unknown as (input: {
+        data: {
+          page?: number;
+          workspace?: string;
+          q?: string;
+          serviceType?: string;
+          status?: string;
+          environmentId?: string;
+        };
+      }) => Promise<PaginatedProjectsResponse>)({
+        data: {
+          page: deps.page,
+          workspace: deps.workspace,
+          q: deps.q,
+          serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
+          status: deps.status && deps.status !== "all" ? deps.status : undefined,
+          environmentId:
+            deps.environmentId && deps.environmentId !== "all"
+              ? deps.environmentId
+              : undefined,
+        },
+      }),
+      (listProjectEnvironmentsServerFn as unknown as (input: {
+        data?: { workspace?: string };
+      }) => Promise<ProjectEnvironment[]>)({
+        data: { workspace: deps.workspace },
+      }),
+    ]);
 
     return {
       projects: result.items.map(mapBackendProject),
+      environments,
       pagination: {
         currentPage: result.currentPage,
         totalPages: result.totalPages,
@@ -106,10 +165,404 @@ export const Route = createFileRoute("/projects/")({
         overallTotalProjects: result.overallTotalProjects,
       },
       workspace: deps.workspace,
+      environmentId: deps.environmentId,
     };
   },
   component: ProjectsPage,
 });
+
+function EnvironmentManagerModal({
+  open,
+  onOpenChange,
+  environments,
+  workspace,
+  activeEnvironmentId,
+  onEnvironmentListChange,
+  onActiveEnvironmentChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  environments: ProjectEnvironment[];
+  workspace?: string;
+  activeEnvironmentId?: string;
+  onEnvironmentListChange: (environments: ProjectEnvironment[]) => void;
+  onActiveEnvironmentChange: (environmentId?: string) => void;
+}) {
+  const createEnvironment = useServerFn(
+    createProjectEnvironmentServerFn as any,
+  ) as (args: {
+    data: { name: string; workspace?: string; inheritFrom?: string };
+  }) => Promise<ProjectEnvironment>;
+  const updateEnvironment = useServerFn(
+    updateProjectEnvironmentServerFn as any,
+  ) as (args: {
+    data: {
+      environmentId: string;
+      workspace?: string;
+      name?: string;
+      inheritFrom?: string | null;
+    };
+  }) => Promise<ProjectEnvironment>;
+  const deleteEnvironment = useServerFn(
+    deleteProjectEnvironmentServerFn as any,
+  ) as (args: {
+    data: { environmentId: string; moveTo: string; workspace?: string };
+  }) => Promise<{ success: boolean }>;
+  const getEnvironmentDetails = useServerFn(
+    getProjectEnvironmentDetailsServerFn as any,
+  ) as (args: {
+    data: { environmentId: string; workspace?: string };
+  }) => Promise<ProjectEnvironment>;
+
+  const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string | null>(
+    null,
+  );
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [envProjectCounts, setEnvProjectCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (activeEnvironmentId && environments.some((env) => env._id === activeEnvironmentId)) {
+      setSelectedEnvironmentId(activeEnvironmentId);
+      return;
+    }
+
+    if (environments.length > 0) {
+      setSelectedEnvironmentId(environments[0]._id);
+    } else {
+      setSelectedEnvironmentId(null);
+    }
+  }, [activeEnvironmentId, environments, open]);
+
+  useEffect(() => {
+    if (!open || environments.length === 0) return;
+    let cancelled = false;
+
+    void Promise.allSettled(
+      environments.map((env) =>
+        getEnvironmentDetails({ data: { environmentId: env._id, workspace } }),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const counts: Record<string, number> = {};
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled" && result.value?.projectCount != null) {
+          counts[environments[index]._id] = result.value.projectCount;
+        }
+      });
+      setEnvProjectCounts(counts);
+    });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, environments.length]);
+
+  const selectedEnvironment =
+    environments.find((env) => env._id === selectedEnvironmentId) ?? null;
+
+  const formInitialValues = {
+    name: selectedEnvironment?.name ?? "",
+    inheritFrom: selectedEnvironment?.inherit_from ?? "",
+  };
+
+  const inheritOptions = environments.filter(
+    (env) => env._id !== selectedEnvironment?._id,
+  );
+
+  const moveOptions = environments.filter(
+    (env) => env._id !== selectedEnvironment?._id,
+  );
+
+  return (
+    <Modal open={open} onOpenChange={onOpenChange} width={860}>
+      <ModalHeader
+        title="Environment Manager"
+        description="Create, edit, and delete project environments with validation checks."
+      />
+      <div className="grid min-h-[460px] grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="border-b border-dash-border p-4 md:border-b-0 md:border-r">
+          <button
+            type="button"
+            onClick={() => setSelectedEnvironmentId(null)}
+            className="mb-3 w-full rounded-[6px] border border-dash-border bg-dash-bg-elevated px-3 py-2 text-left text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg"
+          >
+            + New environment
+          </button>
+          <div className="space-y-1">
+            {environments.map((environment) => (
+              <button
+                key={environment._id}
+                type="button"
+                onClick={() => setSelectedEnvironmentId(environment._id)}
+                className={`flex w-full items-center rounded-[6px] px-3 py-2 text-left text-sm transition-colors ${
+                  selectedEnvironmentId === environment._id
+                    ? "bg-dash-bg-elevated text-dash-text-strong"
+                    : "text-dash-text-body hover:bg-dash-bg-elevated"
+                }`}
+              >
+                <span>{environment.name}</span>
+                {environment.isDefault ? (
+                  <span className="ml-1 text-xs text-dash-text-faded">(default)</span>
+                ) : null}
+                {envProjectCounts[environment._id] != null && (
+                  <span className="ml-auto text-xs text-dash-text-faded">
+                    {envProjectCounts[environment._id]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 md:p-5">
+          <Formik
+            initialValues={formInitialValues}
+            validationSchema={environmentFormSchema}
+            enableReinitialize
+            onSubmit={async (values) => {
+              const name = values.name.trim();
+              const inheritFrom = values.inheritFrom.trim();
+
+              setSaving(true);
+              try {
+                let nextEnvironment: ProjectEnvironment;
+
+                if (selectedEnvironment?._id) {
+                  nextEnvironment = await updateEnvironment({
+                    data: {
+                      environmentId: selectedEnvironment._id,
+                      workspace,
+                      name,
+                      inheritFrom: inheritFrom || null,
+                    },
+                  });
+
+                  onEnvironmentListChange(
+                    environments.map((env) =>
+                      env._id === selectedEnvironment._id ? nextEnvironment : env,
+                    ),
+                  );
+                  toast.success("Environment updated");
+                } else {
+                  nextEnvironment = await createEnvironment({
+                    data: {
+                      workspace,
+                      name,
+                      inheritFrom: inheritFrom || undefined,
+                    },
+                  });
+
+                  onEnvironmentListChange([...environments, nextEnvironment]);
+                  setSelectedEnvironmentId(nextEnvironment._id);
+                  toast.success("Environment created");
+                }
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to save environment",
+                );
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {({ values, errors, touched, handleChange, handleBlur, submitForm }) => (
+              <FormikForm className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm text-dash-text-body">
+                    Environment name
+                  </label>
+                  <input
+                    name="name"
+                    value={values.name}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="e.g. Staging"
+                    className={`w-full input-base px-3 py-2.5 text-sm text-dash-text-strong placeholder:text-[#9ca3af] ${touched.name && errors.name ? "border-[#f05252] focus:border-[#f05252] focus:ring-[#f05252]/20" : "input-focus"}`}
+                  />
+                  {touched.name && errors.name ? (
+                    <p className="mt-1 text-xs text-[#f05252]">{errors.name}</p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-dash-text-body">
+                    Inherit from
+                  </label>
+                  <select
+                    name="inheritFrom"
+                    value={values.inheritFrom}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className="w-full input-base input-focus px-3 py-2.5 text-sm text-dash-text-strong"
+                  >
+                    <option value="">None</option>
+                    {inheritOptions.map((option) => (
+                      <option key={option._id} value={option._id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  {(() => {
+                    const parent = inheritOptions.find((e) => e._id === values.inheritFrom);
+                    if (parent?.inherit_from) {
+                      const grandparent = environments.find((e) => e._id === parent.inherit_from);
+                      return (
+                        <p className="mt-1 text-xs text-[#f59e0b]">
+                          {parent.name} already inherits from {grandparent?.name ?? "another environment"}.
+                          Only one level of inheritance is supported.
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <GlossyButton
+                    type="button"
+                    onClick={() => void submitForm()}
+                    loading={saving}
+                    loadingLabel="Saving..."
+                  >
+                    {selectedEnvironment ? "Update Environment" : "Create Environment"}
+                  </GlossyButton>
+                </div>
+              </FormikForm>
+            )}
+          </Formik>
+
+          {selectedEnvironment && !selectedEnvironment.isDefault ? (
+            <div className="mt-8 border-t border-dash-border-soft pt-5">
+              <h4 className="mb-2 text-sm font-medium text-dash-text-strong">
+                Delete Environment
+              </h4>
+              <p className="mb-3 text-xs text-dash-text-faded">
+                Projects in this environment will be moved before deletion.
+              </p>
+
+              <Formik
+                initialValues={{ moveTo: moveOptions[0]?._id ?? "" }}
+                enableReinitialize
+                validationSchema={deleteEnvironmentFormSchema}
+                onSubmit={async (values) => {
+                  setDeleting(true);
+                  try {
+                    await deleteEnvironment({
+                      data: {
+                        environmentId: selectedEnvironment._id,
+                        moveTo: values.moveTo,
+                        workspace,
+                      },
+                    });
+
+                    const nextEnvironments = environments.filter(
+                      (env) => env._id !== selectedEnvironment._id,
+                    );
+                    onEnvironmentListChange(nextEnvironments);
+
+                    if (activeEnvironmentId === selectedEnvironment._id) {
+                      onActiveEnvironmentChange(undefined);
+                    }
+
+                    setSelectedEnvironmentId(nextEnvironments[0]?._id ?? null);
+                    toast.success("Environment deleted");
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Failed to delete environment",
+                    );
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+              >
+                {({ values, errors, touched, handleChange, handleBlur, submitForm }) => (
+                  <FormikForm className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-sm text-dash-text-body">
+                        Move projects to
+                      </label>
+                      <select
+                        name="moveTo"
+                        value={values.moveTo}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        className="w-full input-base input-focus px-3 py-2.5 text-sm text-dash-text-strong"
+                      >
+                        <option value="">Select target</option>
+                        {moveOptions.map((option) => (
+                          <option key={option._id} value={option._id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                      {touched.moveTo && errors.moveTo ? (
+                        <p className="mt-1 text-xs text-[#f05252]">{errors.moveTo}</p>
+                      ) : null}
+                    </div>
+
+                    <GlossyButton
+                      type="button"
+                      variant="red"
+                      onClick={() => void submitForm()}
+                      loading={deleting}
+                      loadingLabel="Deleting..."
+                      disabled={!values.moveTo}
+                    >
+                      Delete Environment
+                    </GlossyButton>
+                  </FormikForm>
+                )}
+              </Formik>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function ProjectCardSkeleton() {
+  return (
+    <div className="flex min-h-[168px] flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-3.5 pt-3 pb-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="h-4 w-32 animate-pulse rounded bg-dash-border-soft" />
+          <div className="h-5 w-16 animate-pulse rounded-[4px] bg-dash-border-soft" />
+        </div>
+        <div className="h-4 w-48 animate-pulse rounded bg-dash-border-soft" />
+      </div>
+      {/* Tags row */}
+      <div className="flex items-center gap-2 px-3.5 pb-1.5">
+        <span className="flex items-center gap-1.5">
+          <span className="size-1.5 animate-pulse rounded-full bg-dash-border-soft" />
+          <span className="h-3 w-10 animate-pulse rounded bg-dash-border-soft" />
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-1.5 animate-pulse rounded-full bg-dash-border-soft" />
+          <span className="h-3 w-12 animate-pulse rounded bg-dash-border-soft" />
+        </span>
+      </div>
+      <div className="relative flex shrink-0 items-center gap-2 px-3 pb-1 pt-0.5">
+        <div className="absolute left-[23px] top-[-6px] h-[16px] w-px bg-dash-border" />
+        <div className="size-6 animate-pulse rounded-full bg-dash-border-soft" />
+        <div className="h-3.5 w-24 animate-pulse rounded bg-dash-border-soft" />
+      </div>
+      <div className="flex h-10 shrink-0 items-center justify-between border-t-[0.5px] border-dash-border px-3.5">
+        <div className="h-3 w-28 animate-pulse rounded bg-dash-border-soft" />
+        <div className="flex items-center gap-1.5">
+          <div className="size-4 animate-pulse rounded bg-dash-border-soft" />
+          <div className="size-4 animate-pulse rounded bg-dash-border-soft" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ProjectsPage() {
   const navigate = useNavigate({ from: "/projects/" });
@@ -117,12 +570,15 @@ function ProjectsPage() {
   const loaderData = Route.useLoaderData();
   const [projects, setProjects] = useState(loaderData.projects);
   const [pagination, setPagination] = useState(loaderData.pagination);
+  const [environments, setEnvironments] = useState(loaderData.environments);
+  const [environmentModalOpen, setEnvironmentModalOpen] = useState(false);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(search.q ?? "");
   const [isFilterChanging, setIsFilterChanging] = useState(false);
   const [isStatusFilterChanging, setIsStatusFilterChanging] = useState(false);
   const activeProjectType = search.type ?? "all";
   const activeStatus = search.status ?? "all";
+  const activeEnvironmentId = search.environmentId ?? "all";
   const requestedWorkspace = search.workspace?.trim().toLowerCase() || undefined;
   const loadedWorkspace = loaderData.workspace?.trim().toLowerCase() || undefined;
   const isWorkspaceSwitching = requestedWorkspace !== loadedWorkspace;
@@ -138,6 +594,7 @@ function ProjectsPage() {
     q?: string;
     type?: string;
     status?: string;
+    environmentId?: string;
   }) {
     return {
       page: next.page,
@@ -145,12 +602,14 @@ function ProjectsPage() {
       q: next.q,
       type: next.type,
       status: next.status,
+      environmentId: next.environmentId,
     };
   }
 
   useEffect(() => {
     setProjects(loaderData.projects);
     setPagination(loaderData.pagination);
+    setEnvironments(loaderData.environments);
     setIsFilterChanging(false);
     setIsStatusFilterChanging(false);
   }, [loaderData]);
@@ -203,6 +662,7 @@ function ProjectsPage() {
           q: nextQ,
           type: search.type,
           status: search.status,
+          environmentId: search.environmentId,
           page: undefined,
         }),
       });
@@ -220,7 +680,14 @@ function ProjectsPage() {
     void (async () => {
       try {
         const result = await (listProjectsPageServerFn as unknown as (input: {
-          data: { page?: number; workspace?: string; q?: string; serviceType?: string; status?: string };
+          data: {
+            page?: number;
+            workspace?: string;
+            q?: string;
+            serviceType?: string;
+            status?: string;
+            environmentId?: string;
+          };
         }) => Promise<PaginatedProjectsResponse>)({
           data: {
             page: search.page,
@@ -228,6 +695,10 @@ function ProjectsPage() {
             q: search.q,
             serviceType: search.type && search.type !== "all" ? search.type : undefined,
             status: search.status && search.status !== "all" ? search.status : undefined,
+            environmentId:
+              search.environmentId && search.environmentId !== "all"
+                ? search.environmentId
+                : undefined,
           },
         });
         setProjects(result.items.map(mapBackendProject));
@@ -237,9 +708,19 @@ function ProjectsPage() {
           total: result.total,
           overallTotalProjects: result.overallTotalProjects,
         });
-      } catch {}
+      } catch {
+        // Keep previous project list if refresh fails.
+      }
     })();
-  }, [refreshSignal, search.page, search.q, search.status, search.type, search.workspace]);
+  }, [
+    refreshSignal,
+    search.environmentId,
+    search.page,
+    search.q,
+    search.status,
+    search.type,
+    search.workspace,
+  ]);
 
   const filteredProjects = activeTagId
     ? projects.filter((p) =>
@@ -250,6 +731,8 @@ function ProjectsPage() {
   const settledSearchQuery = search.q?.trim() ?? "";
   const pendingSearchQuery = searchQuery.trim();
   const isSearchSettling = pendingSearchQuery !== settledSearchQuery;
+  const isEnvironmentSwitching = (search.environmentId ?? undefined) !== (loaderData.environmentId ?? undefined);
+  const showSkeletons = isWorkspaceSwitching || isEnvironmentSwitching || isFilterChanging || isStatusFilterChanging;
 
   let emptyStateMessage = "No projects found.";
   if (hasSearchQuery && search.q) {
@@ -270,6 +753,7 @@ function ProjectsPage() {
         q: search.q,
         type: search.type,
         status: search.status,
+        environmentId: search.environmentId,
         page: page === 1 ? undefined : page,
       }),
     });
@@ -344,6 +828,7 @@ function ProjectsPage() {
                     q: search.q,
                     type: nextType,
                     status: search.status,
+                    environmentId: search.environmentId,
                     page: undefined,
                   }),
                 });
@@ -362,31 +847,47 @@ function ProjectsPage() {
       </div>
 
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={`${search.q ?? ""}:${activeTagId ?? "all"}:${activeStatus}:${pagination.currentPage}`}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects.map((project, i) => (
-              <motion.div layout key={`${project.name}-${i}`}>
-                <ProjectCard
-                  project={project}
-                  onTagsChange={(nextTags) => handleProjectTagsChange(project.id, nextTags)}
-                />
-              </motion.div>
-            ))}
-          </div>
-
-          {filteredProjects.length === 0 ? (
-            <div className="mt-4 flex flex-col items-center justify-center py-10">
-              <FolderOpen size={40} weight="fill" className="text-dash-text-faded/50 mb-2" />
-              <span className="text-sm text-dash-text-faded">{emptyStateMessage}</span>
+        {showSkeletons ? (
+          <motion.div
+            key="skeletons"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <ProjectCardSkeleton key={i} />
+              ))}
             </div>
-          ) : null}
-        </motion.div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key={`${search.q ?? ""}:${activeTagId ?? "all"}:${activeStatus}:${activeEnvironmentId}:${pagination.currentPage}`}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredProjects.map((project, i) => (
+                <motion.div layout key={`${project.name}-${i}`}>
+                  <ProjectCard
+                    project={project}
+                    onTagsChange={(nextTags) => handleProjectTagsChange(project.id, nextTags)}
+                  />
+                </motion.div>
+              ))}
+            </div>
+
+            {filteredProjects.length === 0 ? (
+              <div className="mt-4 flex flex-col items-center justify-center py-10">
+                <FolderOpen size={40} weight="fill" className="text-dash-text-faded/50 mb-2" />
+                <span className="text-sm text-dash-text-faded">{emptyStateMessage}</span>
+              </div>
+            ) : null}
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <div className="mt-6 flex justify-end">
@@ -396,6 +897,28 @@ function ProjectsPage() {
           onPageChange={handlePageChange}
         />
       </div>
+
+      <EnvironmentManagerModal
+        open={environmentModalOpen}
+        onOpenChange={setEnvironmentModalOpen}
+        environments={environments}
+        workspace={search.workspace}
+        activeEnvironmentId={search.environmentId}
+        onEnvironmentListChange={setEnvironments}
+        onActiveEnvironmentChange={(environmentId) => {
+          navigate({
+            to: "/projects",
+            search: buildProjectsSearch({
+              workspace: search.workspace,
+              q: search.q,
+              type: search.type,
+              status: search.status,
+              environmentId,
+              page: undefined,
+            }),
+          });
+        }}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { ArrowLeft, Copy, Check, ExternalLink, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Copy, Check, ExternalLink } from "lucide-react";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -306,8 +306,8 @@ function AddonDetailPage() {
               </p>
             ) : null}
             {detail.tools.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {detail.tools.slice(0, 6).map((tool) => (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {detail.tools.slice(0, 3).map((tool) => (
                   <span
                     key={tool.name}
                     className="rounded-full bg-dash-bg-elevated px-2 py-1 text-xs text-dash-text-faded"
@@ -315,24 +315,26 @@ function AddonDetailPage() {
                     {tool.name}
                   </span>
                 ))}
+                {detail.tools.length > 3 && (
+                  <span className="text-xs text-dash-text-extra-faded">
+                    +{detail.tools.length - 3}
+                  </span>
+                )}
               </div>
             ) : null}
           </div>
-          <div className="mt-4 flex items-center justify-between gap-4 rounded-[4px] border border-dash-border px-3.5 py-3">
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck className="size-4 text-dash-text-faded" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium text-dash-text-strong">
-                  Enable Authentication
-                </span>
-                <span className="text-xs text-dash-text-faded">
-                  Require an API key in the <code className="rounded bg-dash-bg px-1 font-mono text-[10px]">x-brimble-key</code> header to access this MCP server.
-                </span>
-              </div>
-            </div>
+          <div className="mt-4 flex items-center gap-3">
             <ToggleSwitch checked={authEnabled} onChange={setAuthEnabled} />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-dash-text-strong">
+                Enable Authentication
+              </span>
+              <span className="text-xs font-light text-dash-text-faded">
+                Require an API key in the <code className="rounded bg-dash-bg-elevated px-1 font-mono text-[10px]">x-brimble-key</code> header to access this MCP server.
+              </span>
+            </div>
           </div>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <GlossyButton
               className="min-w-[160px]"
               loading={deploying}

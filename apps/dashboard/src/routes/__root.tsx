@@ -56,6 +56,9 @@ const chatwootBootstrapScript = `(function(d,t){
 export const Route = createRootRoute({
   staleTime: 60_000,
   preloadStaleTime: 60_000,
+  loaderDeps: ({ search }) => ({
+    workspace: (search as Record<string, unknown>).workspace ?? undefined,
+  }),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -69,7 +72,7 @@ export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
     await enforceRouteAuth(location.pathname, location.searchStr);
   },
-  loader: async ({ location }) => {
+  loader: async ({ location, deps }) => {
     const isAuthRoute = /^\/(login|signup)$/.test(location.pathname);
     const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace|teams)?(\/|$)/;
     const isCatchAll = location.pathname !== "/" && !knownPrefixes.test(location.pathname);
@@ -90,10 +93,9 @@ export const Route = createRootRoute({
     }
 
     try {
-      const searchParams = new URLSearchParams(location.searchStr || "");
-      const rawWorkspace = searchParams.get("workspace");
+      const rawWorkspace = deps.workspace;
       let workspace: string | undefined;
-      if (rawWorkspace && rawWorkspace.trim()) {
+      if (rawWorkspace && typeof rawWorkspace === "string" && rawWorkspace.trim()) {
         workspace = rawWorkspace.trim();
       }
 

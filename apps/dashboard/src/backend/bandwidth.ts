@@ -14,7 +14,7 @@ export interface BandwidthSummary {
 }
 
 export interface BandwidthApi {
-  get(input?: { teamId?: string }): Promise<BandwidthSummary>;
+  get(input?: { teamId?: string; environmentId?: string }): Promise<BandwidthSummary>;
 }
 
 function mapPoint(value: unknown): BandwidthPoint | null {
@@ -38,10 +38,13 @@ function mapPoint(value: unknown): BandwidthPoint | null {
 export function createBandwidthApi(client: ApiClient): BandwidthApi {
   return {
     async get(input) {
+      const environmentId = input?.environmentId?.trim() || undefined;
       const response = await client.request<any>("/core/v1/bandwidth", {
         method: "GET",
+        headers: environmentId ? { "x-brimble-environment": environmentId } : undefined,
         query: {
           teamId: input?.teamId,
+          environmentId,
         },
       });
 

@@ -8,7 +8,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { Command } from "cmdk";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Moon, Sun, ArrowsClockwise } from "@phosphor-icons/react";
+import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure } from "@phosphor-icons/react";
 import { PaletteView } from "../../types/enums";
 import { useScoutBar } from "../../contexts/scoutbar-context";
 import { useTheme } from "../../hooks/use-theme";
@@ -18,7 +18,9 @@ import {
   withWorkspaceQuery,
 } from "@/utils/topbar-navigation";
 import { listDomainsPageServerFn } from "@/server/domains/actions";
+import { listProjectEnvironmentsServerFn } from "@/server/environments/actions";
 import type { DomainRecord } from "@/backend/domains";
+import type { ProjectEnvironment } from "@/backend/environments";
 import type { Project } from "@/backend/projects";
 import type { Workspace } from "@/backend/workspaces";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
@@ -42,6 +44,7 @@ export function CommandPalette() {
   const { isOpen, setIsOpen } = useScoutBar();
   const { theme, setTheme, toggleTheme } = useTheme();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const currentPathname = useRouterState({ select: (s) => s.location.pathname });
   const { onboardingProjects, workspaces, settingsSnapshot } =
     (rootRoute.useLoaderData() ?? {}) as {
       onboardingProjects: { items: Project[] } | null;
@@ -58,15 +61,26 @@ export function CommandPalette() {
   const [domainsLoadedForKey, setDomainsLoadedForKey] = useState<string | null>(
     null,
   );
+  const [environments, setEnvironments] = useState<ProjectEnvironment[]>([]);
+  const [environmentsLoading, setEnvironmentsLoading] = useState(false);
+  const [environmentsLoadedForKey, setEnvironmentsLoadedForKey] = useState<string | null>(null);
   const workspace = getWorkspaceFromSearch({ searchStr });
   const listDomains = useServerFn(listDomainsPageServerFn as any) as (args: {
     data: { workspace?: string; page?: number; q?: string };
   }) => Promise<{ items: DomainRecord[] }>;
   const listDomainsRef = useRef(listDomains);
+  const listEnvironments = useServerFn(listProjectEnvironmentsServerFn as any) as (args: {
+    data: { workspace?: string };
+  }) => Promise<ProjectEnvironment[]>;
+  const listEnvironmentsRef = useRef(listEnvironments);
 
   useEffect(() => {
     listDomainsRef.current = listDomains;
   }, [listDomains]);
+
+  useEffect(() => {
+    listEnvironmentsRef.current = listEnvironments;
+  }, [listEnvironments]);
 
   const projects = useMemo(
     () =>
@@ -175,6 +189,46 @@ export function CommandPalette() {
     };
   }, [domainsLoadedForKey, isOpen, query, view, workspace]);
 
+  useEffect(() => {
+    if (!isOpen || view !== PaletteView.EnvironmentSearch) {
+      return;
+    }
+
+    const fetchKey = workspace ?? "__personal__";
+    if (environmentsLoadedForKey === fetchKey) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      setEnvironmentsLoading(true);
+      try {
+        const result = await listEnvironmentsRef.current({
+          data: { workspace },
+        });
+
+        if (!cancelled && Array.isArray(result)) {
+          setEnvironments(result);
+          setEnvironmentsLoadedForKey(fetchKey);
+        }
+      } catch {
+        if (!cancelled) {
+          setEnvironments([]);
+          setEnvironmentsLoadedForKey(fetchKey);
+        }
+      } finally {
+        if (!cancelled) {
+          setEnvironmentsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [environmentsLoadedForKey, isOpen, view, workspace]);
+
   const runAction = useCallback((fn: () => void) => {
     haptics.selection();
     setIsOpen(false);
@@ -222,6 +276,14 @@ export function CommandPalette() {
     setPastViews((prev) => [...prev, view]);
     setFutureViews([]);
     setView(PaletteView.WorkspaceSearch);
+    setQuery("");
+  };
+
+  const openEnvironmentSearch = () => {
+    haptics.selection();
+    setPastViews((prev) => [...prev, view]);
+    setFutureViews([]);
+    setView(PaletteView.EnvironmentSearch);
     setQuery("");
   };
 
@@ -372,6 +434,7 @@ export function CommandPalette() {
     if (view === PaletteView.ProjectSearch) return "Search projects...";
     if (view === PaletteView.DomainSearch) return "Search domains...";
     if (view === PaletteView.WorkspaceSearch) return "Search workspaces...";
+    if (view === PaletteView.EnvironmentSearch) return "Search environments...";
     return "Search or jump to";
   })();
 
@@ -379,12 +442,14 @@ export function CommandPalette() {
     if (view === PaletteView.ProjectSearch) return "No projects found.";
     if (view === PaletteView.DomainSearch) return "No domains found.";
     if (view === PaletteView.WorkspaceSearch) return "No workspaces found.";
+    if (view === PaletteView.EnvironmentSearch) return "No environments found.";
     return "No results found.";
   })();
 
   const subviewHeading = (() => {
     if (view === PaletteView.ProjectSearch) return "PROJECTS";
     if (view === PaletteView.DomainSearch) return "DOMAINS";
+    if (view === PaletteView.EnvironmentSearch) return "ENVIRONMENTS";
     return "WORKSPACES";
   })();
 
@@ -538,6 +603,13 @@ export function CommandPalette() {
                           </Command.Group>
 
                           <Command.Group heading="TEAM">
+                            <Command.Item
+                              value="switch environment staging production development"
+                              onSelect={openEnvironmentSearch}
+                            >
+                              <TreeStructure className="size-4" />
+                              <span>Switch environment</span>
+                            </Command.Item>
                             <Command.Item
                               value="switch workspace team personal"
                               onSelect={openWorkspaceSearch}
@@ -718,6 +790,55 @@ export function CommandPalette() {
                                   <span className="capitalize">{t.name}</span>
                                 </Command.Item>
                               ))}
+                            {view === PaletteView.EnvironmentSearch &&
+                              environments.map((env) => {
+                                const params = new URLSearchParams(searchStr || "");
+                                const currentEnvId = params.get("environmentId");
+                                const isActive = env.isDefault
+                                  ? !currentEnvId
+                                  : currentEnvId === env._id;
+                                const parentEnv = env.inherit_from
+                                  ? environments.find((e) => e._id === env.inherit_from)
+                                  : null;
+
+                                return (
+                                  <Command.Item
+                                    key={env._id}
+                                    value={`environment ${env.name} ${env.slug} ${parentEnv ? `inherits ${parentEnv.name}` : ""}`}
+                                    onSelect={() =>
+                                      runAction(() => {
+                                        const nextParams = new URLSearchParams(searchStr || "");
+                                        if (env.isDefault) {
+                                          nextParams.delete("environmentId");
+                                        } else {
+                                          nextParams.set("environmentId", env._id);
+                                        }
+                                        const search = Object.fromEntries(nextParams.entries());
+                                        navigate({
+                                          to: currentPathname as any,
+                                          search: Object.keys(search).length > 0 ? search as any : undefined,
+                                        });
+                                      })
+                                    }
+                                  >
+                                    <TreeStructure className="size-4" />
+                                    <div className="flex flex-col">
+                                      <span>
+                                        {env.name}
+                                        {env.isDefault ? " (default)" : ""}
+                                      </span>
+                                      {parentEnv ? (
+                                        <span className="text-[11px] leading-tight text-dash-text-extra-faded">
+                                          inherits from {parentEnv.name}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    {isActive ? (
+                                      <span className="ml-auto size-1.5 shrink-0 rounded-full bg-[#34d399]" />
+                                    ) : null}
+                                  </Command.Item>
+                                );
+                              })}
                             {view === PaletteView.DomainSearch && domainsLoading ? (
                               <Command.Item value="domains loading" disabled>
                                 <img
@@ -727,6 +848,12 @@ export function CommandPalette() {
                                   alt=""
                                 />
                                 <span>Loading domains...</span>
+                              </Command.Item>
+                            ) : null}
+                            {view === PaletteView.EnvironmentSearch && environmentsLoading ? (
+                              <Command.Item value="environments loading" disabled>
+                                <TreeStructure className="size-4" />
+                                <span>Loading environments...</span>
                               </Command.Item>
                             ) : null}
                           </Command.Group>

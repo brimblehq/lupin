@@ -1,6 +1,248 @@
 import { createServerFn } from "@tanstack/react-start";
 import { withTokenRefresh } from "@/server/shared/backend";
 
+async function resolveWorkspaceTeamId(
+  api: any,
+  workspace?: string,
+) {
+  const workspaceSlug = workspace?.trim().toLowerCase();
+  if (!workspaceSlug) {
+    return undefined;
+  }
+
+  const teams = await api.workspaces.list();
+  return teams.items.find((item) => item.slug === workspaceSlug)?.id;
+}
+
+export const listProjectEnvironmentsServerFn = createServerFn({
+  method: "GET",
+}).handler(async ({ data }) => {
+  const payload = data as { workspace?: string } | undefined;
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.listEnvironments({ teamId });
+  });
+});
+
+export const getProjectEnvironmentDetailsServerFn = createServerFn({
+  method: "GET",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | { environmentId: string; workspace?: string }
+    | undefined;
+
+  const environmentId = payload?.environmentId?.trim();
+  if (!environmentId) {
+    throw new Error("Environment ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.getEnvironment(environmentId, { teamId });
+  });
+});
+
+export const createProjectEnvironmentServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        name: string;
+        workspace?: string;
+        inheritFrom?: string;
+      }
+    | undefined;
+
+  const name = payload?.name?.trim();
+  if (!name) {
+    throw new Error("Environment name is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.createEnvironment({
+      name,
+      teamId,
+      inheritFrom: payload?.inheritFrom?.trim() || undefined,
+    });
+  });
+});
+
+export const updateProjectEnvironmentServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        environmentId: string;
+        workspace?: string;
+        name?: string;
+        inheritFrom?: string | null;
+      }
+    | undefined;
+
+  const environmentId = payload?.environmentId?.trim();
+  if (!environmentId) {
+    throw new Error("Environment ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.updateEnvironment(environmentId, {
+      teamId,
+      name: payload?.name?.trim() || undefined,
+      inheritFrom:
+        typeof payload?.inheritFrom === "string"
+          ? payload.inheritFrom.trim() || null
+          : payload?.inheritFrom ?? undefined,
+    });
+  });
+});
+
+export const deleteProjectEnvironmentServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        environmentId: string;
+        moveTo: string;
+        workspace?: string;
+      }
+    | undefined;
+
+  const environmentId = payload?.environmentId?.trim();
+  const moveTo = payload?.moveTo?.trim();
+
+  if (!environmentId) {
+    throw new Error("Environment ID is required");
+  }
+  if (!moveTo) {
+    throw new Error("moveTo environment ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.deleteEnvironment(environmentId, {
+      moveTo,
+      teamId,
+    });
+  });
+});
+
+export const getEnvironmentVariablesServerFn = createServerFn({
+  method: "GET",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | { environmentId: string; workspace?: string }
+    | undefined;
+
+  const environmentId = payload?.environmentId?.trim();
+  if (!environmentId) {
+    throw new Error("Environment ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.listEnvironmentVariables(environmentId, { teamId });
+  });
+});
+
+export const saveEnvironmentVariablesServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        environmentId: string;
+        workspace?: string;
+        variables: Array<{ name: string; value: string; inheritable?: boolean }>;
+      }
+    | undefined;
+
+  const environmentId = payload?.environmentId?.trim();
+  if (!environmentId) {
+    throw new Error("Environment ID is required");
+  }
+
+  const variables = Array.isArray(payload?.variables) ? payload.variables : [];
+  if (!variables.length) {
+    throw new Error("At least one variable is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.saveEnvironmentVariables(environmentId, {
+      teamId,
+      variables,
+    });
+  });
+});
+
+export const updateEnvironmentVariableServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        environmentId: string;
+        variableId: string;
+        workspace?: string;
+        name: string;
+        value: string;
+        inheritable?: boolean;
+      }
+    | undefined;
+
+  const environmentId = payload?.environmentId?.trim();
+  const variableId = payload?.variableId?.trim();
+  const name = payload?.name?.trim();
+  const value = payload?.value;
+  if (!environmentId) {
+    throw new Error("Environment ID is required");
+  }
+  if (!variableId) {
+    throw new Error("Variable ID is required");
+  }
+  if (!name) {
+    throw new Error("Variable name is required");
+  }
+  if (typeof value !== "string") {
+    throw new Error("Variable value is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.updateEnvironmentVariable(environmentId, variableId, {
+      teamId,
+      name,
+      value,
+      inheritable: payload?.inheritable,
+    });
+  });
+});
+
+export const deleteEnvironmentVariableServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | { environmentId: string; variableId: string; workspace?: string }
+    | undefined;
+
+  const environmentId = payload?.environmentId?.trim();
+  const variableId = payload?.variableId?.trim();
+  if (!environmentId) {
+    throw new Error("Environment ID is required");
+  }
+  if (!variableId) {
+    throw new Error("Variable ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
+    return api.environments.deleteEnvironmentVariable(environmentId, variableId, {
+      teamId,
+    });
+  });
+});
+
 export const getProjectEnvironmentServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {

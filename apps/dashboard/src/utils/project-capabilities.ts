@@ -77,13 +77,13 @@ export function shouldShowProjectObservabilityTab(project?: Pick<Project, "servi
   return !isStaticProject(project);
 }
 
-export function shouldShowProjectEnvironmentTab(project?: Pick<Project, "framework"> | null): boolean {
+export function shouldShowProjectEnvironmentTab(project?: Pick<Project, "framework" | "serviceType"> | null): boolean {
   const framework = normalize(project?.framework);
-  if (!framework) {
+  if (framework === "html") {
     return false;
   }
 
-  return framework !== "html";
+  return true;
 }
 
 export function shouldShowProjectVisitSite(project?: Pick<Project, "serviceType"> | null): boolean {

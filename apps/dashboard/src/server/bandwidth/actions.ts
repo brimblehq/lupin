@@ -5,8 +5,9 @@ import { withTokenRefresh } from "@/server/shared/backend";
 export const getHomeBandwidthServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {
-  const payload = data as { workspace?: string } | undefined;
+  const payload = data as { workspace?: string; environmentId?: string } | undefined;
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
+  const environmentId = payload?.environmentId?.trim();
 
   return withTokenRefresh(async (api) => {
     let teamId: string | undefined;
@@ -19,7 +20,7 @@ export const getHomeBandwidthServerFn = createServerFn({
       }
     }
 
-    return api.bandwidth.get({ teamId }) as Promise<BandwidthSummary>;
+    return api.bandwidth.get({ teamId, environmentId: environmentId || undefined }) as Promise<BandwidthSummary>;
   });
 });
 

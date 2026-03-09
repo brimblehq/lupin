@@ -123,6 +123,275 @@ function isFullWidthLayoutPath(pathname: string) {
   return isProjectDetailsRoute;
 }
 
+function PageHeaderSkeleton() {
+  return (
+    <div className="mb-8 flex items-center gap-4">
+      <div className="hidden size-[80px] animate-pulse rounded bg-dash-border-soft/60 sm:block" />
+      <div>
+        <div className="mb-2 h-4 w-24 animate-pulse rounded bg-dash-border-soft/70" />
+        <div className="flex flex-col gap-1.5">
+          <div className="h-3 w-[400px] max-w-full animate-pulse rounded bg-dash-border-soft/50" />
+          <div className="h-3 w-[300px] max-w-full animate-pulse rounded bg-dash-border-soft/50" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HomeTabSkeleton() {
+  return (
+    <div className="max-w-[1000px] animate-pulse">
+      {/* WelcomeSection */}
+      <div className="mb-2 h-8 w-64 rounded bg-dash-border-soft/70" />
+      <div className="mb-6 h-4 w-80 rounded bg-dash-border-soft/50" />
+      {/* StatsRow */}
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="h-[88px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/40" />
+        <div className="h-[88px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/40" />
+        <div className="h-[88px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/40" />
+      </div>
+      <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
+      {/* DeployedProjects */}
+      <div className="mb-4 h-5 w-40 rounded bg-dash-border-soft/60" />
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="min-h-[168px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        ))}
+      </div>
+      <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
+      {/* ConnectedDomains */}
+      <div className="mb-3 h-5 w-48 rounded bg-dash-border-soft/60" />
+      <div className="mb-6 h-4 w-20 rounded bg-dash-border-soft/40" />
+      <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
+      {/* FeaturedIntegrations */}
+      <div className="mb-4 h-5 w-48 rounded bg-dash-border-soft/60" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="h-[200px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-[200px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-[200px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+      </div>
+    </div>
+  );
+}
+
+function ProjectsTabSkeleton() {
+  return (
+    <div className="max-w-[1000px] animate-pulse">
+      <PageHeaderSkeleton />
+      <hr className="-mx-4 mb-8 border-dash-border-soft md:-mx-10" />
+      {/* TagFilterBar */}
+      <div className="mb-4 flex gap-2">
+        <div className="h-7 w-16 rounded-full bg-dash-border-soft/50" />
+        <div className="h-7 w-20 rounded-full bg-dash-border-soft/50" />
+        <div className="h-7 w-14 rounded-full bg-dash-border-soft/50" />
+      </div>
+      {/* SearchFilterBar */}
+      <div className="mb-4 mt-4 flex items-center gap-2">
+        <div className="h-10 min-w-0 flex-1 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-10 w-[120px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-10 w-[120px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+      </div>
+      {/* CreateProjectCard placeholder */}
+      <div className="mb-4 h-12 rounded-[4px] border-[0.5px] border-dashed border-dash-border bg-dash-bg-elevated/20" />
+      {/* Project cards grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="min-h-[168px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DomainsTabSkeleton() {
+  return (
+    <div className="max-w-[1000px] animate-pulse">
+      <PageHeaderSkeleton />
+      {/* SearchFilterBar */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-10 min-w-0 flex-1 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-10 w-[120px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+      </div>
+      {/* Table */}
+      <div className="rounded-[4px] border-[0.5px] border-dash-border">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex h-[68px] items-center gap-3 border-b-[0.5px] border-dash-border px-3.5 last:border-b-0">
+            <div className="size-[14px] rounded-[3px] bg-dash-border-soft/50" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="h-3.5 w-40 rounded bg-dash-border-soft/60" />
+              <div className="h-3 w-24 rounded bg-dash-border-soft/40" />
+            </div>
+            <div className="flex w-[140px] items-center gap-1.5">
+              <div className="size-[6px] rounded-full bg-dash-border-soft/60" />
+              <div className="h-3.5 w-12 rounded bg-dash-border-soft/50" />
+            </div>
+            <div className="hidden w-[180px] flex-col items-end gap-1 sm:flex">
+              <div className="h-3.5 w-20 rounded bg-dash-border-soft/50" />
+              <div className="h-3 w-16 rounded bg-dash-border-soft/40" />
+            </div>
+            <div className="w-10 text-right">
+              <div className="ml-auto size-4 rounded bg-dash-border-soft/40" />
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Pagination */}
+      <div className="mt-6 flex justify-end">
+        <div className="h-8 w-28 rounded bg-dash-border-soft/50" />
+      </div>
+    </div>
+  );
+}
+
+function DiscoverTabSkeleton() {
+  return (
+    <div className="animate-pulse px-4 py-8 md:px-10">
+      {/* Banner */}
+      <div className="mb-6 rounded-[4px] border-[0.5px] border-dash-border-soft px-8 py-8">
+        <div className="mb-2 h-5 w-56 rounded bg-dash-border-soft/60" />
+        <div className="mb-4 h-4 w-80 max-w-full rounded bg-dash-border-soft/40" />
+        <div className="h-8 w-28 rounded-[6px] bg-dash-border-soft/50" />
+      </div>
+      {/* Search */}
+      <div className="mb-6 h-10 w-[320px] max-w-full rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+      {/* Section title */}
+      <div className="mb-4 h-5 w-32 rounded bg-dash-border-soft/60" />
+      {/* Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-[200px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScalingTabSkeleton() {
+  return (
+    <div className="max-w-[1000px] animate-pulse">
+      <PageHeaderSkeleton />
+      <hr className="-ml-4 mb-6 border-dash-border-soft md:-ml-10" />
+      {/* Search + button row */}
+      <div className="mb-5 flex items-center gap-3">
+        <div className="h-10 min-w-0 flex-1 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-10 w-[180px] rounded-[6px] bg-dash-border-soft/50" />
+      </div>
+      {/* 2-col grid of scaling cards */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex h-[164px] flex-col rounded-[4px] border-[0.5px] border-dash-border">
+            <div className="flex items-center justify-between px-3.5 pb-1 pt-3">
+              <div className="h-4 w-28 rounded bg-dash-border-soft/50" />
+              <div className="h-4 w-20 rounded bg-dash-border-soft/40" />
+            </div>
+            <div className="px-3.5 pb-3">
+              <div className="h-3 w-32 rounded bg-dash-border-soft/40" />
+            </div>
+            <div className="grid flex-1 grid-cols-2 gap-3 px-3.5 pb-3">
+              <div className="space-y-2">
+                <div className="h-3 w-16 rounded bg-dash-border-soft/40" />
+                <div className="h-4 w-20 rounded bg-dash-border-soft/50" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-16 rounded bg-dash-border-soft/40" />
+                <div className="h-3 w-20 rounded bg-dash-border-soft/50" />
+              </div>
+            </div>
+            <div className="mt-auto h-10 border-t-[0.5px] border-dash-border" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProjectDetailTabSkeleton() {
+  return (
+    <div className="mx-auto flex w-full max-w-[1000px] animate-pulse flex-col gap-6 py-8">
+      {/* Preview banner */}
+      <div className="h-[232px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-gradient-to-b from-dash-border-soft/40 to-dash-border-soft/20">
+        <div className="flex h-full items-end justify-center pb-4">
+          <div className="h-[180px] w-[92%] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/50" />
+        </div>
+      </div>
+      {/* 2-col cards */}
+      <div className="flex flex-col gap-4 md:flex-row">
+        {/* Meta card */}
+        <div className="flex-1 overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="h-10 bg-dash-bg-elevated/60" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex h-12 items-center justify-between border-b-[0.5px] border-dash-border px-3.5 last:border-b-0">
+              <div className="h-3 w-20 rounded bg-dash-border-soft/50" />
+              <div className="h-3 w-28 rounded bg-dash-border-soft/40" />
+            </div>
+          ))}
+        </div>
+        {/* Deployments card */}
+        <div className="flex-1 overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="h-10 bg-dash-bg-elevated/60" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex h-12 items-center justify-between border-b-[0.5px] border-dash-border px-3.5 last:border-b-0">
+              <div className="h-3 w-36 rounded bg-dash-border-soft/50" />
+              <div className="h-3 w-16 rounded bg-dash-border-soft/40" />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Domains section */}
+      <div>
+        <div className="mb-3 h-5 w-40 rounded bg-dash-border-soft/60" />
+        <div className="rounded-[4px] border-[0.5px] border-dash-border">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex h-[52px] items-center justify-between border-b-[0.5px] border-dash-border px-3.5 last:border-b-0">
+              <div className="h-3 w-44 rounded bg-dash-border-soft/50" />
+              <div className="h-3 w-20 rounded bg-dash-border-soft/40" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RouteTransitionSkeleton({
+  pathname,
+  fullWidth,
+}: {
+  pathname: string;
+  fullWidth?: boolean;
+}) {
+  if (/^\/projects\/[^/]+(?:\/|$)/.test(pathname) && !/^\/projects\/new(?:\/|$)/.test(pathname)) {
+    return <ProjectDetailTabSkeleton />;
+  }
+
+  if (pathname === "/" || pathname.startsWith("/workspace")) {
+    return <HomeTabSkeleton />;
+  }
+
+  if (pathname.startsWith("/projects")) {
+    return <ProjectsTabSkeleton />;
+  }
+
+  if (pathname.startsWith("/domains")) {
+    return <DomainsTabSkeleton />;
+  }
+
+  if (pathname.startsWith("/scaling")) {
+    return <ScalingTabSkeleton />;
+  }
+
+  if (pathname.startsWith("/addons")) {
+    return <DiscoverTabSkeleton />;
+  }
+
+  return (
+    <div className={cn("mx-auto w-full animate-pulse", fullWidth ? "max-w-screen-xl px-4 md:px-0" : "max-w-[1000px]")}>
+      <div className="mb-6 h-10 w-56 rounded bg-dash-border-soft/70" />
+      <div className="h-72 rounded bg-dash-border-soft/50" />
+    </div>
+  );
+}
+
 function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -306,6 +575,38 @@ export function DashboardLayout({
   const resolvedIsFullWidth = isFullWidthLayoutPath(layoutPathname);
   const shouldRenderDesktopSidebar = !resolvedIsFullWidth;
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const resolvedSearchStr = useRouterState({
+    select: (s) => s.resolvedLocation?.searchStr ?? s.location.searchStr,
+  });
+  // Only show skeleton when switching workspaces or environments — never for
+  // normal tab navigation. TanStack Router keeps the previous page visible
+  // until the new route resolves, so a skeleton on every tab switch is redundant.
+  const isWorkspaceOrEnvironmentSwitching = useMemo(() => {
+    const next = new URLSearchParams(searchStr || "");
+    const current = new URLSearchParams(resolvedSearchStr || "");
+
+    return (
+      next.get("workspace") !== current.get("workspace") ||
+      next.get("environmentId") !== current.get("environmentId")
+    );
+  }, [searchStr, resolvedSearchStr]);
+
+  // Delay skeleton by 150ms so very fast workspace switches don't flash it
+  const [shouldShowRouteSkeleton, setShouldShowRouteSkeleton] = useState(false);
+
+  useEffect(() => {
+    if (!isWorkspaceOrEnvironmentSwitching) {
+      setShouldShowRouteSkeleton(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setShouldShowRouteSkeleton(true);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [isWorkspaceOrEnvironmentSwitching]);
+
   const currentWorkspace = useMemo(() => {
     const params = new URLSearchParams(searchStr || "");
     return params.get("workspace")?.trim() || undefined;
@@ -686,7 +987,13 @@ export function DashboardLayout({
         {!shouldRenderDesktopSidebar && resolvedIsFullWidth ? (
           <main className="scrollbar-hidden flex flex-1 flex-col overflow-y-auto">
             <div className="mx-auto w-full max-w-screen-xl flex-1 px-4 md:px-0">
-              {children}
+              {shouldShowRouteSkeleton ? (
+                <div className="py-8">
+                  <RouteTransitionSkeleton pathname={pathname} fullWidth />
+                </div>
+              ) : (
+                children
+              )}
             </div>
             <Footer />
           </main>
@@ -697,7 +1004,11 @@ export function DashboardLayout({
             </div>
             <main className="scrollbar-hidden flex min-h-0 flex-1 flex-col overflow-y-auto">
               <div className="flex-1 px-4 py-6 md:py-8 md:pl-10 md:pr-0">
-                {children}
+                {shouldShowRouteSkeleton ? (
+                  <RouteTransitionSkeleton pathname={pathname} />
+                ) : (
+                  children
+                )}
               </div>
               <Footer />
             </main>

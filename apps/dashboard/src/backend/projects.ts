@@ -14,6 +14,8 @@ export interface Project {
   id: string;
   name: string;
   slug: string;
+  projectEnvironmentId?: string | null;
+  inheritEnvironmentVars?: boolean;
   logId?: string;
   screenshot?: string;
   framework?: string;
@@ -101,6 +103,8 @@ export interface ListProjectsInput {
   q?: string;
   serviceType?: string;
   status?: string;
+  environmentId?: string;
+  useEnvironmentHeader?: boolean;
   sort?: string;
   teamId?: string;
   page?: number;
@@ -208,6 +212,10 @@ export interface ProjectsApi {
   listAvailableDatabases(): Promise<DatabaseEngineOption[]>;
   createDatabase(input: CreateDatabaseProjectInput): Promise<DatabaseProvisionResult>;
   update(projectId: string, input: UpdateProjectInput): Promise<Project>;
+  updateEnvironment(
+    projectId: string,
+    input: { environmentId: string; inheritEnvVars?: boolean; teamId?: string },
+  ): Promise<{ id: string; environmentId: string; inheritEnvVars: boolean }>;
   remove(projectId: string, input?: { teamId?: string }): Promise<void>;
 }
 
@@ -367,6 +375,21 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
         .trim()
         .toLowerCase()
         .replace(/\s+/g, "-"),
+      projectEnvironmentId:
+        pickString(
+          row,
+          "projectEnvironmentId",
+          "project_environment_id",
+          "environmentId",
+          "environment_id",
+        ) ?? null,
+      inheritEnvironmentVars:
+        pickBoolean(
+          row,
+          "inheritEnvironmentVars",
+          "inherit_environment_vars",
+          "inheritEnvVars",
+        ) ?? undefined,
       logId: pickString(row, "logId", "logID"),
       screenshot: pickNonEmptyString(row, "screenshot"),
       framework: asString(row.framework),
@@ -427,12 +450,18 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
 
   return {
     async list(input) {
+      const environmentId = input?.environmentId?.trim() || undefined;
       const response = await client.request<any>(listEndpoint, {
         method: "GET",
+        headers:
+          input?.useEnvironmentHeader && environmentId
+            ? { "x-brimble-environment": environmentId }
+            : undefined,
         query: {
           q: input?.q,
           serviceType: input?.serviceType,
           status: input?.status,
+          environmentId,
           sort: input?.sort ?? "updatedAt",
           teamId: input?.teamId,
           page: input?.page,
@@ -726,8 +755,36 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
         message: pickString(rootRecord, "message"),
       };
     },
+    async updateEnvironment(projectId, input) {
+      const response = await client.request<any>(
+        `${listEndpoint}/${encodeURIComponent(projectId)}/environment`,
+        {
+          method: "PATCH",
+          query: {
+            teamId: input.teamId,
+          },
+          body: {
+            environmentId: input.environmentId,
+            inheritEnvVars: input.inheritEnvVars,
+          },
+        },
+      );
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const rootRecord = asRecord(root) ?? {};
+
+      return {
+        id: pickString(rootRecord, "id", "_id") ?? projectId,
+        environmentId:
+          pickString(rootRecord, "environmentId", "environment_id") ??
+          input.environmentId,
+        inheritEnvVars:
+          pickBoolean(rootRecord, "inheritEnvVars", "inherit_environment_vars") ??
+          Boolean(input.inheritEnvVars),
+      };
+    },
     update: () => notImplemented<Project>("projects", "update"),
-    async remove(projectId, input) {
+    async remove(projectId, _input) {
       await client.request<any>(`${listEndpoint}/${encodeURIComponent(projectId)}`, {
         method: "DELETE",
       });

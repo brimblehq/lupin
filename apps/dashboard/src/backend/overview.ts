@@ -18,16 +18,29 @@ export interface OverviewSummary {
 }
 
 export interface OverviewApi {
-  get(input?: { teamId?: string }): Promise<OverviewSummary>;
+  get(input?: {
+    teamId?: string;
+    environmentId?: string;
+    useEnvironmentHeader?: boolean;
+  }): Promise<OverviewSummary>;
 }
 
 export function createOverviewApi(client: ApiClient): OverviewApi {
   return {
     async get(input) {
+      const environmentId = input?.environmentId?.trim() || undefined;
+      let headers: Record<string, string> | undefined;
+      if (input?.useEnvironmentHeader && environmentId) {
+        headers = { "x-brimble-environment": environmentId };
+      } else {
+        headers = undefined;
+      }
       const response = await client.request<any>("/core/v1/overview", {
         method: "GET",
+        headers,
         query: {
           teamId: input?.teamId,
+          environmentId,
         },
       });
 

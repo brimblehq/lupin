@@ -19,7 +19,71 @@ export interface ProjectEnvironmentSnapshot {
   deployId?: string;
 }
 
+export interface ProjectEnvironment {
+  _id: string;
+  name: string;
+  slug: string;
+  owner?: string;
+  team?: string | null;
+  inherit_from?: string | null;
+  isDefault: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  projectCount?: number;
+}
+
+export interface EffectiveEnvironmentVariable {
+  id?: string;
+  name: string;
+  value: string;
+  source: "inherited" | "own";
+  sourceEnvironment?: string;
+  inheritable?: boolean;
+}
+
+export interface EnvironmentVariableInput {
+  name: string;
+  value: string;
+  inheritable?: boolean;
+}
+
 export interface ProjectEnvironmentsApi {
+  listEnvironments(input?: { teamId?: string }): Promise<ProjectEnvironment[]>;
+  getEnvironment(
+    environmentId: string,
+    input?: { teamId?: string },
+  ): Promise<ProjectEnvironment>;
+  createEnvironment(input: {
+    name: string;
+    teamId?: string;
+    inheritFrom?: string;
+  }): Promise<ProjectEnvironment>;
+  updateEnvironment(
+    environmentId: string,
+    input: { name?: string; inheritFrom?: string | null; teamId?: string },
+  ): Promise<ProjectEnvironment>;
+  deleteEnvironment(
+    environmentId: string,
+    input: { moveTo: string; teamId?: string },
+  ): Promise<{ success: boolean }>;
+  listEnvironmentVariables(
+    environmentId: string,
+    input?: { teamId?: string },
+  ): Promise<EffectiveEnvironmentVariable[]>;
+  saveEnvironmentVariables(
+    environmentId: string,
+    input: { variables: EnvironmentVariableInput[]; teamId?: string },
+  ): Promise<EffectiveEnvironmentVariable[]>;
+  updateEnvironmentVariable(
+    environmentId: string,
+    variableId: string,
+    input: EnvironmentVariableInput & { teamId?: string },
+  ): Promise<{ success: boolean }>;
+  deleteEnvironmentVariable(
+    environmentId: string,
+    variableId: string,
+    input?: { teamId?: string },
+  ): Promise<{ success: boolean }>;
   get(projectId: string, input?: { target?: string }): Promise<ProjectEnvironmentSnapshot>;
   listTargets(projectId: string): Promise<string[]>;
   add(
@@ -95,6 +159,36 @@ function mapSnapshot(payload: any): ProjectEnvironmentSnapshot {
   };
 }
 
+function mapProjectEnvironment(item: any): ProjectEnvironment {
+  const row = asRecord(item) ?? {};
+  return {
+    _id: String(row._id ?? row.id ?? ""),
+    name: String(row.name ?? ""),
+    slug: String(row.slug ?? ""),
+    owner: asString(row.owner),
+    team: asString(row.team) ?? null,
+    inherit_from: asString(row.inherit_from) ?? null,
+    isDefault: pickBoolean(row, "isDefault", "is_default") ?? false,
+    createdAt: asString(row.createdAt),
+    updatedAt: asString(row.updatedAt),
+    projectCount:
+      typeof row.projectCount === "number" ? row.projectCount : undefined,
+  };
+}
+
+function mapEffectiveEnvironmentVariable(item: any): EffectiveEnvironmentVariable {
+  const row = asRecord(item) ?? {};
+  const source = asString(row.source) === "inherited" ? "inherited" : "own";
+  return {
+    id: asString(row._id) ?? asString(row.id) ?? undefined,
+    name: String(row.name ?? ""),
+    value: String(row.value ?? ""),
+    source,
+    sourceEnvironment: asString(row.sourceEnvironment) ?? undefined,
+    inheritable: pickBoolean(row, "inheritable") ?? undefined,
+  };
+}
+
 export function formatEnvRelativeTime(date?: string): string {
   if (!date) {
     return "unknown";
@@ -109,9 +203,161 @@ export function formatEnvRelativeTime(date?: string): string {
 
 export function createProjectEnvironmentsApi(client: ApiClient): ProjectEnvironmentsApi {
   const basePath = "/core/v1/envs";
+  const environmentsPath = "/core/v1/environments";
   const decryptPath = "/core/v1/decrypt";
 
   return {
+    async listEnvironments(input) {
+      const response = await client.request(environmentsPath, {
+        method: "GET",
+        query: {
+          teamId: input?.teamId,
+        },
+      });
+
+      const data = unwrapData<any[]>(response);
+      if (!Array.isArray(data)) {
+        return [];
+      }
+
+      return data
+        .map(mapProjectEnvironment)
+        .filter((env) => Boolean(env._id) && Boolean(env.name));
+    },
+    async getEnvironment(environmentId, input) {
+      const response = await client.request(
+        `${environmentsPath}/${encodeURIComponent(environmentId)}`,
+        {
+          method: "GET",
+          query: {
+            teamId: input?.teamId,
+          },
+        },
+      );
+
+      return mapProjectEnvironment(unwrapData(response));
+    },
+    async createEnvironment(input) {
+      const response = await client.request(environmentsPath, {
+        method: "POST",
+        body: {
+          name: input.name,
+          teamId: input.teamId,
+          inheritFrom: input.inheritFrom,
+        },
+      });
+
+      return mapProjectEnvironment(unwrapData(response));
+    },
+    async updateEnvironment(environmentId, input) {
+      const response = await client.request(
+        `${environmentsPath}/${encodeURIComponent(environmentId)}`,
+        {
+          method: "PATCH",
+          query: {
+            teamId: input.teamId,
+          },
+          body: {
+            name: input.name,
+            inheritFrom: input.inheritFrom,
+          },
+        },
+      );
+
+      return mapProjectEnvironment(unwrapData(response));
+    },
+    async deleteEnvironment(environmentId, input) {
+      await client.request(
+        `${environmentsPath}/${encodeURIComponent(environmentId)}`,
+        {
+          method: "DELETE",
+          query: {
+            moveTo: input.moveTo,
+            teamId: input.teamId,
+          },
+        },
+      );
+
+      return { success: true };
+    },
+    async listEnvironmentVariables(environmentId, input) {
+      const response = await client.request(
+        `${environmentsPath}/${encodeURIComponent(environmentId)}/variables`,
+        {
+          method: "GET",
+          query: {
+            teamId: input?.teamId,
+          },
+        },
+      );
+
+      const data = unwrapData<any[]>(response);
+      if (!Array.isArray(data)) {
+        return [];
+      }
+
+      return data
+        .map(mapEffectiveEnvironmentVariable)
+        .filter((row) => Boolean(row.name));
+    },
+    async saveEnvironmentVariables(environmentId, input) {
+      const response = await client.request(
+        `${environmentsPath}/${encodeURIComponent(environmentId)}/variables`,
+        {
+          method: "POST",
+          query: {
+            teamId: input.teamId,
+          },
+          body: {
+            variables: input.variables.map((variable) => ({
+              name: variable.name,
+              value: variable.value,
+              inheritable: variable.inheritable,
+            })),
+          },
+        },
+      );
+
+      const data = unwrapData<any[]>(response);
+      if (!Array.isArray(data)) {
+        return [];
+      }
+
+      return data
+        .map(mapEffectiveEnvironmentVariable)
+        .filter((row) => Boolean(row.name));
+    },
+    async updateEnvironmentVariable(environmentId, variableId, input) {
+      await client.request(
+        `${environmentsPath}/${encodeURIComponent(environmentId)}/variables/${encodeURIComponent(variableId)}`,
+        {
+          method: "PATCH",
+          query: {
+            teamId: input.teamId,
+          },
+          body: {
+            name: input.name,
+            value: input.value,
+            inheritable: input.inheritable,
+          },
+        },
+      );
+
+      return { success: true };
+    },
+    async deleteEnvironmentVariable(environmentId, variableId, input) {
+      await client.request(
+        `${environmentsPath}/${encodeURIComponent(environmentId)}/variables/${encodeURIComponent(variableId)}`,
+        {
+          method: "DELETE",
+          query: {
+            teamId: input?.teamId,
+          },
+        },
+      );
+
+      return { success: true };
+    },
     async get(projectId, input) {
       const target = input?.target?.trim();
       const path = target

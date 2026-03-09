@@ -24,8 +24,12 @@ import { RootDirectoryTrigger } from "../../../components/shared/root-directory-
 import {
   updateDatabaseProjectConfigServerFn,
   saveProjectGeneralConfigServerFn,
+  saveProjectBuildConfigServerFn,
   deleteProjectServerFn,
+  moveProjectEnvironmentServerFn,
 } from "@/server/projects/actions";
+import { listProjectEnvironmentsServerFn } from "@/server/environments/actions";
+import type { ProjectEnvironment } from "@/backend/environments";
 import { listScalingGroupsServerFn } from "@/server/scaling/actions";
 import { listRegionsServerFn } from "@/server/regions/actions";
 import type { FrameworkOption } from "@/backend/frameworks";
@@ -224,6 +228,115 @@ const allSections: { id: ConfigSection; label: string; icon: React.ReactNode }[]
 /* ─── ConfigInput ─── */
 
 /* ─── Section: General ─── */
+
+function EnvironmentSection({
+  projectId,
+  currentEnvironmentId,
+  workspace,
+}: {
+  projectId: string;
+  currentEnvironmentId?: string | null;
+  workspace?: string;
+}) {
+  const [environments, setEnvironments] = useState<ProjectEnvironment[]>([]);
+  const [selectedId, setSelectedId] = useState(currentEnvironmentId ?? "");
+  const [inheritEnvVars, setInheritEnvVars] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const listEnvironments = useServerFn(listProjectEnvironmentsServerFn as any) as (args: {
+    data: { workspace?: string };
+  }) => Promise<ProjectEnvironment[]>;
+  const moveProject = useServerFn(moveProjectEnvironmentServerFn as any) as (args: {
+    data: { projectId: string; environmentId: string; inheritEnvVars?: boolean; workspace?: string };
+  }) => Promise<{ id: string; environmentId: string; inheritEnvVars: boolean }>;
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const envs = await listEnvironments({ data: { workspace } });
+        if (!cancelled && Array.isArray(envs)) {
+          setEnvironments(envs);
+          if (!selectedId && envs.length > 0) {
+            const defaultEnv = envs.find((e) => e.isDefault);
+            setSelectedId(defaultEnv?._id ?? envs[0]._id);
+          }
+        }
+      } catch {
+        // keep empty
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace]);
+
+  useEffect(() => {
+    if (currentEnvironmentId) {
+      setSelectedId(currentEnvironmentId);
+    }
+  }, [currentEnvironmentId]);
+
+  useEffect(() => {
+    setInheritEnvVars(true);
+  }, [selectedId]);
+
+  const isDirty = selectedId !== (currentEnvironmentId ?? "");
+  const options = environments.map((e) => ({ id: e._id, label: e.name }));
+
+  return (
+    <div className="mb-6 rounded-[4px] border-[0.5px] border-dash-border">
+      <div className="flex items-center justify-between gap-4 px-4 py-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <label className="text-sm font-medium text-dash-text-strong">
+            Environment
+          </label>
+          <Dropdown
+            value={selectedId}
+            options={options}
+            onChange={setSelectedId}
+            placeholder="Select environment..."
+          />
+        </div>
+      </div>
+      {isDirty && (
+        <div className="flex items-center justify-between gap-4 border-t border-dash-border px-4 py-3">
+          <label className="flex items-center gap-2 text-sm text-dash-text-body">
+            <input
+              type="checkbox"
+              checked={inheritEnvVars}
+              onChange={(e) => setInheritEnvVars(e.target.checked)}
+              className="size-4 rounded border-dash-border accent-[#4879f8]"
+            />
+            Inherit environment variables
+          </label>
+          <GlossyButton
+            variant="black"
+            disabled={saving}
+            loading={saving}
+            loadingLabel="Saving..."
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await moveProject({
+                  data: { projectId, environmentId: selectedId, inheritEnvVars, workspace },
+                });
+                toast.success("Project environment updated");
+              } catch (error) {
+                toast.error(
+                  error instanceof Error ? error.message : "Failed to update environment",
+                );
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            Save
+          </GlossyButton>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function GeneralSection({
   initialValues,
@@ -430,39 +543,53 @@ function GeneralSection({
 
 /* ─── Section: Build & Deploy ─── */
 
+interface BuildInitialValues {
+  installCommand: string;
+  buildCommand: string;
+  startCommand: string;
+  healthCheckPath: string;
+  preStartCommand: string;
+  dockerImage: string;
+}
+
 function BuildSection({
-  installCmd,
-  setInstallCmd,
-  buildCmd,
-  setBuildCmd,
-  startCmd,
-  setStartCmd,
-  healthCheckPath,
-  setHealthCheckPath,
-  preStartCmd,
-  setPreStartCmd,
-  dockerImage,
-  setDockerImage,
+  initialValues,
+  onSubmit,
   showCommands = true,
   showHealthCheck = true,
   showDockerSourceFields = false,
 }: {
-  installCmd: string;
-  setInstallCmd: (v: string) => void;
-  buildCmd: string;
-  setBuildCmd: (v: string) => void;
-  startCmd: string;
-  setStartCmd: (v: string) => void;
-  healthCheckPath: string;
-  setHealthCheckPath: (v: string) => void;
-  preStartCmd: string;
-  setPreStartCmd: (v: string) => void;
-  dockerImage: string;
-  setDockerImage: (v: string) => void;
+  initialValues: BuildInitialValues;
+  onSubmit: (values: BuildInitialValues) => Promise<void>;
   showCommands?: boolean;
   showHealthCheck?: boolean;
   showDockerSourceFields?: boolean;
 }) {
+  const [values, setValues] = useState(initialValues);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValues(initialValues);
+  }, [initialValues.installCommand, initialValues.buildCommand, initialValues.startCommand, initialValues.healthCheckPath, initialValues.preStartCommand, initialValues.dockerImage]);
+
+  const dirty =
+    values.installCommand !== initialValues.installCommand ||
+    values.buildCommand !== initialValues.buildCommand ||
+    values.startCommand !== initialValues.startCommand ||
+    values.healthCheckPath !== initialValues.healthCheckPath ||
+    values.preStartCommand !== initialValues.preStartCommand ||
+    values.dockerImage !== initialValues.dockerImage;
+
+  async function handleSave() {
+    if (!dirty || saving) return;
+    setSaving(true);
+    try {
+      await onSubmit(values);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
       {showDockerSourceFields && (
@@ -473,8 +600,8 @@ function BuildSection({
             </label>
             <input
               type="text"
-              value={preStartCmd}
-              onChange={(e) => setPreStartCmd(e.target.value)}
+              value={values.preStartCommand}
+              onChange={(e) => setValues((v) => ({ ...v, preStartCommand: e.target.value }))}
               placeholder="apk add curl"
               className={inputClass}
             />
@@ -489,8 +616,8 @@ function BuildSection({
             </label>
             <input
               type="text"
-              value={dockerImage}
-              onChange={(e) => setDockerImage(e.target.value)}
+              value={values.dockerImage}
+              onChange={(e) => setValues((v) => ({ ...v, dockerImage: e.target.value }))}
               placeholder="docker.io/library/nginx:latest"
               className={`${inputClass} font-family-mono text-[13px]`}
             />
@@ -508,8 +635,8 @@ function BuildSection({
             </label>
             <input
               type="text"
-              value={installCmd}
-              onChange={(e) => setInstallCmd(e.target.value)}
+              value={values.installCommand}
+              onChange={(e) => setValues((v) => ({ ...v, installCommand: e.target.value }))}
               placeholder="npm install"
               className={inputClass}
             />
@@ -524,8 +651,8 @@ function BuildSection({
             </label>
             <input
               type="text"
-              value={buildCmd}
-              onChange={(e) => setBuildCmd(e.target.value)}
+              value={values.buildCommand}
+              onChange={(e) => setValues((v) => ({ ...v, buildCommand: e.target.value }))}
               placeholder="npm run build"
               className={inputClass}
             />
@@ -540,8 +667,8 @@ function BuildSection({
             </label>
             <input
               type="text"
-              value={startCmd}
-              onChange={(e) => setStartCmd(e.target.value)}
+              value={values.startCommand}
+              onChange={(e) => setValues((v) => ({ ...v, startCommand: e.target.value }))}
               placeholder="npm start"
               className={inputClass}
             />
@@ -557,8 +684,8 @@ function BuildSection({
           </label>
           <input
             type="text"
-            value={healthCheckPath}
-            onChange={(e) => setHealthCheckPath(e.target.value)}
+            value={values.healthCheckPath}
+            onChange={(e) => setValues((v) => ({ ...v, healthCheckPath: e.target.value }))}
             placeholder="/api/health"
             className={inputClass}
           />
@@ -576,7 +703,14 @@ function BuildSection({
 
       {/* Footer */}
       <div className="flex justify-end border-t border-dash-border px-4 py-3">
-        <GlossyButton disabled>Save</GlossyButton>
+        <GlossyButton
+          disabled={!dirty || saving}
+          loading={saving}
+          loadingLabel="Saving..."
+          onClick={handleSave}
+        >
+          Save
+        </GlossyButton>
       </div>
     </div>
   );
@@ -1085,16 +1219,19 @@ function ConfigurationPage() {
       whitelistedIps?: string[];
     };
   }) => Promise<{ message?: string }>;
+  const saveBuildConfig = useServerFn(saveProjectBuildConfigServerFn as any) as (args: {
+    data: {
+      projectId: string;
+      workspace?: string;
+      installCommand?: string;
+      buildCommand?: string;
+      startCommand?: string;
+      healthCheckPath?: string;
+      preStartCommand?: string;
+    };
+  }) => Promise<{ message?: string }>;
   const [activeSection, setActiveSection] = useState<ConfigSection>(ConfigSection.General);
   const haptics = useHaptics();
-
-  // Build settings (read-only section, not Formik-managed)
-  const [installCmd, setInstallCmd] = useState(project?.installCommand || "");
-  const [buildCmd, setBuildCmd] = useState(project?.buildCommand || "");
-  const [startCmd, setStartCmd] = useState(project?.startCommand || "");
-  const [preStartCmd, setPreStartCmd] = useState(project?.preStartCommand || "");
-  const [dockerImage, setDockerImage] = useState(project?.repo?.name || "");
-  const [healthCheckPath, setHealthCheckPath] = useState(project?.healthCheckPath || "");
 
   // Root directory (managed outside Formik — set by drawer)
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1106,12 +1243,6 @@ function ConfigurationPage() {
 
   // Sync when project data changes
   useEffect(() => {
-    setInstallCmd(project?.installCommand || "");
-    setBuildCmd(project?.buildCommand || "");
-    setStartCmd(project?.startCommand || "");
-    setPreStartCmd(project?.preStartCommand || "");
-    setDockerImage(project?.repo?.name || "");
-    setHealthCheckPath(project?.healthCheckPath || "");
     setRootDir(project?.rootDirectory || "./");
     setMaintenanceMode(Boolean(project?.maintenance));
   }, [project]);
@@ -1131,6 +1262,16 @@ function ConfigurationPage() {
     region: typeof currentRegionId === "string" ? currentRegionId : "",
     authEnabled: Boolean(project?.authEnabled),
     buildCacheEnabled: Boolean(project?.buildCacheEnabled),
+  };
+
+  // Build section initial values
+  const buildInitialValues: BuildInitialValues = {
+    installCommand: project?.installCommand || "",
+    buildCommand: project?.buildCommand || "",
+    startCommand: project?.startCommand || "",
+    healthCheckPath: project?.healthCheckPath || "",
+    preStartCommand: project?.preStartCommand || "",
+    dockerImage: project?.repo?.name || "",
   };
 
   // Database section initial values
@@ -1310,6 +1451,25 @@ function ConfigurationPage() {
     }
   }
 
+  async function handleSubmitBuild(values: BuildInitialValues) {
+    try {
+      await saveBuildConfig({
+        data: {
+          projectId: project?.id || params.projectId,
+          workspace,
+          installCommand: values.installCommand,
+          buildCommand: values.buildCommand,
+          startCommand: values.startCommand,
+          healthCheckPath: values.healthCheckPath,
+          preStartCommand: values.preStartCommand,
+        },
+      });
+      toast.success("Build configuration saved. Redeploy started.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save build configuration");
+    }
+  }
+
   async function handleSubmitDatabase(values: DatabaseConfigValues) {
     const password = values.password.trim();
 
@@ -1432,6 +1592,12 @@ function ConfigurationPage() {
                     isPublicAccessEnabled={Boolean(project?.isPublicAccess)}
                   />
                 ) : (
+                  <>
+                  <EnvironmentSection
+                    projectId={project?.id || params.projectId}
+                    currentEnvironmentId={project?.projectEnvironmentId}
+                    workspace={workspace}
+                  />
                   <GeneralSection
                     initialValues={generalInitialValues}
                     onSubmit={handleSubmitGeneral}
@@ -1441,26 +1607,17 @@ function ConfigurationPage() {
                     frameworkOptions={frameworkOptions}
                     regionOptions={regionOptions}
                     showSourceFields={sourceFieldsVisible}
-                    dockerSourceImage={dockerImage}
+                    dockerSourceImage={buildInitialValues.dockerImage}
                     showMcpAuthControl={mcpAuthToggleVisible}
                     showBuildCacheControl={buildCacheToggleVisible}
                   />
+                  </>
                 )
               )}
               {activeSection === ConfigSection.Build && (
                 <BuildSection
-                  installCmd={installCmd}
-                  setInstallCmd={setInstallCmd}
-                  buildCmd={buildCmd}
-                  setBuildCmd={setBuildCmd}
-                  startCmd={startCmd}
-                  setStartCmd={setStartCmd}
-                  healthCheckPath={healthCheckPath}
-                  setHealthCheckPath={setHealthCheckPath}
-                  preStartCmd={preStartCmd}
-                  setPreStartCmd={setPreStartCmd}
-                  dockerImage={dockerImage}
-                  setDockerImage={setDockerImage}
+                  initialValues={buildInitialValues}
+                  onSubmit={handleSubmitBuild}
                   showCommands={sourceFieldsVisible}
                   showHealthCheck={healthCheckVisible}
                   showDockerSourceFields={dockerSourceFieldsVisible}

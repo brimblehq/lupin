@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { SlidersHorizontal, Check } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Spinner } from "./spinner";
+import { useHaptics } from "@/hooks/use-haptics";
 
 export interface FilterOption {
   label: string;
@@ -41,6 +42,7 @@ export function FilterDropdown({
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const haptics = useHaptics();
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -62,7 +64,10 @@ export function FilterDropdown({
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          haptics.selection();
+          setOpen(!open);
+        }}
         className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-dash-text-body transition-colors hover:text-dash-text-strong"
       >
         {activeDot ? (
@@ -93,6 +98,7 @@ export function FilterDropdown({
               <button
                 key={option.value}
                 onClick={() => {
+                  haptics.selection();
                   onChange(option.value);
                   setOpen(false);
                 }}

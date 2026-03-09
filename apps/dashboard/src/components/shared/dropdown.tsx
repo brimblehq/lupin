@@ -134,7 +134,7 @@ export function Dropdown({
       <div ref={triggerRef}>
         {showSearch && open ? (
           <div
-            className={`flex min-h-[46px] w-full items-center justify-between input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong ${className ?? ""}`}
+            className={`flex min-h-[46px] w-full items-center justify-between input-base px-3 py-2.5 text-sm leading-6 text-dash-text-strong ${className ?? ""}`}
             onMouseDown={(e) => {
               if (e.target instanceof HTMLElement && e.target.closest("button")) {
                 return;
@@ -184,7 +184,7 @@ export function Dropdown({
               }
               setOpen((prev) => !prev);
             }}
-            className={`flex min-h-[46px] w-full items-center justify-between input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] ${className ?? ""}`}
+            className={`flex min-h-[46px] w-full items-center justify-between input-base px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] ${className ?? ""}`}
           >
             <span className={`flex items-center gap-2 ${displayLabel ? "" : "text-[#9ca3af]"}`}>
               {selectedOption?.icon && (

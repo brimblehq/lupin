@@ -2153,6 +2153,10 @@ function NewProjectPage() {
     const params = new URLSearchParams(searchStr || "");
     return params.get("workspace")?.trim() || undefined;
   }, [searchStr]);
+  const environmentId = useMemo(() => {
+    const params = new URLSearchParams(searchStr || "");
+    return params.get("environmentId")?.trim() || undefined;
+  }, [searchStr]);
 
   const listFrameworks = useServerFn(listFrameworksServerFn as any) as () => Promise<FrameworkOption[]>;
   const listRegions = useServerFn(listRegionsServerFn as any) as (args: {
@@ -2662,6 +2666,7 @@ function NewProjectPage() {
         })),
         experimental: {},
         authEnabled: false,
+        ...(environmentId ? { environmentId } : {}),
       };
     } else if (sourceType === SourceType.Docker) {
       if (!selectedDockerSource?.imageUri) {
@@ -2708,6 +2713,7 @@ function NewProjectPage() {
         })),
         experimental: {},
         authEnabled: false,
+        ...(environmentId ? { environmentId } : {}),
         ...(selectedDockerSource.credentials
           ? {
             registry_credentials: {

@@ -32,26 +32,34 @@ const rootRoute = getRouteApi("__root__");
 export const Route = createFileRoute("/")({
   staleTime: 30_000,
   preloadStaleTime: 30_000,
-  validateSearch: (search: Record<string, unknown>) => workspaceLoaderDeps(search),
-  loaderDeps: ({ search }) => workspaceLoaderDeps(search),
+  validateSearch: (search: Record<string, unknown>): { workspace?: string; environmentId?: string } => {
+    const base = workspaceLoaderDeps(search);
+    const environmentId = typeof search.environmentId === "string" ? search.environmentId.trim() || undefined : undefined;
+    return { ...base, environmentId };
+  },
+  loaderDeps: ({ search }) => ({
+    workspace: search.workspace,
+    environmentId: search.environmentId,
+  }),
   loader: async ({ deps }) => {
     const workspace = deps.workspace;
+    const environmentId = deps.environmentId && deps.environmentId !== "all" ? deps.environmentId : undefined;
 
     const [projectsResult, overviewResult, bandwidthResult, mcpTemplatesResult] = await Promise.all([
       (listHomeProjectsServerFn as unknown as (input: {
-        data: { workspace?: string };
+        data: { workspace?: string; environmentId?: string };
       }) => Promise<ApiListResponse<BackendProject>>)({
-        data: { workspace },
+        data: { workspace, environmentId },
       }),
       (getHomeOverviewServerFn as unknown as (input: {
-        data: { workspace?: string };
+        data: { workspace?: string; environmentId?: string };
       }) => Promise<OverviewSummary>)({
-        data: { workspace },
+        data: { workspace, environmentId },
       }),
       (getHomeBandwidthServerFn as unknown as (input: {
-        data: { workspace?: string };
+        data: { workspace?: string; environmentId?: string };
       }) => Promise<BandwidthSummary>)({
-        data: { workspace },
+        data: { workspace, environmentId },
       }).catch(() => ({ results: [], total: 0 } as BandwidthSummary)),
       (listMcpTemplatesServerFn as unknown as (input: {
         data?: { limit?: number };

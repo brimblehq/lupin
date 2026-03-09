@@ -5,8 +5,12 @@ import { withTokenRefresh } from "@/server/shared/backend";
 export const getHomeOverviewServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {
-  const payload = data as unknown as { workspace?: string } | undefined;
+  const payload = data as unknown as {
+    workspace?: string;
+    environmentId?: string;
+  } | undefined;
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
+  const environmentId = payload?.environmentId?.trim();
 
   return withTokenRefresh(async (api) => {
     let teamId: string | undefined;
@@ -19,6 +23,10 @@ export const getHomeOverviewServerFn = createServerFn({
       }
     }
 
-    return api.overview.get({ teamId }) as Promise<OverviewSummary>;
+    return api.overview.get({
+      teamId,
+      environmentId: environmentId || undefined,
+      useEnvironmentHeader: Boolean(environmentId),
+    }) as Promise<OverviewSummary>;
   });
 });

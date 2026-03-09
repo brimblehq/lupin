@@ -15,8 +15,9 @@ function assignFiniteNumber(
 export const listHomeProjectsServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {
-  const payload = data as unknown as { workspace?: string } | undefined;
+  const payload = data as unknown as { workspace?: string; environmentId?: string } | undefined;
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
+  const environmentId = payload?.environmentId?.trim();
 
   return withTokenRefresh(async (api) => {
     let teamId: string | undefined;
@@ -32,6 +33,8 @@ export const listHomeProjectsServerFn = createServerFn({
     return api.projects.list({
       sort: "updatedAt",
       teamId,
+      environmentId: environmentId || undefined,
+      useEnvironmentHeader: Boolean(environmentId),
     });
   });
 });
@@ -46,6 +49,7 @@ export const listProjectsPageServerFn = createServerFn({
         q?: string;
         serviceType?: string;
         status?: string;
+        environmentId?: string;
       }
     | undefined;
 
@@ -54,6 +58,7 @@ export const listProjectsPageServerFn = createServerFn({
   const query = payload?.q?.trim();
   const serviceType = payload?.serviceType?.trim();
   const status = payload?.status?.trim();
+  const environmentId = payload?.environmentId?.trim();
 
   let page = 1;
   if (typeof requestedPage === "number" && Number.isFinite(requestedPage) && requestedPage > 0) {
@@ -75,6 +80,8 @@ export const listProjectsPageServerFn = createServerFn({
       q: query || undefined,
       serviceType: serviceType || undefined,
       status: status || undefined,
+      environmentId: environmentId || undefined,
+      useEnvironmentHeader: Boolean(environmentId),
       sort: "updatedAt",
       page,
       teamId,
@@ -449,6 +456,65 @@ export const saveProjectGeneralConfigServerFn = createServerFn({
   });
 });
 
+export const saveProjectBuildConfigServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        projectId: string;
+        workspace?: string;
+        installCommand?: string;
+        buildCommand?: string;
+        startCommand?: string;
+        healthCheckPath?: string;
+        preStartCommand?: string;
+        dockerImage?: string;
+      }
+    | undefined;
+
+  const projectId = payload?.projectId?.trim();
+  if (!projectId) {
+    throw new Error("Project ID is required");
+  }
+
+  const workspaceSlug = payload?.workspace?.trim().toLowerCase();
+
+  const body: Record<string, unknown> = {};
+
+  if (typeof payload?.installCommand === "string") {
+    body.installCommand = payload.installCommand;
+  }
+  if (typeof payload?.buildCommand === "string") {
+    body.buildCommand = payload.buildCommand;
+  }
+  if (typeof payload?.startCommand === "string") {
+    body.startCommand = payload.startCommand;
+  }
+  if (typeof payload?.healthCheckPath === "string") {
+    body.healthCheckPath = payload.healthCheckPath;
+  }
+  if (typeof payload?.preStartCommand === "string") {
+    body.preStartCommand = payload.preStartCommand;
+  }
+
+  return withTokenRefresh(async (api) => {
+    let teamId: string | undefined;
+
+    if (workspaceSlug) {
+      const teams = await api.workspaces.list();
+      const match = teams.items.find((item) => item.slug === workspaceSlug);
+      if (match?.id) {
+        teamId = match.id;
+      }
+    }
+
+    return api.projects.redeploy(projectId, {
+      teamId,
+      payload: body,
+    });
+  });
+});
+
 export const backupDatabaseProjectServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
@@ -586,6 +652,48 @@ export const decryptDatabaseConnectionUriServerFn = createServerFn({
     }
 
     return { connectionUri } as const;
+  });
+});
+
+export const moveProjectEnvironmentServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        projectId: string;
+        environmentId: string;
+        inheritEnvVars?: boolean;
+        workspace?: string;
+      }
+    | undefined;
+
+  const projectId = payload?.projectId?.trim();
+  const environmentId = payload?.environmentId?.trim();
+  if (!projectId) {
+    throw new Error("Project ID is required");
+  }
+  if (!environmentId) {
+    throw new Error("Environment ID is required");
+  }
+
+  const workspaceSlug = payload?.workspace?.trim().toLowerCase();
+
+  return withTokenRefresh(async (api) => {
+    let teamId: string | undefined;
+
+    if (workspaceSlug) {
+      const teams = await api.workspaces.list();
+      const match = teams.items.find((item) => item.slug === workspaceSlug);
+      if (match?.id) {
+        teamId = match.id;
+      }
+    }
+
+    return api.projects.updateEnvironment(projectId, {
+      teamId,
+      environmentId,
+      inheritEnvVars: Boolean(payload?.inheritEnvVars),
+    });
   });
 });
 

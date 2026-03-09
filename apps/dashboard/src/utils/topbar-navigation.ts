@@ -11,6 +11,8 @@ export function buildWorkspaceSwitchUrl(input: {
     params.delete("workspace");
   }
 
+  params.delete("environmentId");
+
   let nextPathname = input.pathname;
 
   if (/^\/projects\/[^/]+(?:\/|$)/.test(input.pathname)) {
@@ -29,16 +31,18 @@ export function buildWorkspaceSwitchUrl(input: {
 
 export function getWorkspaceSearch(input: { searchStr?: string }): string {
   const params = new URLSearchParams(input.searchStr || "");
-  const workspace = params.get("workspace");
-
-  if (!workspace || !workspace.trim()) {
-    return "";
-  }
+  const workspace = params.get("workspace")?.trim();
+  const environmentId = params.get("environmentId")?.trim();
 
   const nextParams = new URLSearchParams();
-  nextParams.set("workspace", workspace.trim());
-  const query = nextParams.toString();
+  if (workspace) {
+    nextParams.set("workspace", workspace);
+  }
+  if (environmentId) {
+    nextParams.set("environmentId", environmentId);
+  }
 
+  const query = nextParams.toString();
   if (!query) {
     return "";
   }

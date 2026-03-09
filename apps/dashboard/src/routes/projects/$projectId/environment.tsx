@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Code2, Copy as CopyIcon, Eye, EyeOff, Lock, Search, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Code2, Copy as CopyIcon, Eye, EyeOff, Lock, Search, X } from "lucide-react";
 import { Info } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -10,15 +10,21 @@ import { TabHeader } from "../../../components/shared/tab-header";
 import { GlossyButton } from "../../../components/shared/glossy-button";
 import { Tooltip } from "@/components/shared/tooltip";
 import { Spinner } from "@/components/shared/spinner";
-import type { ProjectEnvironmentSnapshot, ProjectEnvironmentVariable } from "@/backend/environments";
+import type { EffectiveEnvironmentVariable, ProjectEnvironmentSnapshot, ProjectEnvironmentVariable } from "@/backend/environments";
 import {
   addProjectEnvironmentVariablesServerFn,
   decryptProjectEnvironmentValuesServerFn,
   deleteProjectEnvironmentVariableServerFn,
+  deleteEnvironmentVariableServerFn,
+  getEnvironmentVariablesServerFn,
+  getProjectEnvironmentDetailsServerFn,
   getProjectEnvironmentServerFn,
   listProjectEnvironmentTargetsServerFn,
+  saveEnvironmentVariablesServerFn,
+  updateEnvironmentVariableServerFn,
   updateProjectEnvironmentVariableServerFn,
 } from "@/server/environments/actions";
+import type { ProjectEnvironment } from "@/backend/environments";
 import { redeployProjectServerFn } from "@/server/projects/actions";
 import {
   canDeleteProjectEnv,
@@ -390,6 +396,369 @@ function EnvAccordionRow({
   );
 }
 
+function EnvLevelVarRow({
+  variable,
+  environmentId,
+  workspace,
+  onUpdated,
+  onDeleted,
+}: {
+  variable: EffectiveEnvironmentVariable;
+  environmentId: string;
+  workspace?: string;
+  onUpdated: () => void;
+  onDeleted: () => void;
+}) {
+  const haptics = useHaptics();
+  const isInherited = variable.source === "inherited";
+  const [name, setName] = useState(variable.name);
+  const [value, setValue] = useState(variable.value);
+  const [inheritable, setInheritable] = useState(variable.inheritable ?? false);
+  const [showValue, setShowValue] = useState(false);
+  const [valueCopied, setValueCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const updateVar = useServerFn(updateEnvironmentVariableServerFn as any) as (args: {
+    data: { environmentId: string; variableId: string; workspace?: string; name: string; value: string; inheritable?: boolean };
+  }) => Promise<{ success: boolean }>;
+  const deleteVar = useServerFn(deleteEnvironmentVariableServerFn as any) as (args: {
+    data: { environmentId: string; variableId: string; workspace?: string };
+  }) => Promise<{ success: boolean }>;
+
+  const isDirty = name !== variable.name || value !== variable.value || inheritable !== (variable.inheritable ?? false);
+
+  async function saveRow() {
+    if (saving || !variable.id) return;
+    if (!name.trim() || !value.trim()) {
+      toast.error("Please fill all the fields");
+      return;
+    }
+    try {
+      setSaving(true);
+      await updateVar({
+        data: { environmentId, variableId: variable.id, workspace, name: name.trim(), value, inheritable },
+      });
+      toast.success("Variable updated");
+      onUpdated();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update variable");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteRow() {
+    if (removing || !variable.id) return;
+    try {
+      setRemoving(true);
+      await deleteVar({ data: { environmentId, variableId: variable.id, workspace } });
+      toast.success("Variable deleted");
+      onDeleted();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete variable");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  return (
+    <div className="border-b border-dash-border last:border-b-0">
+      <button
+        type="button"
+        onClick={() => !isInherited && setExpanded((prev) => !prev)}
+        className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm ${isInherited ? "cursor-default" : "hover:bg-dash-bg-elevated/50"}`}
+      >
+        <span className="min-w-0 flex-1 truncate font-mono text-dash-text-strong">{variable.name}</span>
+        {isInherited ? (
+          <span className="shrink-0 rounded-full bg-dash-bg-elevated px-2 py-0.5 text-xs text-dash-text-faded">
+            Inherited{variable.sourceEnvironment ? ` from ${variable.sourceEnvironment}` : ""}
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-full bg-[#4879f8]/10 px-2 py-0.5 text-xs text-[#4879f8]">Own</span>
+        )}
+        <span className="hidden shrink-0 text-sm font-normal text-dash-text-faded sm:block">
+          {isInherited ? "" : "••••••••••••••••"}
+        </span>
+        {!isInherited && (
+          expanded ? <ChevronUp className="size-4 shrink-0 text-dash-text-faded" /> : <ChevronDown className="size-4 shrink-0 text-dash-text-faded" />
+        )}
+      </button>
+
+      {expanded && !isInherited && (
+        <div className="bg-dash-bg-elevated px-4 pb-4 pt-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-base input-focus h-[36px] w-full px-3 font-mono text-sm text-dash-text-strong"
+            />
+            <div className="input-base input-focus-within relative flex h-[36px] items-center">
+              <input
+                type="text"
+                autoComplete="off"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className={`h-full w-full bg-transparent px-3 pr-16 text-sm text-dash-text-strong outline-none ${!showValue ? "[text-security:disc] [-webkit-text-security:disc]" : ""}`}
+              />
+              <div className="absolute right-2 flex items-center gap-1.5">
+                <button type="button" onClick={() => setShowValue((p) => !p)} className="shrink-0 text-dash-text-faded hover:text-dash-text-strong">
+                  {showValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(value);
+                    haptics.light();
+                    setValueCopied(true);
+                    setTimeout(() => setValueCopied(false), 1500);
+                  }}
+                  className="shrink-0 text-dash-text-faded hover:text-dash-text-strong"
+                >
+                  {valueCopied ? <Check className="size-3.5 text-[#13d282]" /> : <CopyIcon className="size-3.5" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <label className="flex items-center gap-2 text-xs text-dash-text-faded">
+              <input
+                type="checkbox"
+                checked={inheritable}
+                onChange={(e) => setInheritable(e.target.checked)}
+                className="size-3.5 rounded border-dash-border accent-[#4879f8]"
+              />
+              Inheritable by child environments
+            </label>
+            <div className="flex items-center gap-2">
+              <GlossyButton
+                disabled={!isDirty || !name.trim() || !value.trim() || saving}
+                loading={saving}
+                loadingLabel="Saving..."
+                onClick={() => { void saveRow(); }}
+              >
+                Save
+              </GlossyButton>
+              <GlossyButton
+                variant="red"
+                disabled={removing}
+                loading={removing}
+                loadingLabel="Removing..."
+                onClick={() => { void deleteRow(); }}
+              >
+                Remove
+              </GlossyButton>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EnvironmentLevelVarsSection({
+  environmentId,
+  workspace,
+}: {
+  environmentId: string;
+  workspace?: string;
+}) {
+  const [envVars, setEnvVars] = useState<EffectiveEnvironmentVariable[]>([]);
+  const [envName, setEnvName] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [draftRows, setDraftRows] = useState<Array<{ id: string; name: string; value: string; inheritable: boolean }>>([]);
+  const [savingDrafts, setSavingDrafts] = useState(false);
+
+  const getEnvVars = useServerFn(getEnvironmentVariablesServerFn as any) as (args: {
+    data: { environmentId: string; workspace?: string };
+  }) => Promise<EffectiveEnvironmentVariable[]>;
+  const saveEnvVars = useServerFn(saveEnvironmentVariablesServerFn as any) as (args: {
+    data: { environmentId: string; workspace?: string; variables: Array<{ name: string; value: string; inheritable?: boolean }> };
+  }) => Promise<EffectiveEnvironmentVariable[]>;
+  const getEnvDetails = useServerFn(getProjectEnvironmentDetailsServerFn as any) as (args: {
+    data: { environmentId: string; workspace?: string };
+  }) => Promise<ProjectEnvironment>;
+
+  async function fetchVars() {
+    try {
+      setLoading(true);
+      const [vars, details] = await Promise.all([
+        getEnvVars({ data: { environmentId, workspace } }),
+        getEnvDetails({ data: { environmentId, workspace } }).catch(() => null),
+      ]);
+      setEnvVars(Array.isArray(vars) ? vars : []);
+      if (details?.name) setEnvName(details.name);
+    } catch {
+      // keep empty
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void fetchVars();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [environmentId]);
+
+  function addDraftRow() {
+    setDraftRows((prev) => [...prev, { id: createDraftId(), name: "", value: "", inheritable: false }]);
+  }
+
+  function updateDraftRow(id: string, field: "name" | "value" | "inheritable", val: string | boolean) {
+    setDraftRows((prev) => prev.map((row) => (row.id === id ? { ...row, [field]: val } : row)));
+  }
+
+  function removeDraftRow(id: string) {
+    setDraftRows((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  async function handleSaveDrafts() {
+    if (savingDrafts) return;
+    const nonEmpty = draftRows.filter((r) => r.name.trim() && r.value.trim());
+    if (nonEmpty.length === 0) {
+      toast.error("Add at least one variable with name and value");
+      return;
+    }
+    try {
+      setSavingDrafts(true);
+      await saveEnvVars({
+        data: {
+          environmentId,
+          workspace,
+          variables: nonEmpty.map((r) => ({ name: r.name.trim(), value: r.value, inheritable: r.inheritable })),
+        },
+      });
+      setDraftRows([]);
+      toast.success("Environment variables saved");
+      void fetchVars();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save variables");
+    } finally {
+      setSavingDrafts(false);
+    }
+  }
+
+  const inheritedVars = envVars.filter((v) => v.source === "inherited");
+
+  return (
+    <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+      <div className="flex items-center gap-3 border-b-[0.5px] border-dash-border px-4 py-3.5">
+        <h3 className="text-sm font-medium text-dash-text-strong">Environment Variables</h3>
+        {envName && (
+          <span className="rounded-full bg-[#4879f8]/10 px-2.5 py-0.5 text-xs font-medium text-[#4879f8]">
+            {envName}
+          </span>
+        )}
+        <span className="text-xs text-dash-text-faded">{envVars.length} variable{envVars.length !== 1 ? "s" : ""}</span>
+      </div>
+
+      <div className="border-b-[0.5px] border-dash-border px-4 py-3">
+        <p className="text-xs text-dash-text-faded">
+          Shared across all projects in this environment.{" "}
+          {inheritedVars.length > 0 ? "Inherited variables come from the parent environment and are read-only." : ""}
+        </p>
+      </div>
+
+      {loading ? (
+        <EnvRowsSkeleton />
+      ) : (
+        <>
+          {envVars.length === 0 && draftRows.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <Lock className="mb-3 size-7 text-dash-text-extra-faded opacity-40" />
+              <h3 className="mb-1 text-sm font-medium text-dash-text-strong">No environment-level variables</h3>
+              <p className="max-w-[360px] text-sm text-dash-text-faded">
+                Add variables that are shared across all projects in this environment.
+              </p>
+            </div>
+          )}
+
+          {envVars.length > 0 && (
+            <div>
+              {envVars.map((v) => (
+                <EnvLevelVarRow
+                  key={v.id ?? v.name}
+                  variable={v}
+                  environmentId={environmentId}
+                  workspace={workspace}
+                  onUpdated={() => void fetchVars()}
+                  onDeleted={() => void fetchVars()}
+                />
+              ))}
+            </div>
+          )}
+
+          {draftRows.length > 0 && (
+            <div className="border-t border-dash-border px-4 py-4">
+              <div className="flex flex-col gap-2">
+                {draftRows.map((row) => (
+                  <div key={row.id} className="grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
+                    <input
+                      type="text"
+                      value={row.name}
+                      onChange={(e) => updateDraftRow(row.id, "name", e.target.value)}
+                      placeholder="VARIABLE_NAME"
+                      className="input-base input-focus h-[36px] w-full px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded"
+                    />
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      value={row.value}
+                      onChange={(e) => updateDraftRow(row.id, "value", e.target.value)}
+                      placeholder="value"
+                      className="input-base input-focus h-[36px] w-full px-3 text-sm text-dash-text-strong [text-security:disc] [-webkit-text-security:disc] placeholder:text-dash-text-extra-faded placeholder:[-webkit-text-security:none]"
+                    />
+                    <label className="flex items-center gap-1.5 text-xs text-dash-text-faded" title="Inheritable by child environments">
+                      <input
+                        type="checkbox"
+                        checked={row.inheritable}
+                        onChange={(e) => updateDraftRow(row.id, "inheritable", e.target.checked)}
+                        className="size-3.5 rounded border-dash-border accent-[#4879f8]"
+                      />
+                      Inherit
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => removeDraftRow(row.id)}
+                      className="flex h-[36px] w-[36px] items-center justify-center rounded-[4px] text-dash-text-faded hover:text-red-400"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <button type="button" onClick={addDraftRow} className="text-sm text-dash-text-faded hover:text-dash-text-strong">
+                  + Add Another
+                </button>
+                <GlossyButton
+                  disabled={savingDrafts}
+                  loading={savingDrafts}
+                  loadingLabel="Saving..."
+                  onClick={() => { void handleSaveDrafts(); }}
+                >
+                  Save
+                </GlossyButton>
+              </div>
+            </div>
+          )}
+
+          {draftRows.length === 0 && (
+            <div className="border-t border-dash-border px-4 py-3">
+              <button type="button" onClick={addDraftRow} className="text-sm text-dash-text-faded hover:text-dash-text-strong">
+                + Add Variable
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function EnvironmentPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const { initialTarget, initialSnapshot, targets: initialTargets } = Route.useLoaderData() as LoaderData;
@@ -397,6 +766,7 @@ function EnvironmentPage() {
   const projectId = project?.id as string | undefined;
   const serviceType = project?.serviceType as string | undefined;
   const framework = project?.framework as string | undefined;
+  const projectEnvironmentId = project?.projectEnvironmentId as string | null | undefined;
   const canEdit = canEditProjectEnvs(serviceType);
   const databaseProject = isDatabaseService(serviceType);
   const envTabSupported = shouldShowEnvironmentTab(framework);
@@ -749,6 +1119,13 @@ function EnvironmentPage() {
       </TabHeader>
 
       <hr className="border-dash-border" />
+
+      {envTabSupported && projectEnvironmentId && (
+        <EnvironmentLevelVarsSection
+          environmentId={projectEnvironmentId}
+          workspace={workspace}
+        />
+      )}
 
       {!envTabSupported && (
         <div className="rounded-[4px] border-[0.5px] border-dash-border px-4 py-5 text-sm text-dash-text-faded">

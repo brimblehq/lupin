@@ -47,7 +47,12 @@ function buildTasks({
   showInviteTeamMemberTask: boolean;
 }): OnboardingTask[] {
   const tasks: OnboardingTask[] = [
-    { label: "Connect Git", done: hasGit, action: "/projects/new" },
+    {
+      label: "Connect Git",
+      done: hasGit,
+      action: "https://github.com/apps/brimble-build/installations/new",
+      external: true,
+    },
     { label: "Deploy a project", done: hasProject, action: "/projects/new" },
   ];
 
@@ -122,6 +127,15 @@ export function OnboardingChecklist({
   const [gitRefreshKey, setGitRefreshKey] = useState(0);
   const workspaceCacheKey = activeWorkspaceSlug ?? "__personal__";
 
+  const projectList = projects ?? [];
+  const deployableProjects = projectList.filter((project) => {
+    const serviceType = String(project.serviceType ?? "").toLowerCase();
+    return serviceType !== "database" && serviceType !== "database-service";
+  });
+  const hasGitFromProjects = deployableProjects.some(
+    (p) => p.gitLink || p.repo?.git || p.repo?.fullName || p.repo?.name,
+  );
+
   useEffect(() => {
     function handleGitChange() {
       setGitRefreshKey((k) => k + 1);
@@ -135,23 +149,30 @@ export function OnboardingChecklist({
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    void (async () => {
+    async function fetchGitStatus(attempt = 0) {
       try {
         const accounts = await listGithubAccounts();
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
         setHasConnectedGit(Array.isArray(accounts) && accounts.length > 0);
       } catch {
-        if (!cancelled) {
-          setHasConnectedGit(false);
+        if (cancelled) return;
+        // Retry up to 2 times with a delay — the initial call can fail
+        // if auth cookies haven't settled yet on page load.
+        if (attempt < 2) {
+          retryTimeout = setTimeout(() => fetchGitStatus(attempt + 1), 1500);
+        } else {
+          setHasConnectedGit(hasGitFromProjects);
         }
       }
-    })();
+    }
+
+    void fetchGitStatus();
 
     return () => {
       cancelled = true;
+      if (retryTimeout) clearTimeout(retryTimeout);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- listGithubAccounts is stable in behavior but unstable in reference (useServerFn)
   }, [gitRefreshKey]);
@@ -202,14 +223,6 @@ export function OnboardingChecklist({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- getTeamMembers is stable in behavior but unstable in reference (useServerFn)
   }, [activeWorkspaceSlug, isTeamWorkspace, teamDetails, teamDetailsByWorkspace]);
 
-  const projectList = projects ?? [];
-  const deployableProjects = projectList.filter((project) => {
-    const serviceType = String(project.serviceType ?? "").toLowerCase();
-    return serviceType !== "database" && serviceType !== "database-service";
-  });
-  const hasGitFromProjects = deployableProjects.some(
-    (p) => p.gitLink || p.repo?.git || p.repo?.fullName || p.repo?.name,
-  );
   const hasGit = hasConnectedGit ?? hasGitFromProjects;
   const hasProject = deployableProjects.length > 0;
   const planType = (settingsSnapshot?.profile?.subscription?.planType ?? "").toUpperCase();

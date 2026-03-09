@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import { Drawer } from "vaul";
 import { cn } from "@brimble/ui";
@@ -73,6 +73,7 @@ export { ProfileTab };
 
 const accountNav: { label: string; key: ProfileTab }[] = [
   { label: "Profile", key: ProfileTab.Profile },
+  { label: "Activity session", key: ProfileTab.ActivitySession },
   { label: "Members", key: ProfileTab.Members },
   { label: "Notifications", key: ProfileTab.Notifications },
   { label: "Billing", key: ProfileTab.Billing },
@@ -96,6 +97,201 @@ const aboutNav = [
 
 const navItemBase =
   "flex items-center gap-2 whitespace-nowrap rounded-[4px] px-3.5 py-1.5 text-sm tracking-[-0.0224px] transition-colors w-full cursor-pointer";
+
+type ActivityStatus = "success" | "failed" | "warning";
+
+interface ActivitySessionItem {
+  id: string;
+  action: string;
+  category: "Authentication" | "Projects" | "Domains" | "Workspace" | "Security";
+  at: string;
+  status: ActivityStatus;
+  device?: string;
+  location?: string;
+  ipAddress?: string;
+}
+
+function buildActivitySessionItems(profile?: UserProfile | null, workspace?: string | null): ActivitySessionItem[] {
+  const now = Date.now();
+  const actor = profile?.username || profile?.email || "User";
+  const workspaceLabel = workspace?.trim() || "personal workspace";
+
+  return [
+    {
+      id: "auth-login",
+      action: `${actor} logged in`,
+      category: "Authentication",
+      at: new Date(now - 12 * 60 * 1000).toISOString(),
+      status: "success",
+      device: "Chrome on macOS",
+      location: "Lagos, NG",
+      ipAddress: "102.89.41.23",
+    },
+    {
+      id: "project-register",
+      action: `Registered project "frontend-portal" in ${workspaceLabel}`,
+      category: "Projects",
+      at: new Date(now - 46 * 60 * 1000).toISOString(),
+      status: "success",
+      device: "Chrome on macOS",
+    },
+    {
+      id: "domain-purchase",
+      action: `Purchased domain "brimblelabs.dev"`,
+      category: "Domains",
+      at: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      status: "success",
+      device: "Safari on iPhone",
+      location: "Abuja, NG",
+      ipAddress: "105.112.78.41",
+    },
+    {
+      id: "logout",
+      action: `${actor} logged out`,
+      category: "Authentication",
+      at: new Date(now - 4 * 60 * 60 * 1000).toISOString(),
+      status: "success",
+      device: "Chrome on Windows",
+      location: "London, UK",
+      ipAddress: "51.142.33.80",
+    },
+    {
+      id: "security-attempt",
+      action: "Blocked sign-in attempt due to invalid OTP",
+      category: "Security",
+      at: new Date(now - 9 * 60 * 60 * 1000).toISOString(),
+      status: "warning",
+      device: "Firefox on Linux",
+      location: "Frankfurt, DE",
+      ipAddress: "18.193.14.40",
+    },
+  ];
+}
+
+function formatActivityTime(value: string): string {
+  const timestamp = new Date(value).getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return "Unknown time";
+  }
+
+  const diff = Date.now() - timestamp;
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diff < hour) {
+    const mins = Math.max(1, Math.floor(diff / minute));
+    return `${mins}m ago`;
+  }
+
+  if (diff < day) {
+    const hours = Math.max(1, Math.floor(diff / hour));
+    return `${hours}h ago`;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function groupActivityByDate(items: ActivitySessionItem[]): { label: string; items: ActivitySessionItem[] }[] {
+  const groups = new Map<string, ActivitySessionItem[]>();
+
+  for (const item of items) {
+    const date = new Date(item.at);
+    const now = new Date();
+    const isToday =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate();
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday =
+      date.getFullYear() === yesterday.getFullYear() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getDate() === yesterday.getDate();
+
+    const label = isToday
+      ? "Today"
+      : isYesterday
+        ? "Yesterday"
+        : new Intl.DateTimeFormat("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          }).format(date);
+
+    const group = groups.get(label);
+    if (group) {
+      group.push(item);
+    } else {
+      groups.set(label, [item]);
+    }
+  }
+
+  return Array.from(groups, ([label, items]) => ({ label, items }));
+}
+
+function ActivitySessionForm({
+  items,
+}: {
+  items: ActivitySessionItem[];
+}) {
+  if (!items.length) {
+    return (
+      <div className="py-6 text-sm text-dash-text-faded">
+        No activity captured yet.
+      </div>
+    );
+  }
+
+  const groups = groupActivityByDate(items);
+
+  return (
+    <div className="flex max-w-[760px] flex-col gap-6">
+      <div>
+        <p className="text-sm font-medium text-dash-text-strong">User activity sessions</p>
+        <p className="text-xs text-dash-text-faded">
+          Recent account actions across authentication, projects, and domains.
+        </p>
+      </div>
+
+      {groups.map((group) => (
+        <div key={group.label} className="flex flex-col">
+          <p className="mb-2 text-xs font-medium text-dash-text-faded">{group.label}</p>
+          <div className="flex flex-col">
+            {group.items.map((item, index) => (
+              <div
+                key={item.id}
+                className={cn(
+                  "grid gap-2 py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center",
+                  index !== 0 && "border-t border-dash-border-soft",
+                )}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium leading-5 text-dash-text-strong">{item.action}</p>
+                  <p className="mt-1 text-xs text-dash-text-faded">
+                    {item.category}
+                    {item.device ? ` • ${item.device}` : ""}
+                    {item.location ? ` • ${item.location}` : ""}
+                    {item.ipAddress ? ` • IP ${item.ipAddress}` : ""}
+                  </p>
+                </div>
+                <span className="text-xs text-dash-text-extra-faded justify-self-start md:justify-self-end">{formatActivityTime(item.at)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -184,6 +380,7 @@ function ProfileForm({
   );
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl ?? "");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isAltPressed, setIsAltPressed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isTextDirty =
@@ -222,6 +419,36 @@ function ProfileForm({
   useEffect(() => {
     setBuildsEnabled(profile.buildsEnabled ?? true);
   }, [profile.buildsEnabled]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.altKey) {
+        setIsAltPressed(true);
+      }
+    }
+
+    function handleKeyUp(event: KeyboardEvent) {
+      if (!event.altKey) {
+        setIsAltPressed(false);
+      }
+    }
+
+    function clearAltState() {
+      setIsAltPressed(false);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", clearAltState);
+    document.addEventListener("visibilitychange", clearAltState);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", clearAltState);
+      document.removeEventListener("visibilitychange", clearAltState);
+    };
+  }, []);
 
   async function handleAvatarFileChange(
     event: React.ChangeEvent<HTMLInputElement>,
@@ -267,6 +494,53 @@ function ProfileForm({
 
   const avatarSeed =
     profile.username || profile.firstName || profile.email || "user";
+  const hasCustomAvatar = Boolean(avatarUrl);
+  const alternateActionLabel = hasCustomAvatar
+    ? "Remove photo"
+    : "Paste image URL";
+
+  function applyAvatarUrlFromPrompt() {
+    const input = window.prompt("Paste an image URL (https://...)");
+
+    if (!input) {
+      return;
+    }
+
+    const trimmed = input.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        throw new Error("invalid protocol");
+      }
+
+      setAvatarUrl(parsed.toString());
+      toast.success("Image URL added. Click Confirm to save changes.");
+    } catch {
+      toast.error("Please enter a valid image URL.");
+    }
+  }
+
+  function handleAvatarButtonClick(event: React.MouseEvent<HTMLButtonElement>) {
+    const useAlternateAction = event.altKey || isAltPressed;
+
+    if (useAlternateAction) {
+      if (hasCustomAvatar) {
+        setAvatarUrl("");
+        toast.success("Photo removed. Click Confirm to save changes.");
+        return;
+      }
+
+      applyAvatarUrlFromPrompt();
+      return;
+    }
+
+    fileInputRef.current?.click();
+  }
+
   const avatarSrc =
     avatarUrl ||
     `https://avatar.vercel.sh/${encodeURIComponent(avatarSeed)}`;
@@ -297,14 +571,20 @@ function ProfileForm({
         </div>
         <div className="flex flex-col gap-2">
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleAvatarButtonClick}
             disabled={isUploadingAvatar || Boolean(isSaving)}
             className="flex h-[34px] w-fit items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-50"
           >
-            {isUploadingAvatar ? "Uploading..." : "Upload photo"}
+            {isUploadingAvatar
+              ? "Uploading..."
+              : isAltPressed
+                ? alternateActionLabel
+                : "Upload photo"}
           </button>
           <span className="text-sm text-dash-text-faded">
-            Hold Option "⌥" to reveal alternate action
+            {isAltPressed
+              ? `Release Option "⌥" to upload photo`
+              : `Hold Option "⌥" to ${alternateActionLabel.toLowerCase()}`}
           </span>
         </div>
       </div>
@@ -1495,6 +1775,10 @@ export function UserProfileDrawer({
     : null;
 
   const profile = mapSettingsSnapshotToDrawerProfile(snapshot);
+  const activityItems = useMemo(
+    () => buildActivitySessionItems(profile, activeWorkspaceSlug),
+    [profile, activeWorkspaceSlug],
+  );
 
   const currentWorkspaceRole = (() => {
     if (!hasActiveWorkspace || !workspaceTeam) return null;
@@ -1653,7 +1937,9 @@ export function UserProfileDrawer({
   }
 
   let drawerTitle: string = activeTab;
-  if (activeTab === ProfileTab.Billing) {
+  if (activeTab === ProfileTab.ActivitySession) {
+    drawerTitle = "Activity session";
+  } else if (activeTab === ProfileTab.Billing) {
     drawerTitle = "Plan & billing";
   } else if (activeTab === ProfileTab.Members) {
     drawerTitle = "Members";
@@ -1698,7 +1984,7 @@ export function UserProfileDrawer({
 
             {/* Form */}
             <div className="flex-1 px-4 py-5 md:px-8 md:py-8">
-              {settingsError && activeTab !== "members" && (
+              {settingsError && activeTab !== ProfileTab.Members && (
                 <div className="mb-4 rounded-[6px] border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-500">
                   {settingsError}
                 </div>
@@ -1706,6 +1992,7 @@ export function UserProfileDrawer({
               {isLoadingSettings &&
               !snapshot &&
               activeTab !== ProfileTab.Members &&
+              activeTab !== ProfileTab.ActivitySession &&
               !(activeTab === ProfileTab.Profile && hasActiveWorkspace) ? (
                 <div className="text-sm text-dash-text-faded">
                   Loading settings…
@@ -2001,6 +2288,9 @@ export function UserProfileDrawer({
                 <div className="text-sm text-dash-text-faded">
                   Profile settings are unavailable right now.
                 </div>
+              )}
+              {activeTab === ProfileTab.ActivitySession && (
+                <ActivitySessionForm items={activityItems} />
               )}
               {activeTab === ProfileTab.Members && activeWorkspaceSlug && (
                 <MembersForm

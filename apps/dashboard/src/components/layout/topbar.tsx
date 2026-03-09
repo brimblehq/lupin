@@ -28,6 +28,14 @@ import type { Workspace } from "@/backend/workspaces";
 import type { Project } from "@/backend/projects";
 import type { AppTooltipMessage } from "@/backend/messages";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
+import {
+  listProjectEnvironmentsServerFn,
+  createProjectEnvironmentServerFn,
+  deleteProjectEnvironmentServerFn,
+} from "@/server/environments/actions";
+import type { ProjectEnvironment } from "@/backend/environments";
+import { WarningModal } from "../shared/warning-modal";
+import { Dropdown } from "../shared/dropdown";
 import { toTitleCase } from "@/utils/dashboard";
 import {
   buildProjectSwitchUrl,
@@ -56,11 +64,13 @@ function splitInternalUrl(url: string) {
 
 function ProjectSwitcher({
   projectId,
+  currentProjectName,
   pathname,
   searchStr,
   projects,
 }: {
   projectId: string;
+  currentProjectName?: string;
   pathname: string;
   searchStr: string;
   projects: Project[];
@@ -93,10 +103,8 @@ function ProjectSwitcher({
       project.slug === displayProjectId ||
       project.name === displayProjectId,
   );
-  let activeProjectLabel = displayProjectId;
-  if (currentProject?.name) {
-    activeProjectLabel = currentProject.name;
-  }
+  const activeProjectLabel =
+    currentProjectName?.trim() || currentProject?.name || displayProjectId;
 
   return (
     <div className="relative" ref={ref}>
@@ -137,7 +145,7 @@ function ProjectSwitcher({
             <div className="scrollbar-hidden flex max-h-[240px] flex-col gap-2 overflow-y-auto border-b-[0.5px] border-dash-border px-3.5 py-2">
               {projects.length > 0 ? (
                 projects.filter((p) => !filter || (p.name || p.slug || "").toLowerCase().includes(filter.toLowerCase())).map((project) => {
-                  const nextProjectId = project.slug || project.name;
+                  const nextProjectId = project.slug || project.id || project.name;
                   if (!nextProjectId) {
                     return null;
                   }
@@ -425,17 +433,76 @@ function WorkspaceSwitcher({
   );
 }
 
-const environments = ["Production", "Preview", "Development", "Staging"];
-
-function EnvironmentDropdown() {
-  const [selected, setSelected] = useState("Production");
+function EnvironmentDropdown({ workspace }: { workspace?: string }) {
+  const [environments, setEnvironments] = useState<ProjectEnvironment[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newEnvName, setNewEnvName] = useState("");
+  const [newEnvNameError, setNewEnvNameError] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectEnvironment | null>(null);
+  const [migrateTarget, setMigrateTarget] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const createInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+
+  const listEnvironments = useServerFn(listProjectEnvironmentsServerFn as any) as (args: {
+    data: { workspace?: string };
+  }) => Promise<ProjectEnvironment[]>;
+  const createEnvironment = useServerFn(createProjectEnvironmentServerFn as any) as (args: {
+    data: { name: string; workspace?: string };
+  }) => Promise<ProjectEnvironment>;
+  const deleteEnvironment = useServerFn(deleteProjectEnvironmentServerFn as any) as (args: {
+    data: { environmentId: string; moveTo: string; workspace?: string };
+  }) => Promise<{ success: boolean }>;
+
+  const listEnvironmentsRef = useRef(listEnvironments);
+  const createEnvironmentRef = useRef(createEnvironment);
+  const deleteEnvironmentRef = useRef(deleteEnvironment);
+
+  useEffect(() => {
+    listEnvironmentsRef.current = listEnvironments;
+  }, [listEnvironments]);
+  useEffect(() => {
+    createEnvironmentRef.current = createEnvironment;
+  }, [createEnvironment]);
+  useEffect(() => {
+    deleteEnvironmentRef.current = deleteEnvironment;
+  }, [deleteEnvironment]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const envs = await listEnvironmentsRef.current({
+          data: { workspace },
+        });
+        if (!cancelled && Array.isArray(envs) && envs.length > 0) {
+          setEnvironments(envs);
+          // Auto-select the default environment, or first
+          const defaultEnv = envs.find((e) => e.isDefault) ?? envs[0];
+          setSelectedId((prev) => {
+            if (prev && envs.some((e) => e._id === prev)) return prev;
+            return defaultEnv._id;
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setEnvironments([]);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [workspace]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
+        setCreating(false);
+        setNewEnvName("");
       }
     }
     if (open) {
@@ -444,10 +511,88 @@ function EnvironmentDropdown() {
     }
   }, [open]);
 
+  useEffect(() => {
+    if (creating) {
+      createInputRef.current?.focus();
+    }
+  }, [creating]);
+
+  const selectedEnv = environments.find((e) => e._id === selectedId);
+  const defaultEnv = environments.find((e) => e.isDefault);
+
+  function selectEnvironment(envId: string) {
+    setSelectedId(envId);
+    const params = new URLSearchParams(searchStr || "");
+    const isDefault = environments.find((e) => e._id === envId)?.isDefault;
+    if (isDefault) {
+      params.delete("environmentId");
+    } else {
+      params.set("environmentId", envId);
+    }
+    const search = Object.fromEntries(params.entries());
+    navigate({
+      to: pathname as any,
+      search: Object.keys(search).length > 0 ? search as any : undefined,
+    });
+  }
+
+  async function handleCreateSubmit() {
+    const name = newEnvName.trim();
+    if (!name || name.length < 3 || !/^[a-zA-Z][a-zA-Z _-]*$/.test(name)) {
+      setNewEnvNameError(true);
+      return;
+    }
+    setNewEnvNameError(false);
+    // If an environment with the same name already exists, just select it
+    const existing = environments.find(
+      (e) => e.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (existing) {
+      selectEnvironment(existing._id);
+      setCreating(false);
+      setNewEnvName("");
+      setOpen(false);
+      return;
+    }
+    try {
+      const created = await createEnvironmentRef.current({
+        data: { name, workspace },
+      });
+      setEnvironments((prev) => [...prev, created]);
+      selectEnvironment(created._id);
+    } catch {
+      // silently fail
+    }
+    setCreating(false);
+    setNewEnvName("");
+    setOpen(false);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget || !migrateTarget) return;
+    try {
+      await deleteEnvironmentRef.current({
+        data: {
+          environmentId: deleteTarget._id,
+          moveTo: migrateTarget,
+          workspace,
+        },
+      });
+      setEnvironments((prev) => prev.filter((e) => e._id !== deleteTarget._id));
+      if (selectedId === deleteTarget._id) {
+        selectEnvironment(migrateTarget);
+      }
+    } catch {
+      // silently fail
+    }
+    setDeleteTarget(null);
+    setMigrateTarget(null);
+  }
+
   return (
     <div className="relative" ref={ref}>
       <DashButton onClick={() => setOpen(!open)}>
-        {selected}
+        {selectedEnv?.name ?? "Production"}
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
@@ -463,27 +608,123 @@ function EnvironmentDropdown() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-full z-50 mt-2 w-[180px] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
+            className="absolute right-0 top-full z-50 mt-2 w-[180px] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
           >
-            {environments.map((env) => (
+            <div className="py-1">
+              {environments.map((env) => {
+                const isSelected = env._id === selectedId;
+                const isDeletable = !env.isDefault;
+                return (
+                  <div
+                    key={env._id}
+                    className={`group mx-1 flex w-[calc(100%-8px)] items-center justify-between rounded-[2px] px-2 py-1.5 transition-colors hover:bg-dash-bg-elevated ${
+                      isSelected
+                        ? "font-medium text-dash-text-strong"
+                        : "font-light text-dash-text-faded"
+                    }`}
+                  >
+                    <button
+                      className="min-w-0 flex-1 text-left text-sm"
+                      onClick={() => {
+                        selectEnvironment(env._id);
+                        setOpen(false);
+                      }}
+                    >
+                      {env.name}
+                    </button>
+                    {isDeletable && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(env);
+                          setMigrateTarget(defaultEnv?._id ?? null);
+                          setOpen(false);
+                        }}
+                        className="ml-2 hidden shrink-0 text-dash-text-extra-faded transition-colors hover:text-red-400 group-hover:block"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Create environment */}
+            {creating ? (
+              <div className={`border-t-[0.5px] px-3 py-2 ${newEnvNameError ? "border-[#f05252] bg-[#f05252]/5" : "border-dash-border"}`}>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleCreateSubmit();
+                  }}
+                >
+                  <input
+                    ref={createInputRef}
+                    type="text"
+                    value={newEnvName}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setNewEnvName(v);
+                      if (newEnvNameError) {
+                        const t = v.trim();
+                        if (t.length >= 3 && /^[a-zA-Z][a-zA-Z _-]*$/.test(t)) {
+                          setNewEnvNameError(false);
+                        }
+                      }
+                    }}
+                    placeholder="Environment name"
+                    className={`w-full bg-transparent text-sm text-dash-text-body placeholder:text-dash-text-extra-faded outline-none ${newEnvNameError ? "text-[#f05252]" : ""}`}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setCreating(false);
+                        setNewEnvName("");
+                        setNewEnvNameError(false);
+                      }
+                    }}
+                  />
+                </form>
+              </div>
+            ) : (
               <button
-                key={env}
-                onClick={() => {
-                  setSelected(env);
-                  setOpen(false);
-                }}
-                className={`mx-1 flex w-[calc(100%-8px)] items-center rounded-[2px] px-2 py-1.5 text-sm transition-colors hover:bg-dash-bg-elevated ${
-                  env === selected
-                    ? "font-medium text-dash-text-strong"
-                    : "font-light text-dash-text-faded"
-                }`}
+                type="button"
+                onClick={() => setCreating(true)}
+                className="flex h-9 w-full items-center gap-2 border-t-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-left text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
               >
-                {env}
+                <Plus className="size-3.5" />
+                Create environment
               </button>
-            ))}
+            )}
           </motion.div>
         )}
       </AnimatePresence>
+
+      <WarningModal
+        open={deleteTarget !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setDeleteTarget(null);
+            setMigrateTarget(null);
+          }
+        }}
+        title={`Delete ${deleteTarget?.name ?? ""} environment?`}
+        description="Projects attached to this environment will be moved to the environment you select below. This action cannot be undone."
+        confirmLabel="Delete environment"
+        confirmLoadingLabel="Deleting..."
+        onConfirm={handleDeleteConfirm}
+      >
+        <div className="flex flex-col gap-1.5 text-left">
+          <label className="text-xs font-medium text-dash-text-faded">
+            Move projects to
+          </label>
+          <Dropdown
+            value={migrateTarget ?? ""}
+            options={environments
+              .filter((e) => e._id !== deleteTarget?._id)
+              .map((e) => ({ id: e._id, label: e.name }))}
+            onChange={(id) => setMigrateTarget(id)}
+          />
+        </div>
+      </WarningModal>
     </div>
   );
 }
@@ -907,6 +1148,17 @@ export function Topbar({
   const { open: openScoutBar } = useScoutBar();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const currentProject = useRouterState({
+    select: (s) => {
+      const projectMatch = s.matches.find(
+        (match) => match.routeId === "/projects/$projectId",
+      );
+      const loaderData = projectMatch?.loaderData as
+        | { project?: Project | null }
+        | undefined;
+      return loaderData?.project ?? null;
+    },
+  });
   const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
   const projectId = projectMatch ? projectMatch[1] : null;
   const isWorkspaceNew = /^\/workspace\/new/.test(pathname);
@@ -998,6 +1250,7 @@ export function Topbar({
               ) : (
                 <ProjectSwitcher
                   projectId={projectId}
+                  currentProjectName={currentProject?.name}
                   pathname={pathname}
                   searchStr={searchStr}
                   projects={projectSwitcherProjects ?? []}
@@ -1011,7 +1264,7 @@ export function Topbar({
           </div>
           <div className="hidden items-center gap-4 md:flex">
             {/* Environment selector */}
-            <EnvironmentDropdown />
+            <EnvironmentDropdown workspace={new URLSearchParams(searchStr || "").get("workspace") ?? undefined} />
             {/* Create split button */}
             <CreateDropdown />
           </div>

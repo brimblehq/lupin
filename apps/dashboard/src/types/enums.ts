@@ -3,6 +3,7 @@ export enum PaletteView {
   ProjectSearch = "project-search",
   DomainSearch = "domain-search",
   WorkspaceSearch = "workspace-search",
+  EnvironmentSearch = "environment-search",
 }
 
 export enum Theme {
@@ -57,6 +58,7 @@ export enum DomainStep {
 
 export enum ProfileTab {
   Profile = "profile",
+  ActivitySession = "activity-session",
   Members = "members",
   Notifications = "notifications",
   Billing = "billing",
