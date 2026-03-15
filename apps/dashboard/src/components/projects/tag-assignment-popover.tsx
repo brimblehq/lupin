@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Search, Plus, Check } from "lucide-react";
 import { Spinner } from "../shared/spinner";
 import { useTags } from "@/contexts/tags-context";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { normalizeTagName } from "@/types/tags";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -25,6 +26,7 @@ export function TagAssignmentPopover({
   assignedTagIds = [],
   onAssignedTagIdsChange,
 }: TagAssignmentPopoverProps) {
+  const { canWrite } = useWorkspaceRole();
   const { tags, toggleTagAssignment, createTag } = useTags();
   const [query, setQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -87,7 +89,7 @@ export function TagAssignmentPopover({
   const exactMatch = tags.some((t) => t.name === trimmed);
 
   async function handleToggle(tagId: string) {
-    if (pendingToggles.has(tagId)) return;
+    if (!canWrite || pendingToggles.has(tagId)) return;
 
     const wasAssigned = localAssigned.has(tagId);
     const optimistic = new Set(localAssigned);
@@ -127,7 +129,7 @@ export function TagAssignmentPopover({
   }
 
   async function handleCreate() {
-    if (!trimmed || exactMatch || creatingTag) return;
+    if (!canWrite || !trimmed || exactMatch || creatingTag) return;
     setCreatingTag(true);
     const beforeCreate = new Set(localAssigned);
     try {
@@ -186,7 +188,7 @@ export function TagAssignmentPopover({
                 if (e.key === "Escape") onOpenChange(false);
                 if (e.key === "Enter") handleCreate();
               }}
-              placeholder="Search or create..."
+              placeholder={canWrite ? "Search or create..." : "Search tags..."}
               className="w-full bg-transparent text-sm text-dash-text-strong outline-none placeholder:text-[#9ca3af]"
             />
           </div>
@@ -198,7 +200,7 @@ export function TagAssignmentPopover({
             return (
               <button
                 key={tag.id}
-                disabled={isPending}
+                disabled={!canWrite || isPending}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -220,8 +222,8 @@ export function TagAssignmentPopover({
             );
           })}
 
-          {/* Create row */}
-          {trimmed && !exactMatch && (
+          {/* Create row — hidden for Viewers */}
+          {canWrite && trimmed && !exactMatch && (
             <button
               disabled={creatingTag}
               onClick={(e) => {

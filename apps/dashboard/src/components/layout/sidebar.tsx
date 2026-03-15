@@ -10,6 +10,7 @@ export const mainNav = [
   { label: "Projects", icon: "/icons/project.svg", href: "/projects" },
   { label: "Domains", icon: "/icons/domains.svg", href: "/domains" },
   { label: "Scaling", icon: "/icons/scaling.svg", href: "/scaling" },
+  { label: "Buckets", icon: "/icons/bucket.svg", href: "#", comingSoon: true },
   { label: "Sandboxes", icon: "/icons/sandbox.svg", href: "#", comingSoon: true },
 ];
 

@@ -23,6 +23,7 @@ import type { DomainRecord } from "@/backend/domains";
 import type { ProjectEnvironment } from "@/backend/environments";
 import type { Project } from "@/backend/projects";
 import type { Workspace } from "@/backend/workspaces";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 
 const rootRoute = getRouteApi("__root__");
@@ -43,6 +44,7 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const { isOpen, setIsOpen } = useScoutBar();
   const { theme, setTheme, toggleTheme } = useTheme();
+  const { canWrite } = useWorkspaceRole();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const currentPathname = useRouterState({ select: (s) => s.location.pathname });
   const { onboardingProjects, workspaces, settingsSnapshot } =
@@ -252,7 +254,7 @@ export function CommandPalette() {
   };
 
   const openNewTeam = () => {
-    runAction(() => go("/workspace/new"));
+    runAction(() => navigate({ to: "/workspace/new" }));
   };
 
   const openProjectSearch = () => {
@@ -341,10 +343,12 @@ export function CommandPalette() {
     }
 
     const shortcutActions: Record<string, () => void> = {
-      n: openNewProject,
-      d: openNewDomain,
-      b: openBuyDomain,
-      db: openNewDatabase,
+      ...(canWrite ? {
+        n: openNewProject,
+        d: openNewDomain,
+        b: openBuyDomain,
+        db: openNewDatabase,
+      } : {}),
       t: openNewTeam,
     };
     const shortcutPrefixes = new Set(["d"]);
@@ -519,6 +523,7 @@ export function CommandPalette() {
                               />
                               <span>Search projects</span>
                             </Command.Item>
+                            {canWrite && (
                             <Command.Item
                               value="new project create"
                               onSelect={openNewProject}
@@ -534,6 +539,7 @@ export function CommandPalette() {
                                 N
                               </span>
                             </Command.Item>
+                            )}
                           </Command.Group>
 
                           <Command.Group heading="DOMAINS">
@@ -549,6 +555,8 @@ export function CommandPalette() {
                               />
                               <span>Search domains</span>
                             </Command.Item>
+                            {canWrite && (
+                            <>
                             <Command.Item
                               value="new domain add"
                               onSelect={openNewDomain}
@@ -579,8 +587,11 @@ export function CommandPalette() {
                                 B
                               </span>
                             </Command.Item>
+                            </>
+                            )}
                           </Command.Group>
 
+                          {canWrite && (
                           <Command.Group heading="DATABASES">
                             <Command.Item
                               value="new database create"
@@ -601,6 +612,7 @@ export function CommandPalette() {
                               </span>
                             </Command.Item>
                           </Command.Group>
+                          )}
 
                           <Command.Group heading="TEAM">
                             <Command.Item

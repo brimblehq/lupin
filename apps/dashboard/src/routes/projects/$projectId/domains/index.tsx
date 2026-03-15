@@ -25,6 +25,7 @@ import { formatRelativeTime } from "@/utils/dashboard";
 import { shouldShowProjectDomainsTab } from "@/utils/project-capabilities";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -162,6 +163,7 @@ function ProjectDomainsPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const { settingsSnapshot } = (RootRoute.useLoaderData() ?? {}) as any;
   const { customDomain } = usePlanGate();
+  const { canWrite } = useWorkspaceRole();
   if (!shouldShowProjectDomainsTab(project)) {
     return (
       <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
@@ -380,10 +382,10 @@ function ProjectDomainsPage() {
         domains={rows}
         basePath={`/projects/${projectId}/domains`}
         projects={projects}
-        onAddDomain={() => setAddDomainOpen(true)}
+        onAddDomain={canWrite ? () => setAddDomainOpen(true) : undefined}
         onRefreshDomain={handleRefreshDomain}
-        onConfigureDomain={handleConfigureDomain}
-        onDeleteDomain={handleDeleteDomain}
+        onConfigureDomain={canWrite ? handleConfigureDomain : undefined}
+        onDeleteDomain={canWrite ? handleDeleteDomain : undefined}
       />
 
       <div className="mt-2 flex justify-end">
@@ -394,24 +396,26 @@ function ProjectDomainsPage() {
         />
       </div>
 
-      <AddDomainModal
-        open={addDomainOpen}
-        onOpenChange={setAddDomainOpen}
-        projects={[{ id: project.id, name: project.name }]}
-        defaultRegistrantEmail={settingsSnapshot?.profile?.email ?? ""}
-        paymentCards={settingsSnapshot?.billing?.cards ?? []}
-        onValidate={validateDomain}
-        onContinue={(selectedProjectId, domainUrl) => {
-          void handleAddDomain(selectedProjectId, domainUrl);
-        }}
-        onRegisterDomain={(domainUrl) => {
-          let to = `/domains/buy?q=${encodeURIComponent(domainUrl)}`;
-          if (project.id) {
-            to = `${to}&project=${encodeURIComponent(project.id)}`;
-          }
-          navigate({ to: to as any });
-        }}
-      />
+      {canWrite && (
+        <AddDomainModal
+          open={addDomainOpen}
+          onOpenChange={setAddDomainOpen}
+          projects={[{ id: project.id, name: project.name }]}
+          defaultRegistrantEmail={settingsSnapshot?.profile?.email ?? ""}
+          paymentCards={settingsSnapshot?.billing?.cards ?? []}
+          onValidate={validateDomain}
+          onContinue={(selectedProjectId, domainUrl) => {
+            void handleAddDomain(selectedProjectId, domainUrl);
+          }}
+          onRegisterDomain={(domainUrl) => {
+            let to = `/domains/buy?q=${encodeURIComponent(domainUrl)}`;
+            if (project.id) {
+              to = `${to}&project=${encodeURIComponent(project.id)}`;
+            }
+            navigate({ to: to as any });
+          }}
+        />
+      )}
     </div>
   );
 }

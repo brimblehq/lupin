@@ -31,6 +31,7 @@ import { formatRelativeTime } from "@/utils/dashboard";
 import { resolveEnvironmentId } from "@/utils/environment-selection";
 import { parsePositivePageSearchValue, parseTextSearchValue, parseWorkspaceSearchValue, workspacePageLoaderDeps } from "@/utils/workspace-route-search";
 import { useTagsStore } from "@/hooks/use-tags-store";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 
 const environmentFormSchema = Yup.object({
   name: Yup.string()
@@ -188,6 +189,7 @@ function EnvironmentManagerModal({
   activeEnvironmentId,
   onEnvironmentListChange,
   onActiveEnvironmentChange,
+  canWrite,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -196,6 +198,7 @@ function EnvironmentManagerModal({
   activeEnvironmentId?: string;
   onEnvironmentListChange: (environments: ProjectEnvironment[]) => void;
   onActiveEnvironmentChange: (environmentId?: string) => void;
+  canWrite?: boolean;
 }) {
   const createEnvironment = useServerFn(
     createProjectEnvironmentServerFn as any,
@@ -292,13 +295,15 @@ function EnvironmentManagerModal({
       />
       <div className="grid min-h-[460px] grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]">
         <div className="border-b border-dash-border p-4 md:border-b-0 md:border-r">
-          <button
-            type="button"
-            onClick={() => setSelectedEnvironmentId(null)}
-            className="mb-3 w-full rounded-[6px] border border-dash-border bg-dash-bg-elevated px-3 py-2 text-left text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg"
-          >
-            + New environment
-          </button>
+          {canWrite !== false && (
+            <button
+              type="button"
+              onClick={() => setSelectedEnvironmentId(null)}
+              className="mb-3 w-full rounded-[6px] border border-dash-border bg-dash-bg-elevated px-3 py-2 text-left text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg"
+            >
+              + New environment
+            </button>
+          )}
           <div className="space-y-1">
             {environments.map((environment) => (
               <button
@@ -430,21 +435,23 @@ function EnvironmentManagerModal({
                   })()}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <GlossyButton
-                    type="button"
-                    onClick={() => void submitForm()}
-                    loading={saving}
-                    loadingLabel="Saving..."
-                  >
-                    {selectedEnvironment ? "Update Environment" : "Create Environment"}
-                  </GlossyButton>
-                </div>
+                {canWrite !== false && (
+                  <div className="flex items-center gap-2">
+                    <GlossyButton
+                      type="button"
+                      onClick={() => void submitForm()}
+                      loading={saving}
+                      loadingLabel="Saving..."
+                    >
+                      {selectedEnvironment ? "Update Environment" : "Create Environment"}
+                    </GlossyButton>
+                  </div>
+                )}
               </FormikForm>
             )}
           </Formik>
 
-          {selectedEnvironment && !selectedEnvironment.isDefault ? (
+          {canWrite !== false && selectedEnvironment && !selectedEnvironment.isDefault ? (
             <div className="mt-8 border-t border-dash-border-soft pt-5">
               <h4 className="mb-2 text-sm font-medium text-dash-text-strong">
                 Delete Environment
@@ -577,6 +584,7 @@ function ProjectsPage() {
   const navigate = useNavigate({ from: "/projects/" });
   const search = Route.useSearch();
   const loaderData = Route.useLoaderData();
+  const { canWrite } = useWorkspaceRole();
   const [projects, setProjects] = useState(loaderData.projects);
   const [pagination, setPagination] = useState(loaderData.pagination);
   const [environments, setEnvironments] = useState(loaderData.environments);
@@ -854,9 +862,11 @@ function ProjectsPage() {
         />
       </div>
 
-      <div className="mb-4">
-        <CreateProjectCard className="col-span-full" />
-      </div>
+      {canWrite && (
+        <div className="mb-4">
+          <CreateProjectCard className="col-span-full" />
+        </div>
+      )}
 
       <AnimatePresence mode="wait" initial={false}>
         {showSkeletons ? (
@@ -917,6 +927,7 @@ function ProjectsPage() {
         workspace={search.workspace}
         activeEnvironmentId={effectiveEnvironmentId}
         onEnvironmentListChange={setEnvironments}
+        canWrite={canWrite}
         onActiveEnvironmentChange={(environmentId) => {
           navigate({
             to: "/projects",

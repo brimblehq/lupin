@@ -246,7 +246,7 @@ function BillingFormInner({
       <BillForecast stats={initialSubscriptionStats} />
 
       {/* ── Usage / Bill estimate ── */}
-      <UsageSection estimate={estimate} />
+      <UsageSection estimate={estimate} spendingLimit={savedSpendingLimit} usage={currentUsage} />
 
       {!hidePaymentMethods && (
         <>
@@ -576,11 +576,17 @@ function BillForecast({
 
 function UsageSection({
   estimate,
+  spendingLimit,
+  usage,
 }: {
   estimate?: { current_usage: number; projected_total: number; line_items: Array<{ description: string; amount: number }> } | null;
+  spendingLimit?: number | null;
+  usage?: number;
 }) {
-  const used = Number(estimate?.current_usage ?? 0);
-  const projected = Number(estimate?.projected_total ?? 0);
+  const used = usage ?? Number(estimate?.current_usage ?? 0);
+  const hasSpendingLimit =
+    typeof spendingLimit === "number" && Number.isFinite(spendingLimit) && spendingLimit >= 5;
+  const limit = hasSpendingLimit ? spendingLimit : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -594,11 +600,11 @@ function UsageSection({
           </p>
         </div>
 
-        {projected > 0 ? (
+        {limit ? (
           <UsageBar
             label="Spending budget"
             used={used}
-            limit={projected}
+            limit={limit}
             unit="USD"
             overageNote="Overage may be added to the next invoice"
           />

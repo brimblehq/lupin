@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { PageHeader } from "../../components/shared/page-header";
 import { DomainList, type Domain } from "../../components/shared/domain-list";
 import { NumberPagination } from "../../components/shared/pagination";
@@ -144,6 +145,7 @@ function mapDomainToRow(domain: DomainRecord): Domain {
 }
 
 function DomainsPage() {
+  const { canWrite } = useWorkspaceRole();
   const search = Route.useSearch();
   const { domains: domainsResult, projects, workspace } = Route.useLoaderData();
   const { settingsSnapshot } = RootRoute.useLoaderData() ?? ({} as any);
@@ -225,6 +227,8 @@ function DomainsPage() {
 
   // Listen for topbar "add domain" / "transfer in" events
   useEffect(() => {
+    if (!canWrite) return;
+
     function handleAddDomainEvent() {
       openAddDomain();
     }
@@ -238,7 +242,7 @@ function DomainsPage() {
       window.removeEventListener("brimble:add-domain", handleAddDomainEvent);
       window.removeEventListener("brimble:transfer-in", handleTransferInEvent);
     };
-  }, [openAddDomain]);
+  }, [canWrite, openAddDomain]);
 
   const settledSearchQuery = search.q?.trim() ?? "";
   const pendingSearchQuery = searchQuery.trim();
@@ -410,8 +414,8 @@ function DomainsPage() {
         onSearchQueryChange={setSearchQuery}
         searchLoading={isSearchSettling}
         onRefreshDomain={handleRefreshDomain}
-        onConfigureDomain={handleConfigureDomain}
-        onDeleteDomain={handleDeleteDomain}
+        onConfigureDomain={canWrite ? handleConfigureDomain : undefined}
+        onDeleteDomain={canWrite ? handleDeleteDomain : undefined}
       />
 
       <div className="mt-6 flex justify-end">
@@ -422,25 +426,27 @@ function DomainsPage() {
         />
       </div>
 
-      <AddDomainModal
-        open={addDomainOpen}
-        onOpenChange={setAddDomainOpen}
-        projects={projects}
-        defaultRegistrantEmail={settingsSnapshot?.profile?.email ?? ""}
-        paymentCards={settingsSnapshot?.billing?.cards ?? []}
-        initialStep={addDomainStep}
-        onValidate={validateDomain}
-        onContinue={(projectId, domainUrl) => {
-          void handleAddDomain(projectId, domainUrl);
-        }}
-        onRegisterDomain={() => {
-          setAddDomainOpen(false);
-          navigate({
-            to: "/domains/buy",
-            search: workspace ? { workspace } : {},
-          });
-        }}
-      />
+      {canWrite && (
+        <AddDomainModal
+          open={addDomainOpen}
+          onOpenChange={setAddDomainOpen}
+          projects={projects}
+          defaultRegistrantEmail={settingsSnapshot?.profile?.email ?? ""}
+          paymentCards={settingsSnapshot?.billing?.cards ?? []}
+          initialStep={addDomainStep}
+          onValidate={validateDomain}
+          onContinue={(projectId, domainUrl) => {
+            void handleAddDomain(projectId, domainUrl);
+          }}
+          onRegisterDomain={() => {
+            setAddDomainOpen(false);
+            navigate({
+              to: "/domains/buy",
+              search: workspace ? { workspace } : {},
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

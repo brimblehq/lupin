@@ -24,9 +24,11 @@ import { Spinner } from "../shared/spinner";
 import { Avatar } from "../shared/avatar";
 import { useScoutBar } from "../../contexts/scoutbar-context";
 import config from "@/config";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import type { Workspace } from "@/backend/workspaces";
 import type { Project } from "@/backend/projects";
+import type { TeamDetails } from "@/backend/teams";
 import type { AppTooltipMessage } from "@/backend/messages";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
 import {
@@ -189,25 +191,34 @@ function ProjectSwitcher({
                 </div>
               )}
             </div>
-            {/* Create project */}
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                navigate({
-                  to: "/projects/new",
-                  search: getWorkspaceSearch(searchStr) as any,
-                });
-              }}
-              className="flex h-10 w-full items-center gap-2 bg-dash-bg-elevated px-3.5 text-left text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
-            >
-              <Plus className="size-4" />
-              Create project
-            </button>
+            {/* Create project — hidden for Viewers */}
+            <CreateProjectButton searchStr={searchStr} onClose={() => setOpen(false)} />
           </motion.div>
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function CreateProjectButton({ searchStr, onClose }: { searchStr: string; onClose: () => void }) {
+  const { canWrite } = useWorkspaceRole();
+  const navigate = useNavigate();
+  if (!canWrite) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onClose();
+        navigate({
+          to: "/projects/new",
+          search: getWorkspaceSearch(searchStr) as any,
+        });
+      }}
+      className="flex h-10 w-full items-center gap-2 bg-dash-bg-elevated px-3.5 text-left text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
+    >
+      <Plus className="size-4" />
+      Create project
+    </button>
   );
 }
 
@@ -418,10 +429,7 @@ function WorkspaceSwitcher({
               <button
                 onClick={() => {
                   setOpen(false);
-                  navigate({
-                    to: "/workspace/new",
-                    search: getWorkspaceSearch(searchStr) as any,
-                  });
+                  navigate({ to: "/workspace/new" });
                 }}
                 className="flex h-10 w-full items-center gap-2 px-3.5 text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
               >
@@ -436,7 +444,15 @@ function WorkspaceSwitcher({
   );
 }
 
-function EnvironmentDropdown({ workspace }: { workspace?: string }) {
+function EnvironmentDropdown({
+  workspace,
+  teamDetails,
+  userProfile,
+}: {
+  workspace?: string;
+  teamDetails?: TeamDetails | null;
+  userProfile?: SettingsSidebarSnapshot["profile"] | null;
+}) {
   const [environments, setEnvironments] = useState<ProjectEnvironment[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -555,6 +571,26 @@ function EnvironmentDropdown({ workspace }: { workspace?: string }) {
 
   const selectedEnv = environments.find((e) => e._id === selectedId);
   const defaultEnv = environments.find((e) => e.isDefault);
+  const currentUserId = userProfile?.id?.trim().toLowerCase() ?? "";
+  const currentUserEmail = userProfile?.email?.trim().toLowerCase() ?? "";
+  const currentTeamMember = teamDetails?.members?.find((member) => {
+    const memberUserId = member.userId?.trim().toLowerCase() ?? "";
+    const memberEmail = member.email.trim().toLowerCase();
+    return (
+      (currentUserId && memberUserId === currentUserId) ||
+      (currentUserEmail && memberEmail === currentUserEmail)
+    );
+  });
+  const normalizedRole = (currentTeamMember?.role ?? "").trim().toLowerCase();
+  const { canWrite: workspaceCanWrite } = useWorkspaceRole();
+  const canManageEnvironments =
+    workspaceCanWrite &&
+    (!workspace ||
+    (Boolean(teamDetails?.isCreator) ||
+      Boolean(currentTeamMember?.isCreator) ||
+      normalizedRole.includes("creator") ||
+      normalizedRole.includes("owner") ||
+      normalizedRole.includes("admin")));
 
   async function selectEnvironment(envId: string) {
     setSelectedId(envId);
@@ -584,6 +620,10 @@ function EnvironmentDropdown({ workspace }: { workspace?: string }) {
   }
 
   async function handleCreateSubmit() {
+    if (!canManageEnvironments) {
+      return;
+    }
+
     if (creatingSubmitting) {
       return;
     }
@@ -624,6 +664,12 @@ function EnvironmentDropdown({ workspace }: { workspace?: string }) {
   }
 
   async function handleDeleteConfirm() {
+    if (!canManageEnvironments) {
+      setDeleteTarget(null);
+      setMigrateTarget(null);
+      return;
+    }
+
     if (!deleteTarget || !migrateTarget) return;
     try {
       await deleteEnvironmentRef.current({
@@ -668,7 +714,7 @@ function EnvironmentDropdown({ workspace }: { workspace?: string }) {
             <div className="py-1">
               {environments.map((env) => {
                 const isSelected = env._id === selectedId;
-                const isDeletable = !env.isDefault;
+                const isDeletable = canManageEnvironments && !env.isDefault;
                 return (
                   <div
                     key={env._id}
@@ -712,56 +758,58 @@ function EnvironmentDropdown({ workspace }: { workspace?: string }) {
               })}
             </div>
             {/* Create environment */}
-            {creating ? (
-              <div className={`border-t-[0.5px] px-3 py-2 ${newEnvNameError ? "border-[#f05252] bg-[#f05252]/5" : "border-dash-border"}`}>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void handleCreateSubmit();
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={createInputRef}
-                      type="text"
-                      value={newEnvName}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setNewEnvName(v);
-                        if (newEnvNameError) {
-                          const t = v.trim();
-                          if (t.length >= 3 && /^[a-zA-Z][a-zA-Z _-]*$/.test(t)) {
+            {canManageEnvironments ? (
+              creating ? (
+                <div className={`border-t-[0.5px] px-3 py-2 ${newEnvNameError ? "border-[#f05252] bg-[#f05252]/5" : "border-dash-border"}`}>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void handleCreateSubmit();
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={createInputRef}
+                        type="text"
+                        value={newEnvName}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setNewEnvName(v);
+                          if (newEnvNameError) {
+                            const t = v.trim();
+                            if (t.length >= 3 && /^[a-zA-Z][a-zA-Z _-]*$/.test(t)) {
+                              setNewEnvNameError(false);
+                            }
+                          }
+                        }}
+                        placeholder="Environment name"
+                        className={`w-full bg-transparent text-sm text-dash-text-body placeholder:text-dash-text-extra-faded outline-none ${newEnvNameError ? "text-[#f05252]" : ""}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape" && !creatingSubmitting) {
+                            setCreating(false);
+                            setNewEnvName("");
                             setNewEnvNameError(false);
                           }
-                        }
-                      }}
-                      placeholder="Environment name"
-                      className={`w-full bg-transparent text-sm text-dash-text-body placeholder:text-dash-text-extra-faded outline-none ${newEnvNameError ? "text-[#f05252]" : ""}`}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape" && !creatingSubmitting) {
-                          setCreating(false);
-                          setNewEnvName("");
-                          setNewEnvNameError(false);
-                        }
-                      }}
-                      disabled={creatingSubmitting}
-                    />
-                    {creatingSubmitting ? (
-                      <Spinner size="size-3.5" className="shrink-0 text-dash-text-faded" />
-                    ) : null}
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setCreating(true)}
-                className="flex h-9 w-full items-center gap-2 border-t-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-left text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
-              >
-                <Plus className="size-3.5" />
-                Create environment
-              </button>
-            )}
+                        }}
+                        disabled={creatingSubmitting}
+                      />
+                      {creatingSubmitting ? (
+                        <Spinner size="size-3.5" className="shrink-0 text-dash-text-faded" />
+                      ) : null}
+                    </div>
+                  </form>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  className="flex h-9 w-full items-center gap-2 border-t-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-left text-sm text-dash-text-faded transition-colors hover:text-dash-text-body"
+                >
+                  <Plus className="size-3.5" />
+                  Create environment
+                </button>
+              )
+            ) : null}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1068,6 +1116,7 @@ const domainsCreateMenuItems = [
 ];
 
 function CreateDropdown() {
+  const { canWrite } = useWorkspaceRole();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -1131,14 +1180,11 @@ function CreateDropdown() {
         }) as any,
       });
     } else if (label === "New workspace") {
-      navigate({
-        to: withWorkspaceQuery({
-          pathname: "/workspace/new",
-          searchStr,
-        }) as any,
-      });
+      navigate({ to: "/workspace/new" });
     }
   }
+
+  if (!canWrite) return null;
 
   return (
     <div className="relative" ref={ref}>
@@ -1202,6 +1248,7 @@ export function Topbar({
   userProfile,
   workspaces,
   projectSwitcherProjects,
+  workspaceTeamMembers,
 }: {
   onSettingsClick: () => void;
   onMobileNavToggle?: () => void;
@@ -1210,6 +1257,7 @@ export function Topbar({
   userProfile?: SettingsSidebarSnapshot["profile"] | null;
   workspaces?: Workspace[];
   projectSwitcherProjects?: Project[];
+  workspaceTeamMembers?: TeamDetails | null;
 }) {
   const { theme, toggleTheme } = useTheme();
   const haptics = useHaptics();
@@ -1332,7 +1380,11 @@ export function Topbar({
           </div>
           <div className="hidden items-center gap-4 md:flex">
             {/* Environment selector */}
-            <EnvironmentDropdown workspace={new URLSearchParams(searchStr || "").get("workspace") ?? undefined} />
+            <EnvironmentDropdown
+              workspace={new URLSearchParams(searchStr || "").get("workspace") ?? undefined}
+              teamDetails={workspaceTeamMembers}
+              userProfile={userProfile}
+            />
             {/* Create split button */}
             <CreateDropdown />
           </div>

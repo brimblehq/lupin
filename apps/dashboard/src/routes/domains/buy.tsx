@@ -9,6 +9,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { Search, Globe } from "lucide-react";
 import { CheckCircle } from "@phosphor-icons/react";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { Dropdown } from "../../components/shared/dropdown";
 import { GlossyButton } from "../../components/shared/glossy-button";
@@ -165,6 +167,7 @@ function CardChip() {
 /* ─── Main Page ─── */
 
 function BuyDomainPage() {
+  const { canWrite } = useWorkspaceRole();
   const router = useRouter();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const searchDomains = useServerFn(searchDomainSaleServerFn as any) as (args: {
@@ -299,6 +302,10 @@ function BuyDomainPage() {
           : `${year} ${year === 1 ? "year" : "years"} — ${formatUsd((purchaseTarget?.price ?? 0) * year)}`,
       };
     }).filter((opt) => !isAi || opt.id === "2");
+  }
+
+  if (!canWrite) {
+    return <AccessDenied {...accessDeniedForbidden} />;
   }
 
   return (

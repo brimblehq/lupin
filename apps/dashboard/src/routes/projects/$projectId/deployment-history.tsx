@@ -35,6 +35,7 @@ import {
   formatDeploymentTimeAgo,
 } from "@/utils/deployment-history";
 import { useProjectDeploymentLogsDrawer } from "@/contexts/project-deployment-logs-drawer-context";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { usePushNotification } from "@/hooks/use-push-notification";
 import { Route as RootRoute } from "@/routes/__root";
 import type { TeamDetails, TeamMember } from "@/backend/teams";
@@ -205,6 +206,7 @@ function DeploymentMenu({
   projectStatus?: string;
   onRedeployed: () => void;
 }) {
+  const { canWrite } = useWorkspaceRole();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -248,8 +250,8 @@ function DeploymentMenu({
   const isActive = status === "active" || status === "ready";
   const projectInProgress = projectStatus?.toLowerCase() === "inprogress";
 
-  const canRedeploy = !isInProgress && !projectInProgress;
-  const canCancel = isInProgress || isPending;
+  const canRedeploy = canWrite && !isInProgress && !projectInProgress;
+  const canCancel = canWrite && (isInProgress || isPending);
   const canViewApp = isActive && deployment.domain;
   const canViewCommit = !!deployment.commitLink;
 

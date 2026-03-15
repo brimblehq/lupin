@@ -200,6 +200,27 @@ export const removeWorkspaceTeamMemberServerFn = createServerFn({
   });
 });
 
+export const transferOwnershipServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        memberId?: string;
+      }
+    | undefined;
+
+  const memberId = payload?.memberId?.trim();
+  if (!memberId) {
+    throw new Error("Member ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const { teamId } = await resolveWorkspaceTeam(api, payload?.workspace);
+    return api.teams.transferOwnership(teamId, memberId);
+  });
+});
+
 export const checkTeamInvitationServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {

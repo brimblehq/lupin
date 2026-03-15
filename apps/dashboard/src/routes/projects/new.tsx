@@ -28,6 +28,8 @@ import { RangeSlider } from "../../components/shared/range-slider";
 import { Dropdown } from "../../components/shared/dropdown";
 import { DiskSizeSelect, diskSizes } from "../../components/shared/disk-size-select";
 import { RootDirectoryTrigger } from "../../components/shared/root-directory-trigger";
+import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { RootDirectoryDrawer } from "../../components/project/root-directory-drawer";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import {
@@ -2185,6 +2187,7 @@ function Phase3Configure({
 /* ─── Main Page ─── */
 
 function NewProjectPage() {
+  const { canWrite } = useWorkspaceRole();
   const navigate = useNavigate({ from: "/projects/new" });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspace = useMemo(() => {
@@ -2891,6 +2894,10 @@ function NewProjectPage() {
     () => withWorkspaceQuery({ pathname: "/projects", searchStr }),
     [searchStr],
   );
+
+  if (!canWrite) {
+    return <AccessDenied {...accessDeniedForbidden} />;
+  }
 
   return (
     <div className="px-6 py-8">

@@ -6,6 +6,7 @@ import { useHaptics } from "@/hooks/use-haptics";
 import { SUBSCRIPTION_PLAN_TYPE } from "@brimble/models/dist/enum";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { useProfileDrawer } from "@/contexts/profile-drawer-context";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { ProfileTab } from "@/types/enums";
 import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
@@ -97,6 +98,7 @@ export function OnboardingChecklist({
   isTeamWorkspace?: boolean;
   teamDetails?: TeamDetails | null;
 }) {
+  const { canWrite } = useWorkspaceRole();
   const profileDrawer = useProfileDrawer();
   const haptics = useHaptics();
   const [expanded, setExpanded] = useState(false);
@@ -319,8 +321,8 @@ export function OnboardingChecklist({
   // Avoid flash-then-disappear while workspace-specific checks are still resolving.
   if (!checklistSignalsReady) return null;
 
-  // Hide if all tasks are done
-  if (completedCount === tasks.length) return null;
+  // Hide if all tasks are done or if user is a Viewer
+  if (!canWrite || completedCount === tasks.length) return null;
 
   return (
     <motion.div

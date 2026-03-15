@@ -2,6 +2,7 @@ import { Plus, ArrowUpRight } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { DashButton } from "../shared/dash-button";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 export function ConnectedDomains({
@@ -10,6 +11,7 @@ export function ConnectedDomains({
   activeDomains?: number;
 }) {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const { canWrite } = useWorkspaceRole();
   return (
     <div className="mb-8 flex rounded-[4px] border-[0.5px] border-dash-border py-2">
       {/* Left content */}
@@ -22,12 +24,14 @@ export function ConnectedDomains({
             Get intuitive domain registration and management using Brimble
           </p>
         </div>
+        {canWrite && (
         <Link to={withWorkspaceQuery({ pathname: "/domains/buy", searchStr }) as any}>
           <DashButton className="w-fit">
             <Plus className="size-4" />
             Register a new domain
           </DashButton>
         </Link>
+        )}
       </div>
 
       {/* Right stat */}

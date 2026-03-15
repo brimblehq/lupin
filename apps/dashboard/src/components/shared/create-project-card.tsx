@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useHaptics } from "@/hooks/use-haptics";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 interface CreateProjectCardProps {
@@ -11,6 +12,9 @@ interface CreateProjectCardProps {
 export function CreateProjectCard({ className }: CreateProjectCardProps) {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const haptics = useHaptics();
+  const { canWrite } = useWorkspaceRole();
+
+  if (!canWrite) return null;
 
   return (
     <div

@@ -6,6 +6,7 @@ import { Info } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@brimble/ui";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { TabHeader } from "../../../components/shared/tab-header";
 import { GlossyButton } from "../../../components/shared/glossy-button";
 import { Tooltip } from "@/components/shared/tooltip";
@@ -186,6 +187,7 @@ function EnvAccordionRow({
   isExpanded,
   isDecrypting,
   decryptedValue,
+  canWrite,
   onUpdated,
   onDeleted,
   onRedeploy,
@@ -196,6 +198,7 @@ function EnvAccordionRow({
   isExpanded: boolean;
   isDecrypting: boolean;
   decryptedValue?: string;
+  canWrite: boolean;
   onUpdated: (next: ProjectEnvironmentVariable) => void;
   onDeleted: (envId: string) => void;
   onRedeploy: (logId?: string) => Promise<void>;
@@ -234,8 +237,8 @@ function EnvAccordionRow({
     }
   }, [isExpanded]);
 
-  const canEdit = canEditProjectEnvs(serviceType);
-  const canDelete = canDeleteProjectEnv(serviceType);
+  const canEdit = canEditProjectEnvs(serviceType) && canWrite;
+  const canDelete = canDeleteProjectEnv(serviceType) && canWrite;
   const databaseProject = isDatabaseService(serviceType);
   const disableNameInput = !canEdit || isNonEditableEnvName(row.name);
   const isDirty = name !== row.name || value !== row.value;
@@ -400,12 +403,14 @@ function EnvLevelVarRow({
   variable,
   environmentId,
   workspace,
+  canWrite,
   onUpdated,
   onDeleted,
 }: {
   variable: EffectiveEnvironmentVariable;
   environmentId: string;
   workspace?: string;
+  canWrite: boolean;
   onUpdated: () => void;
   onDeleted: () => void;
 }) {
@@ -493,7 +498,8 @@ function EnvLevelVarRow({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="input-base input-focus h-[36px] w-full px-3 font-mono text-sm text-dash-text-strong"
+              disabled={!canWrite}
+              className="input-base input-focus h-[36px] w-full px-3 font-mono text-sm text-dash-text-strong disabled:opacity-60"
             />
             <div className="input-base input-focus-within relative flex h-[36px] items-center">
               <input
@@ -501,7 +507,8 @@ function EnvLevelVarRow({
                 autoComplete="off"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                className={`h-full w-full bg-transparent px-3 pr-16 text-sm text-dash-text-strong outline-none ${!showValue ? "[text-security:disc] [-webkit-text-security:disc]" : ""}`}
+                readOnly={!canWrite}
+                className={`h-full w-full bg-transparent px-3 pr-16 text-sm text-dash-text-strong outline-none ${!canWrite ? "cursor-default" : ""} ${!showValue ? "[text-security:disc] [-webkit-text-security:disc]" : ""}`}
               />
               <div className="absolute right-2 flex items-center gap-1.5">
                 <button type="button" onClick={() => setShowValue((p) => !p)} className="shrink-0 text-dash-text-faded hover:text-dash-text-strong">
@@ -529,29 +536,32 @@ function EnvLevelVarRow({
                 type="checkbox"
                 checked={inheritable}
                 onChange={(e) => setInheritable(e.target.checked)}
+                disabled={!canWrite}
                 className="size-3.5 rounded border-dash-border accent-[#4879f8]"
               />
               Inheritable by child environments
             </label>
-            <div className="flex items-center gap-2">
-              <GlossyButton
-                disabled={!isDirty || !name.trim() || !value.trim() || saving}
-                loading={saving}
-                loadingLabel="Saving..."
-                onClick={() => { void saveRow(); }}
-              >
-                Save
-              </GlossyButton>
-              <GlossyButton
-                variant="red"
-                disabled={removing}
-                loading={removing}
-                loadingLabel="Removing..."
-                onClick={() => { void deleteRow(); }}
-              >
-                Remove
-              </GlossyButton>
-            </div>
+            {canWrite && (
+              <div className="flex items-center gap-2">
+                <GlossyButton
+                  disabled={!isDirty || !name.trim() || !value.trim() || saving}
+                  loading={saving}
+                  loadingLabel="Saving..."
+                  onClick={() => { void saveRow(); }}
+                >
+                  Save
+                </GlossyButton>
+                <GlossyButton
+                  variant="red"
+                  disabled={removing}
+                  loading={removing}
+                  loadingLabel="Removing..."
+                  onClick={() => { void deleteRow(); }}
+                >
+                  Remove
+                </GlossyButton>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -562,9 +572,11 @@ function EnvLevelVarRow({
 function EnvironmentLevelVarsSection({
   environmentId,
   workspace,
+  canWrite,
 }: {
   environmentId: string;
   workspace?: string;
+  canWrite: boolean;
 }) {
   const [envVars, setEnvVars] = useState<EffectiveEnvironmentVariable[]>([]);
   const [envName, setEnvName] = useState<string | undefined>(undefined);
@@ -684,6 +696,7 @@ function EnvironmentLevelVarsSection({
                   variable={v}
                   environmentId={environmentId}
                   workspace={workspace}
+                  canWrite={canWrite}
                   onUpdated={() => void fetchVars()}
                   onDeleted={() => void fetchVars()}
                 />
@@ -691,7 +704,7 @@ function EnvironmentLevelVarsSection({
             </div>
           )}
 
-          {draftRows.length > 0 && (
+          {canWrite && draftRows.length > 0 && (
             <div className="border-t border-dash-border px-4 py-4">
               <div className="flex flex-col gap-2">
                 {draftRows.map((row) => (
@@ -746,7 +759,7 @@ function EnvironmentLevelVarsSection({
             </div>
           )}
 
-          {draftRows.length === 0 && (
+          {canWrite && draftRows.length === 0 && (
             <div className="border-t border-dash-border px-4 py-3">
               <button type="button" onClick={addDraftRow} className="text-sm text-dash-text-faded hover:text-dash-text-strong">
                 + Add Variable
@@ -762,12 +775,13 @@ function EnvironmentLevelVarsSection({
 function EnvironmentPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const { initialTarget, initialSnapshot, targets: initialTargets } = Route.useLoaderData() as LoaderData;
+  const { canWrite } = useWorkspaceRole();
 
   const projectId = project?.id as string | undefined;
   const serviceType = project?.serviceType as string | undefined;
   const framework = project?.framework as string | undefined;
   const projectEnvironmentId = project?.projectEnvironmentId as string | null | undefined;
-  const canEdit = canEditProjectEnvs(serviceType);
+  const canEdit = canEditProjectEnvs(serviceType) && canWrite;
   const databaseProject = isDatabaseService(serviceType);
   const envTabSupported = shouldShowEnvironmentTab(framework);
 
@@ -1124,6 +1138,7 @@ function EnvironmentPage() {
         <EnvironmentLevelVarsSection
           environmentId={projectEnvironmentId}
           workspace={workspace}
+          canWrite={canWrite}
         />
       )}
 
@@ -1202,7 +1217,7 @@ function EnvironmentPage() {
                     setRawDirty(true);
                   }}
                   format={rawFormat}
-                  readOnly={databaseProject}
+                  readOnly={databaseProject || !canWrite}
                   placeholder={rawFormat === "json" ? '{\n  "API_KEY": "value"\n}' : 'API_KEY=value'}
                 />
 
@@ -1214,7 +1229,7 @@ function EnvironmentPage() {
                   >
                     Cancel
                   </button>
-                  {!databaseProject && (
+                  {!databaseProject && canWrite && (
                     <GlossyButton
                       disabled={!rawDirty || savingRaw}
                       loading={savingRaw}
@@ -1319,6 +1334,7 @@ function EnvironmentPage() {
                             isExpanded={expandedRowId === row.id}
                             isDecrypting={decryptingRowId === row.id}
                             decryptedValue={decryptedCache[row.id]}
+                            canWrite={canWrite}
                             onRedeploy={handleRedeploy}
                             onUpdated={() => {
                               void refreshCurrentTarget();

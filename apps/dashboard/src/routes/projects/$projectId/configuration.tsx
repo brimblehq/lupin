@@ -17,6 +17,7 @@ import {
 } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { Formik } from "formik";
 import { GlossyButton } from "../../../components/shared/glossy-button";
 import { TabHeader } from "../../../components/shared/tab-header";
@@ -290,11 +291,13 @@ function EnvironmentSection({
   currentEnvironmentId,
   workspace,
   initialEnvironments = [],
+  canWrite = true,
 }: {
   projectId: string;
   currentEnvironmentId?: string | null;
   workspace?: string;
   initialEnvironments?: ProjectEnvironment[];
+  canWrite?: boolean;
 }) {
   const router = useRouter();
   const [environments, setEnvironments] =
@@ -391,6 +394,7 @@ function EnvironmentSection({
             options={options}
             onChange={setSelectedId}
             placeholder="Select environment..."
+            disabled={!canWrite}
           />
         </div>
       </div>
@@ -401,13 +405,14 @@ function EnvironmentSection({
               type="checkbox"
               checked={inheritEnvVars}
               onChange={(e) => setInheritEnvVars(e.target.checked)}
+              disabled={!canWrite}
               className="size-4 rounded border-dash-border accent-[#4879f8]"
             />
             Inherit environment variables
           </label>
           <GlossyButton
             variant="black"
-            disabled={saving}
+            disabled={!canWrite || saving}
             loading={saving}
             loadingLabel="Saving..."
             onClick={async () => {
@@ -455,6 +460,7 @@ function GeneralSection({
   dockerSourceImage,
   showMcpAuthControl,
   showBuildCacheControl,
+  canWrite = true,
 }: {
   initialValues: GeneralConfigValues;
   onSubmit: (values: GeneralConfigValues) => Promise<void>;
@@ -467,6 +473,7 @@ function GeneralSection({
   dockerSourceImage?: string;
   showMcpAuthControl: boolean;
   showBuildCacheControl: boolean;
+  canWrite?: boolean;
 }) {
   return (
     <Formik
@@ -521,6 +528,7 @@ function GeneralSection({
                 value={values.name}
                 onChange={handleChange}
                 onBlur={handleBlur}
+                readOnly={!canWrite}
                 className="w-full bg-transparent px-3 py-2.5 text-sm leading-6 text-dash-text-strong outline-none"
               />
             </div>
@@ -543,6 +551,7 @@ function GeneralSection({
                   options={branchOptions}
                   onChange={(v) => setFieldValue("branch", v)}
                   placeholder="Select branch..."
+                  disabled={!canWrite}
                 />
               </div>
 
@@ -553,7 +562,7 @@ function GeneralSection({
                 <label className="text-sm font-medium text-dash-text-strong">
                   Root directory
                 </label>
-                <RootDirectoryTrigger value={rootDir} onClick={onOpenDrawer} />
+                <RootDirectoryTrigger value={rootDir} onClick={canWrite ? onOpenDrawer : undefined} />
               </div>
 
               <hr className="border-dash-border" />
@@ -568,6 +577,7 @@ function GeneralSection({
                   options={frameworkOptions}
                   onChange={(v) => setFieldValue("framework", v)}
                   placeholder="Select framework..."
+                  disabled={!canWrite}
                 />
               </div>
 
@@ -607,6 +617,7 @@ function GeneralSection({
                   options={regionOptions}
                   onChange={(v) => setFieldValue("region", v)}
                   placeholder="Select region..."
+                  disabled={!canWrite}
                 />
               </div>
               <hr className="border-dash-border" />
@@ -629,6 +640,7 @@ function GeneralSection({
                     <ToggleSwitch
                       checked={values.buildCacheEnabled}
                       onChange={(v) => setFieldValue("buildCacheEnabled", v)}
+                      disabled={!canWrite}
                     />
                   </div>
                 )}
@@ -645,6 +657,7 @@ function GeneralSection({
                     <ToggleSwitch
                       checked={values.authEnabled}
                       onChange={(v) => setFieldValue("authEnabled", v)}
+                      disabled={!canWrite}
                     />
                   </div>
                 )}
@@ -656,7 +669,7 @@ function GeneralSection({
           <div className="flex justify-end px-4 py-4">
             <GlossyButton
               type="submit"
-              disabled={!dirty || isSubmitting}
+              disabled={!canWrite || !dirty || isSubmitting}
               loading={isSubmitting}
               loadingLabel="Saving..."
             >
@@ -686,12 +699,14 @@ function BuildSection({
   showCommands = true,
   showHealthCheck = true,
   showDockerSourceFields = false,
+  canWrite = true,
 }: {
   initialValues: BuildInitialValues;
   onSubmit: (values: BuildInitialValues) => Promise<void>;
   showCommands?: boolean;
   showHealthCheck?: boolean;
   showDockerSourceFields?: boolean;
+  canWrite?: boolean;
 }) {
   const [values, setValues] = useState(initialValues);
   const [saving, setSaving] = useState(false);
@@ -740,6 +755,7 @@ function BuildSection({
                 setValues((v) => ({ ...v, preStartCommand: e.target.value }))
               }
               placeholder="apk add curl"
+              readOnly={!canWrite}
               className={inputClass}
             />
             <p className="mt-1 text-xs text-dash-text-faded">
@@ -758,6 +774,7 @@ function BuildSection({
                 setValues((v) => ({ ...v, dockerImage: e.target.value }))
               }
               placeholder="docker.io/library/nginx:latest"
+              readOnly={!canWrite}
               className={`${inputClass} font-family-mono text-[13px]`}
             />
           </div>
@@ -779,6 +796,7 @@ function BuildSection({
                 setValues((v) => ({ ...v, installCommand: e.target.value }))
               }
               placeholder="npm install"
+              readOnly={!canWrite}
               className={inputClass}
             />
           </div>
@@ -797,6 +815,7 @@ function BuildSection({
                 setValues((v) => ({ ...v, buildCommand: e.target.value }))
               }
               placeholder="npm run build"
+              readOnly={!canWrite}
               className={inputClass}
             />
           </div>
@@ -815,6 +834,7 @@ function BuildSection({
                 setValues((v) => ({ ...v, startCommand: e.target.value }))
               }
               placeholder="npm start"
+              readOnly={!canWrite}
               className={inputClass}
             />
           </div>
@@ -834,6 +854,7 @@ function BuildSection({
               setValues((v) => ({ ...v, healthCheckPath: e.target.value }))
             }
             placeholder="/api/health"
+            readOnly={!canWrite}
             className={inputClass}
           />
           <p className="mt-1 text-xs text-dash-text-faded">
@@ -851,7 +872,7 @@ function BuildSection({
       {/* Footer */}
       <div className="flex justify-end border-t border-dash-border px-4 py-3">
         <GlossyButton
-          disabled={!dirty || saving}
+          disabled={!canWrite || !dirty || saving}
           loading={saving}
           loadingLabel="Saving..."
           onClick={handleSave}
@@ -872,6 +893,7 @@ function ResourcesSection({
   showScalingGroup = true,
   showPersistentStorage = true,
   canSave = true,
+  canWrite = true,
 }: {
   initialValues: ResourcesConfigValues;
   onSubmit?: (values: ResourcesConfigValues) => Promise<void>;
@@ -879,6 +901,7 @@ function ResourcesSection({
   showScalingGroup?: boolean;
   showPersistentStorage?: boolean;
   canSave?: boolean;
+  canWrite?: boolean;
 }) {
   return (
     <Formik
@@ -909,6 +932,7 @@ function ResourcesSection({
               max={8}
               step={0.5}
               unit=" vCPU"
+              disabled={!canWrite}
             />
           </div>
 
@@ -931,6 +955,7 @@ function ResourcesSection({
                   max={12}
                   step={0.5}
                   hideValue
+                  disabled={!canWrite}
                 />
               </div>
               <span className="min-w-[52px] text-right text-sm font-medium text-dash-text-strong">
@@ -956,6 +981,7 @@ function ResourcesSection({
                   options={scalingGroupOptions}
                   onChange={(v) => setFieldValue("scalingGroup", v)}
                   placeholder="Select scaling group..."
+                  disabled={!canWrite}
                 />
               </div>
 
@@ -980,6 +1006,7 @@ function ResourcesSection({
                   checked={values.diskEnabled}
                   onChange={(v) => setFieldValue("diskEnabled", v)}
                   size="sm"
+                  disabled={!canWrite}
                 />
               </div>
               <p className="mt-1 ml-6 text-sm font-light leading-[1.3] text-dash-text-faded">
@@ -1008,6 +1035,7 @@ function ResourcesSection({
                             value={values.diskSize}
                             options={diskSizes}
                             onChange={(v) => setFieldValue("diskSize", v)}
+                            disabled={!canWrite}
                           />
                         </div>
                         <div>
@@ -1021,6 +1049,7 @@ function ResourcesSection({
                               setFieldValue("mountPath", e.target.value)
                             }
                             placeholder="/mnt/data"
+                            readOnly={!canWrite}
                             className={`${inputClass} font-family-mono text-[13px]`}
                           />
                         </div>
@@ -1049,7 +1078,7 @@ function ResourcesSection({
           {/* Footer */}
           <div className="flex justify-end border-t border-dash-border px-4 py-3">
             <GlossyButton
-              disabled={!canSave || !dirty || isSubmitting}
+              disabled={!canWrite || !canSave || !dirty || isSubmitting}
               loading={isSubmitting}
               loadingLabel="Saving..."
               onClick={() => handleSubmit()}
@@ -1070,11 +1099,13 @@ function DatabaseConfigurationPanel({
   onSubmit,
   region,
   dbImageName,
+  canWrite = true,
 }: {
   initialValues: DatabaseConfigValues;
   onSubmit: (values: DatabaseConfigValues) => Promise<void>;
   region?: string;
   dbImageName?: string;
+  canWrite?: boolean;
 }) {
   return (
     <Formik
@@ -1121,6 +1152,7 @@ function DatabaseConfigurationPanel({
                 onChange={handleChange}
                 onBlur={handleBlur}
                 placeholder="Project name"
+                readOnly={!canWrite}
                 className={inputClass}
               />
               {touched.name && errors.name && (
@@ -1162,6 +1194,7 @@ function DatabaseConfigurationPanel({
                   type="button"
                   role="switch"
                   aria-checked={isPublicAccess}
+                  disabled={!canWrite}
                   onClick={() => {
                     if (isPublicAccess) {
                       setFieldValue("whitelistIps", []);
@@ -1228,6 +1261,7 @@ function DatabaseConfigurationPanel({
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Enter new password"
+                  readOnly={!canWrite}
                   className={inputClass}
                   autoComplete="new-password"
                 />
@@ -1246,6 +1280,7 @@ function DatabaseConfigurationPanel({
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Re-enter password"
+                  readOnly={!canWrite}
                   className={inputClass}
                   autoComplete="new-password"
                 />
@@ -1258,7 +1293,7 @@ function DatabaseConfigurationPanel({
             </div>
             <div className="flex justify-end border-t border-dash-border px-4 py-3">
               <GlossyButton
-                disabled={!canSave}
+                disabled={!canWrite || !canSave}
                 loading={isSubmitting}
                 loadingLabel="Saving..."
                 onClick={() => handleSubmit()}
@@ -1461,6 +1496,7 @@ function ConfigurationPage() {
     ConfigSection.General,
   );
   const haptics = useHaptics();
+  const { canWrite } = useWorkspaceRole();
 
   // Root directory (managed outside Formik — set by drawer)
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1641,6 +1677,10 @@ function ConfigurationPage() {
     }
 
     if (!buildSectionVisible && section.id === ConfigSection.Build) {
+      return false;
+    }
+
+    if (!canWrite && section.id === ConfigSection.Danger) {
       return false;
     }
 
@@ -1843,6 +1883,7 @@ function ConfigurationPage() {
                     onSubmit={handleSubmitDatabase}
                     region={project?.region}
                     dbImageName={project?.dbImage?.name}
+                    canWrite={canWrite}
                   />
                 ) : (
                   <>
@@ -1851,6 +1892,7 @@ function ConfigurationPage() {
                       currentEnvironmentId={project?.projectEnvironmentId}
                       workspace={workspace}
                       initialEnvironments={preloadedEnvironments}
+                      canWrite={canWrite}
                     />
                     <GeneralSection
                       initialValues={generalInitialValues}
@@ -1864,6 +1906,7 @@ function ConfigurationPage() {
                       dockerSourceImage={buildInitialValues.dockerImage}
                       showMcpAuthControl={mcpAuthToggleVisible}
                       showBuildCacheControl={buildCacheToggleVisible}
+                      canWrite={canWrite}
                     />
                   </>
                 ))}
@@ -1874,6 +1917,7 @@ function ConfigurationPage() {
                   showCommands={sourceFieldsVisible}
                   showHealthCheck={healthCheckVisible}
                   showDockerSourceFields={dockerSourceFieldsVisible}
+                  canWrite={canWrite}
                 />
               )}
               {activeSection === ConfigSection.Resources && (
@@ -1884,9 +1928,10 @@ function ConfigurationPage() {
                   showScalingGroup={scalingGroupVisible}
                   showPersistentStorage={persistentStorageVisible}
                   canSave={databaseProject}
+                  canWrite={canWrite}
                 />
               )}
-              {activeSection === ConfigSection.Danger && (
+              {canWrite && activeSection === ConfigSection.Danger && (
                 <DangerSection
                   maintenanceMode={maintenanceMode}
                   setMaintenanceMode={setMaintenanceMode}

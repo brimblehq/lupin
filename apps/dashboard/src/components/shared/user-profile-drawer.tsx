@@ -54,6 +54,7 @@ import { BillingForm } from "../settings/billing-form";
 import { Avatar } from "./avatar";
 import { SimpleTooltip } from "./tooltip";
 import { usePlanGate } from "@/hooks/use-plan-gate";
+import { useTheme } from "@/hooks/use-theme";
 import { isPushEnabled, setPushEnabled } from "@/hooks/use-push-notification";
 import type { PaymentMethod } from "@/backend/payments";
 import {
@@ -64,6 +65,7 @@ import {
   updateWorkspaceTeamProfileServerFn,
   updateMemberEnvironmentsServerFn,
   updateMemberRoleServerFn,
+  transferOwnershipServerFn,
 } from "@/server/teams/actions";
 import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import type {
@@ -71,6 +73,7 @@ import type {
   SettingsWebhookGroup as ServerWebhookGroup,
 } from "@/backend/settings";
 import type { TeamDetails, TeamMember } from "@/backend/teams";
+import { normalizeMemberRole as normalizeRole } from "@/utils/workspace-role";
 import config from "@/config";
 import {
   mapSettingsSnapshotToDrawerProfile,
@@ -79,7 +82,7 @@ import {
 } from "@/utils/dashboard";
 import { formatUsdMonthly } from "@/utils/billing";
 import { usePricing } from "@/contexts/pricing-context";
-import { ProfileTab } from "../../types/enums";
+import { ProfileTab, Theme } from "../../types/enums";
 type UserProfile = DrawerUserProfile;
 
 export { ProfileTab };
@@ -139,6 +142,23 @@ function formatActivityTime(value: string): string {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function formatWorkspaceCreatedAt(value?: string): string {
+  if (!value) {
+    return "Unavailable";
+  }
+
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) {
+    return "Unavailable";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   }).format(new Date(timestamp));
 }
 
@@ -333,6 +353,7 @@ function CopyButton({ text }: { text: string }) {
 
 function ProfileForm({
   profile,
+  projectCount = 0,
   onSave,
   onChangeEmail,
   onBuildsChange,
@@ -348,6 +369,7 @@ function ProfileForm({
   isSaving,
 }: {
   profile: UserProfile;
+  projectCount?: number;
   onSave?: (data: {
     firstName: string;
     lastName: string;
@@ -420,13 +442,13 @@ function ProfileForm({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.altKey) {
+      if (event.key === "Alt" || event.altKey) {
         setIsAltPressed(true);
       }
     }
 
     function handleKeyUp(event: KeyboardEvent) {
-      if (!event.altKey) {
+      if (event.key === "Alt" || !event.altKey) {
         setIsAltPressed(false);
       }
     }
@@ -493,46 +515,13 @@ function ProfileForm({
   const avatarSeed =
     profile.username || profile.firstName || profile.email || "user";
   const hasCustomAvatar = Boolean(avatarUrl);
-  const alternateActionLabel = hasCustomAvatar
-    ? "Remove photo"
-    : "Paste image URL";
-
-  function applyAvatarUrlFromPrompt() {
-    const input = window.prompt("Paste an image URL (https://...)");
-
-    if (!input) {
-      return;
-    }
-
-    const trimmed = input.trim();
-    if (!trimmed) {
-      return;
-    }
-
-    try {
-      const parsed = new URL(trimmed);
-      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-        throw new Error("invalid protocol");
-      }
-
-      setAvatarUrl(parsed.toString());
-      toast.success("Image URL added. Click Confirm to save changes.");
-    } catch {
-      toast.error("Please enter a valid image URL.");
-    }
-  }
 
   function handleAvatarButtonClick(event: React.MouseEvent<HTMLButtonElement>) {
-    const useAlternateAction = event.altKey || isAltPressed;
+    const useAlternateAction = hasCustomAvatar && (event.altKey || isAltPressed);
 
     if (useAlternateAction) {
-      if (hasCustomAvatar) {
-        setAvatarUrl("");
-        toast.success("Photo removed. Click Confirm to save changes.");
-        return;
-      }
-
-      applyAvatarUrlFromPrompt();
+      setAvatarUrl("");
+      toast.success("Photo removed. Click Confirm to save changes.");
       return;
     }
 
@@ -575,15 +564,17 @@ function ProfileForm({
           >
             {isUploadingAvatar
               ? "Uploading..."
-              : isAltPressed
-                ? alternateActionLabel
+              : hasCustomAvatar && isAltPressed
+                ? "Remove photo"
                 : "Upload photo"}
           </button>
-          <span className="text-sm text-dash-text-faded">
-            {isAltPressed
-              ? `Release Option "⌥" to upload photo`
-              : `Hold Option "⌥" to ${alternateActionLabel.toLowerCase()}`}
-          </span>
+          {hasCustomAvatar && (
+            <span className="text-sm text-dash-text-faded">
+              {isAltPressed
+                ? `Release Option "⌥" to upload photo`
+                : `Hold Option "⌥" to remove photo`}
+            </span>
+          )}
         </div>
       </div>
 
@@ -727,6 +718,7 @@ function ProfileForm({
 
       {/* Danger zone */}
       <DangerZone
+        projectCount={projectCount}
         isGithubConnected={isGithubConnected}
         onDisconnectGithub={onDisconnectGithub}
         onConnectGithub={onConnectGithub}
@@ -739,6 +731,7 @@ function ProfileForm({
 }
 
 function DangerZone({
+  projectCount = 0,
   isGithubConnected,
   onDisconnectGithub,
   onConnectGithub,
@@ -746,20 +739,35 @@ function DangerZone({
   onVerifyDeleteAccountOtp,
   onDeleteAccount,
 }: {
+  projectCount?: number;
   isGithubConnected: boolean;
   onDisconnectGithub?: () => Promise<void> | void;
   onConnectGithub?: () => void;
-  onRequestDeleteAccountOtp?: () => Promise<void> | void;
+  onRequestDeleteAccountOtp?: (turnstileToken?: string) => Promise<void> | void;
   onVerifyDeleteAccountOtp?: (code: string) => Promise<void> | void;
   onDeleteAccount?: () => Promise<void> | void;
 }) {
+  const { theme } = useTheme();
+  const normalizedProjectCount =
+    typeof projectCount === "number" && Number.isFinite(projectCount) && projectCount > 0
+      ? Math.floor(projectCount)
+      : 0;
+  const hasRemainingProjects = normalizedProjectCount > 0;
+  const projectsLabel = normalizedProjectCount === 1 ? "project" : "projects";
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteStep, setDeleteStep] = useState<"confirm" | "otp">("confirm");
   const [disconnectConfirm, setDisconnectConfirm] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [isTurnstileReady, setIsTurnstileReady] = useState(false);
   const [deleteOtp, setDeleteOtp] = useState("");
   const [deleteOtpError, setDeleteOtpError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (deleteOpen && deleteStep === "confirm" && !hasRemainingProjects) {
+      setIsTurnstileReady(false);
+    }
+  }, [deleteOpen, deleteStep, hasRemainingProjects, theme]);
 
   return (
     <>
@@ -848,6 +856,7 @@ function DangerZone({
           setDeleteOpen(open);
           if (!open) {
             setTurnstileToken(null);
+            setIsTurnstileReady(false);
             setDeleteStep("confirm");
             setDeleteOtp("");
             setDeleteOtpError(null);
@@ -872,12 +881,18 @@ function DangerZone({
           deleteStep === "confirm" ? "Sending code..." : "Deleting account..."
         }
         confirmDisabled={
-          deleteStep === "confirm"
+          hasRemainingProjects
+            ? true
+            : deleteStep === "confirm"
             ? !turnstileToken
             : deleteOtp.length < 6
         }
         closeOnConfirm={deleteStep === "otp"}
         onConfirm={async () => {
+          if (hasRemainingProjects) {
+            return;
+          }
+
           if (deleteStep === "confirm") {
             setDeleteOtpError(null);
             setDeleteStep("otp");
@@ -914,42 +929,75 @@ function DangerZone({
         }}
       >
         <div className="flex flex-col gap-2 text-left">
-          <div className="flex items-start gap-2.5 rounded-[8px] bg-dash-bg-elevated px-3 py-2.5">
-            <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-[#ef2f1f]/10">
-              <TriangleAlert className="size-2.5 text-[#ef2f1f]" />
-            </span>
+          <div
+            className={`flex items-start rounded-[8px] bg-dash-bg-elevated px-3 py-2.5 ${hasRemainingProjects ? "" : "gap-2.5"}`}
+          >
+            {!hasRemainingProjects ? (
+              <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-[#ef2f1f]/10">
+                <TriangleAlert className="size-2.5 text-[#ef2f1f]" />
+              </span>
+            ) : null}
             <div className="min-w-0">
               <p className="text-xs font-semibold leading-5 text-dash-text-strong">
-                This action is permanent.
+                {hasRemainingProjects
+                  ? `You still have ${normalizedProjectCount} ${projectsLabel}.`
+                  : "This action is permanent."}
               </p>
               <p className="text-xs leading-5 text-dash-text-faded">
-                Deleted accounts cannot be recovered.
+                {hasRemainingProjects
+                  ? `Delete your ${projectsLabel} first before deleting your account.`
+                  : "Deleted accounts cannot be recovered."}
               </p>
             </div>
           </div>
           {deleteStep === "confirm" ? (
             <>
-              <label className="text-sm leading-5 text-dash-text-faded">
-                Complete the verification to continue
-              </label>
-              <div className="rounded-[10px] bg-dash-bg-elevated/70 p-2.5">
-                <div className="mx-auto w-full max-w-[360px]">
-                  <Turnstile
-                    siteKey={config.turnstileSiteKey}
-                    className="w-full"
-                    options={{
-                      theme: "light",
-                      size: "flexible",
-                    }}
-                    onSuccess={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken(null)}
-                    onError={() => setTurnstileToken(null)}
-                  />
-                </div>
-                <p className="mt-2 text-[11px] leading-4 text-dash-text-extra-faded">
-                  Security check powered by Cloudflare.
-                </p>
-              </div>
+              {hasRemainingProjects ? (
+                null
+              ) : (
+                <>
+                  <label className="text-sm leading-5 text-dash-text-faded">
+                    Complete the verification to continue
+                  </label>
+                  <div className="rounded-[10px] bg-dash-bg-elevated/70 p-2.5">
+                    <div className="mx-auto w-full max-w-[360px]">
+                      <div className="relative min-h-[65px]">
+                        {!isTurnstileReady ? (
+                          <div className="absolute inset-0 animate-pulse rounded-[8px] border border-dash-border-soft bg-dash-bg/70 p-3">
+                            <div className="flex h-full items-center gap-3">
+                              <div className="size-8 shrink-0 rounded-full bg-dash-border-soft/70" />
+                              <div className="h-4 flex-1 rounded bg-dash-border-soft/60" />
+                              <div className="h-6 w-20 shrink-0 rounded bg-dash-border-soft/50" />
+                            </div>
+                          </div>
+                        ) : null}
+                        <Turnstile
+                          key={`delete-account-turnstile-${theme}`}
+                          siteKey={config.turnstileSiteKey}
+                          className={cn(
+                            "w-full transition-opacity duration-200",
+                            isTurnstileReady ? "opacity-100" : "opacity-0",
+                          )}
+                          options={{
+                            theme: theme === Theme.Dark ? Theme.Dark : Theme.Light,
+                            size: "flexible",
+                          }}
+                          onWidgetLoad={() => setIsTurnstileReady(true)}
+                          onSuccess={(token) => setTurnstileToken(token)}
+                          onExpire={() => setTurnstileToken(null)}
+                          onError={() => {
+                            setTurnstileToken(null);
+                            setIsTurnstileReady(true);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[11px] leading-4 text-dash-text-extra-faded">
+                      Security check powered by Cloudflare.
+                    </p>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <>
@@ -1340,6 +1388,10 @@ function WorkspaceProfileForm({
         </div>
       </div>
 
+      <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
+        Workspace created {formatWorkspaceCreatedAt(team.createdAt)}
+      </p>
+
       <hr className="border-dash-border-soft" />
 
       <div className="flex items-center justify-between">
@@ -1709,6 +1761,7 @@ export function UserProfileDrawer({
   initialActivityLogs = null,
   initialSubscriptionStats = null,
   initialProjectEnvironments = null,
+  projectCount = 0,
   requestedTab,
 }: {
   open: boolean;
@@ -1720,6 +1773,7 @@ export function UserProfileDrawer({
   initialActivityLogs?: ActivityLogsResponse | null;
   initialSubscriptionStats?: import("@/backend/payments").SubscriptionStats | null;
   initialProjectEnvironments?: ProjectEnvironment[] | null;
+  projectCount?: number;
   requestedTab?: ProfileTab;
 }) {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
@@ -2115,6 +2169,7 @@ export function UserProfileDrawer({
               {activeTab === ProfileTab.Profile && !hasActiveWorkspace && profile && (
                 <ProfileForm
                   profile={profile}
+                  projectCount={projectCount}
                   isSaving={isSavingProfile}
                   onSave={async (data) => {
                     setIsSavingProfile(true);
@@ -3094,19 +3149,9 @@ function NotificationsForm({
         <Toggle checked={emailNotifs} onChange={setEmailNotifs} />
       </div>
 
-      <hr className="-ml-8 border-dash-border-soft" />
-
-      {!webhookEnabled ? (
-        <div className="flex max-w-[488px] flex-col gap-3">
-          <span className="text-sm font-medium leading-5 text-dash-text-strong">
-            Webhooks & Event Notifications
-          </span>
-          <p className="text-sm leading-5 text-dash-text-faded">
-            Configure webhook integrations (Discord, Slack, custom) and fine-grained event notifications by upgrading to a paid plan.
-          </p>
-        </div>
-      ) : (
+      {webhookEnabled && (
         <>
+          <hr className="-ml-8 border-dash-border-soft" />
           {/* Webhook URLs */}
           <div className="flex max-w-[488px] flex-col gap-4">
             <div className="flex flex-col gap-1.5">
@@ -3297,13 +3342,7 @@ const roleBadgeStyles: Record<string, string> = {
 };
 
 function normalizeMemberRole(member: TeamMember): Member["role"] {
-  if (member.isCreator) return "Creator";
-
-  const role = (member.role ?? "").toLowerCase();
-  if (role.includes("admin")) return "Administrator";
-  if (role.includes("creator") || role.includes("owner")) return "Creator";
-  if (role.includes("viewer")) return "Viewer";
-  return "Member";
+  return normalizeRole(member);
 }
 
 function buildAvatarGradient(seed: string): string {
@@ -3629,6 +3668,11 @@ function MembersForm({
   ) as (args: {
     data: { workspace: string; memberId: string; role: string };
   }) => Promise<{ ok: true }>;
+  const transferOwnership = useServerFn(
+    transferOwnershipServerFn as any,
+  ) as (args: {
+    data: { workspace: string; memberId: string };
+  }) => Promise<{ ok: true }>;
 
   const [team, setTeam] = useState<TeamDetails | null>(initialTeam);
   const [isLoadingMembers, setIsLoadingMembers] = useState(!initialTeam);
@@ -3640,6 +3684,10 @@ function MembersForm({
   const [environments, setEnvironments] = useState<ProjectEnvironment[]>(initialEnvironments ?? []);
   const [envAccess, setEnvAccess] = useState<Record<string, Set<string>>>({});
   const [envBusyKey, setEnvBusyKey] = useState<string | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferTarget, setTransferTarget] = useState<Member | null>(null);
+  const [transferConfirmText, setTransferConfirmText] = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   const updateMemberEnvs = useServerFn(
     updateMemberEnvironmentsServerFn as any,
@@ -4057,6 +4105,150 @@ function MembersForm({
           </div>
         );
       })()}
+
+      {/* Transfer ownership danger zone — Creator only */}
+      {currentUserRole === "Creator" && (
+        <>
+          <hr className="-ml-8 border-dash-border-soft" />
+          <div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <h4 className="text-sm font-medium text-dash-text-strong">
+                  Transfer ownership
+                </h4>
+                <p className="text-sm font-light leading-[1.3] text-dash-text-faded">
+                  Transfer Creator role to another workspace member. You will become an Administrator.
+                </p>
+              </div>
+              <button
+                onClick={() => setTransferOpen(true)}
+                className="shrink-0 rounded-[4px] border border-red-500/30 bg-gradient-to-b from-red-500 via-red-600 to-red-700 px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+              >
+                Transfer ownership
+              </button>
+            </div>
+          </div>
+
+          <WarningModal
+            open={transferOpen}
+            onOpenChange={(open) => {
+              setTransferOpen(open);
+              if (!open) {
+                setTransferTarget(null);
+                setTransferConfirmText("");
+              }
+            }}
+            title="Transfer ownership?"
+            description={
+              transferTarget
+                ? `This will make ${transferTarget.name} the Creator of this workspace. You will be downgraded to Administrator. This action cannot be undone.`
+                : "Select a member to transfer ownership to. You will be downgraded to Administrator. This action cannot be undone."
+            }
+            confirmLabel="Transfer ownership"
+            confirmLoadingLabel="Transferring..."
+            confirmDisabled={
+              !transferTarget || transferConfirmText !== team?.name || transferring
+            }
+            closeOnConfirm={false}
+            onConfirm={async () => {
+              if (!transferTarget) return;
+              setTransferring(true);
+              try {
+                await transferOwnership({
+                  data: { workspace, memberId: transferTarget.id },
+                });
+                toast.success(`Ownership transferred to ${transferTarget.name}`);
+                setTransferOpen(false);
+                setTransferTarget(null);
+                setTransferConfirmText("");
+                await refreshMembers();
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to transfer ownership",
+                );
+              } finally {
+                setTransferring(false);
+              }
+            }}
+          >
+            {/* Member picker */}
+            <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
+              {members
+                .filter((m) => m.role !== "Creator")
+                .map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => setTransferTarget(member)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-[6px] px-3 py-2 text-left transition-colors",
+                      transferTarget?.id === member.id
+                        ? "bg-[#4879f8]/10 ring-1 ring-[#4879f8]/30"
+                        : "hover:bg-dash-bg-elevated",
+                    )}
+                  >
+                    <Avatar
+                      src={member.avatarUrl}
+                      fallbackSeed={member.email || member.name || member.id}
+                      alt={member.name}
+                      className="size-7 shrink-0 rounded-full border border-dash-border-soft object-cover"
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm leading-5 text-dash-text-strong">
+                        {member.name}
+                      </span>
+                      <span className="truncate text-xs leading-4 text-dash-text-faded">
+                        {member.email}
+                      </span>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        roleBadgeStyles[member.role] ?? roleBadgeStyles.Member
+                      }`}
+                    >
+                      {member.role}
+                    </span>
+                    <div
+                      className={cn(
+                        "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                        transferTarget?.id === member.id
+                          ? "border-[#4879f8] bg-[#4879f8]"
+                          : "border-dash-border",
+                      )}
+                    >
+                      {transferTarget?.id === member.id && (
+                        <div className="size-1.5 rounded-full bg-white" />
+                      )}
+                    </div>
+                  </button>
+                ))}
+            </div>
+
+            {/* Type-to-confirm */}
+            {transferTarget && (
+              <div className="flex flex-col gap-2 pt-3">
+                <label className="text-sm text-dash-text-faded">
+                  Type{" "}
+                  <span className="font-medium text-dash-text-strong">
+                    {team?.name}
+                  </span>{" "}
+                  to confirm
+                </label>
+                <input
+                  type="text"
+                  value={transferConfirmText}
+                  onChange={(e) => setTransferConfirmText(e.target.value)}
+                  onPaste={(e) => e.preventDefault()}
+                  placeholder={team?.name}
+                  className="h-[38px] rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm text-dash-text-strong outline-none placeholder:text-dash-text-extra-faded focus:border-[#4879f8]/50 focus:ring-1 focus:ring-[#4879f8]/20"
+                />
+              </div>
+            )}
+          </WarningModal>
+        </>
+      )}
 
       <InviteMembersModal
         open={inviteOpen}

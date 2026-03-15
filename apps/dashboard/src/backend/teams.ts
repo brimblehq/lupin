@@ -50,6 +50,7 @@ export interface TeamDetails {
   name: string;
   description?: string;
   avatarUrl?: string;
+  createdAt?: string;
   buildDisabled?: boolean;
   buildDisabledBy?: string | null;
   spendingLimit?: number | null;
@@ -100,6 +101,7 @@ export interface TeamsApi {
   checkInvitation(teamName: string): Promise<TeamInvitation>;
   acceptInvite(teamId: string): Promise<{ ok: true }>;
   denyInvite(teamId: string): Promise<{ ok: true }>;
+  transferOwnership(teamId: string, newOwnerId: string): Promise<{ ok: true }>;
 }
 
 function mapTeamMember(item: unknown): TeamMember | null {
@@ -209,6 +211,10 @@ export function createTeamsApi(client: ApiClient): TeamsApi {
         name: pickString(root, "name") ?? teamName,
         description: pickString(root, "description") || undefined,
         avatarUrl: pickString(root, "avatar", "avatarUrl", "avatar_url"),
+        createdAt:
+          pickString(subscriptionRow, "created_at", "createdAt") ??
+          pickString(root, "createdAt", "created_at") ??
+          undefined,
         buildDisabled: pickBoolean(root, "build_disabled", "buildDisabled"),
         buildDisabledBy:
           pickString(root, "build_disabled_by", "buildDisabledBy") ?? null,
@@ -349,6 +355,18 @@ export function createTeamsApi(client: ApiClient): TeamsApi {
       await client.request<any>(
         `/core/v1/teams/${encodeURIComponent(teamId)}/deny`,
         { method: "POST", body: {} },
+      );
+
+      return { ok: true } as const;
+    },
+
+    async transferOwnership(teamId, newOwnerId) {
+      await client.request<any>(
+        `/core/v1/teams/${encodeURIComponent(teamId)}/transfer-ownership`,
+        {
+          method: "POST",
+          body: { newOwnerId },
+        },
       );
 
       return { ok: true } as const;

@@ -21,6 +21,7 @@ import {
 import { formatRelativeTime } from "@/utils/dashboard";
 import { workspaceLoaderDeps } from "@/utils/workspace-route-search";
 import { usePlanGate } from "@/hooks/use-plan-gate";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { PlanUpgradePrompt } from "../../components/shared/plan-upgrade-prompt";
 
 export const Route = createFileRoute("/scaling/")({
@@ -165,6 +166,7 @@ function ScalingGroupCard({
   onDelete,
   toggling,
   deleting,
+  canWrite = true,
 }: {
   group: UiScalingGroup;
   onToggle: (group: UiScalingGroup, nextActive: boolean) => void;
@@ -172,6 +174,7 @@ function ScalingGroupCard({
   onDelete: (group: UiScalingGroup) => void;
   toggling?: boolean;
   deleting?: boolean;
+  canWrite?: boolean;
 }) {
   return (
     <motion.div
@@ -187,29 +190,33 @@ function ScalingGroupCard({
           {group.name}
         </span>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onEdit(group)}
-            className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-body"
-            title="Edit scaling group"
-            disabled={Boolean(deleting)}
-          >
-            <Pencil className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(group)}
-            className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-[#ef2f1f]"
-            title="Delete scaling group"
-            disabled={Boolean(deleting)}
-          >
-            <FolderTrashIcon className="size-3.5" color="currentColor" />
-          </button>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => onEdit(group)}
+              className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-body"
+              title="Edit scaling group"
+              disabled={Boolean(deleting)}
+            >
+              <Pencil className="size-3.5" />
+            </button>
+          )}
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => onDelete(group)}
+              className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-[#ef2f1f]"
+              title="Delete scaling group"
+              disabled={Boolean(deleting)}
+            >
+              <FolderTrashIcon className="size-3.5" color="currentColor" />
+            </button>
+          )}
           <ToggleSwitch
             size="sm"
             checked={group.active}
             onChange={(next) => onToggle(group, next)}
-            disabled={Boolean(toggling) || Boolean(deleting)}
+            disabled={!canWrite || Boolean(toggling) || Boolean(deleting)}
           />
         </div>
       </div>
@@ -481,7 +488,7 @@ function CreationForm({
   );
 }
 
-function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
+function EmptyState({ onCreateClick, canWrite = true }: { onCreateClick: () => void; canWrite?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -499,14 +506,17 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
         Create a scaling group to automatically manage instance counts based on CPU and
         memory usage.
       </p>
-      <GlossyButton variant="blue" onClick={onCreateClick}>
-        Create Scaling Group
-      </GlossyButton>
+      {canWrite && (
+        <GlossyButton variant="blue" onClick={onCreateClick}>
+          Create Scaling Group
+        </GlossyButton>
+      )}
     </motion.div>
   );
 }
 
 function ScalingPage() {
+  const { canWrite } = useWorkspaceRole();
   const { autoscalingEnabled } = usePlanGate();
   const { groups: serverGroups, workspace } = Route.useLoaderData();
   const saveScalingGroup = useServerFn(saveScalingGroupServerFn as any) as (args: {
@@ -732,18 +742,20 @@ function ScalingPage() {
             className={`${inputClass} pl-9`}
           />
         </div>
-        <GlossyButton
-          variant="blue"
-          onClick={handleNewGroup}
-          className="shrink-0 gap-1.5"
-        >
-          <Plus className="size-3.5" />
-          New Scaling Group
-        </GlossyButton>
+        {canWrite && (
+          <GlossyButton
+            variant="blue"
+            onClick={handleNewGroup}
+            className="shrink-0 gap-1.5"
+          >
+            <Plus className="size-3.5" />
+            New Scaling Group
+          </GlossyButton>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
-        {formOpen ? (
+        {canWrite && formOpen ? (
           <CreationForm
             key={editingGroup?.id ?? "new"}
             initialValues={toFormValues(editingGroup)}
@@ -755,7 +767,7 @@ function ScalingPage() {
       </AnimatePresence>
 
       {rows.length === 0 ? (
-        <EmptyState onCreateClick={handleNewGroup} />
+        <EmptyState onCreateClick={handleNewGroup} canWrite={canWrite} />
       ) : filtered.length === 0 ? (
         <div className="py-12 text-center text-sm text-dash-text-faded">
           No scaling groups match your search.
@@ -776,6 +788,7 @@ function ScalingPage() {
                 onDelete={(next) => setDeleteTarget(next)}
                 toggling={Boolean(togglingIds[group.id])}
                 deleting={Boolean(deletingIds[group.id])}
+                canWrite={canWrite}
               />
             </motion.div>
           ))}

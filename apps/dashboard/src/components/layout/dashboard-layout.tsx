@@ -29,6 +29,8 @@ import type { PaymentMethod } from "@/backend/payments";
 import type { Pricing } from "@/types/pricing";
 import { PricingProvider } from "@/contexts/pricing-context";
 import { PlanTypeProvider } from "@/contexts/plan-type-context";
+import { WorkspaceRoleProvider } from "@/contexts/workspace-role-context";
+import { resolveCurrentWorkspaceRole } from "@/utils/workspace-role";
 import { ProfileDrawerProvider } from "@/contexts/profile-drawer-context";
 import { DEFAULT_PRICING } from "@/utils/default-pricing";
 import { ProfileTab } from "../../types/enums";
@@ -576,6 +578,16 @@ export function DashboardLayout({
       return null;
     },
   });
+  const matchedOverviewProjectCount = useRouterState({
+    select: (s) => {
+      const homeMatch = s.matches.find((m) => m.routeId === "/");
+      const homeData = homeMatch?.loaderData as
+        | { overview?: { total?: { project?: number } } | null }
+        | undefined;
+      const value = homeData?.overview?.total?.project;
+      return typeof value === "number" && Number.isFinite(value) ? value : null;
+    },
+  });
   const navigate = useNavigate();
   const isAuthRoute = /^\/(login|signup)$/.test(layoutPathname) || /^\/(login|signup)$/.test(pathname);
   const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace)?(\/|$)/;
@@ -619,6 +631,21 @@ export function DashboardLayout({
     const params = new URLSearchParams(searchStr || "");
     return params.get("workspace")?.trim() || undefined;
   }, [searchStr]);
+  const dashboardProjects =
+    matchedProjects ??
+    matchedProjectSwitcherProjects ??
+    initialOnboardingProjects?.items ??
+    initialProjectSwitcherProjects?.items ??
+    [];
+  const accountProjectCount = Math.max(
+    0,
+    Math.floor(
+      matchedOverviewProjectCount ??
+        initialOnboardingProjects?.total ??
+        initialProjectSwitcherProjects?.total ??
+        dashboardProjects.length,
+    ),
+  );
   const settingsScopeKey = currentWorkspace ?? "__personal__";
   const [stableWorkspaces, setStableWorkspaces] = useState<Workspace[]>(
     initialWorkspaces?.items ?? [],
@@ -868,15 +895,44 @@ export function DashboardLayout({
   const pricing = initialPricing ?? DEFAULT_PRICING;
   const planType = activeSettingsSnapshot?.profile?.subscription?.planType;
 
+  const workspaceRoleValue = useMemo(() => {
+    const inWorkspace = Boolean(currentWorkspace && isKnownWorkspace);
+    const role = inWorkspace
+      ? resolveCurrentWorkspaceRole(
+          activeWorkspaceTeamMembers,
+          userProfile?.id,
+          userProfile?.email,
+        )
+      : null;
+    const isViewer = role === "Viewer";
+    const roleKnown = !inWorkspace || role !== null;
+    return {
+      role,
+      isViewer,
+      canWrite: roleKnown ? !isViewer : false,
+      canManageMembers: roleKnown
+        ? (!inWorkspace || role === "Creator" || role === "Administrator")
+        : false,
+      canEditWorkspace: roleKnown
+        ? (!inWorkspace || role === "Creator" || role === "Administrator")
+        : false,
+      canSeeBilling: roleKnown
+        ? (!inWorkspace || role === "Creator" || role === "Administrator")
+        : false,
+    };
+  }, [currentWorkspace, isKnownWorkspace, activeWorkspaceTeamMembers, userProfile?.id, userProfile?.email]);
+
   if (isAuthRoute || isCatchAll) {
     return (
       <QueryClientProvider client={dashboardQueryClient}>
       <PricingProvider value={pricing}>
       <PlanTypeProvider value={planType}>
+      <WorkspaceRoleProvider value={workspaceRoleValue}>
       <TooltipProvider>
         <DashToaster />
         {children}
       </TooltipProvider>
+      </WorkspaceRoleProvider>
       </PlanTypeProvider>
       </PricingProvider>
       </QueryClientProvider>
@@ -887,6 +943,7 @@ export function DashboardLayout({
     <QueryClientProvider client={dashboardQueryClient}>
     <PricingProvider value={pricing}>
     <PlanTypeProvider value={planType}>
+    <WorkspaceRoleProvider value={workspaceRoleValue}>
     <ScoutBarProvider>
     <TooltipProvider>
     <ProfileDrawerProvider onOpen={openProfileDrawer}>
@@ -900,6 +957,7 @@ export function DashboardLayout({
           settingsSnapshot={activeSettingsSnapshot}
           userProfile={userProfile}
           workspaces={effectiveWorkspaces}
+          workspaceTeamMembers={activeWorkspaceTeamMembers}
           projectSwitcherProjects={
             matchedProjectSwitcherProjects ?? initialProjectSwitcherProjects?.items ?? []
           }
@@ -1024,13 +1082,7 @@ export function DashboardLayout({
         )}
         <WelcomeModal />
         <OnboardingChecklist
-          projects={
-            matchedProjects ??
-            matchedProjectSwitcherProjects ??
-            initialOnboardingProjects?.items ??
-            initialProjectSwitcherProjects?.items ??
-            []
-          }
+          projects={dashboardProjects}
           settingsSnapshot={activeSettingsSnapshot}
           initialPaymentMethods={initialPaymentMethods ?? null}
           isTeamWorkspace={isTeamWorkspace}
@@ -1047,11 +1099,13 @@ export function DashboardLayout({
           initialActivityLogs={initialActivityLogs ?? null}
           initialSubscriptionStats={initialSubscriptionStats ?? null}
           initialProjectEnvironments={initialProjectEnvironments ?? null}
+          projectCount={accountProjectCount}
         />
       </div>
     </ProfileDrawerProvider>
     </TooltipProvider>
     </ScoutBarProvider>
+    </WorkspaceRoleProvider>
     </PlanTypeProvider>
     </PricingProvider>
     </QueryClientProvider>

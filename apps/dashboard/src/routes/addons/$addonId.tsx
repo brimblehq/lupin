@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { ArrowLeft, Copy, Check, ExternalLink } from "lucide-react";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { AddonCard } from "../../components/shared/addon-card";
@@ -123,6 +124,7 @@ function chooseGithubInstallation(accounts: GithubAccount[], workspace?: string)
 }
 
 function AddonDetailPage() {
+  const { canWrite } = useWorkspaceRole();
   const navigate = useNavigate();
   const search = Route.useSearch() as { workspace?: string };
   const { detail, relatedAddons } = Route.useLoaderData();
@@ -335,6 +337,7 @@ function AddonDetailPage() {
             </div>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {canWrite && (
             <GlossyButton
               className="min-w-[160px]"
               loading={deploying}
@@ -345,6 +348,7 @@ function AddonDetailPage() {
             >
               Deploy server
             </GlossyButton>
+            )}
             {detail.documentationUrl ? (
               <a
                 href={detail.documentationUrl}
