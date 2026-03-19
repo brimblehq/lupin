@@ -10,6 +10,10 @@ export function getRouter() {
     routeTree,
     scrollRestoration: true,
     defaultPreload: "intent",
+    defaultStaleTime: 300_000,
+    defaultPreloadStaleTime: 300_000,
+    defaultGcTime: 30 * 60_000,
+    defaultPendingMs: 300,
     defaultErrorComponent: DefaultErrorComponent,
   });
 

@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Command } from "cmdk";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure } from "@phosphor-icons/react";
-import { PaletteView } from "../../types/enums";
+import { PaletteView, Theme } from "../../types/enums";
 import { useScoutBar } from "../../contexts/scoutbar-context";
 import { useTheme } from "../../hooks/use-theme";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -43,7 +43,7 @@ function mapDomainItems(items: DomainRecord[]): CommandDomain[] {
 export function CommandPalette() {
   const navigate = useNavigate();
   const { isOpen, setIsOpen } = useScoutBar();
-  const { theme, setTheme, toggleTheme } = useTheme();
+  const { theme, mode, setTheme, toggleTheme } = useTheme();
   const { canWrite } = useWorkspaceRole();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const currentPathname = useRouterState({ select: (s) => s.location.pathname });
@@ -458,11 +458,15 @@ export function CommandPalette() {
   })();
 
   const setLightTheme = () => {
-    runAction(() => setTheme("light"));
+    runAction(() => setTheme(Theme.Light));
   };
 
   const setDarkTheme = () => {
-    runAction(() => setTheme("dark"));
+    runAction(() => setTheme(Theme.Dark));
+  };
+
+  const setSystemTheme = () => {
+    runAction(() => setTheme(Theme.System));
   };
 
   const toggleAppTheme = () => {
@@ -659,7 +663,7 @@ export function CommandPalette() {
                               <ArrowsClockwise className="size-4" />
                               <span>Toggle theme</span>
                               <span className="cmdk-shortcut">
-                                {theme === "dark" ? "D" : "L"}
+                                {mode === Theme.System ? "S" : theme === Theme.Dark ? "D" : "L"}
                               </span>
                             </Command.Item>
                             <Command.Item
@@ -675,6 +679,13 @@ export function CommandPalette() {
                             >
                               <Moon className="size-4" />
                               <span>Dark mode</span>
+                            </Command.Item>
+                            <Command.Item
+                              value="theme system mode follow os"
+                              onSelect={setSystemTheme}
+                            >
+                              <ArrowsClockwise className="size-4" />
+                              <span>System mode</span>
                             </Command.Item>
                           </Command.Group>
 

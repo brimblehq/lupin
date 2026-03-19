@@ -2,6 +2,7 @@ import { cn } from "@brimble/ui";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../../hooks/use-theme";
+import { Theme } from "../../types/enums";
 import { useHaptics } from "@/hooks/use-haptics";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
@@ -29,7 +30,7 @@ export function Sidebar({
   profileOpen: boolean;
   onProfileOpenChange: (open: boolean) => void;
 }) {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, mode, cycleTheme } = useTheme();
   const haptics = useHaptics();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -154,7 +155,7 @@ export function Sidebar({
           <button
             onClick={() => {
               haptics.selection();
-              toggleTheme();
+              cycleTheme();
             }}
             className={cn(navItemBase, "hover:bg-dash-bg-elevated")}
           >
@@ -163,7 +164,7 @@ export function Sidebar({
             ) : (
               <Moon className="size-4 shrink-0" />
             )}
-            {theme === "dark" ? "Light mode" : "Dark mode"}
+            {mode === Theme.System ? "System mode" : theme === Theme.Dark ? "Dark mode" : "Light mode"}
           </button>
         </div>
       </aside>

@@ -9,6 +9,7 @@ export enum PaletteView {
 export enum Theme {
   Light = "light",
   Dark = "dark",
+  System = "system",
 }
 
 export enum SourceType {

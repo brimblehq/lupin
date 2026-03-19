@@ -35,17 +35,6 @@ import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 
 const parentRoute = getRouteApi("/projects/$projectId");
-const PROJECT_DOMAINS_CACHE_MS = 300_000;
-const projectDomainsLoaderCache = new Map<
-  string,
-  {
-    data: {
-      domains: PaginatedDomainsResponse;
-      projects: Array<{ id: string; name: string; serviceType?: string }>;
-    };
-    timestamp: number;
-  }
->();
 
 export const Route = createFileRoute("/projects/$projectId/domains/")({
   staleTime: 300_000,
@@ -88,11 +77,6 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
         page = Math.floor(parsed);
       }
     }
-    const cacheKey = `${project?.id || project?.name || "unknown"}:${workspace ?? "__personal__"}:${page}`;
-    const cached = projectDomainsLoaderCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < PROJECT_DOMAINS_CACHE_MS) {
-      return cached.data;
-    }
 
     const [domains, projects] = await Promise.all([
       (
@@ -130,7 +114,6 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
         serviceType: item.serviceType,
       })),
     };
-    projectDomainsLoaderCache.set(cacheKey, { data, timestamp: Date.now() });
     return data;
   },
   component: ProjectDomainsPage,

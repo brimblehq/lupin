@@ -42,6 +42,7 @@ import type { ProjectEnvironment } from "@/backend/environments";
 import { WarningModal } from "../shared/warning-modal";
 import { Dropdown } from "../shared/dropdown";
 import { toTitleCase } from "@/utils/dashboard";
+import { Theme } from "@/types/enums";
 import {
   buildProjectSwitchUrl,
   buildWorkspaceSwitchUrl,
@@ -1259,7 +1260,7 @@ export function Topbar({
   projectSwitcherProjects?: Project[];
   workspaceTeamMembers?: TeamDetails | null;
 }) {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, mode, cycleTheme } = useTheme();
   const haptics = useHaptics();
   const { open: openScoutBar } = useScoutBar();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -1330,8 +1331,9 @@ export function Topbar({
               />
             </button>
             <button
-              onClick={() => { haptics.selection(); toggleTheme(); }}
+              onClick={() => { haptics.selection(); cycleTheme(); }}
               className="flex items-center gap-1.5 text-sm hover:text-dash-text-strong"
+              title={mode === Theme.System ? "System theme" : theme === Theme.Dark ? "Dark theme" : "Light theme"}
             >
               {theme === "dark" ? (
                 <Sun className="size-4" />

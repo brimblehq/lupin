@@ -51,11 +51,6 @@ function normalizeMemberRole(member: TeamMember): string {
 }
 
 const PAGE_LIMIT = 10;
-const DEPLOYMENT_HISTORY_CACHE_MS = 300_000;
-const deploymentHistoryCache = new Map<
-  string,
-  { data: { deployments: PaginatedDeploymentsResponse; workspace?: string }; timestamp: number }
->();
 
 export const Route = createFileRoute(
   "/projects/$projectId/deployment-history",
@@ -68,11 +63,6 @@ export const Route = createFileRoute(
       (context as any).workspace ||
       new URLSearchParams(location.searchStr || "").get("workspace") ||
       undefined;
-    const cacheKey = `${project?.id || project?.name || "unknown"}:${workspace ?? "__personal__"}`;
-    const cached = deploymentHistoryCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < DEPLOYMENT_HISTORY_CACHE_MS) {
-      return cached.data;
-    }
 
     const range = defaultDeploymentHistoryDateRange();
 
@@ -96,9 +86,7 @@ export const Route = createFileRoute(
       },
     });
 
-    const data = { deployments: result, workspace };
-    deploymentHistoryCache.set(cacheKey, { data, timestamp: Date.now() });
-    return data;
+    return { deployments: result, workspace };
   },
   component: DeploymentHistoryPage,
 });

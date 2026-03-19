@@ -110,33 +110,6 @@ function DomainActionsMenu({
   );
 }
 
-function DomainCheckbox({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      role="checkbox"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`flex size-[14px] shrink-0 items-center justify-center rounded-[3px] border shadow-[0px_1px_2px_rgba(3,7,18,0.12),0px_0px_0px_1px_rgba(3,7,18,0.08)] transition-colors ${
-        checked
-          ? "border-[#4879f8] bg-[#4879f8]"
-          : "border-transparent bg-dash-bg dark:border-white/20 dark:bg-transparent"
-      }`}
-    >
-      {checked && (
-        <svg width="8" height="6" viewBox="0 0 8 6" fill="none" className="text-white">
-          <path d="M1 3L3 5L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </button>
-  );
-}
-
 /* ─── Transfer Domain Modal ─── */
 
 const mockWorkspaces = [
@@ -497,7 +470,6 @@ export function DomainList({
   const searchStr = useRouterState({
     select: (state) => state.location.searchStr,
   });
-  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [searchQueryInternal, setSearchQueryInternal] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [editingDomain, setEditingDomain] = useState<Domain | null>(null);
@@ -528,25 +500,6 @@ export function DomainList({
         return next;
       });
     }
-  }
-
-  const allSelected = selected.size === domains.length && domains.length > 0;
-
-  function toggleAll() {
-    if (allSelected) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(domains.map((_, i) => i)));
-    }
-  }
-
-  function toggleOne(index: number) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
   }
 
   const filtered = domains.filter((d) => {
@@ -682,7 +635,6 @@ export function DomainList({
 
       {/* Failed domains (each in its own card) */}
       {failedDomains.map((domain, i) => {
-        const originalIndex = domains.indexOf(domain);
         const actions = actionsFor(domain);
         const domainDetailsPath = getDomainDetailsPath(domain);
         const isAssigned = hasAssignedProject(domain);
@@ -691,10 +643,7 @@ export function DomainList({
             <table className="w-full border-collapse">
               <tbody>
                 <tr className="h-[68px] bg-dash-bg">
-                  <td className="w-10 pl-3.5">
-                    <DomainCheckbox checked={selected.has(originalIndex)} onChange={() => toggleOne(originalIndex)} />
-                  </td>
-                  <td className="py-2">
+                  <td className="py-2 pl-3.5">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-1.5">
                         {domainDetailsPath ? (
@@ -786,7 +735,6 @@ export function DomainList({
 
       {/* Expired domains (each in its own card) */}
       {expiredDomains.map((domain, i) => {
-        const originalIndex = domains.indexOf(domain);
         const actions = actionsFor(domain);
         const domainDetailsPath = getDomainDetailsPath(domain);
         const isAssigned = hasAssignedProject(domain);
@@ -795,10 +743,7 @@ export function DomainList({
             <table className="w-full border-collapse">
               <tbody>
                 <tr className="h-[68px] bg-dash-bg">
-                  <td className="w-10 pl-3.5">
-                    <DomainCheckbox checked={selected.has(originalIndex)} onChange={() => toggleOne(originalIndex)} />
-                  </td>
-                  <td className="py-2">
+                  <td className="py-2 pl-3.5">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-1.5">
                         {domainDetailsPath ? (
@@ -880,7 +825,6 @@ export function DomainList({
           <table className="w-full border-collapse">
             <tbody>
               {activeDomains.map((domain, i) => {
-                const originalIndex = domains.indexOf(domain);
                 const actions = actionsFor(domain);
                 const domainDetailsPath = getDomainDetailsPath(domain);
                 const projectLabel = getDomainProjectLabel(domain);
@@ -890,10 +834,7 @@ export function DomainList({
                     key={`active-${i}`}
                     className={`h-[68px] ${i < activeDomains.length - 1 ? "border-b-[0.5px] border-dash-border" : ""}`}
                   >
-                    <td className="w-10 pl-3.5">
-                      <DomainCheckbox checked={selected.has(originalIndex)} onChange={() => toggleOne(originalIndex)} />
-                    </td>
-                    <td className="py-2">
+                    <td className="py-2 pl-3.5">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5">
                           {domainDetailsPath ? (
@@ -954,13 +895,6 @@ export function DomainList({
             </tbody>
           </table>
 
-          {/* Select all footer */}
-          <div className="flex items-center gap-2 border-t-[0.5px] border-dash-border px-3.5 py-3">
-            <DomainCheckbox checked={allSelected} onChange={toggleAll} />
-            <span className="text-sm font-light text-dash-text-extra-faded">
-              Select all
-            </span>
-          </div>
         </div>
       )}
 

@@ -839,14 +839,14 @@ export function DomainSettings({
         {/* DNS Records table */}
         <div className="flex flex-col gap-2">
           {/* Column headers */}
-          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 px-3.5">
+          <div className="grid grid-cols-[92px_minmax(0,1fr)_84px_minmax(0,2fr)_76px] gap-2 px-3.5">
             <span className="text-xs font-medium leading-5 tracking-[-0.019px] text-dash-text-body">
               Type
             </span>
             <span className="text-xs font-medium leading-5 tracking-[-0.019px] text-dash-text-body">
               Name
             </span>
-            <span className="text-xs font-medium leading-5 tracking-[-0.019px] text-dash-text-body">
+            <span className="whitespace-nowrap text-xs font-medium leading-5 tracking-[-0.019px] text-dash-text-body">
               TTL
             </span>
             <span className="text-xs font-medium leading-5 tracking-[-0.019px] text-dash-text-body">
@@ -860,29 +860,31 @@ export function DomainSettings({
             {records.map((record, i) => (
               <div
                 key={i}
-                className={`grid grid-cols-[1fr_1fr_1fr_1fr_auto] items-center gap-2 bg-dash-bg-elevated px-3.5 py-2.5 ${
+                className={`grid grid-cols-[92px_minmax(0,1fr)_84px_minmax(0,2fr)_76px] items-center gap-2 bg-dash-bg-elevated px-3.5 py-2.5 ${
                   i < records.length - 1
                     ? "border-b-[0.5px] border-dash-border"
                     : ""
                 }`}
               >
-                <span className="flex items-center gap-1.5 font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
-                  {record.type}
-                  {record.isProxied && (
-                    <SimpleTooltip content={<><CheckCircle size={13} weight="fill" className="text-[#34d399]" />Proxied by Brimble</>}>
-                      <span className="text-[#4879f8]">
-                        <ShieldCheck size={14} weight="fill" />
-                      </span>
-                    </SimpleTooltip>
-                  )}
+                <span className="min-w-0 whitespace-nowrap font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
+                  <span className="flex items-center gap-1.5">
+                    {record.type}
+                    {record.isProxied && (
+                      <SimpleTooltip content={<><CheckCircle size={13} weight="fill" className="text-[#34d399]" />Proxied by Brimble</>}>
+                        <span className="text-[#4879f8]">
+                          <ShieldCheck size={14} weight="fill" />
+                        </span>
+                      </SimpleTooltip>
+                    )}
+                  </span>
                 </span>
-                <span className="font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
+                <span className="min-w-0 break-all font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
                   {record.name}
                 </span>
-                <span className="font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
+                <span className="min-w-0 whitespace-nowrap font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
                   {record.ttl}
                 </span>
-                <span className="font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
+                <span className="min-w-0 break-all whitespace-normal font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">
                   {record.value}
                 </span>
                 <div className="flex items-center gap-2">

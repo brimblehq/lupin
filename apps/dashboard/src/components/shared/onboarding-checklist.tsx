@@ -59,7 +59,7 @@ function buildTasks({
 
   // Only show "Upgrade your plan" on personal workspaces
   if (!isTeamWorkspace) {
-    tasks.push({ label: "Upgrade your plan", done: !isFreePlan });
+    tasks.push({ label: "Upgrade your plan", done: !isFreePlan, onClick: onAddPaymentCard });
   }
 
   tasks.push({

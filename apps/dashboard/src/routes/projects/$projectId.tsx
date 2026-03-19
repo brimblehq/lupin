@@ -34,80 +34,30 @@ import config from "@/config";
 const SUCCESS_LOG_PATTERN = /site (is )?(live|running)\b/i;
 const FAILURE_LOG_PATTERN = /deployment failed|build failed|failed to deploy/i;
 
-const PROJECT_CACHE_MS = 300_000;
-const projectCache = new Map<string, { project: BackendProject; timestamp: number }>();
-const PROJECT_ROUTE_BEFORELOAD_CACHE_MS = 300_000;
-type ProjectRouteBeforeLoadData = {
-  project: BackendProject;
-  workspace?: string;
-  projectSwitcherProjects: ApiListResponse<BackendProject>;
-};
-const projectRouteBeforeLoadCache = new Map<
-  string,
-  { data: ProjectRouteBeforeLoadData; timestamp: number }
->();
-
-async function fetchProjectCached(
-  projectId: string,
-  workspace?: string,
-  environmentId?: string,
-) {
-  const key = `${projectId}:${workspace ?? ""}:${environmentId ?? ""}`;
-  const cached = projectCache.get(key);
-
-  if (cached && Date.now() - cached.timestamp < PROJECT_CACHE_MS) {
-    return cached.project;
-  }
-
-  const project = await (getProjectDetailsServerFn as unknown as (input: {
-    data: { projectId: string; workspace?: string; environmentId?: string };
-  }) => Promise<BackendProject>)({
-    data: { projectId, workspace, environmentId },
-  });
-
-  projectCache.set(key, { project, timestamp: Date.now() });
-  return project;
-}
-
-export function invalidateProjectCache(projectId?: string) {
-  if (projectId) {
-    const normalizedProjectId = projectId.trim().toLowerCase();
-
-    for (const key of projectCache.keys()) {
-      if (key.toLowerCase().startsWith(`${normalizedProjectId}:`)) {
-        projectCache.delete(key);
-      }
-    }
-
-    for (const key of projectRouteBeforeLoadCache.keys()) {
-      if (key.toLowerCase().startsWith(`${normalizedProjectId}:`)) {
-        projectRouteBeforeLoadCache.delete(key);
-      }
-    }
-  } else {
-    projectCache.clear();
-    projectRouteBeforeLoadCache.clear();
-  }
-}
-
 export const Route = createFileRoute("/projects/$projectId")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
-  beforeLoad: async ({ params, location }) => {
+  loaderDeps: ({ search }) => {
+    const rawSearch = search as Record<string, unknown>;
+    const workspace =
+      typeof rawSearch.workspace === "string" && rawSearch.workspace.trim().length > 0
+        ? rawSearch.workspace.trim()
+        : undefined;
+    const environmentId =
+      typeof rawSearch.environmentId === "string" &&
+      rawSearch.environmentId.trim().length > 0
+        ? rawSearch.environmentId.trim()
+        : undefined;
+
+    return {
+      workspace,
+      environmentId,
+    };
+  },
+  loader: async ({ params, deps }) => {
     const requestedProjectId = params.projectId.trim().toLowerCase();
-    const beforeLoadCacheKey = `${requestedProjectId}:${location.searchStr ?? ""}`;
-    const cachedBeforeLoad = projectRouteBeforeLoadCache.get(beforeLoadCacheKey);
-
-    if (
-      cachedBeforeLoad &&
-      Date.now() - cachedBeforeLoad.timestamp < PROJECT_ROUTE_BEFORELOAD_CACHE_MS
-    ) {
-      return cachedBeforeLoad.data;
-    }
-
-    const searchParams = new URLSearchParams(location.searchStr || "");
-    const workspace = searchParams.get("workspace") || undefined;
-    const searchEnvironmentId = searchParams.get("environmentId")?.trim() || undefined;
+    const workspace = deps.workspace;
+    const searchEnvironmentId = deps.environmentId;
     const hasExplicitEnvironment = hasExplicitEnvironmentSelection(searchEnvironmentId);
     const [environments, persistedEnvironmentId] = await Promise.all([
       (listProjectEnvironmentsServerFn as unknown as (input: {
@@ -151,25 +101,20 @@ export const Route = createFileRoute("/projects/$projectId")({
       });
     }
 
-    const project = await fetchProjectCached(
-      params.projectId,
-      workspace,
-      environmentId,
-    );
-
-    const nextData = { project, workspace, projectSwitcherProjects };
-    projectRouteBeforeLoadCache.set(beforeLoadCacheKey, {
-      data: nextData,
-      timestamp: Date.now(),
+    const project = await (getProjectDetailsServerFn as unknown as (input: {
+      data: { projectId: string; workspace?: string; environmentId?: string };
+    }) => Promise<BackendProject>)({
+      data: {
+        projectId: params.projectId,
+        workspace,
+        environmentId,
+      },
     });
 
-    return nextData;
-  },
-  loader: ({ context }) => {
     return {
-      project: (context as any).project,
-      workspace: (context as any).workspace,
-      projectSwitcherProjects: (context as any).projectSwitcherProjects,
+      project,
+      workspace,
+      projectSwitcherProjects,
     };
   },
   component: ProjectLayout,

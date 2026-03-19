@@ -48,44 +48,25 @@ const chatwootBootstrapScript = `(function(d,t){
 })(document,"script");`;
 
 type RootLoaderData = {
-  workspace: string | null;
-  settingsSnapshot: SettingsSidebarSnapshot | null;
+  workspace?: string;
+  settingsSnapshot?: SettingsSidebarSnapshot;
   workspaces: ApiListResponse<Workspace>;
-  projectSwitcherProjects: ApiListResponse<Project> | null;
-  onboardingProjects: ApiListResponse<Project> | null;
-  workspaceTeamMembers: null;
-  tooltipMessages: null;
-  tags: BackendTag[] | null;
-  paymentMethods: null;
-  invoices: null;
+  projectSwitcherProjects?: ApiListResponse<Project>;
+  onboardingProjects?: ApiListResponse<Project>;
+  tags?: BackendTag[];
   pricing: Pricing;
-  activityLogs: null;
-  subscriptionStats: null;
-  projectEnvironments: null;
 };
 
-const EMPTY_ROOT_LOADER_DATA: RootLoaderData = {
-  workspace: null,
-  settingsSnapshot: null,
+const DEFAULT_ROOT_LOADER_DATA: RootLoaderData = {
   workspaces: { items: [] },
-  projectSwitcherProjects: null,
-  onboardingProjects: null,
-  workspaceTeamMembers: null,
-  tooltipMessages: null,
-  tags: null,
-  paymentMethods: null,
-  invoices: null,
   pricing: DEFAULT_PRICING,
-  activityLogs: null,
-  subscriptionStats: null,
-  projectEnvironments: null,
 };
 
 function createRootLoaderData(
   overrides: Partial<RootLoaderData> = {},
 ): RootLoaderData {
   return {
-    ...EMPTY_ROOT_LOADER_DATA,
+    ...DEFAULT_ROOT_LOADER_DATA,
     ...overrides,
   };
 }
@@ -163,18 +144,22 @@ export const Route = createRootRoute({
       }
 
       return createRootLoaderData({
-        workspace: workspace ?? null,
+        workspace,
         settingsSnapshot:
-          settingsSnapshot.status === "fulfilled" ? settingsSnapshot.value : null,
+          settingsSnapshot.status === "fulfilled" ? settingsSnapshot.value : undefined,
         workspaces:
-          workspaces.status === "fulfilled" ? workspaces.value : EMPTY_ROOT_LOADER_DATA.workspaces,
+          workspaces.status === "fulfilled"
+            ? workspaces.value
+            : DEFAULT_ROOT_LOADER_DATA.workspaces,
         projectSwitcherProjects:
           onboardingProjects.status === "fulfilled"
             ? (onboardingProjects.value as any)
-            : null,
+            : undefined,
         onboardingProjects:
-          onboardingProjects.status === "fulfilled" ? onboardingProjects.value : null,
-        tags: tags.status === "fulfilled" ? tags.value : null,
+          onboardingProjects.status === "fulfilled"
+            ? onboardingProjects.value
+            : undefined,
+        tags: tags.status === "fulfilled" ? tags.value : undefined,
         pricing:
           pricingResult.status === "fulfilled"
             ? pricingResult.value
@@ -196,7 +181,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var d=document.documentElement;var t=localStorage.getItem('theme');var dark=t==='dark'||((!t)&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()`,
+            __html: `(function(){try{var d=document.documentElement;var t=localStorage.getItem('theme');var sys=(t==='system'||(!t));var dark=t==='dark'||(sys&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()`,
           }}
         />
       </head>
@@ -210,7 +195,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  const { workspace: loaderWorkspace, settingsSnapshot, workspaces, projectSwitcherProjects, onboardingProjects, workspaceTeamMembers, tooltipMessages, tags, paymentMethods, invoices, pricing, activityLogs, subscriptionStats, projectEnvironments } =
+  const {
+    workspace: loaderWorkspace,
+    settingsSnapshot,
+    workspaces,
+    projectSwitcherProjects,
+    onboardingProjects,
+    tags,
+    pricing,
+  } =
     Route.useLoaderData() ?? ({} as any);
 
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
@@ -251,14 +244,7 @@ function RootComponent() {
       initialWorkspaces={workspaces}
       initialProjectSwitcherProjects={projectSwitcherProjects}
       initialOnboardingProjects={onboardingProjects}
-      initialWorkspaceTeamMembers={workspaceTeamMembers}
-      initialTooltipMessages={tooltipMessages}
-      initialPaymentMethods={paymentMethods}
-      initialInvoices={invoices}
       initialPricing={pricing}
-      initialActivityLogs={activityLogs}
-      initialSubscriptionStats={subscriptionStats}
-      initialProjectEnvironments={projectEnvironments}
     >
       <Outlet />
     </DashboardLayout>

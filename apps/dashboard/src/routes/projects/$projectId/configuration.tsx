@@ -75,21 +75,6 @@ import type {
 } from "@/utils/configuration-schemas";
 
 const parentRoute = getRouteApi("/projects/$projectId");
-const CONFIGURATION_CACHE_MS = 300_000;
-const configurationLoaderCache = new Map<
-  string,
-  {
-    data: {
-      repo: RepositoryMetadata | null;
-      frameworks: FrameworkOption[];
-      scalingGroups: ScalingGroup[];
-      regions: Region[];
-      environments: ProjectEnvironment[];
-      workspace?: string;
-    };
-    timestamp: number;
-  }
->();
 
 export const Route = createFileRoute("/projects/$projectId/configuration")({
   staleTime: 300_000,
@@ -97,11 +82,6 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
   loader: async ({ context }) => {
     const project = (context as any).project;
     const workspace = (context as any).workspace;
-    const cacheKey = `${project?.id || project?.name || "unknown"}:${workspace ?? "__personal__"}`;
-    const cached = configurationLoaderCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CONFIGURATION_CACHE_MS) {
-      return cached.data;
-    }
 
     let repo: RepositoryMetadata | null = null;
     let frameworks: FrameworkOption[] = [];
@@ -247,7 +227,6 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
       environments,
       workspace,
     };
-    configurationLoaderCache.set(cacheKey, { data, timestamp: Date.now() });
     return data;
   },
   component: ConfigurationPage,

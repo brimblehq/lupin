@@ -33,7 +33,7 @@ import { WorkspaceRoleProvider } from "@/contexts/workspace-role-context";
 import { resolveCurrentWorkspaceRole } from "@/utils/workspace-role";
 import { ProfileDrawerProvider } from "@/contexts/profile-drawer-context";
 import { DEFAULT_PRICING } from "@/utils/default-pricing";
-import { ProfileTab } from "../../types/enums";
+import { ProfileTab, Theme } from "../../types/enums";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
 import { getSettingsSidebarSnapshotServerFn } from "@/server/settings/actions";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
@@ -397,7 +397,7 @@ function RouteTransitionSkeleton({
 }
 
 function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, mode, cycleTheme } = useTheme();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
@@ -497,7 +497,7 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
       </button>
       <hr className="mx-4 border-dash-border-soft" />
       <button
-        onClick={toggleTheme}
+        onClick={cycleTheme}
         className={cn(mobileNavItemBase, "text-dash-text-faded hover:bg-dash-bg-elevated")}
       >
         {theme === "dark" ? (
@@ -505,7 +505,7 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
         ) : (
           <Moon className="size-5 shrink-0" />
         )}
-        {theme === "dark" ? "Light mode" : "Dark mode"}
+        {mode === Theme.System ? "System mode" : theme === Theme.Dark ? "Dark mode" : "Light mode"}
       </button>
     </nav>
   );
