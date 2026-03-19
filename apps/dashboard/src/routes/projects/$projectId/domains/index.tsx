@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  getRouteApi,
+  useNavigate,
+} from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
-import { DomainList, type Domain } from "../../../../components/shared/domain-list";
+import {
+  DomainList,
+  type Domain,
+} from "../../../../components/shared/domain-list";
 import { TabHeader } from "../../../../components/shared/tab-header";
 import { NumberPagination } from "../../../../components/shared/pagination";
 import {
@@ -47,7 +54,11 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
     const next: { page?: number; workspace?: string } = {};
 
     const rawPage = search.page;
-    if (typeof rawPage === "number" && Number.isFinite(rawPage) && rawPage > 0) {
+    if (
+      typeof rawPage === "number" &&
+      Number.isFinite(rawPage) &&
+      rawPage > 0
+    ) {
       next.page = Math.floor(rawPage);
     } else if (typeof rawPage === "string") {
       const parsed = Number(rawPage);
@@ -84,18 +95,22 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
     }
 
     const [domains, projects] = await Promise.all([
-      (listDomainsPageServerFn as unknown as (input: {
-        data: { page?: number; workspace?: string; projectName?: string };
-      }) => Promise<PaginatedDomainsResponse>)({
+      (
+        listDomainsPageServerFn as unknown as (input: {
+          data: { page?: number; workspace?: string; projectName?: string };
+        }) => Promise<PaginatedDomainsResponse>
+      )({
         data: {
           page,
           workspace,
           projectName: project.name,
         },
       }),
-      (listDomainProjectsServerFn as unknown as (input: {
-        data: { workspace?: string };
-      }) => Promise<PaginatedProjectsResponse>)({
+      (
+        listDomainProjectsServerFn as unknown as (input: {
+          data: { workspace?: string };
+        }) => Promise<PaginatedProjectsResponse>
+      )({
         data: { workspace },
       }).catch(
         () =>
@@ -149,7 +164,10 @@ function mapDomainStatus(domain: DomainRecord): Domain["status"] {
   return "Failed";
 }
 
-function mapDomainToRow(domain: DomainRecord, fallbackProjectName: string): Domain {
+function mapDomainToRow(
+  domain: DomainRecord,
+  fallbackProjectName: string,
+): Domain {
   const addedAtSource = domain.updatedAt || domain.createdAt;
   const addedAt = `Added ${formatRelativeTime(addedAtSource)}`;
 
@@ -212,10 +230,14 @@ function ProjectDomainsPage() {
     domainsResult.items.map((item) => mapDomainToRow(item, project.name)),
   );
   const navigate = useNavigate({ from: "/projects/$projectId/domains/" });
-  const refreshDomainStatus = useServerFn(refreshDomainStatusServerFn as any) as (args: {
+  const refreshDomainStatus = useServerFn(
+    refreshDomainStatusServerFn as any,
+  ) as (args: {
     data: { workspace?: string; domainName: string };
   }) => Promise<DomainRecord | null>;
-  const createProjectDomain = useServerFn(createProjectDomainServerFn as any) as (args: {
+  const createProjectDomain = useServerFn(
+    createProjectDomainServerFn as any,
+  ) as (args: {
     data: { workspace?: string; projectId?: string; name: string };
   }) => Promise<DomainRecord>;
   const updateDomain = useServerFn(updateDomainServerFn as any) as (args: {
@@ -234,11 +256,17 @@ function ProjectDomainsPage() {
   }) => Promise<{ success: boolean }>;
 
   useEffect(() => {
-    setRows(domainsResult.items.map((item) => mapDomainToRow(item, project.name)));
+    setRows(
+      domainsResult.items.map((item) => mapDomainToRow(item, project.name)),
+    );
   }, [domainsResult.items, project.name]);
 
   function handlePageChange(page: number) {
-    if (page < 1 || page === domainsResult.currentPage || page > domainsResult.totalPages) {
+    if (
+      page < 1 ||
+      page === domainsResult.currentPage ||
+      page > domainsResult.totalPages
+    ) {
       return;
     }
 
@@ -284,7 +312,11 @@ function ProjectDomainsPage() {
         toast.success("Domain status refreshed");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to refresh domain status");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to refresh domain status",
+      );
     }
   }
 
@@ -296,7 +328,9 @@ function ProjectDomainsPage() {
     }
 
     const normalized = domainUrl.trim().toLowerCase();
-    const alreadyOwned = rows.some((row) => row.name.toLowerCase() === normalized);
+    const alreadyOwned = rows.some(
+      (row) => row.name.toLowerCase() === normalized,
+    );
     if (alreadyOwned) {
       toast.error("You already own this domain, try another one.");
       return;
@@ -313,7 +347,9 @@ function ProjectDomainsPage() {
       setRows((prev) => [mapDomainToRow(created, project.name), ...prev]);
       toast.success("Domain added successfully");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to add domain");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to add domain",
+      );
     }
   }
 
@@ -393,7 +429,7 @@ function ProjectDomainsPage() {
     <div className="mx-auto flex max-w-[1000px] flex-col gap-6 py-8">
       <TabHeader title="Project domains">
         Manage all your domains on this project. You get a default
-        ".brimble.com" domain with each project you deploy.
+        ".brimble.app" domain with each project you deploy.
       </TabHeader>
 
       <DomainList

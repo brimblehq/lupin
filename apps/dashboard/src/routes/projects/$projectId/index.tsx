@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  getRouteApi,
+  useNavigate,
+} from "@tanstack/react-router";
 import { ExternalLink, Copy, Check, ArrowUpRight } from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
@@ -24,17 +28,18 @@ export const Route = createFileRoute("/projects/$projectId/")({
     let screenshotUrl = project?.screenshot || null;
     if (project?.id) {
       try {
-        const endpointScreenshot = await (getProjectScreenshotServerFn as unknown as (input: {
-          data: { projectId: string };
-        }) => Promise<string | null>)({
+        const endpointScreenshot = await (
+          getProjectScreenshotServerFn as unknown as (input: {
+            data: { projectId: string };
+          }) => Promise<string | null>
+        )({
           data: { projectId: project.id },
         });
 
         if (endpointScreenshot) {
           screenshotUrl = endpointScreenshot;
         }
-      } catch {
-      }
+      } catch {}
     }
 
     return { screenshotUrl };
@@ -82,10 +87,15 @@ function ProjectDetailPage() {
 
   let computeSizeText = "Not available";
   if (project?.specs) {
-    const memory = project.specs.memory ? `${project.specs.memory}GB RAM` : null;
+    const memory = project.specs.memory
+      ? `${project.specs.memory}GB RAM`
+      : null;
     const cpu = project.specs.cpu ? `${project.specs.cpu} CPU` : null;
-    const storage = project.specs.storage ? `${project.specs.storage}GB Storage` : null;
-    computeSizeText = [memory, cpu, storage].filter(Boolean).join(" • ") || "Not available";
+    const storage = project.specs.storage
+      ? `${project.specs.storage}GB Storage`
+      : null;
+    computeSizeText =
+      [memory, cpu, storage].filter(Boolean).join(" • ") || "Not available";
   }
 
   const frameworkLabel = project?.framework || "Unknown";
@@ -101,7 +111,12 @@ function ProjectDetailPage() {
 
   const deploymentRows: Array<{ url: string; date: string }> = [];
 
-  let domainRows: Array<{ url: string; team: string; type: string; date: string }> = [];
+  let domainRows: Array<{
+    url: string;
+    team: string;
+    type: string;
+    date: string;
+  }> = [];
   if (project?.domains && project.domains.length > 0) {
     domainRows = project.domains.map((domain: any) => {
       let type = "Custom domain";
@@ -109,9 +124,14 @@ function ProjectDetailPage() {
       const domainName =
         typeof domain?.name === "string" ? domain.name.toLowerCase() : "";
       const isBrimbleManagedDefault =
-        domainName.endsWith(".brimble.app") || domainName.endsWith(".brimble.io");
+        domainName.endsWith(".brimble.app") ||
+        domainName.endsWith(".brimble.io");
 
-      if (domain?.isDefault === true || domain?.isCustom === false || isBrimbleManagedDefault) {
+      if (
+        domain?.isDefault === true ||
+        domain?.isCustom === false ||
+        isBrimbleManagedDefault
+      ) {
         type = "default domain";
       }
 
@@ -192,7 +212,9 @@ function ProjectDetailPage() {
 
         {isMcpProject ? (
           <div className="rounded-[4px] bg-dash-bg-elevated p-3.5">
-            <p className="text-sm font-medium text-dash-text-strong">MCP Server</p>
+            <p className="text-sm font-medium text-dash-text-strong">
+              MCP Server
+            </p>
             <p className="mt-1 text-sm font-light leading-[1.35] text-dash-text-faded">
               {mcpServerUrl ? (
                 <>
@@ -217,7 +239,11 @@ function ProjectDetailPage() {
                   }}
                   className="inline-flex items-center gap-2 rounded-[4px] px-2.5 py-1.5 text-xs text-dash-text-body transition-colors hover:bg-dash-bg"
                 >
-                  {copiedIdx === -1 ? <Check className="size-3.5 text-[#13d282]" /> : <Copy className="size-3.5" />}
+                  {copiedIdx === -1 ? (
+                    <Check className="size-3.5 text-[#13d282]" />
+                  ) : (
+                    <Copy className="size-3.5" />
+                  )}
                   {copiedIdx === -1 ? "Copied" : "Copy MCP URL"}
                 </button>
               ) : null}
@@ -235,7 +261,9 @@ function ProjectDetailPage() {
         ) : null}
 
         {/* Meta / deployments cards */}
-        <div className={`flex flex-col gap-4 ${isDatabaseProject ? "" : "md:flex-row"}`}>
+        <div
+          className={`flex flex-col gap-4 ${isDatabaseProject ? "" : "md:flex-row"}`}
+        >
           {/* Project meta card */}
           <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
             <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
@@ -349,7 +377,12 @@ function ProjectDetailPage() {
                           From <span className="underline">{repoName}</span>
                         </span>
                         <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                          <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
+                          <svg
+                            width="9"
+                            height="9"
+                            viewBox="0 0 16 16"
+                            fill="white"
+                          >
                             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
                           </svg>
                         </div>
@@ -360,7 +393,12 @@ function ProjectDetailPage() {
                           From <span className="underline">{repoName}</span>
                         </span>
                         <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                          <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
+                          <svg
+                            width="9"
+                            height="9"
+                            viewBox="0 0 16 16"
+                            fill="white"
+                          >
                             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
                           </svg>
                         </div>
@@ -374,179 +412,199 @@ function ProjectDetailPage() {
 
           {/* Deployments card */}
           {!isDatabaseProject ? (
-          <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
-            <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
-              <span className="text-dash-text-strong">Deployments</span>
-              <button
-                onClick={() => navigate({ to: `/projects/$projectId/deployment-history`, params: { projectId } })}
-                className="text-dash-text-faded transition-colors hover:text-dash-text-strong"
-              >
-                See all
-              </button>
-            </div>
-            <div className="flex flex-col">
-              {deploymentRows.length > 0 ? (
-                deploymentRows.map((dep, i) => (
+            <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+              <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
+                <span className="text-dash-text-strong">Deployments</span>
                 <button
-                  key={i}
-                  onClick={() => setDrawerOpen(true)}
-                  className="relative cursor-pointer px-3.5 pb-3.5 pt-3 text-left transition-colors hover:bg-dash-bg-elevated"
+                  onClick={() =>
+                    navigate({
+                      to: `/projects/$projectId/deployment-history`,
+                      params: { projectId },
+                    })
+                  }
+                  className="text-dash-text-faded transition-colors hover:text-dash-text-strong"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex h-full w-[17px] shrink-0 items-center">
-                      {i > 0 && (
-                        <div className="absolute -top-3 left-[7.5px] h-3 w-px bg-dash-border" />
-                      )}
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        className="shrink-0"
-                      >
-                        <circle
-                          cx="8"
-                          cy="8"
-                          r="2"
-                          stroke="#353535"
-                          strokeWidth="1.5"
-                          fill="none"
-                        />
-                        <path
-                          d="M10 8h4"
-                          stroke="#353535"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                        />
-                        <path
-                          d="M2 8h4"
-                          stroke="#353535"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      {i < deploymentRows.length - 1 && (
-                        <div className="absolute -bottom-3.5 left-[7.5px] h-3.5 w-px bg-dash-border" />
-                      )}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
-                        {dep.url}
-                      </span>
-                      <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-faded">
-                        {dep.date}
-                      </span>
-                    </div>
-                  </div>
+                  See all
                 </button>
-                ))
-              ) : (
-                <div className="px-3.5 py-4 text-sm font-light text-dash-text-faded">
-                  No deployments available yet.
-                </div>
-              )}
+              </div>
+              <div className="flex flex-col">
+                {deploymentRows.length > 0 ? (
+                  deploymentRows.map((dep, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setDrawerOpen(true)}
+                      className="relative cursor-pointer px-3.5 pb-3.5 pt-3 text-left transition-colors hover:bg-dash-bg-elevated"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex h-full w-[17px] shrink-0 items-center">
+                          {i > 0 && (
+                            <div className="absolute -top-3 left-[7.5px] h-3 w-px bg-dash-border" />
+                          )}
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            className="shrink-0"
+                          >
+                            <circle
+                              cx="8"
+                              cy="8"
+                              r="2"
+                              stroke="#353535"
+                              strokeWidth="1.5"
+                              fill="none"
+                            />
+                            <path
+                              d="M10 8h4"
+                              stroke="#353535"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M2 8h4"
+                              stroke="#353535"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          {i < deploymentRows.length - 1 && (
+                            <div className="absolute -bottom-3.5 left-[7.5px] h-3.5 w-px bg-dash-border" />
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
+                            {dep.url}
+                          </span>
+                          <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-faded">
+                            {dep.date}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-3.5 py-4 text-sm font-light text-dash-text-faded">
+                    No deployments available yet.
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
           ) : null}
         </div>
       </div>
 
       {!isDatabaseProject ? (
-      <>
-      {/* Project domains section */}
-      <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-xl font-medium leading-5 tracking-[-0.03px] text-dash-text-body dark:text-dash-text-strong">
-            Project domains
-          </h2>
-          <p className="max-w-[560px] text-sm font-light leading-[1.3] text-dash-text-faded">
-            Manage all your domains on this project. You get a default
-            ".brimble.com" domain with each project you deploy.
-          </p>
-        </div>
-        <hr className="border-dash-border" />
-      </div>
+        <>
+          {/* Project domains section */}
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-xl font-medium leading-5 tracking-[-0.03px] text-dash-text-body dark:text-dash-text-strong">
+                Project domains
+              </h2>
+              <p className="max-w-[560px] text-sm font-light leading-[1.3] text-dash-text-faded">
+                Manage all your domains on this project. You get a default
+                ".brimble.app" domain with each project you deploy.
+              </p>
+            </div>
+            <hr className="border-dash-border" />
+          </div>
 
-      {/* Domain rows */}
-      <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
-        <table className="w-full border-collapse">
-          <tbody>
-            {domainRows.length > 0 ? (
-              domainRows.map((domain, i) => (
-              <tr
-                key={i}
-                className="h-[68px] border-b-[0.5px] border-dash-border bg-white last:border-b-0 dark:bg-dash-bg"
-              >
-                <td className="w-[40%] truncate px-3.5">
-                  <a
-                    href={`https://${domain.url}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group/link inline-flex items-center gap-1 text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong transition-colors hover:text-dash-text-body"
-                  >
-                    <span className="group-hover/link:underline">{domain.url}</span>
-                    <ArrowUpRight className="size-3 -translate-x-1 translate-y-0.5 opacity-0 transition-all duration-200 ease-out group-hover/link:translate-x-0 group-hover/link:translate-y-0 group-hover/link:opacity-100" />
-                  </a>
-                </td>
-                <td className="w-[100px] px-3.5">
-                  <SimpleTooltip
-                    content={domain.type === "default domain" ? "Default Brimble domain" : "Custom domain added by you"}
-                    side="top"
-                    sideOffset={4}
-                    delayDuration={150}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className={`size-[6px] rounded-full ${domain.type === "default domain" ? "bg-[#e87b35]" : "bg-dash-text-strong"}`} />
-                      <span className="text-sm font-light text-dash-text-faded">
-                        {domain.type === "default domain" ? "Default" : "Custom"}
-                      </span>
-                    </span>
-                  </SimpleTooltip>
-                </td>
-                <td className="px-3.5 text-right">
-                  <span className="text-sm text-dash-text-strong">
-                    {domain.team}
-                  </span>
-                  <br />
-                  <span className="text-sm font-light text-dash-text-faded">
-                    {domain.date}
-                  </span>
-                </td>
-                <td className="w-[50px] pr-3.5 text-right">
-                  <SimpleTooltip content={copiedIdx === i ? "Copied!" : "Copy domain"} side="top" sideOffset={4} delayDuration={150}>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(domain.url);
-                        haptics.light();
-                        setCopiedIdx(i);
-                        setTimeout(() => setCopiedIdx(null), 2000);
-                      }}
-                      className="inline-flex size-[34px] items-center justify-center rounded-[4px] border border-dash-border transition-colors hover:bg-dash-bg-elevated"
+          {/* Domain rows */}
+          <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+            <table className="w-full border-collapse">
+              <tbody>
+                {domainRows.length > 0 ? (
+                  domainRows.map((domain, i) => (
+                    <tr
+                      key={i}
+                      className="h-[68px] border-b-[0.5px] border-dash-border bg-white last:border-b-0 dark:bg-dash-bg"
                     >
-                      {copiedIdx === i ? (
-                        <Check className="size-4 text-[#13d282]" />
-                      ) : (
-                        <Copy className="size-4 text-dash-text-extra-faded" />
-                      )}
-                    </button>
-                  </SimpleTooltip>
-                </td>
-              </tr>
-              ))
-            ) : (
-              <tr className="h-[68px] border-b-0 bg-white dark:bg-dash-bg">
-                <td
-                  colSpan={4}
-                  className="px-3.5 text-sm font-light text-dash-text-faded"
-                >
-                  No domains attached to this project yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      </>
+                      <td className="w-[40%] truncate px-3.5">
+                        <a
+                          href={`https://${domain.url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group/link inline-flex items-center gap-1 text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong transition-colors hover:text-dash-text-body"
+                        >
+                          <span className="group-hover/link:underline">
+                            {domain.url}
+                          </span>
+                          <ArrowUpRight className="size-3 -translate-x-1 translate-y-0.5 opacity-0 transition-all duration-200 ease-out group-hover/link:translate-x-0 group-hover/link:translate-y-0 group-hover/link:opacity-100" />
+                        </a>
+                      </td>
+                      <td className="w-[100px] px-3.5">
+                        <SimpleTooltip
+                          content={
+                            domain.type === "default domain"
+                              ? "Default Brimble domain"
+                              : "Custom domain added by you"
+                          }
+                          side="top"
+                          sideOffset={4}
+                          delayDuration={150}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span
+                              className={`size-[6px] rounded-full ${domain.type === "default domain" ? "bg-[#e87b35]" : "bg-dash-text-strong"}`}
+                            />
+                            <span className="text-sm font-light text-dash-text-faded">
+                              {domain.type === "default domain"
+                                ? "Default"
+                                : "Custom"}
+                            </span>
+                          </span>
+                        </SimpleTooltip>
+                      </td>
+                      <td className="px-3.5 text-right">
+                        <span className="text-sm text-dash-text-strong">
+                          {domain.team}
+                        </span>
+                        <br />
+                        <span className="text-sm font-light text-dash-text-faded">
+                          {domain.date}
+                        </span>
+                      </td>
+                      <td className="w-[50px] pr-3.5 text-right">
+                        <SimpleTooltip
+                          content={copiedIdx === i ? "Copied!" : "Copy domain"}
+                          side="top"
+                          sideOffset={4}
+                          delayDuration={150}
+                        >
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(domain.url);
+                              haptics.light();
+                              setCopiedIdx(i);
+                              setTimeout(() => setCopiedIdx(null), 2000);
+                            }}
+                            className="inline-flex size-[34px] items-center justify-center rounded-[4px] border border-dash-border transition-colors hover:bg-dash-bg-elevated"
+                          >
+                            {copiedIdx === i ? (
+                              <Check className="size-4 text-[#13d282]" />
+                            ) : (
+                              <Copy className="size-4 text-dash-text-extra-faded" />
+                            )}
+                          </button>
+                        </SimpleTooltip>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="h-[68px] border-b-0 bg-white dark:bg-dash-bg">
+                    <td
+                      colSpan={4}
+                      className="px-3.5 text-sm font-light text-dash-text-faded"
+                    >
+                      No domains attached to this project yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : null}
 
       {/* Deployment logs drawer */}
