@@ -311,7 +311,7 @@ function ActivitySessionForm({
           )}
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}

@@ -39,7 +39,8 @@ const PATTERNS = {
 
 export function useHaptics() {
   const { trigger } = useWebHaptics({
-    debug: process.env.NODE_ENV !== "production",
+    debug: true,
+    showSwitch: false,
   });
   return useMemo(() => {
     const fire = (key: keyof typeof PATTERNS) => {

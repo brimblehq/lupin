@@ -51,6 +51,11 @@ import {
 
 const parentRoute = getRouteApi("/projects/$projectId");
 const DEFAULT_TARGET = "PRODUCTION";
+const PROJECT_ENVIRONMENT_CACHE_MS = 300_000;
+const projectEnvironmentLoaderCache = new Map<
+  string,
+  { data: LoaderData; timestamp: number }
+>();
 
 type LoaderData = {
   initialTarget: string;
@@ -59,8 +64,8 @@ type LoaderData = {
 };
 
 export const Route = createFileRoute("/projects/$projectId/environment")({
-  staleTime: 120_000,
-  preloadStaleTime: 120_000,
+  staleTime: 300_000,
+  preloadStaleTime: 300_000,
   loader: async ({ context }) => {
     const project = (context as any).project;
     const projectId = project?.id as string | undefined;
@@ -72,6 +77,11 @@ export const Route = createFileRoute("/projects/$projectId/environment")({
         targets: [DEFAULT_TARGET],
       } satisfies LoaderData;
     }
+    const cacheKey = projectId;
+    const cached = projectEnvironmentLoaderCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < PROJECT_ENVIRONMENT_CACHE_MS) {
+      return cached.data;
+    }
 
     const [snapshot, targets] = await Promise.all([
       (getProjectEnvironmentServerFn as any)({
@@ -82,11 +92,16 @@ export const Route = createFileRoute("/projects/$projectId/environment")({
       }).catch(() => [DEFAULT_TARGET]),
     ]);
 
-    return {
+    const data = {
       initialTarget: DEFAULT_TARGET,
       initialSnapshot: snapshot,
       targets: sortEnvironmentTargets(targets),
     } satisfies LoaderData;
+    projectEnvironmentLoaderCache.set(cacheKey, {
+      data,
+      timestamp: Date.now(),
+    });
+    return data;
   },
   component: EnvironmentPage,
 });

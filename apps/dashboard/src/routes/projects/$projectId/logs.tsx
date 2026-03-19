@@ -33,8 +33,8 @@ import {
 import { isDatabaseProject, isStaticProject } from "@/utils/project-capabilities";
 
 export const Route = createFileRoute("/projects/$projectId/logs")({
-  staleTime: 120_000,
-  preloadStaleTime: 120_000,
+  staleTime: 300_000,
+  preloadStaleTime: 300_000,
   component: LogsPage,
 });
 

@@ -19,13 +19,23 @@ import { usePlanGate } from "@/hooks/use-plan-gate";
 import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
 
 const parentRoute = getRouteApi("/projects/$projectId");
+const OBSERVABILITY_CACHE_MS = 300_000;
+const observabilityLoaderCache = new Map<
+  string,
+  { data: { metrics: ResourceObservabilityMetrics; grafanaUrl: string | null }; timestamp: number }
+>();
 
 export const Route = createFileRoute("/projects/$projectId/observability")({
-  staleTime: 120_000,
-  preloadStaleTime: 120_000,
+  staleTime: 300_000,
+  preloadStaleTime: 300_000,
   loader: async ({ context }) => {
     const project = (context as any).project;
     const workspace = (context as any).workspace;
+    const cacheKey = `${project?.id || project?.name || "unknown"}:${workspace ?? "__personal__"}`;
+    const cached = observabilityLoaderCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < OBSERVABILITY_CACHE_MS) {
+      return cached.data;
+    }
 
     const [metrics, grafanaUrl] = await Promise.all([
       (getProjectObservabilityMetricsServerFn as unknown as (input: {
@@ -40,7 +50,9 @@ export const Route = createFileRoute("/projects/$projectId/observability")({
       }).catch(() => null),
     ]);
 
-    return { metrics, grafanaUrl };
+    const data = { metrics, grafanaUrl };
+    observabilityLoaderCache.set(cacheKey, { data, timestamp: Date.now() });
+    return data;
   },
   component: ObservabilityPage,
 });
