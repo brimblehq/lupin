@@ -11,10 +11,8 @@ export const Route = createFileRoute("/projects/$projectId/domains/$domainName")
   {
     staleTime: 0,
     preloadStaleTime: 0,
-    loader: async ({ params, context, location }) => {
-      const workspace = (context as any).workspace
-        || new URLSearchParams(location.searchStr || "").get("workspace")
-        || undefined;
+    loader: async ({ params, context }) => {
+      const workspace = (context as any).workspace;
 
       const domain = await (getDomainDetailsServerFn as unknown as (input: {
         data: { domainName: string; workspace?: string };

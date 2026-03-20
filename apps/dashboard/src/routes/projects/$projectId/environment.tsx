@@ -63,15 +63,7 @@ export const Route = createFileRoute("/projects/$projectId/environment")({
   preloadStaleTime: 300_000,
   loader: async ({ context }) => {
     const project = (context as any).project;
-    const projectId = project?.id as string | undefined;
-
-    if (!projectId) {
-      return {
-        initialTarget: DEFAULT_TARGET,
-        initialSnapshot: { envs: [] },
-        targets: [DEFAULT_TARGET],
-      } satisfies LoaderData;
-    }
+    const projectId = project?.id;
 
     const [snapshot, targets] = await Promise.all([
       (getProjectEnvironmentServerFn as any)({

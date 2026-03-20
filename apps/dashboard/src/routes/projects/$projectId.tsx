@@ -54,7 +54,25 @@ export const Route = createFileRoute("/projects/$projectId")({
       environmentId,
     };
   },
-  loader: async ({ params, deps }) => {
+  beforeLoad: async ({ params, search }) => {
+    const rawSearch = search as Record<string, unknown>;
+    const workspace =
+      typeof rawSearch.workspace === "string" && rawSearch.workspace.trim().length > 0
+        ? rawSearch.workspace.trim()
+        : undefined;
+
+    const project = await (getProjectDetailsServerFn as unknown as (input: {
+      data: { projectId: string; workspace?: string };
+    }) => Promise<BackendProject>)({
+      data: {
+        projectId: params.projectId,
+        workspace,
+      },
+    });
+
+    return { project, workspace };
+  },
+  loader: async ({ params, deps, context }) => {
     const requestedProjectId = params.projectId.trim().toLowerCase();
     const workspace = deps.workspace;
     const searchEnvironmentId = deps.environmentId;
@@ -101,15 +119,7 @@ export const Route = createFileRoute("/projects/$projectId")({
       });
     }
 
-    const project = await (getProjectDetailsServerFn as unknown as (input: {
-      data: { projectId: string; workspace?: string; environmentId?: string };
-    }) => Promise<BackendProject>)({
-      data: {
-        projectId: params.projectId,
-        workspace,
-        environmentId,
-      },
-    });
+    const project = (context as any).project as BackendProject;
 
     return {
       project,

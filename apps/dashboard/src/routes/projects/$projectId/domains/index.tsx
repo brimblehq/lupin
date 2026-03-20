@@ -63,11 +63,13 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
 
     return next;
   },
-  loader: async ({ context, location }) => {
+  loader: async ({ params, context }) => {
     const project = (context as any).project;
     const workspace = (context as any).workspace;
 
-    const searchParams = new URLSearchParams(location.searchStr || "");
+    const searchParams = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : "",
+    );
     const rawPage = searchParams.get("page");
 
     let page = 1;
@@ -87,7 +89,7 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
         data: {
           page,
           workspace,
-          projectName: project.name,
+          projectName: params.projectId,
         },
       }),
       (

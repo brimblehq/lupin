@@ -57,12 +57,9 @@ export const Route = createFileRoute(
 )({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
-  loader: async ({ context, location }) => {
+  loader: async ({ context }) => {
     const project = (context as any).project;
-    const workspace =
-      (context as any).workspace ||
-      new URLSearchParams(location.searchStr || "").get("workspace") ||
-      undefined;
+    const workspace = (context as any).workspace;
 
     const range = defaultDeploymentHistoryDateRange();
 

@@ -31,7 +31,7 @@ export const Route = createFileRoute("/projects/$projectId/observability")({
       (getProjectObservabilityMetricsServerFn as unknown as (input: {
         data: { projectId: string; workspace?: string; hrsAgo?: number };
       }) => Promise<ResourceObservabilityMetrics>)({
-        data: { projectId: project.id, workspace, hrsAgo: 1 },
+        data: { projectId: project?.id, workspace, hrsAgo: 1 },
       }),
       (getObservabilityGrafanaUrlServerFn as unknown as (input: {
         data: { workspace?: string };

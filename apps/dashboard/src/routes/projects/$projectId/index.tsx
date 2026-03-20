@@ -24,23 +24,20 @@ export const Route = createFileRoute("/projects/$projectId/")({
   preloadStaleTime: 300_000,
   loader: async ({ context }) => {
     const project = (context as any).project;
+    let screenshotUrl: string | null = null;
+    try {
+      const endpointScreenshot = await (
+        getProjectScreenshotServerFn as unknown as (input: {
+          data: { projectId: string };
+        }) => Promise<string | null>
+      )({
+        data: { projectId: project?.id },
+      });
 
-    let screenshotUrl = project?.screenshot || null;
-    if (project?.id) {
-      try {
-        const endpointScreenshot = await (
-          getProjectScreenshotServerFn as unknown as (input: {
-            data: { projectId: string };
-          }) => Promise<string | null>
-        )({
-          data: { projectId: project.id },
-        });
-
-        if (endpointScreenshot) {
-          screenshotUrl = endpointScreenshot;
-        }
-      } catch {}
-    }
+      if (endpointScreenshot) {
+        screenshotUrl = endpointScreenshot;
+      }
+    } catch {}
 
     return { screenshotUrl };
   },

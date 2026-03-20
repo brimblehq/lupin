@@ -88,8 +88,8 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
     let scalingGroups: ScalingGroup[] = [];
     let regions: Region[] = [];
     let environments: ProjectEnvironment[] = [];
-    const repoName = project?.repo?.fullName || project?.repo?.name;
-    const installationId = project?.repo?.installationId;
+    const repoName = undefined;
+    const installationId = undefined;
 
     const tasks: Promise<void>[] = [];
 
