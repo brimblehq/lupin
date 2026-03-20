@@ -12,8 +12,8 @@ import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
 import type { Project } from "@/backend/projects";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
-import type { PaymentMethod } from "@/backend/payments";
 import type { TeamDetails } from "@/backend/teams";
+import { usePaymentMethods } from "@/hooks/use-payments";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 const FOLLOW_KEY = "brimble:followed-on-x";
@@ -88,13 +88,11 @@ function buildTasks({
 export function OnboardingChecklist({
   projects,
   settingsSnapshot,
-  initialPaymentMethods,
   isTeamWorkspace,
   teamDetails,
 }: {
   projects?: Project[] | null;
   settingsSnapshot?: SettingsSidebarSnapshot | null;
-  initialPaymentMethods?: PaymentMethod[] | null;
   isTeamWorkspace?: boolean;
   teamDetails?: TeamDetails | null;
 }) {
@@ -232,9 +230,9 @@ export function OnboardingChecklist({
   const planType = (settingsSnapshot?.profile?.subscription?.planType ?? "").toUpperCase();
   const isFreePlan =
     !planType || planType === SUBSCRIPTION_PLAN_TYPE.FreePlan;
+  const { data: fetchedPaymentMethods } = usePaymentMethods();
   const hasPaymentCard =
-    (Array.isArray(initialPaymentMethods) && initialPaymentMethods.length > 0) ||
-    (Array.isArray(settingsSnapshot?.billing?.cards) && settingsSnapshot.billing.cards.length > 0);
+    (Array.isArray(fetchedPaymentMethods) && fetchedPaymentMethods.length > 0);
   const resolvedTeamDetails =
     (activeWorkspaceSlug ? teamDetailsByWorkspace[activeWorkspaceSlug] : null) ?? teamDetails ?? null;
   const acceptedTeamMembersCount =

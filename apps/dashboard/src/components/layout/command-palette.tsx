@@ -8,7 +8,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { Command } from "cmdk";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure } from "@phosphor-icons/react";
+import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check } from "@phosphor-icons/react";
 import { PaletteView, Theme } from "../../types/enums";
 import { useScoutBar } from "../../contexts/scoutbar-context";
 import { useTheme } from "../../hooks/use-theme";
@@ -672,6 +672,9 @@ export function CommandPalette() {
                             >
                               <Sun className="size-4" />
                               <span>Light mode</span>
+                              {mode === Theme.Light && (
+                                <Check className="ml-auto size-4 text-[#34d399]" weight="bold" />
+                              )}
                             </Command.Item>
                             <Command.Item
                               value="theme dark mode"
@@ -679,6 +682,9 @@ export function CommandPalette() {
                             >
                               <Moon className="size-4" />
                               <span>Dark mode</span>
+                              {mode === Theme.Dark && (
+                                <Check className="ml-auto size-4 text-[#34d399]" weight="bold" />
+                              )}
                             </Command.Item>
                             <Command.Item
                               value="theme system mode follow os"
@@ -686,6 +692,9 @@ export function CommandPalette() {
                             >
                               <ArrowsClockwise className="size-4" />
                               <span>System mode</span>
+                              {mode === Theme.System && (
+                                <Check className="ml-auto size-4 text-[#34d399]" weight="bold" />
+                              )}
                             </Command.Item>
                           </Command.Group>
 

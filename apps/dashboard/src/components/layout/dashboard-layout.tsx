@@ -1080,7 +1080,6 @@ export function DashboardLayout({
         <OnboardingChecklist
           projects={dashboardProjects}
           settingsSnapshot={activeSettingsSnapshot}
-          initialPaymentMethods={initialPaymentMethods ?? null}
           isTeamWorkspace={isTeamWorkspace}
           teamDetails={activeWorkspaceTeamMembers}
         />
