@@ -5,8 +5,18 @@ export function getLegacyServiceType(
   frameworkId: string,
 ) {
   if (sourceType === "docker") return "web-service";
-  if (frameworkId === "static") return "static";
+  const normalized = frameworkId.trim().toLowerCase();
+  if (normalized === "static" || normalized === "html") return "static";
   return "web-service";
+}
+
+/**
+ * Frameworks that need no build step (plain HTML, pre-built static assets).
+ * Build/install/start commands should be hidden for these.
+ */
+export function isNoBuildFramework(frameworkId: string): boolean {
+  const normalized = frameworkId.trim().toLowerCase();
+  return normalized === "html" || normalized === "static";
 }
 
 export function getEnvPrefixForFramework(frameworkId: string) {

@@ -63,6 +63,7 @@ import {
   shouldShowPersistentStorageField,
   shouldShowScalingGroupField,
 } from "@/utils/project-capabilities";
+import { isNoBuildFramework } from "@/utils/project-deploy";
 import {
   generalConfigSchema,
   databaseConfigSchema,
@@ -1660,6 +1661,7 @@ function ConfigurationPage() {
 
   const databaseProject = isDatabaseProject(project);
   const sourceFieldsVisible = shouldShowBranchRootFrameworkFields(project);
+  const noBuildFramework = isNoBuildFramework(project?.framework ?? "");
   const dockerSourceFieldsVisible = shouldShowDockerSourceFields(project);
   const buildSectionVisible = shouldShowBuildSection(project);
   const healthCheckVisible = shouldShowHealthCheckField(project);
@@ -1915,7 +1917,7 @@ function ConfigurationPage() {
                 <BuildSection
                   initialValues={buildInitialValues}
                   onSubmit={handleSubmitBuild}
-                  showCommands={sourceFieldsVisible}
+                  showCommands={sourceFieldsVisible && !noBuildFramework}
                   showHealthCheck={healthCheckVisible}
                   showDockerSourceFields={dockerSourceFieldsVisible}
                   canWrite={canWrite}

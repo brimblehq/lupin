@@ -40,6 +40,7 @@ import { mapFrameworksToDropdownOptions } from "@/utils/framework-dropdown";
 import {
   getEnvPrefixForFramework,
   getLegacyServiceType,
+  isNoBuildFramework,
 } from "@/utils/project-deploy";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import { listRegionsServerFn } from "@/server/regions/actions";
@@ -1969,61 +1970,67 @@ function Phase3Configure({
               />
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm text-dash-text-body">
-                Build command
-              </label>
-              <input
-                type="text"
-                value={buildCmd}
-                onChange={(e) => setBuildCmd(e.target.value)}
-                placeholder="npm run build"
-                className={`${inputClass} font-family-mono text-[13px]`}
-              />
-            </div>
+            {!isNoBuildFramework(framework) && (
+              <>
+                <div>
+                  <label className="mb-1.5 block text-sm text-dash-text-body">
+                    Build command
+                  </label>
+                  <input
+                    type="text"
+                    value={buildCmd}
+                    onChange={(e) => setBuildCmd(e.target.value)}
+                    placeholder="npm run build"
+                    className={`${inputClass} font-family-mono text-[13px]`}
+                  />
+                </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm text-dash-text-body">
-                Start command
-              </label>
-              <input
-                type="text"
-                value={startCmd}
-                onChange={(e) => setStartCmd(e.target.value)}
-                placeholder="npm run start"
-                className={`${inputClass} font-family-mono text-[13px]`}
-              />
-            </div>
+                <div>
+                  <label className="mb-1.5 block text-sm text-dash-text-body">
+                    Start command
+                  </label>
+                  <input
+                    type="text"
+                    value={startCmd}
+                    onChange={(e) => setStartCmd(e.target.value)}
+                    placeholder="npm run start"
+                    className={`${inputClass} font-family-mono text-[13px]`}
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-sm text-dash-text-body">
-                  Output directory
-                </label>
-                <input
-                  type="text"
-                  value={outputDir}
-                  onChange={(e) => setOutputDir(e.target.value)}
-                  placeholder="dist"
-                  className={`${inputClass} font-family-mono text-[13px]`}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-dash-text-body">
-                  Install command
-                </label>
-                <input
-                  type="text"
-                  value={installCmd}
-                  onChange={(e) => setInstallCmd(e.target.value)}
-                  placeholder="npm install"
-                  className={`${inputClass} font-family-mono text-[13px]`}
-                />
-              </div>
-            </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm text-dash-text-body">
+                      Output directory
+                    </label>
+                    <input
+                      type="text"
+                      value={outputDir}
+                      onChange={(e) => setOutputDir(e.target.value)}
+                      placeholder="dist"
+                      className={`${inputClass} font-family-mono text-[13px]`}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm text-dash-text-body">
+                      Install command
+                    </label>
+                    <input
+                      type="text"
+                      value={installCmd}
+                      onChange={(e) => setInstallCmd(e.target.value)}
+                      placeholder="npm install"
+                      className={`${inputClass} font-family-mono text-[13px]`}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
-          <hr className="my-6 border-dash-border-soft" />
+          {!isNoBuildFramework(framework) && (
+            <hr className="my-6 border-dash-border-soft" />
+          )}
         </>
       )}
 
@@ -2055,8 +2062,8 @@ function Phase3Configure({
         </>
       )}
 
-      {/* Environment variables */}
-      <div>
+      {/* Environment variables — hidden for no-build frameworks (HTML, Static) */}
+      {!isNoBuildFramework(framework) && <div>
         <button
           onClick={() => setEnvExpanded(!envExpanded)}
           className="flex w-full items-center justify-between text-sm"
@@ -2124,7 +2131,7 @@ function Phase3Configure({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </div>}
 
       {/* Persistent storage */}
       <hr className="my-6 border-dash-border-soft" />
