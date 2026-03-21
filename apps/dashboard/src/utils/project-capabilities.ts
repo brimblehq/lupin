@@ -1,4 +1,5 @@
 import type { Project } from "@/backend/projects";
+import { ServiceType } from "@brimble/models/dist/enum";
 
 const GIT_SOURCE_TYPES = new Set([
   "github",
@@ -18,24 +19,23 @@ export function normalizeProjectServiceType(value?: string): string {
 }
 
 export function isDatabaseProject(project?: Pick<Project, "serviceType"> | null): boolean {
-  return normalizeProjectServiceType(project?.serviceType) === "database";
+  return normalizeProjectServiceType(project?.serviceType) === ServiceType.Database;
 }
 
 export function isStaticProject(project?: Pick<Project, "serviceType"> | null): boolean {
-  return normalizeProjectServiceType(project?.serviceType) === "static";
+  return normalizeProjectServiceType(project?.serviceType) === ServiceType.Static;
 }
 
 export function isWorkerProject(project?: Pick<Project, "serviceType"> | null): boolean {
-  return normalizeProjectServiceType(project?.serviceType) === "worker";
+  return normalizeProjectServiceType(project?.serviceType) === ServiceType.Worker;
 }
 
 export function isMcpProject(project?: Pick<Project, "serviceType"> | null): boolean {
-  return normalizeProjectServiceType(project?.serviceType) === "mcp";
+  return normalizeProjectServiceType(project?.serviceType) === ServiceType.Mcp;
 }
 
 export function isWebServiceProject(project?: Pick<Project, "serviceType"> | null): boolean {
-  const value = normalizeProjectServiceType(project?.serviceType);
-  return value === "webservice" || value === "web_service";
+  return normalizeProjectServiceType(project?.serviceType) === ServiceType.WebService;
 }
 
 export function isWebLikeProject(project?: Pick<Project, "serviceType"> | null): boolean {

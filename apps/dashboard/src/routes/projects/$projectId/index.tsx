@@ -4,7 +4,7 @@ import {
   getRouteApi,
   useNavigate,
 } from "@tanstack/react-router";
-import { ExternalLink, Copy, Check, ArrowUpRight } from "lucide-react";
+import { ExternalLink, Copy, Check, ArrowUpRight, Terminal } from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
 import { DeploymentLogsDrawer } from "../../../components/shared/deployment-logs-drawer";
@@ -17,6 +17,11 @@ import {
   isWebLikeProject,
 } from "@/utils/project-capabilities";
 
+/** Backend/service frameworks that don't produce browser screenshots */
+const SERVICE_FRAMEWORKS = new Set([
+  "other", "custom", "docker", "laravel", "php", "python", "golang", "ruby",
+]);
+
 const parentRoute = getRouteApi("/projects/$projectId");
 
 export const Route = createFileRoute("/projects/$projectId/")({
@@ -24,20 +29,28 @@ export const Route = createFileRoute("/projects/$projectId/")({
   preloadStaleTime: 300_000,
   loader: async ({ context }) => {
     const project = (context as any).project;
-    let screenshotUrl: string | null = null;
-    try {
-      const endpointScreenshot = await (
-        getProjectScreenshotServerFn as unknown as (input: {
-          data: { projectId: string };
-        }) => Promise<string | null>
-      )({
-        data: { projectId: project?.id },
-      });
 
-      if (endpointScreenshot) {
-        screenshotUrl = endpointScreenshot;
-      }
-    } catch {}
+    if (!isWebLikeProject(project)) {
+      return { screenshotUrl: null };
+    }
+
+    const framework = String(project?.framework ?? "").toLowerCase();
+    if (SERVICE_FRAMEWORKS.has(framework)) {
+      return { screenshotUrl: null, isServiceFramework: true };
+    }
+
+    let screenshotUrl: string | null = project?.screenshot ?? null;
+    if (!screenshotUrl && project?.id) {
+      try {
+        screenshotUrl = await (
+          getProjectScreenshotServerFn as unknown as (input: {
+            data: { projectId: string };
+          }) => Promise<string | null>
+        )({
+          data: { projectId: project.id },
+        });
+      } catch {}
+    }
 
     return { screenshotUrl };
   },
@@ -51,7 +64,10 @@ function ProjectDetailPage() {
   const navigate = useNavigate();
   const { projectId } = Route.useParams();
   const { project } = parentRoute.useLoaderData() as any;
-  const { screenshotUrl } = Route.useLoaderData();
+  const { screenshotUrl, isServiceFramework } = Route.useLoaderData() as {
+    screenshotUrl: string | null;
+    isServiceFramework?: boolean;
+  };
 
   const projectName = project?.name || projectId;
   const isDatabaseProject = getIsDatabaseProject(project);
@@ -175,6 +191,13 @@ function ProjectDetailPage() {
                       alt={`${projectName} screenshot`}
                       className="h-full w-full object-cover object-top"
                     />
+                  ) : isServiceFramework ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 bg-dash-bg">
+                      <Terminal className="size-10 text-dash-text-extra-faded" />
+                      <span className="text-sm font-light text-dash-text-faded">
+                        Service deployed successfully
+                      </span>
+                    </div>
                   ) : (
                     <div className="flex h-full items-center justify-center text-sm font-light text-dash-text-faded">
                       No screenshot available yet.
