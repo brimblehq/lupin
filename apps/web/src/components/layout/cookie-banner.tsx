@@ -74,7 +74,10 @@ export function CookieBanner() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    setOpen(readCookieConsent() === null);
+    const hasAuthToken = document.cookie
+      .split(";")
+      .some((c) => c.trim().startsWith("brimble_access_token="));
+    setOpen(hasAuthToken && readCookieConsent() === null);
   }, []);
 
   function handleChoice(choice: CookieConsentChoice) {

@@ -8,6 +8,25 @@ import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { normalizeTagName } from "@/types/tags";
 
 const ease = [0.16, 1, 0.3, 1] as const;
+const TAG_DEBUG_STORAGE_KEY = "brimble:debug:tags";
+
+function isTagDebugEnabled() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(TAG_DEBUG_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function tagDebug(message: string, payload?: Record<string, unknown>) {
+  if (!isTagDebugEnabled()) return;
+  if (payload) {
+    console.log(`[tags-debug][popover] ${message}`, payload);
+    return;
+  }
+  console.log(`[tags-debug][popover] ${message}`);
+}
 
 interface TagAssignmentPopoverProps {
   projectId: string;
@@ -92,6 +111,12 @@ export function TagAssignmentPopover({
     if (!canWrite || pendingToggles.has(tagId)) return;
 
     const wasAssigned = localAssigned.has(tagId);
+    tagDebug("toggle:start", {
+      projectId,
+      tagId,
+      wasAssigned,
+      assignedTagIds: Array.from(localAssigned),
+    });
     const optimistic = new Set(localAssigned);
     if (wasAssigned) {
       optimistic.delete(tagId);
@@ -104,6 +129,11 @@ export function TagAssignmentPopover({
     setPendingToggles((prev) => new Set(prev).add(tagId));
     try {
       const result = await toggleTagAssignment(projectId, tagId);
+      tagDebug("toggle:server-result", {
+        projectId,
+        tagId,
+        assigned: result.assigned,
+      });
       setLocalAssigned((prev) => {
         const next = new Set(prev);
         if (result.assigned) {
@@ -115,6 +145,11 @@ export function TagAssignmentPopover({
         return next;
       });
     } catch (err) {
+      tagDebug("toggle:error", {
+        projectId,
+        tagId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       console.error("[tag-popover] toggle failed", err);
       const rollback = new Set(localAssigned);
       setLocalAssigned(rollback);
@@ -132,16 +167,33 @@ export function TagAssignmentPopover({
     if (!canWrite || !trimmed || exactMatch || creatingTag) return;
     setCreatingTag(true);
     const beforeCreate = new Set(localAssigned);
+    tagDebug("create:start", {
+      projectId,
+      query: trimmed,
+    });
     try {
       const tag = await createTag(trimmed);
+      tagDebug("create:created", {
+        projectId,
+        tagId: tag.id,
+        tagName: tag.name,
+      });
       setLocalAssigned((prev) => {
         const next = new Set(prev).add(tag.id);
         publishAssigned(next);
         return next;
       });
       await toggleTagAssignment(projectId, tag.id);
+      tagDebug("create:assigned", {
+        projectId,
+        tagId: tag.id,
+      });
       setQuery("");
     } catch (err) {
+      tagDebug("create:error", {
+        projectId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       console.error("[tag-popover] create+assign failed", err);
       setLocalAssigned(beforeCreate);
       publishAssigned(beforeCreate);

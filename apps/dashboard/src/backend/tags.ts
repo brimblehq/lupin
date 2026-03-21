@@ -35,6 +35,11 @@ function mapTag(raw: any): BackendTag {
   };
 }
 
+function shouldDebugTags(): boolean {
+  if (process.env.DEBUG_TAGS === "1") return true;
+  return process.env.NODE_ENV !== "production";
+}
+
 export function createTagsApi(client: ApiClient): TagsApi {
   const endpoint = "/core/v1/tags";
 
@@ -94,7 +99,22 @@ export function createTagsApi(client: ApiClient): TagsApi {
           },
         },
       );
+      if (shouldDebugTags()) {
+        console.log("[tags-api] toggleAssignment raw response", {
+          tagId: input.tagId,
+          projectId: input.projectId,
+          response,
+        });
+      }
       const root = asRecord(response?.data ?? response) ?? {};
+      if (shouldDebugTags()) {
+        console.log("[tags-api] toggleAssignment normalized root", {
+          tagId: input.tagId,
+          projectId: input.projectId,
+          root,
+          assigned: root.assigned === true,
+        });
+      }
       return { assigned: root.assigned === true };
     },
   };

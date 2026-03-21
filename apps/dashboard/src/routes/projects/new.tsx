@@ -42,6 +42,7 @@ import {
   getLegacyServiceType,
   isNoBuildFramework,
 } from "@/utils/project-deploy";
+import { ServiceType } from "@brimble/models/dist/enum";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import { listRegionsServerFn } from "@/server/regions/actions";
 import {
@@ -1621,6 +1622,8 @@ let envNextId = 1;
 type Phase3DeployInput = {
   name: string;
   regionId: string;
+  serviceType: string;
+  authEnabled: boolean;
   branch?: string;
   rootDirectory: string;
   framework: string;
@@ -1684,6 +1687,33 @@ function Phase3Configure({
   const [rootDir, setRootDir] = useState("./");
   const [rootDirDrawerOpen, setRootDirDrawerOpen] = useState(false);
   const isGit = isGitSource(sourceType);
+  const serviceTypeOptions = useMemo(
+    () => [
+      {
+        id: ServiceType.WebService,
+        label: "Web Service",
+        description:
+          "Run server-side code that handles requests. Ideal for dynamic apps and APIs.",
+      },
+      {
+        id: ServiceType.Static,
+        label: "Static Site",
+        description:
+          "Serve fixed content like HTML, CSS, JS, and images. No server-side code.",
+      },
+      {
+        id: ServiceType.Worker,
+        label: "Worker",
+        description: "Process background jobs and scheduled tasks.",
+      },
+      {
+        id: ServiceType.Mcp,
+        label: "MCP",
+        description: "Deploy MCP servers for AI and context integrations.",
+      },
+    ],
+    [],
+  );
   const defaultFrameworkId = useMemo(() => {
     if (!isGit) return "custom";
     const detectedSlug = detectedFramework?.slug?.trim();
@@ -1711,11 +1741,37 @@ function Phase3Configure({
   const [diskEnabled, setDiskEnabled] = useState(false);
   const [diskSize, setDiskSize] = useState("10");
   const [mountPath, setMountPath] = useState("/mnt/data");
+  const [serviceTypeManuallySelected, setServiceTypeManuallySelected] =
+    useState(false);
+  const [serviceType, setServiceType] = useState<string>(() =>
+    getLegacyServiceType(sourceType, defaultFrameworkId),
+  );
+  const [mcpAuthEnabled, setMcpAuthEnabled] = useState(false);
+  const selectedServiceTypeOption = useMemo(
+    () => serviceTypeOptions.find((option) => option.id === serviceType),
+    [serviceType, serviceTypeOptions],
+  );
+  const hideStorageSettings =
+    isNoBuildFramework(framework) || serviceType === ServiceType.Static;
+  const showMcpAuthToggle = serviceType === ServiceType.Mcp;
 
   useEffect(() => {
     setRootDir("./");
     setRootDirDrawerOpen(false);
   }, [sourceName]);
+
+  useEffect(() => {
+    const derivedServiceType = getLegacyServiceType(sourceType, framework);
+    if (!serviceTypeManuallySelected) {
+      setServiceType(derivedServiceType);
+    }
+  }, [framework, serviceTypeManuallySelected, sourceType]);
+
+  useEffect(() => {
+    if (serviceType !== ServiceType.Mcp) {
+      setMcpAuthEnabled(false);
+    }
+  }, [serviceType]);
 
   useEffect(() => {
     if (!regionOptions.length) {
@@ -1871,6 +1927,8 @@ function Phase3Configure({
     return {
       name: projectName.trim(),
       regionId: region,
+      serviceType,
+      authEnabled: serviceType === ServiceType.Mcp ? mcpAuthEnabled : false,
       branch: isGit ? branch : undefined,
       rootDirectory: isGit ? rootDir : "./",
       framework,
@@ -1923,6 +1981,28 @@ function Phase3Configure({
           </div>
         </div>
 
+        <div>
+          <label className="mb-1.5 block text-sm text-dash-text-body">
+            Deployment type
+          </label>
+          <Dropdown
+            value={serviceType}
+            options={serviceTypeOptions.map((option) => ({
+              id: option.id,
+              label: option.label,
+            }))}
+            onChange={(nextServiceType) => {
+              setServiceType(nextServiceType);
+              setServiceTypeManuallySelected(true);
+            }}
+          />
+          {selectedServiceTypeOption?.description && (
+            <p className="mt-2 text-xs text-dash-text-extra-faded">
+              {selectedServiceTypeOption.description}
+            </p>
+          )}
+        </div>
+
         {isGit && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
@@ -1950,6 +2030,26 @@ function Phase3Configure({
               <p className="mt-2 text-xs text-dash-text-extra-faded">
                 Select the folder in your repository to deploy.
               </p>
+            </div>
+          </div>
+        )}
+
+        {showMcpAuthToggle && (
+          <div>
+            <div className="flex items-center justify-between rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2.5">
+              <div className="pr-4">
+                <p className="text-sm font-medium text-dash-text-strong">
+                  Enable MCP authentication
+                </p>
+                <p className="mt-1 text-xs text-dash-text-faded">
+                  Require an API key in the <code>x-brimble-key</code> header for this MCP server.
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={mcpAuthEnabled}
+                onChange={setMcpAuthEnabled}
+                size="sm"
+              />
             </div>
           </div>
         )}
@@ -2148,8 +2248,8 @@ function Phase3Configure({
         </AnimatePresence>
       </div>}
 
-      {/* Persistent storage — hidden for static/HTML frameworks */}
-      {!isNoBuildFramework(framework) && (<>
+      {/* Persistent storage — hidden for static services and no-build frameworks */}
+      {!hideStorageSettings && (<>
       <hr className="my-6 border-dash-border-soft" />
 
       <div>
@@ -2806,7 +2906,7 @@ function NewProjectPage() {
         buildCommand: input.buildCommand,
         startCommand: input.startCommand,
         outputDirectory: input.outputDirectory,
-        serviceType: getLegacyServiceType(sourceType, input.framework),
+        serviceType: input.serviceType,
         repo: {
           name: selectedGithubRepo.metadata.fullName || selectedGithubRepo.repo.fullName,
           branch,
@@ -2825,7 +2925,7 @@ function NewProjectPage() {
           value: env.value,
         })),
         experimental: {},
-        authEnabled: false,
+        authEnabled: input.authEnabled,
         ...(environmentId ? { environmentId } : {}),
       };
     } else if (sourceType === SourceType.Docker) {
@@ -2853,7 +2953,7 @@ function NewProjectPage() {
         buildCommand: "",
         startCommand: "",
         outputDirectory: "",
-        serviceType: getLegacyServiceType(sourceType, "docker"),
+        serviceType: input.serviceType,
         repo: {
           name: parsedImage.imageUri,
           branch: parsedImage.tag,
@@ -2872,7 +2972,7 @@ function NewProjectPage() {
           value: env.value,
         })),
         experimental: {},
-        authEnabled: false,
+        authEnabled: input.authEnabled,
         ...(environmentId ? { environmentId } : {}),
         ...(selectedDockerSource.credentials
           ? {

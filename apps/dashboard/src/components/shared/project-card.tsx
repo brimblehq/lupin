@@ -31,7 +31,8 @@ export function ProjectCard({
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspace = getWorkspaceFromSearch({ searchStr });
   const slug = (project.slug || project.name).toLowerCase().replace(/\s+/g, "-");
-  const projectId = slug || project.id;
+  const projectRouteId = slug || project.id || project.name;
+  const projectTagTargetId = project.id || slug;
   const [starred, setStarred] = useState(project.starred ?? false);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const dotsRef = useRef<HTMLButtonElement>(null);
@@ -69,7 +70,7 @@ export function ProjectCard({
   return (
     <Link
       to="/projects/$projectId"
-      params={{ projectId }}
+      params={{ projectId: projectRouteId }}
       search={workspace ? { workspace } : {}}
       className="block"
     >
@@ -145,7 +146,7 @@ export function ProjectCard({
       </div>
     </motion.div>
     <TagAssignmentPopover
-      projectId={projectId}
+      projectId={projectTagTargetId}
       anchorRef={dotsRef}
       open={tagPopoverOpen}
       onOpenChange={setTagPopoverOpen}

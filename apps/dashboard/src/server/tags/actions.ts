@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { withTokenRefresh } from "@/server/shared/backend";
+import { createModuleLogger } from "@/server/shared/logger";
+
+const tagsLogger = createModuleLogger("tags");
 
 export const listTagsServerFn = createServerFn({
   method: "GET",
@@ -118,5 +121,23 @@ export const toggleTagAssignmentServerFn = createServerFn({
     throw new Error("Project ID is required");
   }
 
-  return withTokenRefresh((api) => api.tags.toggleAssignment({ tagId, projectId }));
+  tagsLogger.debug("toggleAssignment:start", { tagId, projectId });
+  try {
+    const result = await withTokenRefresh((api) =>
+      api.tags.toggleAssignment({ tagId, projectId }),
+    );
+    tagsLogger.debug("toggleAssignment:result", {
+      tagId,
+      projectId,
+      assigned: result?.assigned,
+    });
+    return result;
+  } catch (error) {
+    tagsLogger.error("toggleAssignment:error", {
+      tagId,
+      projectId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 });

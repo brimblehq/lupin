@@ -9,6 +9,26 @@ import {
   toggleTagAssignmentServerFn,
 } from "@/server/tags/actions";
 
+const TAG_DEBUG_STORAGE_KEY = "brimble:debug:tags";
+
+function isTagDebugEnabled() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(TAG_DEBUG_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function tagDebug(message: string, payload?: Record<string, unknown>) {
+  if (!isTagDebugEnabled()) return;
+  if (payload) {
+    console.log(`[tags-debug][store] ${message}`, payload);
+    return;
+  }
+  console.log(`[tags-debug][store] ${message}`);
+}
+
 interface TagsState {
   tags: Tag[];
   loading: boolean;
@@ -132,11 +152,22 @@ export const useTagsStore = create<TagsState>((set, get) => ({
   },
 
   async toggleTagAssignment(projectId, tagId) {
-    const result = await (toggleTagAssignmentServerFn as unknown as (input: {
-      data: { tagId: string; projectId: string };
-    }) => Promise<{ assigned: boolean }>)({ data: { tagId, projectId } });
-    set((s) => ({ _refreshSignal: s._refreshSignal + 1 }));
-    return result;
+    tagDebug("toggle:start", { projectId, tagId });
+    try {
+      const result = await (toggleTagAssignmentServerFn as unknown as (input: {
+        data: { tagId: string; projectId: string };
+      }) => Promise<{ assigned: boolean }>)({ data: { tagId, projectId } });
+      tagDebug("toggle:success", { projectId, tagId, assigned: result.assigned });
+      set((s) => ({ _refreshSignal: s._refreshSignal + 1 }));
+      return result;
+    } catch (error) {
+      tagDebug("toggle:error", {
+        projectId,
+        tagId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   getProjectCountForTag(tagId, projects) {
