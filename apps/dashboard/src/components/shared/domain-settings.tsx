@@ -5,8 +5,6 @@ import { CheckCircle, FolderOpen, ShieldCheck, Warning } from "@phosphor-icons/r
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
-import * as Dialog from "@radix-ui/react-dialog";
-import { motion, AnimatePresence } from "motion/react";
 import { FolderTrashIcon } from "./folder-trash-icon";
 import { GlossyButton } from "./glossy-button";
 import {
@@ -171,138 +169,98 @@ function AddDnsRecordModal({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <AnimatePresence>
-        {open && (
-          <Dialog.Portal forceMount>
-            <Dialog.Overlay asChild>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]"
-              />
-            </Dialog.Overlay>
+    <Modal open={open} onOpenChange={onOpenChange} width={500} className="overflow-visible">
+      <ModalHeader
+        title={isEditing ? "Edit DNS Record" : "Add DNS Record"}
+        description={isEditing ? `Update record for ${domainName}` : `Connect to ${domainName}`}
+      />
 
-            <Dialog.Content asChild>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: 10 }}
-                transition={{
-                  duration: 0.25,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
-                className="fixed left-1/2 top-1/2 z-50 flex w-[500px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-visible rounded-lg border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]"
-              >
-                {/* Header */}
-                <div className="flex flex-col gap-0.5 rounded-t-lg border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-6 py-4">
-                  <Dialog.Title className="text-base leading-[1.4] tracking-[-0.096px] text-dash-text-strong">
-                    {isEditing ? "Edit DNS Record" : "Add DNS Record"}
-                  </Dialog.Title>
-                  <Dialog.Description className="text-sm font-light leading-[1.3] text-dash-text-faded">
-                    {isEditing ? `Update record for ${domainName}` : `Connect to ${domainName}`}
-                  </Dialog.Description>
-                </div>
+      <div className="flex flex-col gap-4 overflow-visible px-6 pb-5 pt-4">
+        <FormField label="Name" placeholder="Name" value={name} onChange={setName} />
 
-                {/* Form fields */}
-                <div className="flex flex-col gap-4 overflow-visible px-6 pb-5 pt-4">
-                  <FormField label="Name" placeholder="Name" value={name} onChange={setName} />
-
-                  {/* Type dropdown */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm leading-5 tracking-[-0.022px] text-dash-text-strong">
-                      Type
-                    </label>
-                    <div ref={typeRef} className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setTypeOpen(!typeOpen)}
-                        className="input-base input-focus flex w-full items-center justify-between px-2 py-1.5 text-[13px] leading-5 text-dash-text-strong"
-                      >
-                        <span>{type || "Select type"}</span>
-                        <ChevronDown className={`size-4 text-dash-text-faded transition-transform duration-200 ${typeOpen ? "rotate-180" : ""}`} />
-                      </button>
-                      {typeOpen && (
-                        <div className="absolute left-0 top-[calc(100%+4px)] z-10 w-full overflow-clip rounded-[6px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_16px_rgba(0,0,0,0.08)]">
-                          {dnsRecordTypes.map((t) => (
-                            <button
-                              key={t}
-                              onClick={() => {
-                                setType(t);
-                                setTypeOpen(false);
-                              }}
-                              className={`flex w-full items-center px-2.5 py-1.5 text-left text-[13px] transition-colors hover:bg-dash-bg-elevated ${
-                                t === type
-                                  ? "font-medium text-dash-text-strong"
-                                  : "font-light text-dash-text-faded"
-                              }`}
-                            >
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <FormField label="Value" placeholder="Value" value={value} onChange={setValue} />
-                  <FormField label="TTL" placeholder="1 Hour" value={ttl} onChange={setTtl} />
-
-                  {showProxyToggle ? (
-                    <div className="flex flex-col gap-3 rounded-[6px] bg-dash-bg-elevated p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium text-dash-text-strong">Proxy</span>
-                          <span className="text-sm text-dash-text-faded">
-                            Route through Brimble for SSL and IP protection
-                          </span>
-                        </div>
-                        <ToggleSwitch checked={isProxied} onChange={setIsProxied} />
-                      </div>
-
-                      {isProxied ? (
-                        <p className="text-sm leading-6 text-dash-text-body">
-                          <span className="font-semibold">
-                            {name.trim()
-                              ? name.trim() === "@" || name.trim().endsWith(`.${domainName}`) || name.trim() === domainName
-                                ? domainName
-                                : `${name.trim()}.${domainName}`
-                              : `[name].${domainName}`}
-                          </span>{" "}
-                          {type === "CNAME" ? "is an alias of" : "points to"}{" "}
-                          <span className="font-semibold">
-                            {value.trim() || (type === "CNAME" ? "[target]" : "[IP address]")}
-                          </span>{" "}
-                          and has its traffic proxied through Brimble.
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between border-t-[0.5px] border-dash-border px-4 py-4">
-                  <Dialog.Close asChild>
-                    <button className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated">
-                      Cancel
-                    </button>
-                  </Dialog.Close>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm leading-5 tracking-[-0.022px] text-dash-text-strong">
+            Type
+          </label>
+          <div ref={typeRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setTypeOpen(!typeOpen)}
+              className="input-base input-focus flex w-full items-center justify-between px-2 py-1.5 text-[13px] leading-5 text-dash-text-strong"
+            >
+              <span>{type || "Select type"}</span>
+              <ChevronDown className={`size-4 text-dash-text-faded transition-transform duration-200 ${typeOpen ? "rotate-180" : ""}`} />
+            </button>
+            {typeOpen && (
+              <div className="absolute left-0 top-[calc(100%+4px)] z-10 w-full overflow-clip rounded-[6px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_16px_rgba(0,0,0,0.08)]">
+                {dnsRecordTypes.map((t) => (
                   <button
-                    onClick={() => void handleSubmit()}
-                    disabled={submitting}
-                    className="flex items-center rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+                    key={t}
+                    onClick={() => {
+                      setType(t);
+                      setTypeOpen(false);
+                    }}
+                    className={`flex w-full items-center px-2.5 py-1.5 text-left text-[13px] transition-colors hover:bg-dash-bg-elevated ${
+                      t === type
+                        ? "font-medium text-dash-text-strong"
+                        : "font-light text-dash-text-faded"
+                    }`}
                   >
-                    {submitLabel}
+                    {t}
                   </button>
-                </div>
-              </motion.div>
-            </Dialog.Content>
-          </Dialog.Portal>
-        )}
-      </AnimatePresence>
-    </Dialog.Root>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <FormField label="Value" placeholder="Value" value={value} onChange={setValue} />
+        <FormField label="TTL" placeholder="1 Hour" value={ttl} onChange={setTtl} />
+
+        {showProxyToggle ? (
+          <div className="flex flex-col gap-3 rounded-[6px] bg-dash-bg-elevated p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium text-dash-text-strong">Proxy</span>
+                <span className="text-sm text-dash-text-faded">
+                  Route through Brimble for SSL and IP protection
+                </span>
+              </div>
+              <ToggleSwitch checked={isProxied} onChange={setIsProxied} />
+            </div>
+
+            {isProxied ? (
+              <p className="text-sm leading-6 text-dash-text-body">
+                <span className="font-semibold">
+                  {name.trim()
+                    ? name.trim() === "@" || name.trim().endsWith(`.${domainName}`) || name.trim() === domainName
+                      ? domainName
+                      : `${name.trim()}.${domainName}`
+                    : `[name].${domainName}`}
+                </span>{" "}
+                {type === "CNAME" ? "is an alias of" : "points to"}{" "}
+                <span className="font-semibold">
+                  {value.trim() || (type === "CNAME" ? "[target]" : "[IP address]")}
+                </span>{" "}
+                and has its traffic proxied through Brimble.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <ModalFooter>
+        <ModalCancelButton />
+        <ModalContinueButton
+          onClick={() => void handleSubmit()}
+          disabled={submitting}
+          loading={submitting}
+          loadingLabel={isEditing ? "Saving..." : "Creating..."}
+        >
+          {isEditing ? "Save Changes" : "Add Record"}
+        </ModalContinueButton>
+      </ModalFooter>
+    </Modal>
   );
 }
 
@@ -367,6 +325,7 @@ export function DomainSettings({
   const [linkProjectLoading, setLinkProjectLoading] = useState(false);
   const [linkProjectSelected, setLinkProjectSelected] = useState<string | null>(null);
   const [linkProjectSubmitting, setLinkProjectSubmitting] = useState(false);
+  const haptics = useHaptics();
 
   const expiringSoon = (() => {
     if (domain.isExpired || !domain.expiresAt) return false;
@@ -1125,7 +1084,12 @@ export function DomainSettings({
             linkProjectList.map((project) => (
               <button
                 key={project.id}
-                onClick={() => setLinkProjectSelected(project.id)}
+                onClick={() => {
+                  if (linkProjectSelected !== project.id) {
+                    haptics.selection();
+                  }
+                  setLinkProjectSelected(project.id);
+                }}
                 className={`flex w-full items-center gap-3 px-6 py-3 transition-colors hover:bg-dash-bg-elevated ${
                   linkProjectSelected === project.id ? "bg-dash-bg-elevated" : ""
                 }`}
