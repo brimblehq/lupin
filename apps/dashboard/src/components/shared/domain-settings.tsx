@@ -186,7 +186,7 @@ function AddDnsRecordModal({
             <button
               type="button"
               onClick={() => setTypeOpen(!typeOpen)}
-              className="input-base input-focus flex w-full items-center justify-between px-2 py-1.5 text-[13px] leading-5 text-dash-text-strong"
+              className="input-base input-focus flex min-h-[46px] w-full items-center justify-between px-3 py-2.5 text-sm leading-6 text-dash-text-strong"
             >
               <span>{type || "Select type"}</span>
               <ChevronDown className={`size-4 text-dash-text-faded transition-transform duration-200 ${typeOpen ? "rotate-180" : ""}`} />
@@ -285,7 +285,7 @@ function FormField({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="input-base input-focus px-2 py-1.5 text-[13px] leading-5 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded"
+        className="input-base input-focus min-h-[46px] px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded"
       />
     </div>
   );

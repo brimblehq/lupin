@@ -442,15 +442,26 @@ function Phase2GitConnect({
   onConnected,
   connecting = false,
   polling = false,
+  checkingConnection = false,
   errorMessage,
 }: {
   provider: GitProvider;
   onConnected: () => void;
   connecting?: boolean;
   polling?: boolean;
+  checkingConnection?: boolean;
   errorMessage?: string | null;
 }) {
   const { Icon } = provider;
+  const buttonDisabled = connecting || polling || checkingConnection;
+  let buttonLabel = `Connect ${provider.name}`;
+  if (checkingConnection) {
+    buttonLabel = "Checking connection…";
+  } else if (connecting) {
+    buttonLabel = "Opening GitHub…";
+  } else if (polling) {
+    buttonLabel = "Waiting for connection…";
+  }
 
   return (
     <motion.div
@@ -482,13 +493,17 @@ function Phase2GitConnect({
           <GlossyButton
             variant="blue"
             onClick={onConnected}
-            disabled={connecting || polling}
+            disabled={buttonDisabled}
           >
-            {connecting ? "Opening GitHub…" : polling ? "Waiting for connection…" : `Connect ${provider.name}`}
+            {buttonLabel}
           </GlossyButton>
           {errorMessage ? (
             <p className="mt-3 text-center text-xs text-[#ef2f1f]">
               {errorMessage}
+            </p>
+          ) : checkingConnection ? (
+            <p className="mt-3 text-center text-xs text-dash-text-faded">
+              Checking your GitHub connection status…
             </p>
           ) : polling ? (
             <p className="mt-3 text-center text-xs text-dash-text-faded">
@@ -2378,6 +2393,7 @@ function NewProjectPage() {
 
   const [githubAccounts, setGithubAccounts] = useState<GithubAccount[]>([]);
   const [githubAccountsLoading, setGithubAccountsLoading] = useState(false);
+  const [githubAccountsChecked, setGithubAccountsChecked] = useState(false);
   const [githubRepos, setGithubRepos] = useState<GithubRepoListItem[]>([]);
   const [githubReposLoading, setGithubReposLoading] = useState(false);
   const [githubConnectOpening, setGithubConnectOpening] = useState(false);
@@ -2505,6 +2521,7 @@ function NewProjectPage() {
       }
       const items = await listGithubAccounts();
       setGithubAccounts(Array.isArray(items) ? items : []);
+      setGithubAccountsChecked(true);
       if (Array.isArray(items) && items.length > 0) {
         setGithubConnectError(null);
         setConnectedProviders((prev) => {
@@ -3106,6 +3123,11 @@ function NewProjectPage() {
                       }}
                       connecting={provider.id === "github" ? githubConnectOpening : false}
                       polling={provider.id === "github" ? githubConnectPolling : false}
+                      checkingConnection={
+                        provider.id === "github"
+                          ? (!githubAccountsChecked || githubAccountsLoading)
+                          : false
+                      }
                       errorMessage={provider.id === "github" ? githubConnectError : null}
                     />
                   );

@@ -77,6 +77,7 @@ export interface McpApi {
     provider?: "smithery" | "pulsemcp" | "auto";
   }): Promise<McpServerListResult>;
   getTemplate(id: string): Promise<McpServerTemplate | null>;
+  listCategories(): Promise<string[]>;
 }
 
 function mapStringArray(value: unknown): string[] {
@@ -237,6 +238,16 @@ export function createMcpApi(client: ApiClient): McpApi {
 
       const root = response?.data?.data ?? response?.data ?? response ?? null;
       return mapMcpServerTemplate(root);
+    },
+
+    async listCategories() {
+      const response = await client.request<any>("/core/v1/templates/mcp-servers/categories", {
+        method: "GET",
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const categories = root?.categories;
+      return Array.isArray(categories) ? categories.filter((c: unknown) => typeof c === "string") : [];
     },
   };
 }

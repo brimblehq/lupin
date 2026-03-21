@@ -18,47 +18,47 @@ function BrimbleMark({ className = "size-7" }: { className?: string }) {
 
 /* ─── Right panel: Blue Brimble card inspired by Figma ─── */
 
-function AuthBrandPanel() {
-  return (
-    <aside className="relative hidden min-h-dvh overflow-hidden bg-[#006fff] lg:flex lg:w-[46%] lg:flex-col">
-      {/* Subtle radial glow */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_120%,rgba(255,255,255,0.12),transparent)]" />
+// function AuthBrandPanel() {
+//   return (
+//     <aside className="relative hidden min-h-dvh overflow-hidden bg-[#006fff] lg:flex lg:w-[46%] lg:flex-col">
+//       {/* Subtle radial glow */}
+//       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_120%,rgba(255,255,255,0.12),transparent)]" />
 
-      {/* Content */}
-      <div className="relative flex flex-1 flex-col justify-between px-10 py-10 xl:px-14">
-        {/* Top: logo */}
-        <div className="flex items-center gap-2.5">
-          <BrimbleMark className="size-5 text-white" />
-          <span className="text-sm font-semibold tracking-[-0.2px] text-white">
-            Brimble
-          </span>
-        </div>
+//       {/* Content */}
+//       <div className="relative flex flex-1 flex-col justify-between px-10 py-10 xl:px-14">
+//         {/* Top: logo */}
+//         <div className="flex items-center gap-2.5">
+//           <BrimbleMark className="size-5 text-white" />
+//           <span className="text-sm font-semibold tracking-[-0.2px] text-white">
+//             Brimble
+//           </span>
+//         </div>
 
-        {/* Center: heading + tagline */}
-        <div className="max-w-[380px]">
-          <h2 className="font-heading text-[52px] font-normal leading-[1.05] tracking-[-1.8px] text-white xl:text-[60px]">
-            Deploy
-            <br />
-            on Brimble.
-          </h2>
-          <p className="mt-5 max-w-[320px] text-sm leading-[1.6] tracking-[-0.1px] text-white/55">
-            Ship your next project in minutes. Connect your repo, configure your build, and go live — infrastructure handled.
-          </p>
-        </div>
+//         {/* Center: heading + tagline */}
+//         <div className="max-w-[380px]">
+//           <h2 className="font-heading text-[52px] font-normal leading-[1.05] tracking-[-1.8px] text-white xl:text-[60px]">
+//             Deploy
+//             <br />
+//             on Brimble.
+//           </h2>
+//           <p className="mt-5 max-w-[320px] text-sm leading-[1.6] tracking-[-0.1px] text-white/55">
+//             Ship your next project in minutes. Connect your repo, configure your build, and go live — infrastructure handled.
+//           </p>
+//         </div>
 
-        {/* Bottom: baggage illustration */}
-        <div className="relative flex items-end justify-center">
-          <img
-            src="/images/baggage.svg"
-            alt=""
-            className="w-[72%] max-w-[320px] mix-blend-multiply opacity-90"
-            draggable={false}
-          />
-        </div>
-      </div>
-    </aside>
-  );
-}
+//         {/* Bottom: baggage illustration */}
+//         <div className="relative flex items-end justify-center">
+//           <img
+//             src="/images/baggage.svg"
+//             alt=""
+//             className="w-[72%] max-w-[320px] mix-blend-multiply opacity-90"
+//             draggable={false}
+//           />
+//         </div>
+//       </div>
+//     </aside>
+//   );
+// }
 
 /* ─── Layout shell ─── */
 
@@ -80,9 +80,14 @@ export function AuthSplitLayout({
       <div className="w-full max-w-[400px]">
         {/* Header row */}
         <div className="mb-10 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-dash-text-strong">
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-dash-text-strong"
+          >
             <BrimbleMark className="size-6" />
-            <span className="text-sm font-semibold tracking-[-0.2px]">Brimble</span>
+            <span className="text-sm font-semibold tracking-[-0.2px]">
+              Brimble
+            </span>
           </Link>
           <Link
             to={mode === "login" ? "/signup" : "/login"}
@@ -179,7 +184,9 @@ export function AuthField({
   return (
     <label htmlFor={id} className="block">
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <span className="text-xs font-medium text-dash-text-strong">{label}</span>
+        <span className="text-xs font-medium text-dash-text-strong">
+          {label}
+        </span>
         {hint && (
           <span className="text-[11px] text-dash-text-extra-faded">{hint}</span>
         )}
@@ -237,7 +244,10 @@ export function OtpInput({
 
   function handlePaste(e: React.ClipboardEvent) {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, length);
     onChange(pasted);
     const focusIdx = Math.min(pasted.length, length - 1);
     inputsRef.current[focusIdx]?.focus();
@@ -248,7 +258,9 @@ export function OtpInput({
       {Array.from({ length }).map((_, i) => (
         <input
           key={i}
-          ref={(el) => { inputsRef.current[i] = el; }}
+          ref={(el) => {
+            inputsRef.current[i] = el;
+          }}
           type="text"
           inputMode="numeric"
           maxLength={1}

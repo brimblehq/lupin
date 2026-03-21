@@ -9,6 +9,8 @@ import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
 import { DeploymentLogsDrawer } from "../../../components/shared/deployment-logs-drawer";
 import { getProjectScreenshotServerFn } from "@/server/projects/actions";
+import { listFrameworksServerFn } from "@/server/frameworks/actions";
+import type { FrameworkOption } from "@/backend/frameworks";
 import { useHaptics } from "@/hooks/use-haptics";
 import { formatRelativeTime } from "@/utils/dashboard";
 import {
@@ -31,12 +33,20 @@ export const Route = createFileRoute("/projects/$projectId/")({
     const project = (context as any).project;
 
     if (!isWebLikeProject(project)) {
-      return { screenshotUrl: null };
+      let frameworks: FrameworkOption[] = [];
+      try {
+        frameworks = await listFrameworksServerFn();
+      } catch {}
+      return { screenshotUrl: null, frameworks };
     }
 
     const framework = String(project?.framework ?? "").toLowerCase();
     if (SERVICE_FRAMEWORKS.has(framework)) {
-      return { screenshotUrl: null, isServiceFramework: true };
+      let frameworks: FrameworkOption[] = [];
+      try {
+        frameworks = await listFrameworksServerFn();
+      } catch {}
+      return { screenshotUrl: null, isServiceFramework: true, frameworks };
     }
 
     let screenshotUrl: string | null = project?.screenshot ?? null;
@@ -52,7 +62,12 @@ export const Route = createFileRoute("/projects/$projectId/")({
       } catch {}
     }
 
-    return { screenshotUrl };
+    let frameworks: FrameworkOption[] = [];
+    try {
+      frameworks = await listFrameworksServerFn();
+    } catch {}
+
+    return { screenshotUrl, frameworks };
   },
   component: ProjectDetailPage,
 });
@@ -64,9 +79,10 @@ function ProjectDetailPage() {
   const navigate = useNavigate();
   const { projectId } = Route.useParams();
   const { project } = parentRoute.useLoaderData() as any;
-  const { screenshotUrl, isServiceFramework } = Route.useLoaderData() as {
+  const { screenshotUrl, isServiceFramework, frameworks } = Route.useLoaderData() as {
     screenshotUrl: string | null;
     isServiceFramework?: boolean;
+    frameworks?: FrameworkOption[];
   };
 
   const projectName = project?.name || projectId;
@@ -112,6 +128,10 @@ function ProjectDetailPage() {
   }
 
   const frameworkLabel = project?.framework || "Unknown";
+  const matchedFramework = (frameworks ?? []).find(
+    (f) => f.slug === project?.framework,
+  );
+  const frameworkLogo = matchedFramework?.logo;
   const repoSource = project?.repo?.git || "Git";
   const repoName = project?.repo?.name || repoSource;
   const repositoryHref = project?.gitLink || "";
@@ -372,11 +392,20 @@ function ProjectDetailPage() {
                     <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
                       {frameworkLabel}
                     </span>
-                    <img
-                      src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg"
-                      alt="Framework"
-                      className="size-5"
-                    />
+                    {frameworkLogo ? (
+                      frameworkLogo.trim().startsWith("<svg") || frameworkLogo.includes("<svg") ? (
+                        <div
+                          className="flex size-5 items-center justify-center [&>svg]:size-5"
+                          dangerouslySetInnerHTML={{ __html: frameworkLogo }}
+                        />
+                      ) : (
+                        <img
+                          src={frameworkLogo}
+                          alt={frameworkLabel}
+                          className="size-5"
+                        />
+                      )
+                    ) : null}
                   </div>
                 </div>
               ) : null}

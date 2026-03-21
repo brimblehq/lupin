@@ -98,6 +98,14 @@ export function shouldShowDeploymentHistoryTab(project?: Pick<Project, "serviceT
   return !isDatabaseProject(project);
 }
 
+export function shouldShowProjectLogsTab(project?: Pick<Project, "serviceType"> | null): boolean {
+  if (isDatabaseProject(project) || isStaticProject(project)) {
+    return false;
+  }
+
+  return true;
+}
+
 export function shouldShowBuildCacheToggle(
   project?: Pick<Project, "serviceType"> | null,
 ): boolean {

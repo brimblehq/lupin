@@ -102,6 +102,16 @@ export const getMcpTemplateServerFn = createServerFn({
   return result;
 });
 
+export const listMcpCategoriesServerFn = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  try {
+    return await withTokenRefresh((api) => api.mcp.listCategories());
+  } catch {
+    return getPublicBackendApi().mcp.listCategories();
+  }
+});
+
 export const deployMcpTemplateServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {

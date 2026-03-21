@@ -113,13 +113,14 @@ function ProjectSwitcher({
     currentProjectName?.trim() || currentProject?.name || displayProjectId;
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative min-w-0" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-sm font-medium text-dash-text-faded hover:text-dash-text-strong transition-colors"
+        className="flex min-w-0 max-w-[136px] items-center gap-1 text-sm font-medium text-dash-text-faded transition-colors hover:text-dash-text-strong sm:max-w-[260px]"
       >
-        {activeProjectLabel}
+        <span className="truncate whitespace-nowrap">{activeProjectLabel}</span>
         <motion.span
+          className="shrink-0"
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >

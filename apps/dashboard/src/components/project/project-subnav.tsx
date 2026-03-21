@@ -33,6 +33,7 @@ import {
   shouldShowDeploymentHistoryTab,
   shouldShowProjectDomainsTab,
   shouldShowProjectEnvironmentTab,
+  shouldShowProjectLogsTab,
   shouldShowProjectObservabilityTab,
   shouldShowProjectVisitSite,
 } from "@/utils/project-capabilities";
@@ -141,6 +142,10 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
     }
 
     if (tab.slug === "environment" && !shouldShowProjectEnvironmentTab(project as any)) {
+      return false;
+    }
+
+    if (tab.slug === "logs" && !shouldShowProjectLogsTab(project as any)) {
       return false;
     }
 

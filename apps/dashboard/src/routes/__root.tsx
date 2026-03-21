@@ -85,6 +85,11 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      {
+        rel: "icon",
+        type: "image/png",
+        href: "https://res.cloudinary.com/dgqfojhx4/image/upload/v1772279144/dashboard-assets/Icon_np5cdu.png",
+      },
     ],
   }),
   beforeLoad: async ({ location }) => {

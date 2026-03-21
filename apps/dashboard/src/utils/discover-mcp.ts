@@ -19,6 +19,7 @@ const visualThemes: VisualTheme[] = [
 export interface DiscoverAddon extends Addon {
   logoImageUrl?: string;
   mcpId: string;
+  category?: string;
 }
 
 export interface DiscoverAddonDetail {
@@ -132,6 +133,7 @@ export function mapMcpTemplateToAddon(template: McpServerTemplate): DiscoverAddo
     logo: getFallbackLogoLabel(template.name),
     logoBg: theme.logoBg,
     logoImageUrl: template.iconUrl,
+    category: template.category,
   };
 }
 
