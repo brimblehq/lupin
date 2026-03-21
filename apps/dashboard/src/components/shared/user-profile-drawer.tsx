@@ -4129,6 +4129,9 @@ function MembersForm({
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">
                     {member.name}
+                    {isSelf ? (
+                      <span className="text-dash-text-faded"> - You</span>
+                    ) : null}
                   </span>
                   <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
                     {member.email}
