@@ -42,7 +42,7 @@ export interface DiscoverAddonDetail {
   updatedAtLabel?: string;
   tags: string[];
   features: string[];
-  tools: Array<{ name: string; description?: string; requiredCount?: number }>;
+  tools: Array<{ name: string; description?: string; requiredCount?: number; inputSchema?: Record<string, unknown> }>;
   connections: Array<{ type: string; requiredFields: string[] }>;
   gradient: string;
   logoBg: string;
@@ -165,9 +165,10 @@ export function mapMcpTemplateToAddonDetail(template: McpServerTemplate): Discov
     tools: template.tools.map((tool) => {
       const required = Array.isArray(tool.inputSchema?.required) ? tool.inputSchema.required : [];
       return {
-        name: tool.name || "Unnamed tool",
+        name: tool.name,
         description: tool.description,
         requiredCount: required.length || undefined,
+        inputSchema: tool.inputSchema,
       };
     }),
     connections: template.connections.map((connection) => {

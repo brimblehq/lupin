@@ -63,10 +63,17 @@ export function AddonCard({
               src={addon.logoImageUrl}
               alt={`${addon.name} logo`}
               className="size-5 rounded-full object-cover"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.style.display = "none";
+                const fallback = el.nextElementSibling as HTMLElement | null;
+                if (fallback) fallback.style.display = "";
+              }}
             />
-          ) : (
-            <span className="text-xs">{addon.logo}</span>
-          )}
+          ) : null}
+          <span className="text-xs text-white" style={addon.logoImageUrl ? { display: "none" } : undefined}>
+            {addon.logo}
+          </span>
         </div>
       </div>
 

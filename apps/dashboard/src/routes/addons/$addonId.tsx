@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { motion } from "motion/react";
-import { ArrowLeft, Copy, Check, ExternalLink } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { ArrowLeft, Copy, Check, ExternalLink, ChevronDown } from "lucide-react";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { hapticToast as toast } from "@/utils/haptic-toast";
@@ -24,22 +24,27 @@ export const Route = createFileRoute("/addons/$addonId")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
   loader: async ({ params }) => {
-    const [template, relatedResult] = await Promise.all([
-      (getMcpTemplateServerFn as unknown as (input: {
-        data: { id: string };
-      }) => Promise<McpServerTemplate | null>)({
-        data: { id: params.addonId },
-      }),
-      (listMcpTemplatesServerFn as unknown as (input: {
-        data?: { limit?: number };
-      }) => Promise<McpServerListResult>)({
-        data: { limit: 12 },
-      }).catch(() => ({ servers: [], pagination: {} } as McpServerListResult)),
-    ]);
+    const template = await (getMcpTemplateServerFn as unknown as (input: {
+      data: { id: string };
+    }) => Promise<McpServerTemplate | null>)({
+      data: { id: params.addonId },
+    });
 
     const detail = template ? mapMcpTemplateToAddonDetail(template) : null;
+    const category = template?.category;
+
+    const relatedResult = await (listMcpTemplatesServerFn as unknown as (input: {
+      data?: { limit?: number; category?: string };
+    }) => Promise<McpServerListResult>)({
+      data: {
+        limit: 4,
+        ...(category ? { category } : {}),
+      },
+    }).catch(() => ({ servers: [], pagination: {} } as McpServerListResult));
+
+    const currentId = template?.qualifiedName || template?.id || params.addonId;
     const relatedAddons = relatedResult.servers
-      .filter((server) => (detail ? (server.qualifiedName || server.id) !== params.addonId : true))
+      .filter((server) => (server.qualifiedName || server.id) !== currentId)
       .slice(0, 3)
       .map(mapMcpTemplateToAddon);
 
@@ -53,54 +58,64 @@ export const Route = createFileRoute("/addons/$addonId")({
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-function formatWebsiteLabel(value?: string) {
-  if (!value) return undefined;
-  return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
-}
+function ToolCard({ tool }: { tool: { name: string; description?: string; requiredCount?: number; inputSchema?: Record<string, unknown> } }) {
+  const [expanded, setExpanded] = useState(false);
+  const properties = (tool.inputSchema?.properties ?? {}) as Record<string, { type?: string; description?: string }>;
+  const params = Object.entries(properties);
+  const required = new Set(
+    Array.isArray(tool.inputSchema?.required) ? (tool.inputSchema.required as string[]) : [],
+  );
 
-function buildToolLines(detail: NonNullable<ReturnType<typeof Route.useLoaderData>["detail"]>) {
-  const lines: Array<{ key: string; value: string }> = [];
-
-  detail.tools.slice(0, 6).forEach((tool) => {
-    lines.push({
-      key: tool.name,
-      value: tool.description || "Tool available",
-    });
-  });
-
-  detail.connections.forEach((connection) => {
-    if (connection.requiredFields.length === 0) return;
-    connection.requiredFields.forEach((field) => {
-      lines.push({
-        key: `${connection.type.toUpperCase()}_${field}`,
-        value: `Required ${connection.type} config field`,
-      });
-    });
-  });
-
-  return lines.slice(0, 8);
-}
-
-function CopyableRow({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false);
-  const haptics = useHaptics();
-
-  function handleCopy() {
-    navigator.clipboard.writeText(`${label}: ${value}`);
-    haptics.light();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
+  const shortDesc = tool.description?.split("\n")[0]?.slice(0, 120) || "";
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="flex-1 truncate font-mono text-[11px] leading-5 text-[#aadafa]">{label}</span>
+    <div>
       <button
-        onClick={handleCopy}
-        className="shrink-0 text-[#4a505c] transition-colors hover:text-[#9da3ae]"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between gap-3 py-2 text-left"
       >
-        {copied ? <Check className="size-3.5 text-[#28c840]" /> : <Copy className="size-3.5" />}
+        <div className="min-w-0 flex-1">
+          <span className="font-mono text-sm text-dash-text-strong">{tool.name}</span>
+          {shortDesc && !expanded && (
+            <p className="mt-0.5 truncate text-xs font-light text-dash-text-faded">{shortDesc}</p>
+          )}
+        </div>
+        <ChevronDown className={`size-3.5 shrink-0 text-dash-text-extra-faded transition-transform ${expanded ? "rotate-180" : ""}`} />
       </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="pb-3 pt-1">
+              {tool.description && (
+                <p className="text-sm font-light leading-[1.45] text-dash-text-faded">
+                  {tool.description.split("\n")[0]}
+                </p>
+              )}
+              {params.length > 0 && (
+                <div className="mt-3 flex flex-col gap-1">
+                  {params.map(([name, schema]) => (
+                    <div key={name} className="flex items-baseline gap-2 py-1">
+                      <code className="shrink-0 font-mono text-xs text-dash-text-body">{name}</code>
+                      {schema.type && (
+                        <span className="text-[10px] text-dash-text-extra-faded">{Array.isArray(schema.type) ? schema.type.join(" | ") : schema.type}</span>
+                      )}
+                      {required.has(name) && (
+                        <span className="text-[10px] font-medium text-[#f5a623]">required</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -166,16 +181,6 @@ function AddonDetailPage() {
     );
   }
 
-  const toolLines = buildToolLines(detail);
-  const metadataRows = [
-    { label: "Installs", value: detail.installsLabel },
-    { label: "Developer", value: detail.developer },
-    { label: "Category", value: detail.category },
-    { label: "Language", value: detail.language || "-" },
-    { label: "Website", value: formatWebsiteLabel(detail.website), href: detail.website },
-    { label: "Documentation", value: detail.documentationUrl ? "Read" : undefined, href: detail.documentationUrl },
-    { label: "Repository", value: detail.githubUrl ? "View" : undefined, href: detail.githubUrl },
-  ].filter((row) => row.value);
 
   async function ensureGithubAccounts() {
     let accounts = await listGithubAccounts();
@@ -284,10 +289,21 @@ function AddonDetailPage() {
             style={{ backgroundColor: detail.logoBg }}
           >
             {detail.logoImageUrl ? (
-              <img src={detail.logoImageUrl} alt={`${detail.name} logo`} className="size-10 rounded-full object-cover" />
-            ) : (
-              <span className="text-2xl">{detail.logo}</span>
-            )}
+              <img
+                src={detail.logoImageUrl}
+                alt={`${detail.name} logo`}
+                className="size-10 rounded-full object-cover"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = "none";
+                  const fallback = el.nextElementSibling as HTMLElement | null;
+                  if (fallback) fallback.style.display = "";
+                }}
+              />
+            ) : null}
+            <span className="text-2xl text-white" style={detail.logoImageUrl ? { display: "none" } : undefined}>
+              {detail.logo}
+            </span>
           </div>
         </div>
 
@@ -301,6 +317,9 @@ function AddonDetailPage() {
             </div>
             <p className="mt-2 text-sm font-light leading-[1.3] text-dash-text-faded">
               {detail.description}. Connect it to your Brimble project and streamline your workflow.
+              {detail.source ? (
+                <span className="text-dash-text-extra-faded"> — via {detail.source}</span>
+              ) : null}
             </p>
             {detail.tools.length > 0 ? (
               <p className="mt-2 text-sm font-light leading-[1.3] text-dash-text-faded">
@@ -349,9 +368,9 @@ function AddonDetailPage() {
               Deploy server
             </GlossyButton>
             )}
-            {detail.documentationUrl ? (
+            {(detail.githubUrl || detail.documentationUrl) ? (
               <a
-                href={detail.documentationUrl}
+                href={detail.githubUrl || detail.documentationUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex h-[40px] items-center justify-center gap-1 rounded-[8px] border border-dash-border px-3.5 text-sm text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
@@ -369,69 +388,32 @@ function AddonDetailPage() {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1, ease }}
-        className="scrollbar-hidden flex gap-3.5 overflow-x-auto"
-      >
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-[203px] w-[370px] shrink-0 rounded-[8px] bg-dash-bg-elevated dark:bg-[#29292a]"
-          />
-        ))}
-      </motion.div>
-
-      <hr className="my-8 border-dash-border-soft" />
-
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.15, ease }}
-        className="flex flex-col gap-8 lg:flex-row"
+        className="flex flex-col gap-8"
       >
         <div className="flex-1">
           <h2 className="text-base font-medium tracking-[-0.03px] text-dash-text-strong">More details</h2>
-          <p className="mt-3 text-sm font-light leading-[1.45] text-dash-text-faded">{detail.longDescription}</p>
+          <p className="mt-3 text-sm font-light leading-[1.45] text-dash-text-faded">
+            {detail.longDescription}
+            {detail.source ? (
+              <span className="text-dash-text-extra-faded"> — via {detail.source}</span>
+            ) : null}
+          </p>
 
-          {toolLines.length > 0 && (
-            <div className="mt-6 overflow-clip rounded-[4px]">
-              <div className="border-b border-[#394150] bg-[#212936] px-4 py-2">
-                <span className="text-[11px] font-light text-[#9da3ae]">Tools & configuration hints</span>
-              </div>
-              <div className="flex flex-col gap-2 bg-[#121826] px-4 py-3">
-                {toolLines.map((line, i) => (
-                  <div key={`${line.key}-${i}`} className="flex items-center gap-3">
-                    <span className="w-4 shrink-0 text-right font-mono text-[10px] text-[#4a505c]">{i + 1}</span>
-                    <CopyableRow label={line.key} value={line.value} />
-                  </div>
+          {detail.tools.length > 0 && (
+            <div className="mt-6">
+              <h3 className="mb-2 text-sm font-medium text-dash-text-strong">
+                Tools ({detail.tools.length})
+              </h3>
+              <div className="divide-y divide-dash-border-soft">
+                {detail.tools.map((tool) => (
+                  <ToolCard key={tool.name} tool={tool} />
                 ))}
               </div>
             </div>
           )}
         </div>
 
-        <div className="w-full shrink-0 rounded-[8px] border-[0.5px] border-dash-border-soft lg:w-[320px]">
-          {metadataRows.map((row, i) => (
-            <div
-              key={row.label}
-              className={`flex items-center justify-between px-3.5 py-3 ${i < metadataRows.length - 1 ? "border-b-[0.5px] border-dash-border-soft" : ""}`}
-            >
-              <span className="text-sm font-light text-dash-text-body">{row.label}</span>
-              {row.href ? (
-                <a
-                  href={row.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm font-light text-dash-text-faded transition-colors hover:text-dash-text-strong"
-                >
-                  {row.value}
-                  <ExternalLink className="size-3" />
-                </a>
-              ) : (
-                <span className="text-sm font-light text-dash-text-faded">{row.value}</span>
-              )}
-            </div>
-          ))}
-        </div>
       </motion.div>
 
       <hr className="my-8 border-dash-border-soft" />
