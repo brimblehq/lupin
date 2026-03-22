@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { Theme } from "../types/enums";
 
 const listeners = new Set<() => void>();
@@ -98,6 +98,10 @@ function subscribe(cb: () => void) {
 export function useTheme() {
   const mode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const theme = useMemo(() => resolveEffectiveTheme(mode), [mode]);
+
+  useEffect(() => {
+    applyTheme(mode);
+  }, [mode]);
 
   const setTheme = useCallback((t: Theme) => {
     applyTheme(t);

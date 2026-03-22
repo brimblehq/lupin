@@ -1,8 +1,10 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { ShieldAlert } from "lucide-react";
 import { Modal } from "./modal";
 import { GlossyButton } from "./glossy-button";
 import { Spinner } from "./spinner";
+import { useProfileDrawer } from "@/contexts/profile-drawer-context";
+import { ProfileTab } from "@/types/enums";
+import { usePaymentMethods } from "@/hooks/use-payments";
 
 interface OwnershipTransferModalProps {
   open: boolean;
@@ -23,12 +25,18 @@ export function OwnershipTransferModal({
   onAccept,
   onDeny,
 }: OwnershipTransferModalProps) {
+  const profileDrawer = useProfileDrawer();
+  const { data: paymentMethods = [] } = usePaymentMethods();
+  const hasPaymentMethod = paymentMethods.length > 0;
+
   return (
     <Modal open={open} onOpenChange={onOpenChange} width={420}>
       <div className="flex flex-col items-center gap-4 px-6 pb-5 pt-6 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full bg-[#f5a623]/10">
-          <ShieldAlert className="size-5 text-[#f5a623]" />
-        </div>
+        <img
+          src="/icons/icons8-warning-shield.svg"
+          alt="Warning"
+          className="size-12"
+        />
         <div className="flex flex-col gap-1.5">
           <Dialog.Title className="text-base font-medium leading-[1.4] tracking-[-0.096px] text-dash-text-strong">
             Ownership transfer request
@@ -40,9 +48,25 @@ export function OwnershipTransferModal({
             </span>
             . Accept to take ownership, or deny to keep the current owner.
           </Dialog.Description>
+          {!hasPaymentMethod && (
+            <p className="mt-2 text-xs leading-4 text-[#f5a623]">
+              You need to{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenChange(false);
+                  profileDrawer.open(ProfileTab.Billing);
+                }}
+                className="underline underline-offset-2 hover:opacity-80"
+              >
+                add a payment method
+              </button>
+              {" "}before accepting.
+            </p>
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-3 border-t-[0.5px] border-dash-border px-4 py-4">
+      <div className="flex flex-col-reverse gap-3 border-t-[0.5px] border-dash-border px-4 py-4 sm:flex-row sm:items-center">
         <button
           onClick={onDeny}
           disabled={loading}
@@ -61,7 +85,7 @@ export function OwnershipTransferModal({
           fullWidth
           onClick={onAccept}
           className="flex-1"
-          disabled={loading}
+          disabled={loading || !hasPaymentMethod}
           loading={loading && loadingAction === "accept"}
           loadingLabel="Accepting..."
         >

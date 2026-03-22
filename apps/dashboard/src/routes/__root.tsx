@@ -6,6 +6,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useTheme } from "../hooks/use-theme";
 import { DashboardLayout } from "../components/layout/dashboard-layout";
 import { enforceRouteAuth } from "../lib/auth-guards";
 import { getSettingsSidebarSnapshotServerFn } from "@/server/settings/actions";
@@ -222,6 +223,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  useTheme();
+
   const {
     workspace: loaderWorkspace,
     settingsSnapshot,

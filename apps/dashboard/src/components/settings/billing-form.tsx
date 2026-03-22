@@ -3,10 +3,8 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import type { StripeCardElementOptions } from "@stripe/stripe-js";
 import { motion } from "motion/react";
-import { useTheme } from "@/hooks/use-theme";
 import { usePricing } from "@/contexts/pricing-context";
 import { ArrowSquareOut, CreditCard, PencilSimple } from "@phosphor-icons/react";
-import { Theme } from "@/types/enums";
 import { Plus, Star, X } from "lucide-react";
 import { FolderTrashIcon } from "../shared/folder-trash-icon";
 import { PaymentProvider } from "@/providers/payment-provider";
@@ -812,8 +810,17 @@ function AddCardForm({
   const removeMethodMutation = useRemovePaymentMethod();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cardError, setCardError] = useState(false);
-  const { theme } = useTheme();
-  const isDark = theme === Theme.Dark;
+  const [isDark, setIsDark] = useState(() =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+  );
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   const cardOptions: StripeCardElementOptions = useMemo(
     () => ({
@@ -822,9 +829,12 @@ function AddCardForm({
           fontSize: "14px",
           lineHeight: "24px",
           fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
-          color: isDark ? "#e8eaed" : "#222528",
+          color: isDark ? "#e8eaed" : "#111214",
           backgroundColor: "transparent",
           "::placeholder": { color: isDark ? "#6b7280" : "#9ca3af" },
+          ":-webkit-autofill": {
+            color: isDark ? "#e8eaed" : "#111214",
+          },
           iconColor: isDark ? "#9ca3af" : "#6b7280",
         },
         invalid: {
