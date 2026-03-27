@@ -23,7 +23,7 @@ export const siteConfig = {
     subtitle:
       "Brimble gives developers the tools to Build, Launch, and Scale Apps — without managing servers or piecing together providers. Deploy full-stack apps, provision databases, and connect to AI models through a single platform.",
     primaryCta: "Get started for free",
-    secondaryCta: "Read documentation",
+    secondaryCta: "Watch video",
   },
   codePreview: {
     heading: "Host apps, databases, domains & MCP servers — all in one place.",

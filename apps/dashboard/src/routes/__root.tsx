@@ -27,6 +27,8 @@ import type { SubscriptionStats } from "@/backend/payments";
 
 import appCss from "../styles.css?url";
 
+const GA_MEASUREMENT_ID = "G-T6EZL8YJW7";
+
 const chatwootBootstrapScript = `(function(d,t){
   try {
     if (window.__brimbleChatwootBooted) return;
@@ -242,6 +244,20 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
         <script
+          async
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
+            `,
+          }}
+        />
+        <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var d=document.documentElement;var t=localStorage.getItem('theme');var sys=(t==='system'||(!t));var dark=t==='dark'||(sys&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()`,
           }}
@@ -258,6 +274,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   useTheme();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const {
     workspace: loaderWorkspace,
@@ -280,6 +297,24 @@ function RootComponent() {
   const hydrated = useTagsStore((s) => s._hydrated);
   const storeWorkspace = useTagsStore((s) => s._workspace);
   const fetchTags = useTagsStore((s) => s.fetchTags);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const gtagFn = (window as any).gtag as
+      | ((...args: Array<string | number | Date | Record<string, unknown>>) => void)
+      | undefined;
+    if (typeof gtagFn !== "function") {
+      return;
+    }
+
+    gtagFn("event", "page_view", {
+      page_path: pathname,
+      page_title: document.title,
+    });
+  }, [pathname]);
 
   useEffect(() => {
     // Initial hydration can use root loader data.

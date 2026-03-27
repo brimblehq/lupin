@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createFileRoute,
   getRouteApi,
@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { Search, Globe } from "lucide-react";
+import { Search, Globe, AlertCircle } from "lucide-react";
 import { DomainSearchResultCard } from "@brimble/ui";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
@@ -152,12 +152,18 @@ function BuyDomainPage() {
   const [autoRenewal, setAutoRenewal] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [page, setPage] = useState(0);
+  const autoSearchedQueryRef = useRef("");
 
   const totalPages = Math.ceil(results.length / PAGE_SIZE);
   const paginatedResults = results.slice(
     page * PAGE_SIZE,
     (page + 1) * PAGE_SIZE,
   );
+  const exactDomainAvailable = results.some(
+    (result) => result.domainName === searchedDomain && result.available,
+  );
+  const showUnavailableBanner =
+    hasSearched && !searching && Boolean(searchedDomain) && !exactDomainAvailable;
 
   const isAi = purchaseTarget ? isAiDomain(purchaseTarget.domainName) : false;
   const isApp = purchaseTarget ? isAppDomain(purchaseTarget.domainName) : false;
@@ -166,8 +172,12 @@ function BuyDomainPage() {
   const domainCost = (purchaseTarget?.price ?? 0) * years;
   const total = domainCost + privacyCost;
 
-  async function handleSearch() {
-    const name = normalizeQuery(query);
+  async function handleSearch(
+    nextQuery?: string,
+    options?: { autoOpenPurchase?: boolean },
+  ) {
+    const rawQuery = nextQuery ?? query;
+    const name = normalizeQuery(rawQuery);
     if (!name || searching) return;
 
     setSearching(true);
@@ -178,13 +188,21 @@ function BuyDomainPage() {
 
     try {
       const data = await searchDomains({ data: { name } });
-      setResults(
-        data.map((item) => ({
-          domainName: item.domainName,
-          available: item.purchasable,
-          price: item.purchasePrice ?? null,
-        })),
-      );
+      const mappedResults = data.map((item) => ({
+        domainName: item.domainName,
+        available: item.purchasable,
+        price: item.purchasePrice ?? null,
+      }));
+      setResults(mappedResults);
+
+      if (options?.autoOpenPurchase) {
+        const exactMatch = mappedResults.find(
+          (result) => result.domainName === name && result.available,
+        );
+        if (exactMatch) {
+          handleOpenPurchase(exactMatch);
+        }
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Domain search failed");
       setResults([]);
@@ -192,6 +210,27 @@ function BuyDomainPage() {
       setSearching(false);
     }
   }
+
+  useEffect(() => {
+    if (!canWrite) {
+      return;
+    }
+
+    const urlQuery = new URLSearchParams(searchStr || "").get("q")?.trim() ?? "";
+    if (!urlQuery) {
+      autoSearchedQueryRef.current = "";
+      return;
+    }
+
+    const normalized = normalizeQuery(urlQuery);
+    if (!normalized || autoSearchedQueryRef.current === normalized) {
+      return;
+    }
+
+    autoSearchedQueryRef.current = normalized;
+    setQuery(urlQuery);
+    void handleSearch(urlQuery, { autoOpenPurchase: true });
+  }, [canWrite, searchStr]);
 
   function handleOpenPurchase(domain: DomainResult) {
     setPurchaseTarget(domain);
@@ -302,6 +341,14 @@ function BuyDomainPage() {
           Search
         </GlossyButton>
       </div>
+      {showUnavailableBanner && (
+        <div className="mb-4 flex items-center gap-3 rounded-[4px] bg-[#ef2f1f]/5 px-4 py-2.5 dark:bg-[#ef2f1f]/15">
+          <AlertCircle className="size-4 shrink-0 text-[#ef2f1f]" />
+          <p className="text-sm text-dash-text-body dark:text-dash-text-strong">
+            {searchedDomain} is not available for purchase.
+          </p>
+        </div>
+      )}
 
       {/* Pre-search empty state */}
       {!hasSearched && (
@@ -347,6 +394,7 @@ function BuyDomainPage() {
                 {paginatedResults.map((result, i) => (
                   <motion.div
                     key={result.domainName}
+                    className="w-full"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, delay: 0.03 * i, ease }}
@@ -356,6 +404,7 @@ function BuyDomainPage() {
                       variant="dashboard"
                       isExactMatch={result.domainName === searchedDomain}
                       onSelect={() => handleOpenPurchase(result)}
+                      className="w-full"
                     />
                   </motion.div>
                 ))}

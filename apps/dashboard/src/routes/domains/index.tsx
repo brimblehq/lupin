@@ -24,7 +24,10 @@ import {
   updateDomainServerFn,
 } from "@/server/domains/actions";
 import { formatRelativeTime } from "@/utils/dashboard";
-import { getWorkspaceFromSearch } from "@/utils/topbar-navigation";
+import {
+  consumePendingDomainsAction,
+  getWorkspaceFromSearch,
+} from "@/utils/topbar-navigation";
 import {
   parsePositivePageSearchValue,
   parseTextSearchValue,
@@ -242,6 +245,17 @@ function DomainsPage() {
       window.removeEventListener("brimble:add-domain", handleAddDomainEvent);
       window.removeEventListener("brimble:transfer-in", handleTransferInEvent);
     };
+  }, [canWrite, openAddDomain]);
+
+  useEffect(() => {
+    if (!canWrite) return;
+
+    const pendingAction = consumePendingDomainsAction();
+    if (pendingAction === "add-domain") {
+      openAddDomain();
+    } else if (pendingAction === "transfer-in") {
+      openAddDomain(DomainStep.TransferIn);
+    }
   }, [canWrite, openAddDomain]);
 
   const settledSearchQuery = search.q?.trim() ?? "";

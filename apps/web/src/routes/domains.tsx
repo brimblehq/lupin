@@ -248,6 +248,13 @@ function DomainsHero() {
                       result={result}
                       variant="web"
                       isExactMatch={result.domainName === searchedDomain}
+                      onSelect={() =>
+                        window.open(
+                          `https://app.brimble.io/domains/buy?q=${encodeURIComponent(result.domainName)}`,
+                          "_blank",
+                          "noopener,noreferrer",
+                        )
+                      }
                     />
                   ))}
                 </div>

@@ -46,6 +46,7 @@ import { Theme } from "@/types/enums";
 import {
   buildProjectSwitchUrl,
   buildWorkspaceSwitchUrl,
+  setPendingDomainsAction,
   withWorkspaceQuery,
 } from "@/utils/topbar-navigation";
 
@@ -1127,6 +1128,7 @@ function CreateDropdown() {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
 
   const isDomainsPage = /^\/domains(\/|$)/.test(pathname);
+  const isDomainsListPage = pathname === "/domains" || pathname === "/domains/";
   const menuItems = isDomainsPage ? domainsCreateMenuItems : defaultCreateMenuItems;
 
   useEffect(() => {
@@ -1143,8 +1145,16 @@ function CreateDropdown() {
 
   function handlePrimaryClick() {
     haptics.light();
-    if (isDomainsPage) {
+    if (isDomainsListPage) {
       window.dispatchEvent(new CustomEvent("brimble:add-domain"));
+    } else if (isDomainsPage) {
+      setPendingDomainsAction("add-domain");
+      navigate({
+        to: withWorkspaceQuery({
+          pathname: "/domains",
+          searchStr,
+        }) as any,
+      });
     } else {
       navigate({
         to: withWorkspaceQuery({
@@ -1166,7 +1176,17 @@ function CreateDropdown() {
         }) as any,
       });
     } else if (label === "Transfer in") {
-      window.dispatchEvent(new CustomEvent("brimble:transfer-in"));
+      if (isDomainsListPage) {
+        window.dispatchEvent(new CustomEvent("brimble:transfer-in"));
+      } else {
+        setPendingDomainsAction("transfer-in");
+        navigate({
+          to: withWorkspaceQuery({
+            pathname: "/domains",
+            searchStr,
+          }) as any,
+        });
+      }
     } else if (label === "Create project") {
       navigate({
         to: withWorkspaceQuery({

@@ -29,6 +29,33 @@ export function buildWorkspaceSwitchUrl(input: {
   return nextPathname;
 }
 
+const PENDING_DOMAINS_ACTION_KEY = "brimble:pending-domains-action";
+
+export type PendingDomainsAction = "add-domain" | "transfer-in";
+
+export function setPendingDomainsAction(action: PendingDomainsAction): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(PENDING_DOMAINS_ACTION_KEY, action);
+}
+
+export function consumePendingDomainsAction(): PendingDomainsAction | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const action = window.sessionStorage.getItem(PENDING_DOMAINS_ACTION_KEY);
+  if (action === "add-domain" || action === "transfer-in") {
+    window.sessionStorage.removeItem(PENDING_DOMAINS_ACTION_KEY);
+    return action;
+  }
+
+  window.sessionStorage.removeItem(PENDING_DOMAINS_ACTION_KEY);
+  return null;
+}
+
 export function getWorkspaceSearch(input: { searchStr?: string }): string {
   const params = new URLSearchParams(input.searchStr || "");
   const workspace = params.get("workspace")?.trim();
