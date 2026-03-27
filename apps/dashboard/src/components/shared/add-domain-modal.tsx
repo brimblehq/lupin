@@ -578,10 +578,10 @@ export function AddDomainModal({
                       void handleStepTwoContinue();
                     }}
                     autoFocus
-                    className={`rounded-[4px] bg-[#fdfdfd] px-2 py-1.5 text-[13px] font-light leading-5 text-dash-text-strong outline-none placeholder:text-[#9ca3af] dark:bg-[#1a1c1e] dark:placeholder:text-dash-text-extra-faded ${
+                    className={`w-full input-base px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded ${
                       error
                         ? "shadow-[0px_0px_0px_1px_#e1291d,0px_0px_0px_3px_rgba(225,41,29,0.15)] dark:shadow-[0px_0px_0px_1px_#e1291d,0px_0px_0px_3px_rgba(225,41,29,0.15)]"
-                        : "input-base input-focus"
+                        : "input-focus"
                     }`}
                   />
                 </div>
