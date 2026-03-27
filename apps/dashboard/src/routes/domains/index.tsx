@@ -20,6 +20,7 @@ import {
   listDomainProjectsServerFn,
   listDomainsPageServerFn,
   refreshDomainStatusServerFn,
+  searchDomainSaleServerFn,
   transferDomainServerFn,
   updateDomainServerFn,
 } from "@/server/domains/actions";
@@ -165,8 +166,11 @@ function DomainsPage() {
     data: { workspace?: string; domainName: string };
   }) => Promise<DomainRecord | null>;
   const createProjectDomain = useServerFn(createProjectDomainServerFn as any) as (args: {
-    data: { workspace?: string; projectId?: string; name: string };
+    data: { workspace?: string; id?: string; projectId?: string; name: string };
   }) => Promise<DomainRecord>;
+  const searchDomainSale = useServerFn(searchDomainSaleServerFn as any) as (args: {
+    data: { name: string };
+  }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number }>>;
   const updateDomain = useServerFn(updateDomainServerFn as any) as (args: {
     data: {
       workspace?: string;
@@ -227,6 +231,49 @@ function DomainsPage() {
     setAddDomainStep(step);
     setAddDomainOpen(true);
   }, []);
+
+  const validateAddDomain = useCallback(async (domainUrl: string): Promise<DomainValidationError | null> => {
+    const inlineError = validateDomain(domainUrl);
+    if (inlineError) {
+      return inlineError;
+    }
+
+    const normalized = domainUrl.trim().toLowerCase();
+    const alreadyOwned = rows.some((domain) => domain.name.toLowerCase() === normalized);
+    if (alreadyOwned) {
+      return {
+        type: "already-owned",
+        message: "You already own this domain, try another one.",
+      };
+    }
+
+    try {
+      const saleResults = await searchDomainSale({
+        data: { name: normalized },
+      });
+
+      const exactPurchasableMatch = saleResults.some(
+        (item) =>
+          (item.domainName || "").toLowerCase() === normalized &&
+          item.purchasable === true,
+      );
+
+      if (exactPurchasableMatch) {
+        return {
+          type: "not-found",
+          message:
+            "Oops! This domain looks unregistered and unavailable to add directly.",
+        };
+      }
+    } catch {
+      return {
+        type: "generic",
+        message: "Unable to verify this domain right now. Please try again.",
+      };
+    }
+
+    return null;
+  }, [rows, searchDomainSale]);
 
   // Listen for topbar "add domain" / "transfer in" events
   useEffect(() => {
@@ -330,7 +377,7 @@ function DomainsPage() {
       const created = await createProjectDomain({
         data: {
           workspace,
-          projectId,
+          id: projectId,
           name: normalized,
         },
       });
@@ -448,15 +495,15 @@ function DomainsPage() {
           defaultRegistrantEmail={settingsSnapshot?.profile?.email ?? ""}
           paymentCards={settingsSnapshot?.billing?.cards ?? []}
           initialStep={addDomainStep}
-          onValidate={validateDomain}
+          onValidate={validateAddDomain}
           onContinue={(projectId, domainUrl) => {
             void handleAddDomain(projectId, domainUrl);
           }}
-          onRegisterDomain={() => {
+          onRegisterDomain={(domainUrl) => {
             setAddDomainOpen(false);
             navigate({
               to: "/domains/buy",
-              search: workspace ? { workspace } : {},
+              search: workspace ? { workspace, q: domainUrl } : { q: domainUrl },
             });
           }}
         />

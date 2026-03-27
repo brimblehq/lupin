@@ -25,6 +25,7 @@ import {
   listDomainProjectsServerFn,
   listDomainsPageServerFn,
   refreshDomainStatusServerFn,
+  searchDomainSaleServerFn,
   transferDomainServerFn,
   updateDomainServerFn,
 } from "@/server/domains/actions";
@@ -223,8 +224,11 @@ function ProjectDomainsPage() {
   const createProjectDomain = useServerFn(
     createProjectDomainServerFn as any,
   ) as (args: {
-    data: { workspace?: string; projectId?: string; name: string };
+    data: { workspace?: string; id?: string; projectId?: string; name: string };
   }) => Promise<DomainRecord>;
+  const searchDomainSale = useServerFn(searchDomainSaleServerFn as any) as (args: {
+    data: { name: string };
+  }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number }>>;
   const updateDomain = useServerFn(updateDomainServerFn as any) as (args: {
     data: {
       workspace?: string;
@@ -325,7 +329,7 @@ function ProjectDomainsPage() {
       const created = await createProjectDomain({
         data: {
           workspace,
-          projectId: selectedProjectId,
+          id: selectedProjectId,
           name: normalized,
         },
       });
@@ -336,6 +340,49 @@ function ProjectDomainsPage() {
         error instanceof Error ? error.message : "Failed to add domain",
       );
     }
+  }
+
+  async function validateAddDomain(domainUrl: string): Promise<DomainValidationError | null> {
+    const inlineError = validateDomain(domainUrl);
+    if (inlineError) {
+      return inlineError;
+    }
+
+    const normalized = domainUrl.trim().toLowerCase();
+    const alreadyOwned = rows.some((row) => row.name.toLowerCase() === normalized);
+    if (alreadyOwned) {
+      return {
+        type: "already-owned",
+        message: "You already own this domain, try another one.",
+      };
+    }
+
+    try {
+      const saleResults = await searchDomainSale({
+        data: { name: normalized },
+      });
+
+      const exactPurchasableMatch = saleResults.some(
+        (item) =>
+          (item.domainName || "").toLowerCase() === normalized &&
+          item.purchasable === true,
+      );
+
+      if (exactPurchasableMatch) {
+        return {
+          type: "not-found",
+          message:
+            "Oops! This domain looks unregistered and unavailable to add directly.",
+        };
+      }
+    } catch {
+      return {
+        type: "generic",
+        message: "Unable to verify this domain right now. Please try again.",
+      };
+    }
+
+    return null;
   }
 
   async function handleConfigureDomain(input: {
@@ -442,7 +489,7 @@ function ProjectDomainsPage() {
           projects={[{ id: project.id, name: project.name }]}
           defaultRegistrantEmail={settingsSnapshot?.profile?.email ?? ""}
           paymentCards={settingsSnapshot?.billing?.cards ?? []}
-          onValidate={validateDomain}
+          onValidate={validateAddDomain}
           onContinue={(selectedProjectId, domainUrl) => {
             void handleAddDomain(selectedProjectId, domainUrl);
           }}

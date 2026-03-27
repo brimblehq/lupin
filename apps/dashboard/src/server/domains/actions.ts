@@ -172,6 +172,7 @@ export const createProjectDomainServerFn = createServerFn({
   const payload = data as
     | {
         workspace?: string;
+        id?: string;
         projectId?: string;
         name: string;
       }
@@ -184,9 +185,11 @@ export const createProjectDomainServerFn = createServerFn({
 
   return withTokenRefresh(async (api) => {
     const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
+    const domainProjectId = payload?.id?.trim() || payload?.projectId?.trim();
     return api.domains.add({
       name,
-      projectId: payload?.projectId,
+      id: domainProjectId,
+      projectId: domainProjectId,
       teamId,
     });
   });

@@ -71,6 +71,7 @@ export interface ListDomainsInput {
 
 export interface AddDomainInput {
   name: string;
+  id?: string;
   projectId?: string;
   teamId?: string;
 }
@@ -462,8 +463,9 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
     },
 
     async add(input) {
+      const projectId = (input.id ?? input.projectId)?.trim();
       const response = await client.request<any>(
-        `${listEndpoint}/${input.projectId ? encodeURIComponent(input.projectId) : ""}`,
+        `${listEndpoint}/${projectId ? encodeURIComponent(projectId) : ""}`,
         {
           method: "POST",
           body: {

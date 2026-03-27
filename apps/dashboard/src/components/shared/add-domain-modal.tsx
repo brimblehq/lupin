@@ -40,7 +40,7 @@ interface AddDomainModalProps {
   paymentCards?: SettingsPaymentCard[];
   onCreateProject?: () => void;
   /** Called to validate the domain before submitting. Return null if valid, or an error. */
-  onValidate?: (domainUrl: string) => DomainValidationError | null;
+  onValidate?: (domainUrl: string) => DomainValidationError | null | Promise<DomainValidationError | null>;
   /** Called when user clicks "Register" for a domain that doesn't exist. */
   onRegisterDomain?: (domainUrl: string) => void;
   /** Open the modal directly on a specific step. */
@@ -214,6 +214,7 @@ export function AddDomainModal({
       return;
     }
 
+    setSubmitting(true);
     const normalizedDomain = normalizeDomainInput(domainUrl);
 
     if (isReservedBrimbleSubdomain(normalizedDomain)) {
@@ -222,19 +223,19 @@ export function AddDomainModal({
         message:
           "Brimble-managed subdomains are reserved and cannot be added manually.",
       });
+      setSubmitting(false);
       return;
     }
 
-    if (onValidate) {
-      const validationError = onValidate(normalizedDomain);
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-    }
-
     try {
-      setSubmitting(true);
+      if (onValidate) {
+        const validationError = await onValidate(normalizedDomain);
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
+      }
+
       setError(null);
       await onContinue(selectedProject, normalizedDomain);
       resetAndClose();
@@ -570,6 +571,12 @@ export function AddDomainModal({
                     placeholder="myawesomewebsite.com"
                     value={domainUrl}
                     onChange={(e) => handleDomainChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      if (!domainUrl.trim() || !!error || submitting) return;
+                      void handleStepTwoContinue();
+                    }}
                     autoFocus
                     className={`rounded-[4px] bg-[#fdfdfd] px-2 py-1.5 text-[13px] font-light leading-5 text-dash-text-strong outline-none placeholder:text-[#9ca3af] dark:bg-[#1a1c1e] dark:placeholder:text-dash-text-extra-faded ${
                       error
