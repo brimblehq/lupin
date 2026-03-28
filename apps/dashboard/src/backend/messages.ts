@@ -14,7 +14,7 @@ export interface AppTooltipMessage {
 
 export interface MessagesApi {
   listTooltipMessages(input: {
-    subscriptionId: string;
+    subscriptionId?: string;
     type?: "notifications";
     limit?: number;
     page?: number;
@@ -45,15 +45,12 @@ function mapMessage(value: unknown): AppTooltipMessage | null {
 export function createMessagesApi(client: ApiClient): MessagesApi {
   return {
     async listTooltipMessages(input) {
-      const subscriptionId = input.subscriptionId.trim();
-      if (!subscriptionId) {
-        throw new Error("Subscription ID is required");
-      }
+      const subscriptionId = input.subscriptionId?.trim() || undefined;
 
       const response = await client.request<any>("/core/v1/tooltip-message", {
         method: "GET",
         query: {
-          subscriptionId,
+          ...(subscriptionId ? { subscriptionId } : {}),
           type: input.type,
           limit: input.limit,
           page: input.page,

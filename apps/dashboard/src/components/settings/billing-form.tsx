@@ -3,6 +3,7 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import type { StripeCardElementOptions } from "@stripe/stripe-js";
 import { motion } from "motion/react";
+import { cn } from "@brimble/ui";
 import { usePricing } from "@/contexts/pricing-context";
 import { ArrowSquareOut, CreditCard, PencilSimple } from "@phosphor-icons/react";
 import { Plus, Star, X } from "lucide-react";
@@ -1033,6 +1034,8 @@ function InvoicesSection({
               : invoice.number
             : "Invoice";
 
+          const isOpen = invoice.status === "open";
+
           return (
             <div
               key={invoice.id}
@@ -1047,7 +1050,17 @@ function InvoicesSection({
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <span className="text-xs text-dash-text-extra-faded">
+                <span
+                  className={cn(
+                    "flex items-center gap-1.5 text-xs",
+                    isOpen
+                      ? "text-[#f5a623]"
+                      : "text-dash-text-extra-faded",
+                  )}
+                >
+                  {isOpen && (
+                    <span className="size-1.5 rounded-full bg-[#f5a623]" />
+                  )}
                   {invoice.status} {invoice.total ? `• ${invoice.total}` : ""}
                 </span>
                 {invoice.invoice_pdf ? (

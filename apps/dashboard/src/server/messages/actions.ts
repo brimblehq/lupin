@@ -33,10 +33,6 @@ export const listTooltipMessagesServerFn = createServerFn({
       subscriptionId = profile.subscription?.id?.trim() || undefined;
     }
 
-    if (!subscriptionId) {
-      return null as AppTooltipMessage[] | null;
-    }
-
     return api.messages.listTooltipMessages({
       subscriptionId,
       type: payload?.type,
