@@ -1,5 +1,11 @@
 import { redirect } from "@tanstack/react-router";
 import { getCurrentSessionServerFn, refreshSessionServerFn } from "@/server/auth/actions";
+import {
+  clearSessionCache,
+  hasAccessTokenCookie,
+  isSessionRecentlyVerified,
+  markSessionVerified,
+} from "./auth-cache";
 
 const publicRoutes = new Set<string>(["/login", "/signup"]);
 
@@ -16,11 +22,23 @@ function buildNextPath(pathname: string, search?: string) {
 }
 
 export function invalidateSessionCache() {
-  // Auth checks are request-driven now; no process-global cache to clear.
+  clearSessionCache();
 }
 
 export async function enforceRouteAuth(pathname: string, search?: string) {
   const isPublicRoute = publicRoutes.has(pathname);
+
+  if (!isPublicRoute && hasAccessTokenCookie() && isSessionRecentlyVerified()) {
+    return { session: true };
+  }
+
+  if (isPublicRoute && hasAccessTokenCookie() && isSessionRecentlyVerified()) {
+    const nextParam = new URLSearchParams(
+      search?.startsWith("?") ? search : `?${search || ""}`,
+    ).get("next");
+    throw redirect({ to: nextParam || "/" });
+  }
+
   let session: unknown = null;
   let authCheckFailed = false;
 
@@ -35,8 +53,12 @@ export async function enforceRouteAuth(pathname: string, search?: string) {
     session = await refreshSessionServerFn();
   }
 
+  if (session) {
+    markSessionVerified();
+  }
+
   if (!session && !isPublicRoute && !authCheckFailed) {
-    invalidateSessionCache();
+    clearSessionCache();
     throw redirect({
       to: "/login",
       search: {

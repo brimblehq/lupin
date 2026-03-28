@@ -169,6 +169,10 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
           typeof invoice?.invoice_pdf === "string"
             ? invoice.invoice_pdf
             : undefined,
+        hosted_invoice_url:
+          typeof invoice?.hosted_invoice_url === "string"
+            ? invoice.hosted_invoice_url
+            : undefined,
         source:
           invoice?.source === "subscription" || invoice?.source === "purchase"
             ? invoice.source

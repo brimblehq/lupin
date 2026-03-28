@@ -36,6 +36,7 @@ export interface Invoice {
   status: "draft" | "open" | "paid" | "void" | "uncollectible";
   date: string;
   invoice_pdf?: string;
+  hosted_invoice_url?: string;
   source?: "subscription" | "purchase";
   type?: string;
 }

@@ -86,6 +86,14 @@ function AddonsPage() {
   const { addons, total, page, totalPages, categories } = Route.useLoaderData();
   const activeCategory = routeSearch.category ?? undefined;
   const isLoading = useRouterState({ select: (s) => s.isLoading });
+  const pendingPage = useRouterState({
+    select: (s) => {
+      const pending = s.pendingLocation ?? s.location;
+      return parsePositivePageSearchValue(
+        (pending.search as Record<string, unknown>)?.page,
+      ) ?? 1;
+    },
+  });
 
   const filteredAddons = useMemo(() => {
     if (!search.trim()) return addons;
@@ -189,6 +197,8 @@ function AddonsPage() {
                 <NumberPagination
                   currentPage={page}
                   totalPages={totalPages}
+                  isLoading={isLoading}
+                  loadingPage={isLoading ? pendingPage : null}
                   onPageChange={(nextPage) => {
                     navigate({
                       to: "/addons",

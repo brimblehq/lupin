@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import { FolderOpen } from "@phosphor-icons/react";
@@ -625,6 +625,15 @@ function ProjectsPage() {
   const requestedWorkspace = search.workspace?.trim().toLowerCase() || undefined;
   const loadedWorkspace = loaderData.workspace?.trim().toLowerCase() || undefined;
   const isWorkspaceSwitching = requestedWorkspace !== loadedWorkspace;
+  const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
+  const pendingPage = useRouterState({
+    select: (s) => {
+      const pending = s.pendingLocation ?? s.location;
+      return parsePositivePageSearchValue(
+        (pending.search as Record<string, unknown>)?.page,
+      ) ?? 1;
+    },
+  });
 
   const refreshSignal = useTagsStore((s) => s._refreshSignal);
   const tags = useTagsStore((s) => s.tags);
@@ -821,7 +830,7 @@ function ProjectsPage() {
 
       <hr className="border-dash-border-soft mb-8 -mx-4 md:-mx-10" />
 
-      <TagFilterBar activeTagId={activeTagId} onFilterChange={setActiveTagId} projects={projects} />
+      <TagFilterBar activeTagId={activeTagId} onFilterChange={setActiveTagId} projects={projects} workspace={search.workspace} />
 
       <div className="mb-4 mt-4">
         <SearchFilterBar
@@ -939,6 +948,8 @@ function ProjectsPage() {
           currentPage={pagination.currentPage}
           totalPages={pagination.totalPages}
           onPageChange={handlePageChange}
+          isLoading={isRouterLoading}
+          loadingPage={isRouterLoading ? pendingPage : null}
         />
       </div>
 

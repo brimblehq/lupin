@@ -8,6 +8,7 @@ export const siteConfig = {
     { label: "FAQ", href: "/faq" },
     { label: "Docs", href: "https://docs.brimble.io" },
     { label: "Status", href: "https://status.brimble.io", status: true },
+    { label: "Talk to Founder", href: "https://cal.com/brimble/15min" },
   ],
   socials: {
     heading: "Follow Brimble",

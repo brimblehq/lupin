@@ -983,6 +983,7 @@ function InvoicesSection({
       total?: string;
       status: string;
       invoice_pdf?: string;
+      hosted_invoice_url?: string;
       date: string;
       source?: "subscription" | "purchase";
       type?: string;
@@ -1059,11 +1060,23 @@ function InvoicesSection({
                   )}
                 >
                   {isOpen && (
-                    <span className="size-1.5 rounded-full bg-[#f5a623]" />
+                    <span className="relative flex size-1.5">
+                      <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#f5a623] opacity-75" />
+                      <span className="relative inline-flex size-1.5 rounded-full bg-[#f5a623]" />
+                    </span>
                   )}
                   {invoice.status} {invoice.total ? `• ${invoice.total}` : ""}
                 </span>
-                {invoice.invoice_pdf ? (
+                {isOpen && invoice.hosted_invoice_url ? (
+                  <a
+                    href={invoice.hosted_invoice_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-[8px] border border-dash-border bg-dash-bg px-3 py-1.5 text-sm leading-5 tracking-[-0.0224px] text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+                  >
+                    Pay now
+                  </a>
+                ) : invoice.invoice_pdf ? (
                   isPurchase ? (
                     <a
                       href={invoice.invoice_pdf}

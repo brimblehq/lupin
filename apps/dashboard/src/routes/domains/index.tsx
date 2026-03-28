@@ -162,6 +162,15 @@ function DomainsPage() {
     domainsResult.items.map((item) => mapDomainToRow(item)),
   );
   const navigate = useNavigate({ from: "/domains/" });
+  const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
+  const pendingPage = useRouterState({
+    select: (s) => {
+      const pending = s.pendingLocation ?? s.location;
+      return parsePositivePageSearchValue(
+        (pending.search as Record<string, unknown>)?.page,
+      ) ?? 1;
+    },
+  });
   const refreshDomainStatus = useServerFn(refreshDomainStatusServerFn as any) as (args: {
     data: { workspace?: string; domainName: string };
   }) => Promise<DomainRecord | null>;
@@ -484,6 +493,8 @@ function DomainsPage() {
           currentPage={domainsResult.currentPage}
           totalPages={domainsResult.totalPages}
           onPageChange={handlePageChange}
+          isLoading={isRouterLoading}
+          loadingPage={isRouterLoading ? pendingPage : null}
         />
       </div>
 

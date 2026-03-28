@@ -3,6 +3,7 @@ import {
   createFileRoute,
   getRouteApi,
   useNavigate,
+  useRouterState,
 } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
@@ -216,6 +217,14 @@ function ProjectDomainsPage() {
     domainsResult.items.map((item) => mapDomainToRow(item, project.name)),
   );
   const navigate = useNavigate({ from: "/projects/$projectId/domains/" });
+  const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
+  const pendingPage = useRouterState({
+    select: (s) => {
+      const pending = s.pendingLocation ?? s.location;
+      const raw = (pending.search as Record<string, unknown>)?.page;
+      return typeof raw === "number" && raw >= 1 ? Math.floor(raw) : 1;
+    },
+  });
   const refreshDomainStatus = useServerFn(
     refreshDomainStatusServerFn as any,
   ) as (args: {
@@ -479,6 +488,8 @@ function ProjectDomainsPage() {
           currentPage={domainsResult.currentPage}
           totalPages={domainsResult.totalPages}
           onPageChange={handlePageChange}
+          isLoading={isRouterLoading}
+          loadingPage={isRouterLoading ? pendingPage : null}
         />
       </div>
 
