@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { LoaderCircle } from "lucide-react";
 import { SearchFilterBar } from "../../components/shared/search-filter-bar";
 import { DashButton } from "../../components/shared/dash-button";
@@ -12,6 +12,7 @@ import { listMcpTemplatesServerFn, listMcpCategoriesServerFn } from "@/server/mc
 import type { McpServerListResult } from "@/backend/mcp";
 import { parsePositivePageSearchValue } from "@/utils/workspace-route-search";
 import { useHaptics } from "@/hooks/use-haptics";
+import { useServerFn } from "@tanstack/react-start";
 
 const ADDONS_PAGE_SIZE = 18;
 
@@ -29,7 +30,6 @@ export const Route = createFileRoute("/addons/")({
   },
   loaderDeps: ({ search }) => ({
     page: parsePositivePageSearchValue(search.page) ?? 1,
-    category: typeof search.category === "string" ? search.category.trim() : undefined,
   }),
   loader: async ({ deps }) => {
     const page = deps.page;
@@ -42,7 +42,6 @@ export const Route = createFileRoute("/addons/")({
         data: {
           limit: ADDONS_PAGE_SIZE,
           offset,
-          category: deps.category,
         },
       }),
       (listMcpCategoriesServerFn as unknown as () => Promise<string[]>)().catch(
@@ -83,9 +82,8 @@ function AddonsPage() {
   const haptics = useHaptics();
   const [search, setSearch] = useState("");
   const routeSearch = Route.useSearch();
-  const { addons, total, page, totalPages, categories } = Route.useLoaderData();
-  const activeCategory = routeSearch.category ?? undefined;
-  const isLoading = useRouterState({ select: (s) => s.isLoading });
+  const loaderData = Route.useLoaderData();
+  const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
   const pendingPage = useRouterState({
     select: (s) => {
       const pending = s.pendingLocation ?? s.location;
@@ -95,26 +93,58 @@ function AddonsPage() {
     },
   });
 
+  const listMcpTemplates = useServerFn(listMcpTemplatesServerFn as any) as (args: {
+    data?: { limit?: number; offset?: number; category?: string };
+  }) => Promise<McpServerListResult>;
+
+  const [activeCategory, setActiveCategory] = useState<string | undefined>(
+    routeSearch.category ?? undefined,
+  );
+  const [categoryAddons, setCategoryAddons] = useState<DiscoverAddon[] | null>(null);
+  const [categoryTotal, setCategoryTotal] = useState<number | null>(null);
+  const [categoryLoading, setCategoryLoading] = useState(false);
+
+  const displayAddons = activeCategory ? (categoryAddons ?? []) : loaderData.addons;
+  const displayTotal = activeCategory ? (categoryTotal ?? 0) : loaderData.total;
+
+  const fetchCategory = useCallback(async (cat?: string) => {
+    if (!cat) {
+      setCategoryAddons(null);
+      setCategoryTotal(null);
+      return;
+    }
+
+    setCategoryLoading(true);
+    try {
+      const result = await listMcpTemplates({
+        data: { limit: ADDONS_PAGE_SIZE, offset: 0, category: cat },
+      });
+      setCategoryAddons(result.servers.map(mapMcpTemplateToAddon));
+      setCategoryTotal(result.pagination.total ?? result.servers.length);
+    } catch {
+      setCategoryAddons([]);
+      setCategoryTotal(0);
+    } finally {
+      setCategoryLoading(false);
+    }
+  }, [listMcpTemplates]);
+
+  function selectCategory(cat?: string) {
+    haptics.selection();
+    const next = cat === activeCategory ? undefined : cat;
+    setActiveCategory(next);
+    void fetchCategory(next);
+  }
+
   const filteredAddons = useMemo(() => {
-    if (!search.trim()) return addons;
+    if (!search.trim()) return displayAddons;
     const q = search.trim().toLowerCase();
-    return addons.filter(
+    return displayAddons.filter(
       (a) =>
         a.name.toLowerCase().includes(q) ||
         a.description.toLowerCase().includes(q),
     );
-  }, [addons, search]);
-
-  function selectCategory(cat?: string) {
-    haptics.selection();
-    navigate({
-      to: "/addons",
-      search: {
-        category: cat,
-        page: undefined,
-      },
-    });
-  }
+  }, [displayAddons, search]);
 
   return (
     <div className="px-4 py-8 md:px-10">
@@ -134,7 +164,7 @@ function AddonsPage() {
           </p>
           <div className="mt-4">
             <DashButton size="sm" disabled>
-              {total} server{total === 1 ? "" : "s"} available
+              {displayTotal} server{displayTotal === 1 ? "" : "s"} available
             </DashButton>
           </div>
         </div>
@@ -145,36 +175,29 @@ function AddonsPage() {
         />
       </motion.div>
 
-      {/* Category pills */}
-      {categories.length > 0 && (
+      {loaderData.categories.length > 0 && (
         <div className="scrollbar-hidden mt-5 flex gap-2 overflow-x-auto">
           <button
             onClick={() => selectCategory(undefined)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors ${
+            className={`shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors ${
               !activeCategory
                 ? "bg-dash-text-strong text-dash-bg"
                 : "bg-dash-bg-elevated text-dash-text-faded hover:text-dash-text-body"
             }`}
           >
             All
-            {isLoading && !activeCategory && (
-              <LoaderCircle className="size-3 animate-spin" />
-            )}
           </button>
-          {categories.map((cat) => (
+          {loaderData.categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => selectCategory(cat === activeCategory ? undefined : cat)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${
+              onClick={() => selectCategory(cat)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${
                 activeCategory === cat
                   ? "bg-dash-text-strong text-dash-bg"
                   : "bg-dash-bg-elevated text-dash-text-faded hover:text-dash-text-body"
               }`}
             >
               {cat}
-              {isLoading && activeCategory === cat && (
-                <LoaderCircle className="size-3 animate-spin" />
-              )}
             </button>
           ))}
         </div>
@@ -189,34 +212,63 @@ function AddonsPage() {
       </div>
 
       <div className="mt-6">
-        {filteredAddons.length ? (
-          <>
-            <AddonGrid items={filteredAddons} />
-            {!search.trim() && (
-              <div className="mt-6 flex justify-end">
-                <NumberPagination
-                  currentPage={page}
-                  totalPages={totalPages}
-                  isLoading={isLoading}
-                  loadingPage={isLoading ? pendingPage : null}
-                  onPageChange={(nextPage) => {
-                    navigate({
-                      to: "/addons",
-                      search: {
-                        ...routeSearch,
-                        page: nextPage === 1 ? undefined : nextPage,
-                      },
-                    });
-                  }}
-                />
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="py-12 text-center text-sm text-dash-text-faded">
-            No MCP servers match your search.
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {categoryLoading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex flex-col items-center justify-center gap-3 py-16"
+            >
+              <LoaderCircle className="size-5 animate-spin text-dash-text-faded" />
+              <p className="text-sm text-dash-text-faded">
+                Loading servers...
+              </p>
+            </motion.div>
+          ) : filteredAddons.length ? (
+            <motion.div
+              key={`grid-${activeCategory ?? "all"}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <AddonGrid items={filteredAddons} />
+              {!search.trim() && !activeCategory && (
+                <div className="mt-6 flex justify-end">
+                  <NumberPagination
+                    currentPage={loaderData.page}
+                    totalPages={loaderData.totalPages}
+                    isLoading={isRouterLoading}
+                    loadingPage={isRouterLoading ? pendingPage : null}
+                    onPageChange={(nextPage) => {
+                      navigate({
+                        to: "/addons",
+                        search: {
+                          ...routeSearch,
+                          page: nextPage === 1 ? undefined : nextPage,
+                        },
+                      });
+                    }}
+                  />
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="py-12 text-center text-sm text-dash-text-faded"
+            >
+              No MCP servers match your search.
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
