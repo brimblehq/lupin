@@ -220,6 +220,7 @@ export function StatsRow({
         open={changePlanOpen}
         onOpenChange={setChangePlanOpen}
         currentPlan={plan.displayName}
+        defaultSelectedPlan={plan.nextPlan ?? undefined}
         initialPaymentMethods={initialPaymentMethods}
       />
     </div>

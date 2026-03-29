@@ -11,7 +11,6 @@ import config from "@/config";
 import {
   clearServerAuthCookies,
   getServerAccessToken,
-  getServerClientIp,
   getServerRefreshToken,
   setServerAuthCookies,
 } from "./cookies";
@@ -69,15 +68,6 @@ export const resendAuthCodeServerFn = createServerFn({ method: "POST" }).handler
 export const verifyEmailCodeServerFn = createServerFn({ method: "POST" }).handler(
   async ({ data }) => {
     const { geo, ...rest } = data as VerifyEmailCodeInput & { geo?: ClientGeoData };
-
-    const proxyIp = getServerClientIp();
-    console.log("[auth-geo] verifyEmailCode", {
-      geoReceived: geo ?? null,
-      geoIp: geo?.ip ?? null,
-      geoLocation: geo ? [geo.city, geo.region, geo.country].filter(Boolean).join(", ") : null,
-      proxyIp,
-    });
-
     const session = await getServerBackendApi(geo).auth.verifyEmailCode(rest);
     setServerAuthCookies(session);
 

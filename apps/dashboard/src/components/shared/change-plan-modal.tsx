@@ -20,14 +20,16 @@ export function ChangePlanModal({
   open,
   onOpenChange,
   currentPlan,
+  defaultSelectedPlan,
   initialPaymentMethods,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentPlan: string;
+  defaultSelectedPlan?: string;
   initialPaymentMethods?: PaymentMethod[] | null;
 }) {
-  const [selectedPlan, setSelectedPlan] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState(defaultSelectedPlan ?? "");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const pricing = usePricing();
 
@@ -132,7 +134,7 @@ export function ChangePlanModal({
       open={open}
       onOpenChange={(v) => {
         if (!v) {
-          setSelectedPlan("");
+          setSelectedPlan(defaultSelectedPlan ?? "");
           setAcceptedTerms(false);
         }
         onOpenChange(v);
