@@ -363,7 +363,7 @@ function WorkspaceSwitcher({
                     alt=""
                     className="size-6 shrink-0 rounded-full object-cover"
                   />
-                  <span className="text-sm text-dash-text-body dark:text-dash-text-strong">
+                  <span className="text-left text-sm text-dash-text-body dark:text-dash-text-strong">
                     {personalWorkspaceLabel}
                   </span>
                 </button>
@@ -401,7 +401,7 @@ function WorkspaceSwitcher({
                           alt=""
                           className="size-6 shrink-0 rounded-full object-cover"
                         />
-                        <span className="text-sm text-dash-text-body dark:text-dash-text-strong">
+                        <span className="text-left text-sm text-dash-text-body dark:text-dash-text-strong">
                           {`${toTitleCase(team.name)}'s Workspace`}
                         </span>
                       </button>
