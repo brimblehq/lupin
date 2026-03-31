@@ -18,7 +18,7 @@ import {
   ShieldAlert,
   HardDrive,
 } from "lucide-react";
-import { GithubLogo, Cube, Database } from "@phosphor-icons/react";
+import { GithubLogo, Cube, Database, CircleNotch } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { GlossyButton } from "../../components/shared/glossy-button";
@@ -496,7 +496,11 @@ function Phase2GitConnect({
             onClick={onConnected}
             disabled={buttonDisabled}
           >
-            {buttonLabel}
+            {polling ? (
+              <CircleNotch className="size-4 animate-spin" />
+            ) : (
+              buttonLabel
+            )}
           </GlossyButton>
           {errorMessage ? (
             <p className="mt-3 text-center text-xs text-[#ef2f1f]">

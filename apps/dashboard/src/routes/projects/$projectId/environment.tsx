@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, ChevronDown, ChevronUp, Code2, Copy as CopyIcon, Eye, EyeOff, Lock, Search, X } from "lucide-react";
-import { Info } from "@phosphor-icons/react";
+import { Check, ChevronDown, ChevronUp, Code2, Copy as CopyIcon, Lock, Search, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { Info, Eye, EyeSlash } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@brimble/ui";
@@ -327,7 +328,7 @@ function EnvAccordionRow({
                   onClick={revealValue}
                   className="shrink-0 text-dash-text-faded hover:text-dash-text-strong"
                 >
-                  {showValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  {showValue ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
                 </button>
                 <button
                   type="button"
@@ -505,7 +506,7 @@ function EnvLevelVarRow({
               />
               <div className="absolute right-2 flex items-center gap-1.5">
                 <button type="button" onClick={() => setShowValue((p) => !p)} className="shrink-0 text-dash-text-faded hover:text-dash-text-strong">
-                  {showValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  {showValue ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
                 </button>
                 <button
                   type="button"
@@ -576,6 +577,7 @@ function EnvironmentLevelVarsSection({
   const [envName, setEnvName] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [draftRows, setDraftRows] = useState<Array<{ id: string; name: string; value: string; inheritable: boolean }>>([]);
+  const [visibleDraftIds, setVisibleDraftIds] = useState<Set<string>>(new Set());
   const [savingDrafts, setSavingDrafts] = useState(false);
 
   const getEnvVars = useServerFn(getEnvironmentVariablesServerFn as any) as (args: {
@@ -702,14 +704,22 @@ function EnvironmentLevelVarsSection({
           {canWrite && draftRows.length > 0 && (
             <div className="border-t border-dash-border px-4 py-4">
               <div className="flex flex-col gap-2">
+                <AnimatePresence initial={false}>
                 {draftRows.map((row) => (
-                  <div key={row.id} className="grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
+                  <motion.div
+                    key={row.id}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                  <div className="flex items-center gap-2 py-px">
                     <input
                       type="text"
                       value={row.name}
                       onChange={(e) => updateDraftRow(row.id, "name", e.target.value)}
                       placeholder="VARIABLE_NAME"
-                      className="input-base input-focus h-[36px] w-full px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded"
+                      className="input-base input-focus h-[36px] min-w-0 flex-1 px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded"
                     />
                     <input
                       type="text"
@@ -717,26 +727,38 @@ function EnvironmentLevelVarsSection({
                       value={row.value}
                       onChange={(e) => updateDraftRow(row.id, "value", e.target.value)}
                       placeholder="value"
-                      className="input-base input-focus h-[36px] w-full px-3 text-sm text-dash-text-strong [text-security:disc] [-webkit-text-security:disc] placeholder:text-dash-text-extra-faded placeholder:[-webkit-text-security:none]"
+                      className={`input-base input-focus h-[36px] min-w-0 flex-1 px-3 text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded ${
+                        visibleDraftIds.has(row.id)
+                          ? ""
+                          : "[text-security:disc] [-webkit-text-security:disc] placeholder:[-webkit-text-security:none]"
+                      }`}
                     />
-                    <label className="flex items-center gap-1.5 text-xs text-dash-text-faded" title="Inheritable by child environments">
-                      <input
-                        type="checkbox"
-                        checked={row.inheritable}
-                        onChange={(e) => updateDraftRow(row.id, "inheritable", e.target.checked)}
-                        className="size-3.5 rounded border-dash-border accent-[#4879f8]"
-                      />
-                      Inherit
-                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVisibleDraftIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(row.id)) next.delete(row.id);
+                          else next.add(row.id);
+                          return next;
+                        })
+                      }
+                      className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[4px] text-dash-text-faded hover:text-dash-text-body"
+                      title={visibleDraftIds.has(row.id) ? "Hide value" : "Show value"}
+                    >
+                      {visibleDraftIds.has(row.id) ? <EyeSlash className="size-4" /> : <Eye className="size-4" />}
+                    </button>
                     <button
                       type="button"
                       onClick={() => removeDraftRow(row.id)}
-                      className="flex h-[36px] w-[36px] items-center justify-center rounded-[4px] text-dash-text-faded hover:text-red-400"
+                      className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[4px] text-dash-text-faded hover:text-red-400"
                     >
                       <X className="size-4" />
                     </button>
                   </div>
+                  </motion.div>
                 ))}
+                </AnimatePresence>
               </div>
               <div className="mt-3 flex items-center justify-between">
                 <button type="button" onClick={addDraftRow} className="text-sm text-dash-text-faded hover:text-dash-text-strong">
@@ -811,6 +833,7 @@ function EnvironmentPage() {
   const [rawDirty, setRawDirty] = useState(false);
   const [savingRaw, setSavingRaw] = useState(false);
   const [draftRows, setDraftRows] = useState<EditableEnvRow[]>([{ id: createDraftId(), name: "", value: "" }]);
+  const [visibleDraftIds, setVisibleDraftIds] = useState<Set<string>>(new Set());
   const [savingDraftRows, setSavingDraftRows] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState<string | undefined>(undefined);
   const [decryptingRowId, setDecryptingRowId] = useState<string | undefined>(undefined);
@@ -1241,14 +1264,23 @@ function EnvironmentPage() {
                 {canEdit && (
                   <div className="border-b-[0.5px] border-dash-border px-4 py-4">
                     <div className="flex flex-col gap-2">
+                      <AnimatePresence initial={false}>
                       {draftRows.map((row) => (
-                        <div key={row.id} className="grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_1fr_auto]">
+                        <motion.div
+                          key={row.id}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                          className="overflow-x-visible overflow-y-hidden"
+                        >
+                        <div className="flex items-center gap-2 py-px">
                           <input
                             type="text"
                             value={row.name}
                             onChange={(event) => updateDraftRow(row.id, "name", event.target.value)}
                             placeholder="APP_ENV"
-                            className="input-base input-focus h-[36px] w-full px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded"
+                            className="input-base input-focus h-[36px] min-w-0 flex-1 px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded"
                           />
                           <input
                             type="text"
@@ -1256,18 +1288,39 @@ function EnvironmentPage() {
                             value={row.value}
                             onChange={(event) => updateDraftRow(row.id, "value", event.target.value)}
                             placeholder="value"
-                            className="input-base input-focus h-[36px] w-full px-3 text-sm text-dash-text-strong [text-security:disc] [-webkit-text-security:disc] placeholder:text-dash-text-extra-faded placeholder:[-webkit-text-security:none]"
+                            className={`input-base input-focus h-[36px] min-w-0 flex-1 px-3 text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded ${
+                              visibleDraftIds.has(row.id)
+                                ? ""
+                                : "[text-security:disc] [-webkit-text-security:disc] placeholder:[-webkit-text-security:none]"
+                            }`}
                           />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVisibleDraftIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(row.id)) next.delete(row.id);
+                                else next.add(row.id);
+                                return next;
+                              })
+                            }
+                            className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[4px] text-dash-text-faded hover:text-dash-text-body"
+                            title={visibleDraftIds.has(row.id) ? "Hide value" : "Show value"}
+                          >
+                            {visibleDraftIds.has(row.id) ? <EyeSlash className="size-4" /> : <Eye className="size-4" />}
+                          </button>
                           <button
                             type="button"
                             onClick={() => removeDraftRow(row.id)}
                             disabled={draftRows.length === 1}
-                            className="flex h-[36px] w-[36px] items-center justify-center rounded-[4px] text-dash-text-faded hover:text-red-400 disabled:opacity-30"
+                            className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[4px] text-dash-text-faded hover:text-red-400 disabled:opacity-30"
                           >
                             <X className="size-4" />
                           </button>
                         </div>
+                        </motion.div>
                       ))}
+                      </AnimatePresence>
                     </div>
                     <div className="mt-3 flex items-center justify-between">
                       <button
