@@ -55,6 +55,9 @@ export interface Project {
     name?: string;
     [key: string]: unknown;
   } | null;
+  backupUrl?: string;
+  backupSize?: number;
+  lastBackup?: string;
   specs?: {
     memory?: number | string;
     cpu?: number | string;
@@ -424,6 +427,9 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       whiteListedIps,
       autoscalingGroup,
       dbImage,
+      backupUrl: pickString(row, "backupUrl", "backup_url", "last_backup_url"),
+      backupSize: pickNumber(row, "backupSize", "backup_size"),
+      lastBackup: pickString(row, "lastBackup", "last_backup"),
       specs: specsRecord
         ? {
             memory: specsRecord.memory as number | string | undefined,

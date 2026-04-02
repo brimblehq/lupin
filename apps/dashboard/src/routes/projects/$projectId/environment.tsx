@@ -132,7 +132,7 @@ function HighlightedEditor({
       <pre
         ref={preRef}
         aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-auto whitespace-pre-wrap break-words px-3.5 py-3 font-mono text-sm leading-6 scrollbar-thin"
+        className="pointer-events-none absolute inset-0 overflow-auto whitespace-pre-wrap break-words px-3.5 py-3 font-mono text-sm leading-6 scrollbar-hidden"
         dangerouslySetInnerHTML={{ __html: `${highlighted}\n` }}
       />
       <textarea
@@ -143,7 +143,7 @@ function HighlightedEditor({
         readOnly={readOnly}
         placeholder={placeholder}
         spellCheck={false}
-        className="relative h-full w-full resize-none bg-transparent px-3.5 py-3 font-mono text-sm leading-6 text-transparent caret-dash-text-strong outline-none placeholder:text-dash-text-extra-faded"
+        className="scrollbar-hidden relative h-full w-full resize-none overflow-auto bg-transparent px-3.5 py-3 font-mono text-sm leading-6 text-transparent caret-dash-text-strong outline-none placeholder:text-dash-text-extra-faded"
       />
     </div>
   );

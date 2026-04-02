@@ -4,7 +4,7 @@ import {
   getRouteApi,
   useNavigate,
 } from "@tanstack/react-router";
-import { ExternalLink, Copy, Check, ArrowUpRight, Terminal } from "lucide-react";
+import { ExternalLink, Copy, Check, ArrowUpRight, Terminal, Download, Database, Clock, HardDrive } from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
 import { DeploymentLogsDrawer } from "../../../components/shared/deployment-logs-drawer";
@@ -18,6 +18,13 @@ import {
   isMcpProject as getIsMcpProject,
   isWebLikeProject,
 } from "@/utils/project-capabilities";
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+}
 
 /** Backend/service frameworks that don't produce browser screenshots */
 const SERVICE_FRAMEWORKS = new Set([
@@ -458,6 +465,62 @@ function ProjectDetailPage() {
               ) : null}
             </div>
           </div>
+
+          {/* Backups card (database projects) */}
+          {isDatabaseProject ? (
+            <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+              <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
+                <span className="text-dash-text-strong">Manage Backups</span>
+              </div>
+              <div className="flex flex-col divide-y divide-dash-border">
+                <div className="flex items-center justify-between px-3.5 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="size-4 text-dash-text-extra-faded" />
+                    <span className="text-sm font-light text-dash-text-faded">Backup size</span>
+                  </div>
+                  <span className="font-mono text-sm text-dash-text-body">
+                    {project?.backupSize != null ? formatBytes(project.backupSize) : "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between px-3.5 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <Clock className="size-4 text-dash-text-extra-faded" />
+                    <span className="text-sm font-light text-dash-text-faded">Backup frequency</span>
+                  </div>
+                  <span className="font-mono text-sm text-dash-text-body">Daily</span>
+                </div>
+                <div className="flex items-center justify-between px-3.5 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <Download className="size-4 text-dash-text-extra-faded" />
+                    <span className="text-sm font-light text-dash-text-faded">Download backup</span>
+                  </div>
+                  {project?.backupUrl ? (
+                    <a
+                      href={project.backupUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={`${projectName}-${Date.now().toString(36)}-backup.zip`}
+                      className="font-mono text-sm text-[#4879f8] underline transition-colors hover:text-[#3a63d6]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Download Now
+                    </a>
+                  ) : (
+                    <span className="font-mono text-sm text-dash-text-extra-faded">No backup available</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between px-3.5 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <Database className="size-4 text-dash-text-extra-faded" />
+                    <span className="text-sm font-light text-dash-text-faded">Last backup</span>
+                  </div>
+                  <span className="font-mono text-sm text-dash-text-body">
+                    {project?.lastBackup ? formatRelativeTime(project.lastBackup) : "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Deployments card */}
           {!isDatabaseProject ? (

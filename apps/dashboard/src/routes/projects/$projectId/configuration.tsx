@@ -894,6 +894,7 @@ function ResourcesSection({
   scalingGroupOptions,
   showScalingGroup = true,
   showPersistentStorage = true,
+  storageAlwaysOn = false,
   canSave = true,
   canWrite = true,
 }: {
@@ -902,6 +903,7 @@ function ResourcesSection({
   scalingGroupOptions: { id: string; label: string }[];
   showScalingGroup?: boolean;
   showPersistentStorage?: boolean;
+  storageAlwaysOn?: boolean;
   canSave?: boolean;
   canWrite?: boolean;
 }) {
@@ -1006,9 +1008,11 @@ function ResourcesSection({
                 </div>
                 <ToggleSwitch
                   checked={values.diskEnabled}
-                  onChange={(v) => setFieldValue("diskEnabled", v)}
+                  onChange={(v) => {
+                    if (!storageAlwaysOn) setFieldValue("diskEnabled", v);
+                  }}
                   size="sm"
-                  disabled={!canWrite}
+                  disabled={!canWrite || storageAlwaysOn}
                 />
               </div>
               <p className="mt-1 ml-6 text-sm font-light leading-[1.3] text-dash-text-faded">
@@ -1563,12 +1567,13 @@ function ConfigurationPage() {
   };
 
   // Resources section initial values
+  const isDb = isDatabaseProject(project);
   const resourcesInitialValues: ResourcesConfigValues = {
     cpuValue: normalizeCpuValue(project?.specs?.cpu),
     memoryValue: normalizeMemoryGbValue(project?.specs?.memory),
     scalingGroup: project?.autoscalingGroup?.id || "",
-    diskEnabled: Boolean(project?.diskSize || project?.volumeMount),
-    diskSize: String(project?.diskSize || 1),
+    diskEnabled: isDb || Boolean(project?.diskSize || project?.volumeMount),
+    diskSize: String(project?.diskSize || (isDb ? 10 : 1)),
     mountPath: project?.volumeMount || "",
   };
 
@@ -1935,6 +1940,7 @@ function ConfigurationPage() {
                   scalingGroupOptions={scalingGroupOptions}
                   showScalingGroup={scalingGroupVisible}
                   showPersistentStorage={persistentStorageVisible}
+                  storageAlwaysOn={databaseProject}
                   canSave={databaseProject}
                   canWrite={canWrite}
                 />
