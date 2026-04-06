@@ -62,8 +62,12 @@ function buildTasks({
     { label: "Deploy a project", done: hasProject, action: "/projects/new" },
   ];
 
-  // Only show "Upgrade your plan" on personal workspaces
   if (!isTeamWorkspace) {
+    tasks.push({
+      label: "Add a payment card",
+      done: hasPaymentCard,
+      onClick: onAddPaymentCard,
+    });
     tasks.push({ label: "Upgrade your plan", done: !isFreePlan, onClick: onAddPaymentCard });
   }
 
@@ -73,14 +77,6 @@ function buildTasks({
     action: "https://x.com/brimblehq",
     external: true,
   });
-
-  if (!isTeamWorkspace) {
-    tasks.push({
-      label: "Add a payment card",
-      done: hasPaymentCard,
-      onClick: onAddPaymentCard,
-    });
-  }
 
   // Only show "Invite a team member" on team workspaces
   if (isTeamWorkspace && showInviteTeamMemberTask) {

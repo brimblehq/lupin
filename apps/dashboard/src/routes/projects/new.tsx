@@ -3420,7 +3420,6 @@ function NewProjectPage() {
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to provision database");
-    } finally {
       setProvisioningDatabase(false);
     }
   }

@@ -844,7 +844,6 @@ function NewWorkspacePage() {
       } as any);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create workspace");
-    } finally {
       setCreatingWorkspace(false);
     }
   }

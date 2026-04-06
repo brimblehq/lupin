@@ -325,7 +325,6 @@ function SignupPage() {
       return;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "OAuth sign up failed");
-    } finally {
       setOauthLoadingProvider(null);
     }
   }
@@ -383,7 +382,6 @@ function SignupPage() {
       return;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Verification failed");
-    } finally {
       setLoading(false);
     }
   }

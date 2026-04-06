@@ -141,7 +141,6 @@ function TwoFactorChallengePage() {
         window.location.replace(getLoginRedirectUrl());
         return;
       }
-    } finally {
       setLoading(false);
     }
   }

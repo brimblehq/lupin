@@ -272,7 +272,6 @@ function BuyDomainPage() {
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Purchase failed");
-    } finally {
       setPurchasing(false);
     }
   }

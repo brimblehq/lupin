@@ -1416,7 +1416,6 @@ function DangerSection({
                 ? error.message
                 : "Failed to delete project",
             );
-          } finally {
             setDeleting(false);
           }
         }}

@@ -347,7 +347,6 @@ function LoginPage() {
       return;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "OAuth sign in failed");
-    } finally {
       setOauthLoadingProvider(null);
     }
   }
@@ -396,7 +395,6 @@ function LoginPage() {
       return;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Verification failed");
-    } finally {
       setLoading(false);
     }
   }
