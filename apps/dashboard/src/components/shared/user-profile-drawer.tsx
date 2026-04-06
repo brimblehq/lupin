@@ -64,6 +64,7 @@ import {
   updateSettingsWebhooksServerFn,
 } from "@/server/settings/actions";
 import { BillingForm } from "../settings/billing-form";
+import { SecurityForm } from "../settings/security-form";
 import { Avatar } from "./avatar";
 import { SimpleTooltip } from "./tooltip";
 import { usePlanGate } from "@/hooks/use-plan-gate";
@@ -116,6 +117,7 @@ const accountNav: { label: string; key: ProfileTab }[] = [
   { label: "Activity session", key: ProfileTab.ActivitySession },
   { label: "Members", key: ProfileTab.Members },
   { label: "Notifications", key: ProfileTab.Notifications },
+  { label: "Security", key: ProfileTab.Security },
   { label: "Billing", key: ProfileTab.Billing },
 ];
 
@@ -397,7 +399,6 @@ function ProfileForm({
   profile,
   projectCount = 0,
   onSave,
-  onChangeEmail,
   onBuildsChange,
   onHapticsChange,
   onCreateApiKey,
@@ -423,7 +424,6 @@ function ProfileForm({
     username: string;
     avatarUrl?: string;
   }) => void | Promise<void>;
-  onChangeEmail?: (email: string) => void | Promise<void>;
   onBuildsChange?: (enabled: boolean) => Promise<void> | void;
   onHapticsChange?: (enabled: boolean) => Promise<void> | void;
   onCreateApiKey?: () => Promise<string | undefined> | string | undefined;
@@ -446,8 +446,6 @@ function ProfileForm({
   const [firstName, setFirstName] = useState(profile.firstName);
   const [lastName, setLastName] = useState(profile.lastName);
   const [username, setUsername] = useState(profile.username);
-  const [email, setEmail] = useState(profile.email);
-  const [emailCopied, setEmailCopied] = useState(false);
   const [buildsEnabled, setBuildsEnabled] = useState(
     profile.buildsEnabled ?? true,
   );
@@ -486,11 +484,9 @@ function ProfileForm({
     setFirstName(profile.firstName);
     setLastName(profile.lastName);
     setUsername(profile.username);
-    setEmail(profile.email);
     setAvatarUrl(profile.avatarUrl ?? "");
   }, [
     profile.avatarUrl,
-    profile.email,
     profile.firstName,
     profile.lastName,
     profile.username,
@@ -709,52 +705,6 @@ function ProfileForm({
       >
         Confirm
       </GlossyButton>
-
-      <hr className="border-dash-border-soft" />
-
-      {/* Email */}
-      <div className="flex flex-col gap-3.5">
-        <div className="flex flex-col gap-1">
-          <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
-            Email address
-          </span>
-          <span className="text-sm leading-5 text-dash-text-faded">
-            This is a vital info. We would have to verify and save your changes
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className={cn(inputClass, "pr-9 text-dash-text-faded")}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                void navigator.clipboard.writeText(email);
-                setEmailCopied(true);
-                setTimeout(() => setEmailCopied(false), 2000);
-              }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dash-text-faded transition-colors hover:text-dash-text-strong"
-              title="Copy email"
-            >
-              {emailCopied ? (
-                <CheckCircle className="size-4 text-[#34d399]" />
-              ) : (
-                <CopySimple className="size-4" />
-              )}
-            </button>
-          </div>
-          <button
-            onClick={() => onChangeEmail?.(email)}
-            className="shrink-0 text-sm font-medium tracking-[-0.0224px] text-dash-text-strong transition-colors hover:text-dash-text-body"
-          >
-            Change
-          </button>
-        </div>
-      </div>
 
       <hr className="border-dash-border-soft" />
 
@@ -2288,6 +2238,8 @@ export function UserProfileDrawer({
     drawerTitle = "Plan & billing";
   } else if (activeTab === ProfileTab.Members) {
     drawerTitle = "Members";
+  } else if (activeTab === ProfileTab.Security) {
+    drawerTitle = "Security";
   }
 
   return (
@@ -2452,18 +2404,6 @@ export function UserProfileDrawer({
                         );
                       } finally {
                         setIsSavingProfile(false);
-                      }
-                    }}
-                    onChangeEmail={async (email) => {
-                      try {
-                        await requestEmailVerification({ data: { email } });
-                        toast.success("Verification email sent");
-                      } catch (error) {
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to send verification email",
-                        );
                       }
                     }}
                     onBuildsChange={async (enabled) => {
@@ -2958,6 +2898,23 @@ export function UserProfileDrawer({
                     Billing settings are unavailable right now.
                   </div>
                 )}
+              {activeTab === ProfileTab.Security && (
+                <SecurityForm
+                  email={profile?.email ?? ""}
+                  onChangeEmail={async (email) => {
+                    try {
+                      await requestEmailVerification({ data: { email } });
+                      toast.success("Verification email sent");
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to send verification email",
+                      );
+                    }
+                  }}
+                />
+              )}
             </div>
           </div>
         </Drawer.Content>

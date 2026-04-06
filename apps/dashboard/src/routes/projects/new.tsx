@@ -1735,6 +1735,8 @@ function Phase3Configure({
   const [rootDir, setRootDir] = useState("./");
   const [rootDirDrawerOpen, setRootDirDrawerOpen] = useState(false);
   const isGit = isGitSource(sourceType);
+  const { planKey } = usePlanGate();
+  const isFreePlan = planKey === "free";
   const serviceTypeOptions = useMemo(
     () => [
       {
@@ -1742,25 +1744,32 @@ function Phase3Configure({
         label: "Web Service",
         description:
           "Run server-side code that handles requests. Ideal for dynamic apps and APIs.",
+        disabled: isFreePlan,
+        asideText: isFreePlan ? "Upgrade to access" : undefined,
       },
       {
         id: ServiceType.Static,
         label: "Static Site",
         description:
           "Serve fixed content like HTML, CSS, JS, and images. No server-side code.",
+        disabled: false,
       },
       {
         id: ServiceType.Worker,
         label: "Worker",
         description: "Process background jobs and scheduled tasks.",
+        disabled: isFreePlan,
+        asideText: isFreePlan ? "Upgrade to access" : undefined,
       },
       {
         id: ServiceType.Mcp,
         label: "MCP",
         description: "Deploy MCP servers for AI and context integrations.",
+        disabled: isFreePlan,
+        asideText: isFreePlan ? "Upgrade to access" : undefined,
       },
     ],
-    [],
+    [isFreePlan],
   );
   const defaultFrameworkId = useMemo(() => {
     if (!isGit) return "custom";
@@ -1814,6 +1823,12 @@ function Phase3Configure({
       setServiceType(derivedServiceType);
     }
   }, [framework, serviceTypeManuallySelected, sourceType]);
+
+  useEffect(() => {
+    if (isFreePlan && serviceType !== ServiceType.Static) {
+      setServiceType(ServiceType.Static);
+    }
+  }, [isFreePlan, serviceType]);
 
   useEffect(() => {
     if (serviceType !== ServiceType.Mcp) {
@@ -2038,8 +2053,16 @@ function Phase3Configure({
             options={serviceTypeOptions.map((option) => ({
               id: option.id,
               label: option.label,
+              disabled: option.disabled,
+              asideText: option.asideText,
             }))}
             onChange={(nextServiceType) => {
+              const nextOption = serviceTypeOptions.find(
+                (option) => option.id === nextServiceType,
+              );
+              if (nextOption?.disabled) {
+                return;
+              }
               setServiceType(nextServiceType);
               setServiceTypeManuallySelected(true);
             }}

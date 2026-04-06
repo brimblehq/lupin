@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Github, ArrowLeft, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -401,13 +401,23 @@ function LoginPage() {
       footer={
         <>
           By signing in, you agree to Brimble&apos;s{" "}
-          <Link to="/" className="font-medium text-dash-text-faded underline underline-offset-2 transition-colors hover:text-dash-text-body">
+          <a
+            href="https://brimble.io/legal/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-dash-text-faded underline underline-offset-2 transition-colors hover:text-dash-text-body"
+          >
             Terms
-          </Link>{" "}
+          </a>{" "}
           and{" "}
-          <Link to="/" className="font-medium text-dash-text-faded underline underline-offset-2 transition-colors hover:text-dash-text-body">
+          <a
+            href="https://brimble.io/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-dash-text-faded underline underline-offset-2 transition-colors hover:text-dash-text-body"
+          >
             Privacy Policy
-          </Link>
+          </a>
           .
         </>
       }

@@ -63,5 +63,6 @@ export enum ProfileTab {
   ActivitySession = "activity-session",
   Members = "members",
   Notifications = "notifications",
+  Security = "security",
   Billing = "billing",
 }

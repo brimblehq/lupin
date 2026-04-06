@@ -11,6 +11,8 @@ export interface DropdownOption {
   label: string;
   icon?: string;
   iconClassName?: string;
+  disabled?: boolean;
+  asideText?: string;
 }
 
 type ObjectProps = {
@@ -237,25 +239,39 @@ export function Dropdown({
                   ? filteredObjectOptions.map((opt) => (
                       <button
                         key={opt.id}
+                        type="button"
                         onClick={() => {
+                          if (opt.disabled) {
+                            return;
+                          }
                           haptics.selection();
                           (onChange as (id: string) => void)(opt.id);
                           setOpen(false);
                         }}
+                        disabled={opt.disabled}
                         className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-dash-bg-elevated ${
-                          opt.id === value
+                          opt.disabled
+                            ? "cursor-not-allowed text-dash-text-extra-faded hover:bg-transparent"
+                            : opt.id === value
                             ? "font-medium text-dash-text-strong"
                             : "text-dash-text-faded"
                         }`}
                       >
-                        {opt.icon && (
-                          <img
-                            src={opt.icon}
-                            alt=""
-                            className={`size-4 shrink-0 object-contain ${opt.iconClassName ?? ""}`}
-                          />
+                        <span className="flex min-w-0 items-center gap-2">
+                          {opt.icon && (
+                            <img
+                              src={opt.icon}
+                              alt=""
+                              className={`size-4 shrink-0 object-contain ${opt.iconClassName ?? ""}`}
+                            />
+                          )}
+                          <span className="truncate">{opt.label}</span>
+                        </span>
+                        {opt.asideText && (
+                          <span className="ml-auto shrink-0 text-[11px] text-[#4879f8]">
+                            {opt.asideText}
+                          </span>
                         )}
-                        {opt.label}
                       </button>
                     ))
                   : filteredStringOptions.map((opt) => (
