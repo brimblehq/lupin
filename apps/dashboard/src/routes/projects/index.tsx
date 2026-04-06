@@ -138,7 +138,7 @@ export const Route = createFileRoute("/projects/")({
     environmentId: parseTextSearchValue(search.environmentId),
   }),
   loader: async ({ deps }) => {
-    const [environments, persistedEnvironmentId] = await Promise.all([
+    const [environments, persistedEnvironmentId, frameworks] = await Promise.all([
       (listProjectEnvironmentsServerFn as unknown as (input: {
         data?: { workspace?: string };
       }) => Promise<ProjectEnvironment[]>)({
@@ -149,6 +149,8 @@ export const Route = createFileRoute("/projects/")({
       }) => Promise<string | null>)({
         data: { workspace: deps.workspace },
       }).catch(() => null),
+      (listFrameworksServerFn as unknown as () => Promise<FrameworkOption[]>)()
+        .catch(() => [] as FrameworkOption[]),
     ]);
     const resolvedEnvironmentId = resolveEnvironmentId({
       requestedEnvironmentId: deps.environmentId,
@@ -156,29 +158,25 @@ export const Route = createFileRoute("/projects/")({
       environments,
     });
 
-    const [result, frameworks] = await Promise.all([
-      (listProjectsPageServerFn as unknown as (input: {
-        data: {
-          page?: number;
-          workspace?: string;
-          q?: string;
-          serviceType?: string;
-          status?: string;
-          environmentId?: string;
-        };
-      }) => Promise<PaginatedProjectsResponse>)({
-        data: {
-          page: deps.page,
-          workspace: deps.workspace,
-          q: deps.q,
-          serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
-          status: deps.status && deps.status !== "all" ? deps.status : undefined,
-          environmentId: resolvedEnvironmentId,
-        },
-      }),
-      (listFrameworksServerFn as unknown as () => Promise<FrameworkOption[]>)()
-        .catch(() => [] as FrameworkOption[]),
-    ]);
+    const result = await (listProjectsPageServerFn as unknown as (input: {
+      data: {
+        page?: number;
+        workspace?: string;
+        q?: string;
+        serviceType?: string;
+        status?: string;
+        environmentId?: string;
+      };
+    }) => Promise<PaginatedProjectsResponse>)({
+      data: {
+        page: deps.page,
+        workspace: deps.workspace,
+        q: deps.q,
+        serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
+        status: deps.status && deps.status !== "all" ? deps.status : undefined,
+        environmentId: resolvedEnvironmentId,
+      },
+    });
 
     const frameworkLogoMap = new Map<string, string>();
     for (const fw of frameworks) {

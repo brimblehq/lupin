@@ -61,7 +61,7 @@ export const Route = createFileRoute("/")({
   }),
   loader: async ({ deps }) => {
     const workspace = deps.workspace;
-    const [environments, persistedEnvironmentId] = await Promise.all([
+    const [environments, persistedEnvironmentId, mcpTemplatesResult, frameworksList] = await Promise.all([
       (listProjectEnvironmentsServerFn as unknown as (input: {
         data?: { workspace?: string };
       }) => Promise<Array<{ _id: string; isDefault?: boolean }>>)({
@@ -72,6 +72,13 @@ export const Route = createFileRoute("/")({
       }) => Promise<string | null>)({
         data: { workspace },
       }).catch(() => null),
+      (listRecommendedMcpTemplatesServerFn as unknown as (input: {
+        data?: { limit?: number; category?: string; officialOnly?: boolean; shuffle?: boolean };
+      }) => Promise<McpServerListResult>)({
+        data: { limit: 3, category: "development", officialOnly: true, shuffle: true },
+      }).catch(() => ({ servers: [], pagination: {} } as McpServerListResult)),
+      (listFrameworksServerFn as unknown as () => Promise<FrameworkOption[]>)()
+        .catch(() => [] as FrameworkOption[]),
     ]);
     const environmentId = resolveEnvironmentId({
       requestedEnvironmentId: deps.environmentId,
@@ -79,7 +86,7 @@ export const Route = createFileRoute("/")({
       environments,
     });
 
-    const [projectsResult, overviewResult, bandwidthResult, mcpTemplatesResult, frameworksList] = await Promise.all([
+    const [projectsResult, overviewResult, bandwidthResult] = await Promise.all([
       (listHomeProjectsServerFn as unknown as (input: {
         data: { workspace?: string; environmentId?: string };
       }) => Promise<ApiListResponse<BackendProject>>)({
@@ -95,13 +102,6 @@ export const Route = createFileRoute("/")({
       }) => Promise<BandwidthSummary>)({
         data: { workspace, environmentId },
       }).catch(() => ({ results: [], total: 0 } as BandwidthSummary)),
-      (listRecommendedMcpTemplatesServerFn as unknown as (input: {
-        data?: { limit?: number; category?: string; officialOnly?: boolean; shuffle?: boolean };
-      }) => Promise<McpServerListResult>)({
-        data: { limit: 3, category: "development", officialOnly: true, shuffle: true },
-      }).catch(() => ({ servers: [], pagination: {} } as McpServerListResult)),
-      (listFrameworksServerFn as unknown as () => Promise<FrameworkOption[]>)()
-        .catch(() => [] as FrameworkOption[]),
     ]);
 
     const frameworkLogoMap = new Map<string, string>();
