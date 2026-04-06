@@ -38,9 +38,11 @@ import {
 } from "@phosphor-icons/react";
 import {
   confirmDeleteAccountServerFn,
+  getTwoFactorStatusServerFn,
   logoutServerFn,
   requestDeleteAccountOtpServerFn,
 } from "@/server/auth/actions";
+import type { TwoFactorStatus } from "@/backend/auth/types";
 import { listActivityLogsServerFn } from "@/server/activity-logs/actions";
 import { listProjectEnvironmentsServerFn } from "@/server/environments/actions";
 import type { ProjectEnvironment } from "@/backend/environments";
@@ -404,12 +406,9 @@ function ProfileForm({
   onCreateApiKey,
   onResetApiKey,
   onDecryptApiKey,
-  isGithubConnected,
-  onDisconnectGithub,
-  onConnectGithub,
-  isGitlabConnected,
-  onDisconnectGitlab,
-  onConnectGitlab,
+  gitConnections,
+  onDisconnectGitProvider,
+  onConnectGitProvider,
   onRequestDeleteAccountOtp,
   onVerifyDeleteAccountOtp,
   onDeleteAccount,
@@ -431,12 +430,9 @@ function ProfileForm({
   onDecryptApiKey?: (
     encryptedApiKey: string,
   ) => Promise<string | null | undefined>;
-  isGithubConnected: boolean;
-  onDisconnectGithub?: () => Promise<void> | void;
-  onConnectGithub?: () => void;
-  isGitlabConnected: boolean;
-  onDisconnectGitlab?: () => Promise<void> | void;
-  onConnectGitlab?: () => void;
+  gitConnections: { id: string; name: string; connected: boolean }[];
+  onDisconnectGitProvider?: (providerId: string) => Promise<void> | void;
+  onConnectGitProvider?: (providerId: string) => void;
   onRequestDeleteAccountOtp?: (turnstileToken?: string) => Promise<void> | void;
   onVerifyDeleteAccountOtp?: (code: string) => Promise<void> | void;
   onDeleteAccount?: () => Promise<void> | void;
@@ -777,12 +773,9 @@ function ProfileForm({
       {/* Danger zone */}
       <DangerZone
         projectCount={projectCount}
-        isGithubConnected={isGithubConnected}
-        onDisconnectGithub={onDisconnectGithub}
-        onConnectGithub={onConnectGithub}
-        isGitlabConnected={isGitlabConnected}
-        onDisconnectGitlab={onDisconnectGitlab}
-        onConnectGitlab={onConnectGitlab}
+        gitConnections={gitConnections}
+        onDisconnectGitProvider={onDisconnectGitProvider}
+        onConnectGitProvider={onConnectGitProvider}
         onRequestDeleteAccountOtp={onRequestDeleteAccountOtp}
         onVerifyDeleteAccountOtp={onVerifyDeleteAccountOtp}
         onDeleteAccount={onDeleteAccount}
@@ -793,27 +786,22 @@ function ProfileForm({
 
 function DangerZone({
   projectCount = 0,
-  isGithubConnected,
-  onDisconnectGithub,
-  onConnectGithub,
-  isGitlabConnected,
-  onDisconnectGitlab,
-  onConnectGitlab,
+  gitConnections,
+  onDisconnectGitProvider,
+  onConnectGitProvider,
   onRequestDeleteAccountOtp,
   onVerifyDeleteAccountOtp,
   onDeleteAccount,
 }: {
   projectCount?: number;
-  isGithubConnected: boolean;
-  onDisconnectGithub?: () => Promise<void> | void;
-  onConnectGithub?: () => void;
-  isGitlabConnected: boolean;
-  onDisconnectGitlab?: () => Promise<void> | void;
-  onConnectGitlab?: () => void;
+  gitConnections: { id: string; name: string; connected: boolean }[];
+  onDisconnectGitProvider?: (providerId: string) => Promise<void> | void;
+  onConnectGitProvider?: (providerId: string) => void;
   onRequestDeleteAccountOtp?: (turnstileToken?: string) => Promise<void> | void;
   onVerifyDeleteAccountOtp?: (code: string) => Promise<void> | void;
   onDeleteAccount?: () => Promise<void> | void;
 }) {
+  const haptics = useHaptics();
   const { theme } = useTheme();
   const normalizedProjectCount =
     typeof projectCount === "number" &&
@@ -823,12 +811,25 @@ function DangerZone({
       : 0;
   const hasRemainingProjects = normalizedProjectCount > 0;
   const projectsLabel = normalizedProjectCount === 1 ? "project" : "projects";
-  const [disconnectOpen, setDisconnectOpen] = useState(false);
-  const [disconnectGitlabOpen, setDisconnectGitlabOpen] = useState(false);
+  const [disconnectProvider, setDisconnectProvider] = useState<{ id: string; name: string } | null>(null);
+  const [disconnectConfirm, setDisconnectConfirm] = useState("");
+  const [gitMenuOpen, setGitMenuOpen] = useState(false);
+  const gitMenuRef = useRef<HTMLDivElement>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteStep, setDeleteStep] = useState<"confirm" | "otp">("confirm");
-  const [disconnectConfirm, setDisconnectConfirm] = useState("");
-  const [disconnectGitlabConfirm, setDisconnectGitlabConfirm] = useState("");
+  const connectedProviders = gitConnections.filter((p) => p.connected);
+  const disconnectedProviders = gitConnections.filter((p) => !p.connected);
+
+  useEffect(() => {
+    if (!gitMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (gitMenuRef.current && !gitMenuRef.current.contains(e.target as Node)) {
+        setGitMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [gitMenuOpen]);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isTurnstileReady, setIsTurnstileReady] = useState(false);
   const [deleteOtp, setDeleteOtp] = useState("");
@@ -851,53 +852,72 @@ function DangerZone({
         </span>
       </div>
 
-      {/* GitHub connection */}
+      {/* Git providers */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-medium text-dash-text-strong">
-            {isGithubConnected ? "Disconnect GitHub" : "Connect GitHub"}
+            Git providers
           </span>
           <span className="text-xs text-dash-text-faded">
-            {isGithubConnected
-              ? "You won't be able to deploy from Git until you reconnect."
-              : "Connect your GitHub account to deploy from Git."}
+            {connectedProviders.length > 0
+              ? `Connected: ${connectedProviders.map((p) => p.name).join(", ")}`
+              : "No git providers connected."}
           </span>
         </div>
-        {isGithubConnected ? (
-          <GlossyButton variant="red" onClick={() => setDisconnectOpen(true)}>
-            Disconnect
-          </GlossyButton>
-        ) : (
-          <GlossyButton variant="black" onClick={() => onConnectGithub?.()}>
-            Connect
-          </GlossyButton>
-        )}
-      </div>
-
-      {/* GitLab connection */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium text-dash-text-strong">
-            {isGitlabConnected ? "Disconnect GitLab" : "Connect GitLab"}
-          </span>
-          <span className="text-xs text-dash-text-faded">
-            {isGitlabConnected
-              ? "You won't be able to deploy from GitLab until you reconnect."
-              : "Connect your GitLab account to deploy from Git."}
-          </span>
-        </div>
-        {isGitlabConnected ? (
+        <div className="relative" ref={gitMenuRef}>
           <GlossyButton
-            variant="red"
-            onClick={() => setDisconnectGitlabOpen(true)}
+            variant={connectedProviders.length > 0 ? "red" : "black"}
+            onClick={() => {
+              haptics.selection();
+              if (connectedProviders.length === 1 && disconnectedProviders.length === 0) {
+                setDisconnectProvider(connectedProviders[0]);
+              } else {
+                setGitMenuOpen((prev) => !prev);
+              }
+            }}
           >
-            Disconnect
+            {connectedProviders.length > 0 ? "Manage" : "Connect"}
+            <ChevronDown className="ml-1 size-3.5" />
           </GlossyButton>
-        ) : (
-          <GlossyButton variant="black" onClick={() => onConnectGitlab?.()}>
-            Connect
-          </GlossyButton>
-        )}
+          <AnimatePresence>
+            {gitMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute bottom-full right-0 z-10 mb-1.5 min-w-[180px] overflow-hidden rounded-[6px] border border-dash-border bg-dash-bg shadow-[0px_4px_12px_rgba(0,0,0,0.1)] dark:shadow-[0px_4px_12px_rgba(0,0,0,0.3)]"
+              >
+                {connectedProviders.map((provider) => (
+                  <button
+                    key={provider.id}
+                    onClick={() => {
+                      haptics.selection();
+                      setGitMenuOpen(false);
+                      setDisconnectProvider(provider);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#ef4444] transition-colors hover:bg-dash-bg-elevated"
+                  >
+                    Disconnect {provider.name}
+                  </button>
+                ))}
+                {disconnectedProviders.map((provider) => (
+                  <button
+                    key={provider.id}
+                    onClick={() => {
+                      haptics.selection();
+                      setGitMenuOpen(false);
+                      onConnectGitProvider?.(provider.id);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+                  >
+                    Connect {provider.name}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Delete account */}
@@ -916,17 +936,21 @@ function DangerZone({
       </div>
 
       <WarningModal
-        open={disconnectOpen}
+        open={disconnectProvider !== null}
         onOpenChange={(open) => {
-          setDisconnectOpen(open);
-          if (!open) setDisconnectConfirm("");
+          if (!open) {
+            setDisconnectProvider(null);
+            setDisconnectConfirm("");
+          }
         }}
-        title="Disconnect GitHub?"
-        description="This will remove your GitHub connection. All Git-based deployments will stop working until you reconnect your account."
-        confirmLabel="Disconnect GitHub"
+        title={`Disconnect ${disconnectProvider?.name ?? "provider"}?`}
+        description={`This will remove your ${disconnectProvider?.name ?? ""} connection. All ${disconnectProvider?.name ?? ""}-based deployments will stop working until you reconnect your account.`}
+        confirmLabel={`Disconnect ${disconnectProvider?.name ?? ""}`}
         confirmDisabled={disconnectConfirm !== "DISCONNECT"}
         onConfirm={async () => {
-          await onDisconnectGithub?.();
+          if (disconnectProvider) {
+            await onDisconnectGitProvider?.(disconnectProvider.id);
+          }
         }}
       >
         <div className="flex flex-col gap-2 text-left">
@@ -941,38 +965,6 @@ function DangerZone({
             type="text"
             value={disconnectConfirm}
             onChange={(e) => setDisconnectConfirm(e.target.value)}
-            placeholder="DISCONNECT"
-            className="w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]"
-          />
-        </div>
-      </WarningModal>
-
-      <WarningModal
-        open={disconnectGitlabOpen}
-        onOpenChange={(open) => {
-          setDisconnectGitlabOpen(open);
-          if (!open) setDisconnectGitlabConfirm("");
-        }}
-        title="Disconnect GitLab?"
-        description="This will remove your GitLab connection. All GitLab-based deployments will stop working until you reconnect your account."
-        confirmLabel="Disconnect GitLab"
-        confirmDisabled={disconnectGitlabConfirm !== "DISCONNECT"}
-        onConfirm={async () => {
-          await onDisconnectGitlab?.();
-        }}
-      >
-        <div className="flex flex-col gap-2 text-left">
-          <label className="text-sm leading-5 text-dash-text-faded">
-            Type{" "}
-            <span className="font-medium text-dash-text-strong">
-              DISCONNECT
-            </span>{" "}
-            to confirm
-          </label>
-          <input
-            type="text"
-            value={disconnectGitlabConfirm}
-            onChange={(e) => setDisconnectGitlabConfirm(e.target.value)}
             placeholder="DISCONNECT"
             className="w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]"
           />
@@ -1997,12 +1989,12 @@ export function UserProfileDrawer({
     getGitlabConnectUrlServerFn as any,
   ) as (args: { data?: { device?: string } }) => Promise<{ url: string }>;
   const listGitlabAccounts = useServerFn(listGitlabAccountsServerFn);
-  const [isGithubConnected, setIsGithubConnected] = useState<boolean | null>(
-    null,
-  );
-  const [isGitlabConnected, setIsGitlabConnected] = useState<boolean | null>(
-    null,
-  );
+  const [gitConnectionStatus, setGitConnectionStatus] = useState<Record<string, boolean | null>>({
+    github: null,
+    gitlab: null,
+  });
+  const getTwoFactorStatus = useServerFn(getTwoFactorStatusServerFn as any) as () => Promise<TwoFactorStatus>;
+  const [twoFactorStatus, setTwoFactorStatus] = useState<TwoFactorStatus | null>(null);
   const decryptApiKey = useServerFn(
     decryptSettingsApiKeyServerFn as any,
   ) as (args: { data: { encryptedApiKey: string } }) => Promise<string | null>;
@@ -2137,30 +2129,27 @@ export function UserProfileDrawer({
   useEffect(() => {
     if (!open) return;
 
-    if (isGithubConnected === null) {
-      listGithubAccounts()
-        .then((result) => {
-          const accounts = Array.isArray(result)
-            ? result
-            : (result?.accounts ?? []);
-          setIsGithubConnected(accounts.length > 0);
-        })
-        .catch(() => {
-          setIsGithubConnected(false);
-        });
+    const checks: { id: string; fn: () => Promise<any> }[] = [
+      { id: "github", fn: listGithubAccounts },
+      { id: "gitlab", fn: listGitlabAccounts },
+    ];
+    for (const check of checks) {
+      if (gitConnectionStatus[check.id] === null) {
+        check.fn()
+          .then((result) => {
+            const accounts = Array.isArray(result) ? result : (result?.accounts ?? []);
+            setGitConnectionStatus((prev) => ({ ...prev, [check.id]: accounts.length > 0 }));
+          })
+          .catch(() => {
+            setGitConnectionStatus((prev) => ({ ...prev, [check.id]: false }));
+          });
+      }
     }
 
-    if (isGitlabConnected === null) {
-      listGitlabAccounts()
-        .then((result) => {
-          const accounts = Array.isArray(result)
-            ? result
-            : (result?.accounts ?? []);
-          setIsGitlabConnected(accounts.length > 0);
-        })
-        .catch(() => {
-          setIsGitlabConnected(false);
-        });
+    if (!twoFactorStatus) {
+      getTwoFactorStatus()
+        .then(setTwoFactorStatus)
+        .catch(() => {});
     }
   }, [open]);
 
@@ -2533,160 +2522,78 @@ export function UserProfileDrawer({
                         return null;
                       }
                     }}
-                    isGithubConnected={isGithubConnected ?? true}
-                    onDisconnectGithub={async () => {
+                    gitConnections={[
+                      { id: "github", name: "GitHub", connected: gitConnectionStatus.github ?? false },
+                      { id: "gitlab", name: "GitLab", connected: gitConnectionStatus.gitlab ?? false },
+                      { id: "bitbucket", name: "Bitbucket", connected: gitConnectionStatus.bitbucket ?? false },
+                    ]}
+                    onDisconnectGitProvider={async (providerId) => {
                       try {
                         await disconnectGitProvider({
-                          data: { provider: "github" },
+                          data: { provider: providerId as any },
                         });
-                        setIsGithubConnected(false);
-                        window.dispatchEvent(
-                          new Event("brimble:git-connection-changed"),
-                        );
-                        toast.success("GitHub disconnected successfully");
+                        setGitConnectionStatus((prev) => ({ ...prev, [providerId]: false }));
+                        window.dispatchEvent(new Event("brimble:git-connection-changed"));
+                        toast.success(`${providerId.charAt(0).toUpperCase() + providerId.slice(1)} disconnected successfully`);
                       } catch (error) {
                         toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to disconnect GitHub",
+                          error instanceof Error ? error.message : `Failed to disconnect ${providerId}`,
                         );
                       }
                     }}
-                    onConnectGithub={async () => {
+                    onConnectGitProvider={async (providerId) => {
                       try {
-                        const install = await getGithubInstallUrl();
-                        const installUrl = install?.url?.trim();
-                        if (!installUrl) {
-                          throw new Error(
-                            "We could not start GitHub connection right now. Please refresh and try again.",
-                          );
+                        const connectFns: Record<string, () => Promise<{ url: string }>> = {
+                          github: () => getGithubInstallUrl(),
+                          gitlab: () => getGitlabConnectUrl({ data: { device: window.sessionStorage.getItem("brimble.oauth.device_id") ?? undefined } }),
+                        };
+                        const getFn = connectFns[providerId];
+                        if (!getFn) {
+                          toast.error(`${providerId} connection is not available yet.`);
+                          return;
                         }
+                        const result = await getFn();
+                        const url = result?.url?.trim();
+                        if (!url) throw new Error(`Could not start ${providerId} connection.`);
 
-                        const popup = window.open(
-                          installUrl,
-                          "_blank",
-                          "width=900,height=760",
-                        );
-
+                        const popup = window.open(url, "_blank", "width=900,height=760");
                         if (!popup) {
-                          toast.error(
-                            "Popup blocked. Please allow popups and try again.",
-                          );
+                          toast.error("Popup blocked. Please allow popups and try again.");
                           return;
                         }
 
-                        toast.success(
-                          "Complete the GitHub installation in the popup, then refresh.",
-                        );
-                        setIsGithubConnected(null);
-                        // Poll for connection
-                        const interval = window.setInterval(async () => {
-                          try {
-                            const accounts = await listGithubAccounts();
-                            if (
-                              Array.isArray(accounts) &&
-                              accounts.length > 0
-                            ) {
-                              setIsGithubConnected(true);
-                              window.clearInterval(interval);
-                              window.dispatchEvent(
-                                new Event("brimble:git-connection-changed"),
-                              );
-                              toast.success("GitHub connected successfully");
-                            }
-                          } catch {}
-                        }, 3000);
-                        window.setTimeout(() => {
-                          window.clearInterval(interval);
-                          if (isGithubConnected === null) {
-                            setIsGithubConnected(false);
-                          }
-                        }, 90_000);
-                      } catch (error) {
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "We could not open the GitHub connection window. Please try again.",
-                        );
-                      }
-                    }}
-                    isGitlabConnected={isGitlabConnected ?? true}
-                    onDisconnectGitlab={async () => {
-                      try {
-                        await disconnectGitProvider({
-                          data: { provider: "gitlab" },
-                        });
-                        setIsGitlabConnected(false);
-                        window.dispatchEvent(
-                          new Event("brimble:git-connection-changed"),
-                        );
-                        toast.success("GitLab disconnected successfully");
-                      } catch (error) {
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to disconnect GitLab",
-                        );
-                      }
-                    }}
-                    onConnectGitlab={async () => {
-                      try {
-                        const deviceId =
-                          window.sessionStorage.getItem("brimble.oauth.device_id") ??
-                          "";
-                        const connect = await getGitlabConnectUrl({
-                          data: {
-                            device: deviceId || undefined,
-                          },
-                        });
-                        const connectUrl = connect?.url?.trim();
-                        if (!connectUrl) {
-                          throw new Error(
-                            "We could not start GitLab connection right now. Please refresh and try again.",
-                          );
+                        toast.success(`Complete the ${providerId} authorization in the popup, then refresh.`);
+                        setGitConnectionStatus((prev) => ({ ...prev, [providerId]: null }));
+
+                        const checkFns: Record<string, () => Promise<any>> = {
+                          github: listGithubAccounts,
+                          gitlab: listGitlabAccounts,
+                        };
+                        const checkFn = checkFns[providerId];
+                        if (checkFn) {
+                          const interval = window.setInterval(async () => {
+                            try {
+                              const accounts = await checkFn();
+                              const items = Array.isArray(accounts) ? accounts : (accounts?.accounts ?? []);
+                              if (items.length > 0) {
+                                setGitConnectionStatus((prev) => ({ ...prev, [providerId]: true }));
+                                window.clearInterval(interval);
+                                window.dispatchEvent(new Event("brimble:git-connection-changed"));
+                                toast.success(`${providerId.charAt(0).toUpperCase() + providerId.slice(1)} connected successfully`);
+                              }
+                            } catch {}
+                          }, 3000);
+                          window.setTimeout(() => {
+                            window.clearInterval(interval);
+                            setGitConnectionStatus((prev) => {
+                              if (prev[providerId] === null) return { ...prev, [providerId]: false };
+                              return prev;
+                            });
+                          }, 90_000);
                         }
-
-                        const popup = window.open(
-                          connectUrl,
-                          "_blank",
-                          "width=900,height=760",
-                        );
-
-                        if (!popup) {
-                          toast.error(
-                            "Popup blocked. Please allow popups and try again.",
-                          );
-                          return;
-                        }
-
-                        toast.success(
-                          "Complete the GitLab authorization in the popup, then refresh.",
-                        );
-                        setIsGitlabConnected(null);
-                        const interval = window.setInterval(async () => {
-                          try {
-                            const accounts = await listGitlabAccounts();
-                            if (Array.isArray(accounts) && accounts.length > 0) {
-                              setIsGitlabConnected(true);
-                              window.clearInterval(interval);
-                              window.dispatchEvent(
-                                new Event("brimble:git-connection-changed"),
-                              );
-                              toast.success("GitLab connected successfully");
-                            }
-                          } catch {}
-                        }, 3000);
-                        window.setTimeout(() => {
-                          window.clearInterval(interval);
-                          if (isGitlabConnected === null) {
-                            setIsGitlabConnected(false);
-                          }
-                        }, 90_000);
                       } catch (error) {
                         toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "We could not start GitLab connection right now. Please refresh and try again.",
+                          error instanceof Error ? error.message : `Could not open ${providerId} connection.`,
                         );
                       }
                     }}
@@ -2902,6 +2809,8 @@ export function UserProfileDrawer({
               {activeTab === ProfileTab.Security && (
                 <SecurityForm
                   email={profile?.email ?? ""}
+                  initialStatus={twoFactorStatus}
+                  onStatusChange={setTwoFactorStatus}
                   onChangeEmail={async (email) => {
                     try {
                       await requestEmailVerification({ data: { email } });

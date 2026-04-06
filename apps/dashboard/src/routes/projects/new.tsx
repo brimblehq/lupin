@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { IpWhitelist } from "@/components/shared/ip-whitelist";
-import { createFileRoute, Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -24,6 +24,7 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useGitProvider, type UseGitProviderResult } from "@/hooks/use-git-provider";
 import { GlossyButton } from "../../components/shared/glossy-button";
+import { ChangePlanModal } from "../../components/shared/change-plan-modal";
 import { DashButton } from "../../components/shared/dash-button";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { RangeSlider } from "../../components/shared/range-slider";
@@ -157,7 +158,7 @@ const gitProviders: GitProvider[] = [
     name: "Bitbucket",
     Icon: BitbucketLogo,
     cardIcon: "/icons/bitbucket.svg",
-    cardIconClass: "size-5",
+    cardIconClass: "size-5 dark:invert dark:brightness-200",
     description: "Connect a repository from your Bitbucket account",
     permissions: [
       { label: "Read access to your repositories", desc: "Browse and import repos" },
@@ -1710,6 +1711,7 @@ function Phase3Configure({
   branchOptions,
   deploying = false,
   saving = false,
+  projectCount = 0,
   onDeploy,
   onSaveForLater,
   repoBrowser,
@@ -1731,6 +1733,7 @@ function Phase3Configure({
   branchOptions?: string[];
   deploying?: boolean;
   saving?: boolean;
+  projectCount?: number;
   onDeploy: (input: Phase3DeployInput) => boolean | Promise<boolean>;
   onSaveForLater: (input: Phase3DeployInput) => boolean | Promise<boolean>;
   repoBrowser?: {
@@ -1750,8 +1753,10 @@ function Phase3Configure({
   const [rootDir, setRootDir] = useState("./");
   const [rootDirDrawerOpen, setRootDirDrawerOpen] = useState(false);
   const isGit = isGitSource(sourceType);
-  const { planKey } = usePlanGate();
+  const { planKey, projectLimit } = usePlanGate();
   const isFreePlan = planKey === "free";
+  const limitReached = projectLimit !== null && projectCount >= projectLimit;
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const serviceTypeOptions = useMemo(
     () => [
       {
@@ -2423,8 +2428,12 @@ function Phase3Configure({
             fullWidth
             loading={deploying}
             loadingLabel="Deploying..."
-            disabled={deploying || saving || !projectName.trim() || !region}
+            disabled={deploying || saving || !projectName.trim() || !region || limitReached}
             onClick={() => {
+              if (limitReached) {
+                setShowUpgradeModal(true);
+                return;
+              }
               const deployInput = buildDeployInput();
               if (!deployInput) {
                 return;
@@ -2436,6 +2445,24 @@ function Phase3Configure({
             Deploy Project
           </GlossyButton>
         </div>
+
+        {limitReached && (
+          <div className="mt-3 flex items-center gap-2 rounded-[6px] border border-dash-border bg-dash-bg-elevated px-3.5 py-3 text-sm text-dash-text-faded">
+            <span>
+              You've reached your project limit ({projectCount}/{projectLimit}).{" "}
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(true)}
+                className="font-medium text-[#4879f8] transition-colors hover:text-[#3060d0]"
+              >
+                Upgrade your plan
+              </button>{" "}
+              to deploy more projects.
+            </span>
+          </div>
+        )}
+
+        <ChangePlanModal open={showUpgradeModal} onOpenChange={setShowUpgradeModal} currentPlan={planKey} />
       </div>
 
       {isGit && (
@@ -2485,9 +2512,15 @@ function Phase3Configure({
 
 /* ─── Main Page ─── */
 
+const rootRoute = getRouteApi("__root__");
+
 function NewProjectPage() {
   const { canWrite } = useWorkspaceRole();
   const router = useRouter();
+  const { onboardingProjects } = (rootRoute.useLoaderData() ?? {}) as {
+    onboardingProjects?: { items: unknown[] };
+  };
+  const currentProjectCount = onboardingProjects?.items?.length ?? 0;
   const navigate = useNavigate({ from: "/projects/new" });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspace = useMemo(() => {
@@ -3317,6 +3350,7 @@ function NewProjectPage() {
                     }
                     deploying={deployingProject}
                     saving={savingProject}
+                    projectCount={currentProjectCount}
                     onDeploy={handleDeployProject}
                     onSaveForLater={handleSaveProjectForLater}
                   />

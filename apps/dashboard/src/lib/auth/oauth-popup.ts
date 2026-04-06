@@ -88,7 +88,46 @@ export async function startOauthPopup(
 
     let popupPollId: ReturnType<typeof setInterval> | undefined;
 
+    function tryExtractAuth(obj: any): OauthAuthEventPayload | null {
+      if (!obj || typeof obj !== "object") return null;
+
+      const challenge = extractTwoFactorChallenge(obj);
+      if (challenge) {
+        return {
+          requires_2fa: true,
+          challenge_token: challenge.challengeToken,
+          expires_in: challenge.expiresIn,
+        };
+      }
+
+      if (obj.access_token) {
+        return obj as OauthAuthEventPayload;
+      }
+
+      if (obj.data && typeof obj.data === "object") {
+        return tryExtractAuth(obj.data);
+      }
+
+      return null;
+    }
+
+    function handlePostMessage(event: MessageEvent) {
+      const raw = event.data;
+      if (!raw || typeof raw !== "object") return;
+      if (raw?.name === "metamask-provider") return;
+      if (typeof raw === "string" && raw.includes("stripe")) return;
+
+      const result = tryExtractAuth(raw);
+      if (result) {
+        finish(() => resolve(result));
+      }
+    }
+
+    window.addEventListener("message", handlePostMessage);
+
     const cleanup = () => {
+      window.removeEventListener("message", handlePostMessage);
+
       if (timeoutId !== undefined) {
         window.clearTimeout(timeoutId);
       }
@@ -124,9 +163,17 @@ export async function startOauthPopup(
       finish(() => reject(new Error("OAuth login timed out. Please try again.")));
     }, timeoutMs);
 
+    let popupClosedAt: number | null = null;
+
     popupPollId = setInterval(() => {
       if (popup.closed) {
-        finish(() => reject(new Error("Sign-in window was closed.")));
+        if (!popupClosedAt) {
+          popupClosedAt = Date.now();
+          return;
+        }
+        if (Date.now() - popupClosedAt > 2000) {
+          finish(() => reject(new Error("Sign-in window was closed.")));
+        }
         return;
       }
 

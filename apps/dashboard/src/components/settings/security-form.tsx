@@ -77,9 +77,13 @@ function RecoveryCodesGrid({ codes }: { codes: string[] }) {
 
 export function SecurityForm({
   email: initialEmail,
+  initialStatus,
+  onStatusChange,
   onChangeEmail,
 }: {
   email: string;
+  initialStatus?: TwoFactorStatus | null;
+  onStatusChange?: (status: TwoFactorStatus | null) => void;
   onChangeEmail?: (email: string) => void | Promise<void>;
 }) {
   const haptics = useHaptics();
@@ -103,8 +107,13 @@ export function SecurityForm({
   const [email, setEmail] = useState(initialEmail);
   const [emailCopied, setEmailCopied] = useState(false);
 
-  const [status, setStatus] = useState<TwoFactorStatus | null>(null);
-  const [loadingStatus, setLoadingStatus] = useState(true);
+  const [status, setStatusInternal] = useState<TwoFactorStatus | null>(initialStatus ?? null);
+  const [loadingStatus, setLoadingStatus] = useState(!initialStatus);
+
+  function setStatus(next: TwoFactorStatus | null) {
+    setStatusInternal(next);
+    onStatusChange?.(next);
+  }
 
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [setupStep, setSetupStep] = useState<"scan" | "verify" | "codes">(
@@ -157,9 +166,14 @@ export function SecurityForm({
   }
 
   useEffect(() => {
+    if (initialStatus) {
+      setStatusInternal(initialStatus);
+      setLoadingStatus(false);
+      return;
+    }
     void refreshStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialStatus]);
 
   function resetSetupModal() {
     setShowSetupModal(false);

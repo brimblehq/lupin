@@ -76,7 +76,7 @@ export function AuthSplitLayout({
   footer?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-dash-bg px-6 py-10 dark:bg-[#1a1c1e]">
+    <div className="flex min-h-dvh items-center justify-center bg-dash-bg px-6 py-10">
       <div className="w-full max-w-[400px]">
         {/* Header row */}
         <div className="mb-10 flex items-center justify-between">
@@ -91,7 +91,7 @@ export function AuthSplitLayout({
           </Link>
           <Link
             to={mode === "login" ? "/signup" : "/login"}
-            className="rounded-full border border-dash-border bg-dash-bg px-3.5 py-1.5 text-xs font-medium text-dash-text-body transition-colors hover:bg-dash-bg-elevated dark:bg-dash-bg-elevated dark:hover:bg-[#333]"
+            className="rounded-full border border-dash-border bg-dash-bg px-3.5 py-1.5 text-xs font-medium text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
           >
             {mode === "login" ? "Create account" : "Sign in"}
           </Link>
@@ -139,12 +139,12 @@ export function AuthProviderButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="relative flex h-11 w-full items-center justify-center gap-2.5 rounded-[10px] border border-dash-border bg-dash-bg text-sm font-medium text-dash-text-strong shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all hover:bg-dash-bg-elevated hover:shadow-[0_2px_4px_rgba(16,24,40,0.08)] dark:bg-dash-bg-elevated dark:hover:bg-[#333]"
+      className="relative flex h-11 w-full items-center justify-center gap-2.5 rounded-[10px] border border-dash-border bg-dash-bg text-sm font-medium text-dash-text-strong shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all hover:bg-dash-bg-elevated hover:shadow-[0_2px_4px_rgba(16,24,40,0.08)]"
     >
       {icon}
       <span>{label}</span>
       {lastUsed && (
-        <span className="absolute right-3 rounded-full bg-dash-bg-elevated px-1.5 py-0.5 text-[10px] font-normal text-dash-text-faded dark:bg-[#444]">
+        <span className="absolute right-3 rounded-full bg-dash-bg-elevated px-1.5 py-0.5 text-[10px] font-normal text-dash-text-faded">
           Last used
         </span>
       )}
@@ -156,7 +156,7 @@ export function AuthDivider({ label = "or" }: { label?: string }) {
   return (
     <div className="relative my-6">
       <div className="border-t border-dash-border/60" />
-      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-dash-bg px-3 text-[11px] font-medium uppercase tracking-[0.5px] text-dash-text-extra-faded dark:bg-[#1a1c1e]">
+      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-dash-bg px-3 text-[11px] font-medium uppercase tracking-[0.5px] text-dash-text-extra-faded">
         {label}
       </span>
     </div>
@@ -207,7 +207,7 @@ export function AuthField({
         autoFocus={autoFocus}
         maxLength={maxLength}
         inputMode={inputMode}
-        className={`h-11 w-full rounded-[10px] border border-dash-border bg-dash-bg px-3.5 text-sm text-dash-text-strong outline-none transition-shadow placeholder:text-dash-text-extra-faded focus:border-[#006fff] focus:shadow-[0_0_0_3px_rgba(0,111,255,0.1)] dark:bg-dash-bg-elevated dark:focus:border-[#4879f8] dark:focus:shadow-[0_0_0_3px_rgba(72,121,248,0.15)] ${className ?? ""}`}
+        className={`h-11 w-full rounded-[10px] border border-dash-border bg-dash-bg px-3.5 text-sm text-dash-text-strong outline-none transition-shadow placeholder:text-dash-text-extra-faded focus:border-[#006fff] focus:shadow-[0_0_0_3px_rgba(0,111,255,0.1)] ${className ?? ""}`}
       />
     </label>
   );
@@ -277,10 +277,10 @@ export function OtpInput({
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={handlePaste}
-          className={`h-12 min-w-0 flex-1 rounded-[10px] border bg-dash-bg text-center text-lg font-semibold text-dash-text-strong outline-none transition-shadow placeholder:text-dash-text-extra-faded dark:bg-dash-bg-elevated ${
+          className={`h-12 min-w-0 flex-1 rounded-[10px] border bg-dash-bg text-center text-lg font-semibold text-dash-text-strong outline-none transition-shadow placeholder:text-dash-text-extra-faded ${
             error
-              ? "border-[#ef2f1f] focus:border-[#ef2f1f] focus:shadow-[0_0_0_3px_rgba(239,47,31,0.18)] dark:focus:border-[#ef2f1f] dark:focus:shadow-[0_0_0_3px_rgba(239,47,31,0.2)]"
-              : "border-dash-border focus:border-[#006fff] focus:shadow-[0_0_0_3px_rgba(0,111,255,0.1)] dark:focus:border-[#4879f8] dark:focus:shadow-[0_0_0_3px_rgba(72,121,248,0.15)]"
+              ? "border-[#ef2f1f] focus:border-[#ef2f1f] focus:shadow-[0_0_0_3px_rgba(239,47,31,0.18)]"
+              : "border-dash-border focus:border-[#006fff] focus:shadow-[0_0_0_3px_rgba(0,111,255,0.1)]"
           }`}
           aria-label={`Digit ${i + 1}`}
         />

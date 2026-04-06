@@ -69,6 +69,7 @@ function EmailStep({
   onGithub,
   onGoogle,
   onGitlab,
+  onBitbucket,
   oauthLoadingProvider,
   lastAuthMethod,
 }: {
@@ -113,28 +114,30 @@ function EmailStep({
           disabled={loading || oauthLoadingProvider !== null}
           lastUsed={lastAuthMethod === "google"}
         />
-        <AuthProviderButton
-          icon={<GitlabIcon />}
-          label={
-            oauthLoadingProvider === "gitlab"
-              ? "Connecting GitLab..."
-              : "Continue with GitLab"
-          }
-          onClick={onGitlab}
-          disabled={loading || oauthLoadingProvider !== null}
-          lastUsed={lastAuthMethod === "gitlab"}
-        />
-        <AuthProviderButton
-          icon={<BitbucketIcon />}
-          label={
-            oauthLoadingProvider === "bitbucket"
-              ? "Connecting Bitbucket..."
-              : "Continue with Bitbucket"
-          }
-          onClick={onBitbucket}
-          disabled={loading || oauthLoadingProvider !== null}
-          lastUsed={lastAuthMethod === "bitbucket"}
-        />
+        <div className="flex gap-2.5">
+          <AuthProviderButton
+            icon={<GitlabIcon />}
+            label={
+              oauthLoadingProvider === "gitlab"
+                ? "GitLab..."
+                : "GitLab"
+            }
+            onClick={onGitlab}
+            disabled={loading || oauthLoadingProvider !== null}
+            lastUsed={lastAuthMethod === "gitlab"}
+          />
+          <AuthProviderButton
+            icon={<BitbucketIcon />}
+            label={
+              oauthLoadingProvider === "bitbucket"
+                ? "Bitbucket..."
+                : "Bitbucket"
+            }
+            onClick={onBitbucket}
+            disabled={loading || oauthLoadingProvider !== null}
+            lastUsed={lastAuthMethod === "bitbucket"}
+          />
+        </div>
       </div>
 
       <AuthDivider />

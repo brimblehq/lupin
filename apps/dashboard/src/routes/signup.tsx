@@ -115,26 +115,28 @@ function DetailsStep({
           onClick={onGoogle}
           disabled={loading || oauthLoadingProvider !== null}
         />
-        <AuthProviderButton
-          icon={<GitlabIcon />}
-          label={
-            oauthLoadingProvider === "gitlab"
-              ? "Connecting GitLab..."
-              : "Sign up with GitLab"
-          }
-          onClick={onGitlab}
-          disabled={loading || oauthLoadingProvider !== null}
-        />
-        <AuthProviderButton
-          icon={<BitbucketIcon />}
-          label={
-            oauthLoadingProvider === "bitbucket"
-              ? "Connecting Bitbucket..."
-              : "Sign up with Bitbucket"
-          }
-          onClick={onBitbucket}
-          disabled={loading || oauthLoadingProvider !== null}
-        />
+        <div className="flex gap-2.5">
+          <AuthProviderButton
+            icon={<GitlabIcon />}
+            label={
+              oauthLoadingProvider === "gitlab"
+                ? "GitLab..."
+                : "GitLab"
+            }
+            onClick={onGitlab}
+            disabled={loading || oauthLoadingProvider !== null}
+          />
+          <AuthProviderButton
+            icon={<BitbucketIcon />}
+            label={
+              oauthLoadingProvider === "bitbucket"
+                ? "Bitbucket..."
+                : "Bitbucket"
+            }
+            onClick={onBitbucket}
+            disabled={loading || oauthLoadingProvider !== null}
+          />
+        </div>
       </div>
 
       <AuthDivider label="or use email" />
