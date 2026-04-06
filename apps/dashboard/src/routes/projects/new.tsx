@@ -3358,13 +3358,12 @@ function NewProjectPage() {
             ? "Failed to deploy project"
             : "Failed to save project",
       );
-      return false;
-    } finally {
       if (deploy) {
         setDeployingProject(false);
       } else {
         setSavingProject(false);
       }
+      return false;
     }
   }
 

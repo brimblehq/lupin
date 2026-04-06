@@ -7,15 +7,18 @@ import {
 import { ExternalLink, Copy, Check, ArrowUpRight, Terminal, Download, Database, Clock, HardDrive } from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
-import { DeploymentLogsDrawer } from "../../../components/shared/deployment-logs-drawer";
 import { getProjectScreenshotServerFn } from "@/server/projects/actions";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
+import { listDeploymentsServerFn } from "@/server/deployments/actions";
+import type { DeploymentLog, PaginatedDeploymentsResponse } from "@/backend/deployments";
 import type { FrameworkOption } from "@/backend/frameworks";
 import { useHaptics } from "@/hooks/use-haptics";
+import { useProjectDeploymentLogsDrawer } from "@/contexts/project-deployment-logs-drawer-context";
 import { formatRelativeTime } from "@/utils/dashboard";
 import {
   isDatabaseProject as getIsDatabaseProject,
   isMcpProject as getIsMcpProject,
+  isStaticProject as getIsStaticProject,
   isWebLikeProject,
 } from "@/utils/project-capabilities";
 
@@ -38,13 +41,31 @@ export const Route = createFileRoute("/projects/$projectId/")({
   preloadStaleTime: 300_000,
   loader: async ({ context }) => {
     const project = (context as any).project;
+    const workspace = (context as any).workspace as string | undefined;
+
+    let recentDeployments: DeploymentLog[] = [];
+    if (project?.id) {
+      try {
+        const result = await (listDeploymentsServerFn as unknown as (input: {
+          data: { projectId: string; workspace?: string; page?: number; limit?: number };
+        }) => Promise<PaginatedDeploymentsResponse>)({
+          data: {
+            projectId: project.id,
+            workspace,
+            page: 1,
+            limit: 5,
+          },
+        });
+        recentDeployments = result?.items ?? [];
+      } catch {}
+    }
 
     if (!isWebLikeProject(project)) {
       let frameworks: FrameworkOption[] = [];
       try {
         frameworks = await listFrameworksServerFn();
       } catch {}
-      return { screenshotUrl: null, frameworks };
+      return { screenshotUrl: null, frameworks, recentDeployments };
     }
 
     const framework = String(project?.framework ?? "").toLowerCase();
@@ -53,7 +74,7 @@ export const Route = createFileRoute("/projects/$projectId/")({
       try {
         frameworks = await listFrameworksServerFn();
       } catch {}
-      return { screenshotUrl: null, isServiceFramework: true, frameworks };
+      return { screenshotUrl: null, isServiceFramework: true, frameworks, recentDeployments };
     }
 
     let screenshotUrl: string | null = project?.screenshot ?? null;
@@ -74,32 +95,35 @@ export const Route = createFileRoute("/projects/$projectId/")({
       frameworks = await listFrameworksServerFn();
     } catch {}
 
-    return { screenshotUrl, frameworks };
+    return { screenshotUrl, frameworks, recentDeployments };
   },
   component: ProjectDetailPage,
 });
 
 function ProjectDetailPage() {
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const haptics = useHaptics();
+  const { openDeploymentDrawer } = useProjectDeploymentLogsDrawer();
   const navigate = useNavigate();
   const { projectId } = Route.useParams();
   const { project } = parentRoute.useLoaderData() as any;
-  const { screenshotUrl, isServiceFramework, frameworks } = Route.useLoaderData() as {
+  const { screenshotUrl, isServiceFramework, frameworks, recentDeployments } = Route.useLoaderData() as {
     screenshotUrl: string | null;
     isServiceFramework?: boolean;
     frameworks?: FrameworkOption[];
+    recentDeployments?: DeploymentLog[];
   };
 
   const projectName = project?.name || projectId;
   const isDatabaseProject = getIsDatabaseProject(project);
+  const isStaticProject = getIsStaticProject(project);
   const isMcpProject = getIsMcpProject(project);
   const showPreviewBanner = isWebLikeProject(project);
   const showSitePasswordRow = isWebLikeProject(project);
   const showFrameworkRow = !isMcpProject;
   const showMcpAuthRow = isMcpProject;
   const showBuildCacheRow = !isDatabaseProject;
+  const showComputeSizeRow = !isStaticProject;
   const liveUrl = project?.previewUrl || project?.domains?.[0]?.name || "";
   let liveHref = "";
   if (liveUrl) {
@@ -141,6 +165,7 @@ function ProjectDetailPage() {
   const frameworkLogo = matchedFramework?.logo;
   const repoSource = project?.repo?.git || "Git";
   const repoName = project?.repo?.name || repoSource;
+  const isGitlab = repoSource.toLowerCase() === "gitlab";
   const repositoryHref = project?.gitLink || "";
   const lastUpdatedText = project?.updatedAt
     ? formatRelativeTime(project.updatedAt)
@@ -149,7 +174,10 @@ function ProjectDetailPage() {
     ? `https://${project.domains[0].name}/mcp`
     : "";
 
-  const deploymentRows: Array<{ url: string; date: string }> = [];
+  const deploymentRows: Array<{ url: string; date: string }> = (recentDeployments ?? []).map((dep) => ({
+    url: dep.domain || dep.name || dep.id,
+    date: dep.createdAt ? formatRelativeTime(dep.createdAt) : "",
+  }));
 
   let domainRows: Array<{
     url: string;
@@ -380,14 +408,16 @@ function ProjectDetailPage() {
                   </span>
                 </div>
               ) : null}
-              <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
-                <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
-                  Compute size
-                </span>
-                <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
-                  {computeSizeText}
-                </span>
-              </div>
+              {showComputeSizeRow ? (
+                <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
+                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
+                    Compute size
+                  </span>
+                  <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
+                    {computeSizeText}
+                  </span>
+                </div>
+              ) : null}
               {showFrameworkRow ? (
                 <div
                   className={`flex items-center justify-between p-3.5 ${!isDatabaseProject ? "border-b-[0.5px] border-dash-border" : ""}`}
@@ -432,32 +462,34 @@ function ProjectDetailPage() {
                         <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
                           From <span className="underline">{repoName}</span>
                         </span>
-                        <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                          <svg
-                            width="9"
-                            height="9"
-                            viewBox="0 0 16 16"
-                            fill="white"
-                          >
-                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                          </svg>
-                        </div>
+                        {isGitlab ? (
+                          <div className="flex size-6 items-center justify-center rounded-full border border-[#e24329]/30 bg-gradient-to-b from-[#fca326] to-[#e24329] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
+                            <img src="/icons/gitlab.svg" alt="GitLab" className="size-3.5" />
+                          </div>
+                        ) : (
+                          <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
+                            <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
+                              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                            </svg>
+                          </div>
+                        )}
                       </a>
                     ) : (
                       <>
                         <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
                           From <span className="underline">{repoName}</span>
                         </span>
-                        <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                          <svg
-                            width="9"
-                            height="9"
-                            viewBox="0 0 16 16"
-                            fill="white"
-                          >
-                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                          </svg>
-                        </div>
+                        {isGitlab ? (
+                          <div className="flex size-6 items-center justify-center rounded-full border border-[#e24329]/30 bg-gradient-to-b from-[#fca326] to-[#e24329] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
+                            <img src="/icons/gitlab.svg" alt="GitLab" className="size-3.5" />
+                          </div>
+                        ) : (
+                          <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
+                            <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
+                              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                            </svg>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -544,7 +576,10 @@ function ProjectDetailPage() {
                   deploymentRows.map((dep, i) => (
                     <button
                       key={i}
-                      onClick={() => setDrawerOpen(true)}
+                      onClick={() => {
+                        const deployment = recentDeployments?.[i];
+                        if (deployment) openDeploymentDrawer(deployment);
+                      }}
                       className="relative cursor-pointer px-3.5 pb-3.5 pt-3 text-left transition-colors hover:bg-dash-bg-elevated"
                     >
                       <div className="flex items-center gap-2">
@@ -719,15 +754,6 @@ function ProjectDetailPage() {
         </>
       ) : null}
 
-      {/* Deployment logs drawer */}
-      {!isDatabaseProject ? (
-        <DeploymentLogsDrawer
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          environment="Production"
-          status="Successful"
-        />
-      ) : null}
     </div>
   );
 }
