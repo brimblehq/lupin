@@ -469,6 +469,7 @@ export const saveProjectBuildConfigServerFn = createServerFn({
         healthCheckPath?: string;
         preStartCommand?: string;
         dockerImage?: string;
+        outputDirectory?: string;
       }
     | undefined;
 
@@ -495,6 +496,9 @@ export const saveProjectBuildConfigServerFn = createServerFn({
   }
   if (typeof payload?.preStartCommand === "string") {
     body.preStartCommand = payload.preStartCommand;
+  }
+  if (typeof payload?.outputDirectory === "string") {
+    body.outputDirectory = payload.outputDirectory;
   }
 
   return withTokenRefresh(async (api) => {

@@ -4,13 +4,26 @@ import {
   getRouteApi,
   useNavigate,
 } from "@tanstack/react-router";
-import { ExternalLink, Copy, Check, ArrowUpRight, Terminal, Download, Database, Clock, HardDrive } from "lucide-react";
+import {
+  ExternalLink,
+  Copy,
+  Check,
+  ArrowUpRight,
+  Terminal,
+  Download,
+  Database,
+  Clock,
+  HardDrive,
+} from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
 import { getProjectScreenshotServerFn } from "@/server/projects/actions";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import { listDeploymentsServerFn } from "@/server/deployments/actions";
-import type { DeploymentLog, PaginatedDeploymentsResponse } from "@/backend/deployments";
+import type {
+  DeploymentLog,
+  PaginatedDeploymentsResponse,
+} from "@/backend/deployments";
 import type { FrameworkOption } from "@/backend/frameworks";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useProjectDeploymentLogsDrawer } from "@/contexts/project-deployment-logs-drawer-context";
@@ -31,7 +44,14 @@ function formatBytes(bytes: number): string {
 
 /** Backend/service frameworks that don't produce browser screenshots */
 const SERVICE_FRAMEWORKS = new Set([
-  "other", "custom", "docker", "laravel", "php", "python", "golang", "ruby",
+  "other",
+  "custom",
+  "docker",
+  "laravel",
+  "php",
+  "python",
+  "golang",
+  "ruby",
 ]);
 
 const parentRoute = getRouteApi("/projects/$projectId");
@@ -43,57 +63,62 @@ export const Route = createFileRoute("/projects/$projectId/")({
     const project = (context as any).project;
     const workspace = (context as any).workspace as string | undefined;
 
-    let recentDeployments: DeploymentLog[] = [];
-    if (project?.id) {
-      try {
-        const result = await (listDeploymentsServerFn as unknown as (input: {
-          data: { projectId: string; workspace?: string; page?: number; limit?: number };
-        }) => Promise<PaginatedDeploymentsResponse>)({
-          data: {
-            projectId: project.id,
-            workspace,
-            page: 1,
-            limit: 5,
-          },
-        });
-        recentDeployments = result?.items ?? [];
-      } catch {}
-    }
+    const isWebLike = isWebLikeProject(project);
+    const framework = String(project?.framework ?? "").toLowerCase();
+    const isService = SERVICE_FRAMEWORKS.has(framework);
+    const needsScreenshot =
+      isWebLike && !isService && !project?.screenshot && project?.id;
 
-    if (!isWebLikeProject(project)) {
-      let frameworks: FrameworkOption[] = [];
-      try {
-        frameworks = await listFrameworksServerFn();
-      } catch {}
+    const [deploymentsResult, screenshotResult, frameworksResult] =
+      await Promise.allSettled([
+        project?.id
+          ? (
+              listDeploymentsServerFn as unknown as (input: {
+                data: {
+                  projectId: string;
+                  workspace?: string;
+                  page?: number;
+                  limit?: number;
+                };
+              }) => Promise<PaginatedDeploymentsResponse>
+            )({
+              data: { projectId: project.id, workspace, page: 1, limit: 5 },
+            })
+          : Promise.resolve(null),
+        needsScreenshot
+          ? (
+              getProjectScreenshotServerFn as unknown as (input: {
+                data: { projectId: string };
+              }) => Promise<string | null>
+            )({
+              data: { projectId: project.id },
+            })
+          : Promise.resolve(null),
+        listFrameworksServerFn(),
+      ]);
+
+    const recentDeployments =
+      deploymentsResult.status === "fulfilled" && deploymentsResult.value
+        ? (deploymentsResult.value.items ?? [])
+        : [];
+    const screenshotUrl =
+      project?.screenshot ??
+      (screenshotResult.status === "fulfilled" ? screenshotResult.value : null);
+    const frameworks =
+      frameworksResult.status === "fulfilled" ? frameworksResult.value : [];
+
+    if (!isWebLike) {
       return { screenshotUrl: null, frameworks, recentDeployments };
     }
 
-    const framework = String(project?.framework ?? "").toLowerCase();
-    if (SERVICE_FRAMEWORKS.has(framework)) {
-      let frameworks: FrameworkOption[] = [];
-      try {
-        frameworks = await listFrameworksServerFn();
-      } catch {}
-      return { screenshotUrl: null, isServiceFramework: true, frameworks, recentDeployments };
+    if (isService) {
+      return {
+        screenshotUrl: null,
+        isServiceFramework: true,
+        frameworks,
+        recentDeployments,
+      };
     }
-
-    let screenshotUrl: string | null = project?.screenshot ?? null;
-    if (!screenshotUrl && project?.id) {
-      try {
-        screenshotUrl = await (
-          getProjectScreenshotServerFn as unknown as (input: {
-            data: { projectId: string };
-          }) => Promise<string | null>
-        )({
-          data: { projectId: project.id },
-        });
-      } catch {}
-    }
-
-    let frameworks: FrameworkOption[] = [];
-    try {
-      frameworks = await listFrameworksServerFn();
-    } catch {}
 
     return { screenshotUrl, frameworks, recentDeployments };
   },
@@ -107,12 +132,13 @@ function ProjectDetailPage() {
   const navigate = useNavigate();
   const { projectId } = Route.useParams();
   const { project } = parentRoute.useLoaderData() as any;
-  const { screenshotUrl, isServiceFramework, frameworks, recentDeployments } = Route.useLoaderData() as {
-    screenshotUrl: string | null;
-    isServiceFramework?: boolean;
-    frameworks?: FrameworkOption[];
-    recentDeployments?: DeploymentLog[];
-  };
+  const { screenshotUrl, isServiceFramework, frameworks, recentDeployments } =
+    Route.useLoaderData() as {
+      screenshotUrl: string | null;
+      isServiceFramework?: boolean;
+      frameworks?: FrameworkOption[];
+      recentDeployments?: DeploymentLog[];
+    };
 
   const projectName = project?.name || projectId;
   const isDatabaseProject = getIsDatabaseProject(project);
@@ -174,7 +200,9 @@ function ProjectDetailPage() {
     ? `https://${project.domains[0].name}/mcp`
     : "";
 
-  const deploymentRows: Array<{ url: string; date: string }> = (recentDeployments ?? []).map((dep) => ({
+  const deploymentRows: Array<{ url: string; date: string }> = (
+    recentDeployments ?? []
+  ).map((dep) => ({
     url: dep.domain || dep.name || dep.id,
     date: dep.createdAt ? formatRelativeTime(dep.createdAt) : "",
   }));
@@ -430,7 +458,8 @@ function ProjectDetailPage() {
                       {frameworkLabel}
                     </span>
                     {frameworkLogo ? (
-                      frameworkLogo.trim().startsWith("<svg") || frameworkLogo.includes("<svg") ? (
+                      frameworkLogo.trim().startsWith("<svg") ||
+                      frameworkLogo.includes("<svg") ? (
                         <div
                           className="flex size-5 items-center justify-center [&>svg]:size-5"
                           dangerouslySetInnerHTML={{ __html: frameworkLogo }}
@@ -464,11 +493,20 @@ function ProjectDetailPage() {
                         </span>
                         {isGitlab ? (
                           <div className="flex size-6 items-center justify-center rounded-full border border-[#e24329]/30 bg-gradient-to-b from-[#fca326] to-[#e24329] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                            <img src="/icons/gitlab.svg" alt="GitLab" className="size-3.5" />
+                            <img
+                              src="/icons/gitlab.svg"
+                              alt="GitLab"
+                              className="size-3.5"
+                            />
                           </div>
                         ) : (
                           <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                            <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
+                            <svg
+                              width="9"
+                              height="9"
+                              viewBox="0 0 16 16"
+                              fill="white"
+                            >
                               <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
                             </svg>
                           </div>
@@ -481,11 +519,20 @@ function ProjectDetailPage() {
                         </span>
                         {isGitlab ? (
                           <div className="flex size-6 items-center justify-center rounded-full border border-[#e24329]/30 bg-gradient-to-b from-[#fca326] to-[#e24329] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                            <img src="/icons/gitlab.svg" alt="GitLab" className="size-3.5" />
+                            <img
+                              src="/icons/gitlab.svg"
+                              alt="GitLab"
+                              className="size-3.5"
+                            />
                           </div>
                         ) : (
                           <div className="flex size-6 items-center justify-center rounded-full border border-[#3e3e3e] bg-gradient-to-b from-[#666] to-[#1b1b1b] shadow-[0px_1px_1px_rgba(0,0,0,0.15)]">
-                            <svg width="9" height="9" viewBox="0 0 16 16" fill="white">
+                            <svg
+                              width="9"
+                              height="9"
+                              viewBox="0 0 16 16"
+                              fill="white"
+                            >
                               <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
                             </svg>
                           </div>
@@ -508,23 +555,33 @@ function ProjectDetailPage() {
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
                     <HardDrive className="size-4 text-dash-text-extra-faded" />
-                    <span className="text-sm font-light text-dash-text-faded">Backup size</span>
+                    <span className="text-sm font-light text-dash-text-faded">
+                      Backup size
+                    </span>
                   </div>
                   <span className="font-mono text-sm text-dash-text-body">
-                    {project?.backupSize != null ? formatBytes(project.backupSize) : "N/A"}
+                    {project?.backupSize != null
+                      ? formatBytes(project.backupSize)
+                      : "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
                     <Clock className="size-4 text-dash-text-extra-faded" />
-                    <span className="text-sm font-light text-dash-text-faded">Backup frequency</span>
+                    <span className="text-sm font-light text-dash-text-faded">
+                      Backup frequency
+                    </span>
                   </div>
-                  <span className="font-mono text-sm text-dash-text-body">Daily</span>
+                  <span className="font-mono text-sm text-dash-text-body">
+                    Daily
+                  </span>
                 </div>
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
                     <Download className="size-4 text-dash-text-extra-faded" />
-                    <span className="text-sm font-light text-dash-text-faded">Download backup</span>
+                    <span className="text-sm font-light text-dash-text-faded">
+                      Download backup
+                    </span>
                   </div>
                   {project?.backupUrl ? (
                     <a
@@ -538,16 +595,22 @@ function ProjectDetailPage() {
                       Download Now
                     </a>
                   ) : (
-                    <span className="font-mono text-sm text-dash-text-extra-faded">No backup available</span>
+                    <span className="font-mono text-sm text-dash-text-extra-faded">
+                      No backup available
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
                     <Database className="size-4 text-dash-text-extra-faded" />
-                    <span className="text-sm font-light text-dash-text-faded">Last backup</span>
+                    <span className="text-sm font-light text-dash-text-faded">
+                      Last backup
+                    </span>
                   </div>
                   <span className="font-mono text-sm text-dash-text-body">
-                    {project?.lastBackup ? formatRelativeTime(project.lastBackup) : "N/A"}
+                    {project?.lastBackup
+                      ? formatRelativeTime(project.lastBackup)
+                      : "N/A"}
                   </span>
                 </div>
               </div>
@@ -753,7 +816,6 @@ function ProjectDetailPage() {
           </div>
         </>
       ) : null}
-
     </div>
   );
 }

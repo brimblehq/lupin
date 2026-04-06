@@ -694,6 +694,7 @@ interface BuildInitialValues {
   healthCheckPath: string;
   preStartCommand: string;
   dockerImage: string;
+  outputDirectory: string;
 }
 
 function BuildSection({
@@ -702,6 +703,7 @@ function BuildSection({
   showCommands = true,
   showHealthCheck = true,
   showDockerSourceFields = false,
+  showOutputDirectory = false,
   canWrite = true,
 }: {
   initialValues: BuildInitialValues;
@@ -709,6 +711,7 @@ function BuildSection({
   showCommands?: boolean;
   showHealthCheck?: boolean;
   showDockerSourceFields?: boolean;
+  showOutputDirectory?: boolean;
   canWrite?: boolean;
 }) {
   const [values, setValues] = useState(initialValues);
@@ -723,6 +726,7 @@ function BuildSection({
     initialValues.healthCheckPath,
     initialValues.preStartCommand,
     initialValues.dockerImage,
+    initialValues.outputDirectory,
   ]);
 
   const dirty =
@@ -731,7 +735,8 @@ function BuildSection({
     values.startCommand !== initialValues.startCommand ||
     values.healthCheckPath !== initialValues.healthCheckPath ||
     values.preStartCommand !== initialValues.preStartCommand ||
-    values.dockerImage !== initialValues.dockerImage;
+    values.dockerImage !== initialValues.dockerImage ||
+    values.outputDirectory !== initialValues.outputDirectory;
 
   async function handleSave() {
     if (!dirty || saving) return;
@@ -840,6 +845,30 @@ function BuildSection({
               readOnly={!canWrite}
               className={inputClass}
             />
+          </div>
+          <hr className="border-dash-border" />
+        </>
+      )}
+
+      {showOutputDirectory && (
+        <>
+          <div className="flex flex-col gap-1.5 px-4 py-4">
+            <label className="text-sm font-medium text-dash-text-strong">
+              Output directory
+            </label>
+            <input
+              type="text"
+              value={values.outputDirectory}
+              onChange={(e) =>
+                setValues((v) => ({ ...v, outputDirectory: e.target.value }))
+              }
+              placeholder="dist"
+              readOnly={!canWrite}
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-dash-text-faded">
+              The directory where your build output is generated.
+            </p>
           </div>
           <hr className="border-dash-border" />
         </>
@@ -1497,6 +1526,7 @@ function ConfigurationPage() {
       startCommand?: string;
       healthCheckPath?: string;
       preStartCommand?: string;
+      outputDirectory?: string;
     };
   }) => Promise<{ message?: string }>;
   const [activeSection, setActiveSection] = useState<ConfigSection>(
@@ -1549,6 +1579,7 @@ function ConfigurationPage() {
     healthCheckPath: project?.healthCheckPath || "",
     preStartCommand: project?.preStartCommand || "",
     dockerImage: project?.repo?.name || "",
+    outputDirectory: project?.outputDirectory || "",
   };
 
   // Database section initial values
@@ -1760,6 +1791,7 @@ function ConfigurationPage() {
           startCommand: values.startCommand,
           healthCheckPath: values.healthCheckPath,
           preStartCommand: values.preStartCommand,
+          outputDirectory: values.outputDirectory,
         },
       });
       markDeploymentHistoryForRefresh({
@@ -1938,6 +1970,7 @@ function ConfigurationPage() {
                   showCommands={sourceFieldsVisible && !noBuildFramework}
                   showHealthCheck={healthCheckVisible}
                   showDockerSourceFields={dockerSourceFieldsVisible}
+                  showOutputDirectory={isStaticProject(project) && !noBuildFramework}
                   canWrite={canWrite}
                 />
               )}

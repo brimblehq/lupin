@@ -95,7 +95,8 @@ export const Route = createFileRoute("/projects/$projectId")({
     projectCache.delete(`${params.projectId}:${workspace ?? ""}`);
     const searchEnvironmentId = deps.environmentId;
     const hasExplicitEnvironment = hasExplicitEnvironmentSelection(searchEnvironmentId);
-    const [environments, persistedEnvironmentId] = await Promise.all([
+
+    const [environments, persistedEnvironmentId, allProjects] = await Promise.all([
       (listProjectEnvironmentsServerFn as unknown as (input: {
         data: { workspace?: string };
       }) => Promise<Array<{ _id: string; isDefault?: boolean }>>)({
@@ -106,17 +107,27 @@ export const Route = createFileRoute("/projects/$projectId")({
       }) => Promise<string | null>)({
         data: { workspace },
       }).catch(() => null),
+      (listHomeProjectsServerFn as unknown as (input: {
+        data: { workspace?: string; environmentId?: string };
+      }) => Promise<ApiListResponse<BackendProject>>)({
+        data: { workspace, environmentId: searchEnvironmentId },
+      }),
     ]);
+
     const environmentId = resolveEnvironmentId({
       requestedEnvironmentId: searchEnvironmentId,
       preferredEnvironmentId: persistedEnvironmentId,
       environments,
     });
-    const projectSwitcherProjects = await (listHomeProjectsServerFn as unknown as (input: {
-      data: { workspace?: string; environmentId?: string };
-    }) => Promise<ApiListResponse<BackendProject>>)({
-      data: { workspace, environmentId },
-    });
+
+    let projectSwitcherProjects = allProjects;
+    if (environmentId && environmentId !== searchEnvironmentId) {
+      projectSwitcherProjects = await (listHomeProjectsServerFn as unknown as (input: {
+        data: { workspace?: string; environmentId?: string };
+      }) => Promise<ApiListResponse<BackendProject>>)({
+        data: { workspace, environmentId },
+      });
+    }
 
     const projectVisibleInActiveEnvironment = projectSwitcherProjects.items.some((item) => {
       const candidates = [item.slug, item.id, item.name]
