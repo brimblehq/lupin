@@ -1970,7 +1970,7 @@ function ConfigurationPage() {
                   showCommands={sourceFieldsVisible && !noBuildFramework}
                   showHealthCheck={healthCheckVisible}
                   showDockerSourceFields={dockerSourceFieldsVisible}
-                  showOutputDirectory={isStaticProject(project) && !noBuildFramework}
+                  showOutputDirectory={sourceFieldsVisible && !noBuildFramework}
                   canWrite={canWrite}
                 />
               )}

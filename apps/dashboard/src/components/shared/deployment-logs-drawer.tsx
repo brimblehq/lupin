@@ -265,8 +265,13 @@ export function DeploymentLogsDrawer({
             transition={{ type: "spring", stiffness: 400, damping: 35 }}
             className="flex max-h-[60vh] flex-col overflow-clip rounded-t-[4px] border-t-[0.5px] border-[#d9dadd] bg-dash-bg shadow-[0px_-4px_20px_-8px_rgba(0,0,0,0.15)] dark:border-dash-border dark:bg-[#181819]"
           >
+            {/* ─── Drag handle ─── */}
+            <div className="flex shrink-0 cursor-grab items-center justify-center py-2 active:cursor-grabbing">
+              <div className="h-1 w-8 rounded-full bg-dash-border" />
+            </div>
+
             {/* ─── Top bar ─── */}
-            <div className="flex shrink-0 items-center justify-between border-b-[0.5px] border-[#e5e5e5] px-5 py-3.5 dark:border-dash-border">
+            <div className="flex shrink-0 items-center justify-between border-b-[0.5px] border-[#e5e5e5] px-5 pb-3.5 dark:border-dash-border">
               <div className="flex items-center gap-2">
                 <Clock className="size-4 text-dash-text-faded" />
                 <span className="text-sm leading-[1.3] tracking-[-0.0224px] text-dash-text-strong">

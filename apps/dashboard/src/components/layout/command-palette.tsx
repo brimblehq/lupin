@@ -194,7 +194,7 @@ export function CommandPalette() {
   }, [domainsLoadedForKey, isOpen, query, view, workspace]);
 
   useEffect(() => {
-    if (!isOpen || view !== PaletteView.EnvironmentSearch) {
+    if (!isOpen) {
       return;
     }
 
@@ -231,7 +231,7 @@ export function CommandPalette() {
     return () => {
       cancelled = true;
     };
-  }, [environmentsLoadedForKey, isOpen, view, workspace]);
+  }, [environmentsLoadedForKey, isOpen, workspace]);
 
   const runAction = useCallback((fn: () => void) => {
     haptics.selection();
@@ -884,7 +884,7 @@ export function CommandPalette() {
                                       ) : null}
                                     </div>
                                     {isActive ? (
-                                      <span className="ml-auto size-1.5 shrink-0 rounded-full bg-[#34d399]" />
+                                      <div className="ml-auto size-1.5 shrink-0 rounded-full bg-[#34d399]" />
                                     ) : null}
                                   </Command.Item>
                                 );

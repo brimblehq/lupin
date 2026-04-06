@@ -2447,6 +2447,8 @@ function Phase3Configure({
                   iconClassName: f.iconClassName,
                 }))}
                 onChange={handleFrameworkChange}
+                searchable
+                searchPlaceholder="Search frameworks..."
               />
             </div>
 

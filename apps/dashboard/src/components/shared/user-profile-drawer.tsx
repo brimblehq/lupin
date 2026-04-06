@@ -1589,6 +1589,7 @@ function ProfileNavSidebar({
   isSigningOut,
   showMembersTab,
   showBillingTab = true,
+  showSecurityTab = true,
 }: {
   activeTab: ProfileTab;
   onTabChange: (tab: ProfileTab) => void;
@@ -1597,11 +1598,13 @@ function ProfileNavSidebar({
   isSigningOut?: boolean;
   showMembersTab: boolean;
   showBillingTab?: boolean;
+  showSecurityTab?: boolean;
 }) {
   const haptics = useHaptics();
   const hiddenTabs = new Set<ProfileTab>();
   if (!showMembersTab) hiddenTabs.add(ProfileTab.Members);
   if (!showBillingTab) hiddenTabs.add(ProfileTab.Billing);
+  if (!showSecurityTab) hiddenTabs.add(ProfileTab.Security);
   const accountNavItems = accountNav.filter(
     (item) => !hiddenTabs.has(item.key),
   );
@@ -2073,7 +2076,10 @@ export function UserProfileDrawer({
     if (!canSeeBilling && activeTab === ProfileTab.Billing) {
       setActiveTab(ProfileTab.Profile);
     }
-  }, [canSeeBilling, activeTab]);
+    if (hasActiveWorkspace && activeTab === ProfileTab.Security) {
+      setActiveTab(ProfileTab.Profile);
+    }
+  }, [canSeeBilling, activeTab, hasActiveWorkspace]);
 
   useEffect(() => {
     if (!activeWorkspaceSlug || !initialWorkspaceTeamMembers) {
@@ -2255,6 +2261,7 @@ export function UserProfileDrawer({
             isSigningOut={isSigningOut}
             showMembersTab={hasActiveWorkspace}
             showBillingTab={canSeeBilling}
+            showSecurityTab={!hasActiveWorkspace}
           />
 
           {/* Content area */}
