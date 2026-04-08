@@ -150,6 +150,9 @@ export function TimeSeriesChart({
           opacity={0.4}
           activeBar={{ opacity: 1 }}
           radius={[2, 2, 0, 0]}
+          animationBegin={100}
+          animationDuration={900}
+          animationEasing="ease-out"
         />
       </BarChart>
     </ResponsiveContainer>

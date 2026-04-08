@@ -77,6 +77,10 @@ export function shouldShowProjectObservabilityTab(project?: Pick<Project, "servi
   return !isStaticProject(project);
 }
 
+export function shouldShowProjectWebAnalyticsTab(project?: Pick<Project, "serviceType"> | null): boolean {
+  return isWebLikeProject(project);
+}
+
 export function shouldShowProjectEnvironmentTab(project?: Pick<Project, "framework" | "serviceType"> | null): boolean {
   const framework = normalize(project?.framework);
   if (framework === "html") {

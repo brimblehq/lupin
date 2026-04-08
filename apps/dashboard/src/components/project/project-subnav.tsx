@@ -11,6 +11,7 @@ import {
   GlobeSimple,
   GearSix,
   ChartBar,
+  ChartLineUp,
   FileText,
   LockKey,
   RocketLaunch,
@@ -35,6 +36,7 @@ import {
   shouldShowProjectEnvironmentTab,
   shouldShowProjectLogsTab,
   shouldShowProjectObservabilityTab,
+  shouldShowProjectWebAnalyticsTab,
   shouldShowProjectVisitSite,
 } from "@/utils/project-capabilities";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
@@ -44,6 +46,7 @@ const baseTabs = [
   { label: "Projects details", slug: "", Icon: GlobeSimple },
   { label: "Configuration", slug: "configuration", Icon: GearSix },
   { label: "Observability", slug: "observability", Icon: ChartBar },
+  { label: "Web analytics", slug: "web-analytics", Icon: ChartLineUp },
   { label: "Domains", slug: "domains", Icon: FileText },
   { label: "Environment", slug: "environment", Icon: LockKey },
   { label: "Deployment history", slug: "deployment-history", Icon: RocketLaunch },
@@ -131,6 +134,10 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
   const canOpenDatabaseConnection = databaseProject && databaseStatus === "ACTIVE";
   const tabs = baseTabs.filter((tab) => {
     if (tab.slug === "observability" && !shouldShowProjectObservabilityTab(project as any)) {
+      return false;
+    }
+
+    if (tab.slug === "web-analytics" && !shouldShowProjectWebAnalyticsTab(project as any)) {
       return false;
     }
 

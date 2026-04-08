@@ -175,6 +175,7 @@ export function AuthField({
   maxLength,
   inputMode,
   className,
+  autoComplete,
 }: {
   id: string;
   label: string;
@@ -187,6 +188,7 @@ export function AuthField({
   maxLength?: number;
   inputMode?: "email" | "numeric" | "text";
   className?: string;
+  autoComplete?: string;
 }) {
   return (
     <label htmlFor={id} className="block">
@@ -207,6 +209,7 @@ export function AuthField({
         autoFocus={autoFocus}
         maxLength={maxLength}
         inputMode={inputMode}
+        autoComplete={autoComplete}
         className={`h-11 w-full rounded-[10px] border border-dash-border bg-dash-bg px-3.5 text-sm text-dash-text-strong outline-none transition-shadow placeholder:text-dash-text-extra-faded focus:border-[#006fff] focus:shadow-[0_0_0_3px_rgba(0,111,255,0.1)] ${className ?? ""}`}
       />
     </label>

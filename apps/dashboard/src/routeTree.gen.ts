@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ScalingRouteImport } from './routes/scaling'
 import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as PasskeyRecoveryRouteImport } from './routes/passkey-recovery'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DomainsRouteImport } from './routes/domains'
 import { Route as AddonsRouteImport } from './routes/addons'
@@ -32,6 +33,7 @@ import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$p
 import { Route as TeamsTeamNameTransferRouteImport } from './routes/teams/$teamName/transfer'
 import { Route as TeamsTeamNameOwnershipTransferRouteImport } from './routes/teams/$teamName/ownership-transfer'
 import { Route as TeamsTeamNameInvitationRouteImport } from './routes/teams/$teamName/invitation'
+import { Route as ProjectsProjectIdWebAnalyticsRouteImport } from './routes/projects/$projectId/web-analytics'
 import { Route as ProjectsProjectIdObservabilityRouteImport } from './routes/projects/$projectId/observability'
 import { Route as ProjectsProjectIdLogsRouteImport } from './routes/projects/$projectId/logs'
 import { Route as ProjectsProjectIdEnvironmentRouteImport } from './routes/projects/$projectId/environment'
@@ -54,6 +56,11 @@ const ScalingRoute = ScalingRouteImport.update({
 const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PasskeyRecoveryRoute = PasskeyRecoveryRouteImport.update({
+  id: '/passkey-recovery',
+  path: '/passkey-recovery',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -157,6 +164,12 @@ const TeamsTeamNameInvitationRoute = TeamsTeamNameInvitationRouteImport.update({
   path: '/teams/$teamName/invitation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectsProjectIdWebAnalyticsRoute =
+  ProjectsProjectIdWebAnalyticsRouteImport.update({
+    id: '/web-analytics',
+    path: '/web-analytics',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
 const ProjectsProjectIdObservabilityRoute =
   ProjectsProjectIdObservabilityRouteImport.update({
     id: '/observability',
@@ -212,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/addons': typeof AddonsRouteWithChildren
   '/domains': typeof DomainsRouteWithChildren
   '/login': typeof LoginRoute
+  '/passkey-recovery': typeof PasskeyRecoveryRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/scaling': typeof ScalingRouteWithChildren
   '/signup': typeof SignupRoute
@@ -231,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
+  '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
@@ -243,6 +258,7 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/2fa': typeof R2faRoute
   '/login': typeof LoginRoute
+  '/passkey-recovery': typeof PasskeyRecoveryRoute
   '/signup': typeof SignupRoute
   '/addons/$addonId': typeof AddonsAddonIdRoute
   '/domains/$domainName': typeof DomainsDomainNameRoute
@@ -258,6 +274,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
+  '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
@@ -273,6 +290,7 @@ export interface FileRoutesById {
   '/addons': typeof AddonsRouteWithChildren
   '/domains': typeof DomainsRouteWithChildren
   '/login': typeof LoginRoute
+  '/passkey-recovery': typeof PasskeyRecoveryRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/scaling': typeof ScalingRouteWithChildren
   '/signup': typeof SignupRoute
@@ -292,6 +310,7 @@ export interface FileRoutesById {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
+  '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
@@ -308,6 +327,7 @@ export interface FileRouteTypes {
     | '/addons'
     | '/domains'
     | '/login'
+    | '/passkey-recovery'
     | '/projects'
     | '/scaling'
     | '/signup'
@@ -327,6 +347,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
+    | '/projects/$projectId/web-analytics'
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
@@ -339,6 +360,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/2fa'
     | '/login'
+    | '/passkey-recovery'
     | '/signup'
     | '/addons/$addonId'
     | '/domains/$domainName'
@@ -354,6 +376,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
+    | '/projects/$projectId/web-analytics'
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
@@ -368,6 +391,7 @@ export interface FileRouteTypes {
     | '/addons'
     | '/domains'
     | '/login'
+    | '/passkey-recovery'
     | '/projects'
     | '/scaling'
     | '/signup'
@@ -387,6 +411,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
+    | '/projects/$projectId/web-analytics'
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
@@ -402,6 +427,7 @@ export interface RootRouteChildren {
   AddonsRoute: typeof AddonsRouteWithChildren
   DomainsRoute: typeof DomainsRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PasskeyRecoveryRoute: typeof PasskeyRecoveryRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
   ScalingRoute: typeof ScalingRouteWithChildren
   SignupRoute: typeof SignupRoute
@@ -432,6 +458,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/passkey-recovery': {
+      id: '/passkey-recovery'
+      path: '/passkey-recovery'
+      fullPath: '/passkey-recovery'
+      preLoaderRoute: typeof PasskeyRecoveryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -574,6 +607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsTeamNameInvitationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects/$projectId/web-analytics': {
+      id: '/projects/$projectId/web-analytics'
+      path: '/web-analytics'
+      fullPath: '/projects/$projectId/web-analytics'
+      preLoaderRoute: typeof ProjectsProjectIdWebAnalyticsRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
     '/projects/$projectId/observability': {
       id: '/projects/$projectId/observability'
       path: '/observability'
@@ -685,6 +725,7 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdEnvironmentRoute: typeof ProjectsProjectIdEnvironmentRoute
   ProjectsProjectIdLogsRoute: typeof ProjectsProjectIdLogsRoute
   ProjectsProjectIdObservabilityRoute: typeof ProjectsProjectIdObservabilityRoute
+  ProjectsProjectIdWebAnalyticsRoute: typeof ProjectsProjectIdWebAnalyticsRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
 
@@ -696,6 +737,7 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
   ProjectsProjectIdEnvironmentRoute: ProjectsProjectIdEnvironmentRoute,
   ProjectsProjectIdLogsRoute: ProjectsProjectIdLogsRoute,
   ProjectsProjectIdObservabilityRoute: ProjectsProjectIdObservabilityRoute,
+  ProjectsProjectIdWebAnalyticsRoute: ProjectsProjectIdWebAnalyticsRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }
 
@@ -736,6 +778,7 @@ const rootRouteChildren: RootRouteChildren = {
   AddonsRoute: AddonsRouteWithChildren,
   DomainsRoute: DomainsRouteWithChildren,
   LoginRoute: LoginRoute,
+  PasskeyRecoveryRoute: PasskeyRecoveryRoute,
   ProjectsRoute: ProjectsRouteWithChildren,
   ScalingRoute: ScalingRouteWithChildren,
   SignupRoute: SignupRoute,

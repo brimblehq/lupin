@@ -3,6 +3,17 @@ import type {
   AuthApi,
   AuthSession,
   ConfirmDeleteAccountInput,
+  PasskeyAuthOptionsInput,
+  PasskeyAuthOptionsResult,
+  PasskeyAuthVerifyInput,
+  PasskeyFeatureStatus,
+  PasskeyRecoverStartInput,
+  PasskeyRecoverStartResult,
+  PasskeyRecoveryDevice,
+  PasskeyRegisterOptionsInput,
+  PasskeyRegisterOptionsResult,
+  PasskeyRegisterVerifyInput,
+  PasskeySummary,
   TwoFactorCodeInput,
   TwoFactorSetup,
   TwoFactorStatus,
@@ -14,6 +25,12 @@ export type {
   AuthUser,
   ConfirmDeleteAccountInput,
   LoginInput,
+  PasskeyAuthOptionsResult,
+  PasskeyFeatureStatus,
+  PasskeyRecoverStartResult,
+  PasskeyRecoveryDevice,
+  PasskeyRegisterOptionsResult,
+  PasskeySummary,
   SignupInput,
   TwoFactorCodeInput,
   TwoFactorSetup,
@@ -24,6 +41,7 @@ export type {
   VerifyEmailCodeResult,
   VerifyTwoFactorChallengeInput,
 } from "./auth/types";
+import { BackendApiError } from "./errors";
 
 export function createAuthApi(client: ApiClient): AuthApi {
   const endpoints = {
@@ -41,6 +59,17 @@ export function createAuthApi(client: ApiClient): AuthApi {
     twoFactorDisable: "/auth/2fa/disable",
     twoFactorVerify: "/auth/2fa/verify",
     twoFactorRegenerateRecoveryCodes: "/auth/2fa/recovery-codes/regenerate",
+    passkeyRegisterOptions: "/auth/passkey/register/options",
+    passkeyRegisterVerify: "/auth/passkey/register/verify",
+    passkeyAuthOptions: "/auth/passkey/auth/options",
+    passkeyAuthVerify: "/auth/passkey/auth/verify",
+    passkeyList: "/auth/passkey",
+    passkeyById: (id: string) => `/auth/passkey/${encodeURIComponent(id)}`,
+    passkeyRecoverStart: "/auth/passkey/recover",
+    passkeyRecoverDevices: "/auth/passkey/recover/devices",
+    passkeyRecoverDeviceById: (id: string) =>
+      `/auth/passkey/recover/devices/${encodeURIComponent(id)}`,
+    passkeyRecoverComplete: "/auth/passkey/recover/complete",
   } as const;
 
   const normalizeEmail = (email: string) => email.trim().toLowerCase();
@@ -127,6 +156,36 @@ export function createAuthApi(client: ApiClient): AuthApi {
         .filter(Boolean),
     };
   };
+
+  const mapPasskeySummary = (raw: any): PasskeySummary => {
+    const data = raw ?? {};
+    return {
+      id: String(data?.id ?? ""),
+      deviceName: String(data?.device_name ?? data?.deviceName ?? ""),
+      transports: Array.isArray(data?.transports)
+        ? data.transports.map((t: unknown) => String(t))
+        : [],
+      createdAt: data?.created_at ?? data?.createdAt ?? undefined,
+      lastUsedAt: data?.last_used_at ?? data?.lastUsedAt ?? undefined,
+    };
+  };
+
+  const mapPasskeyRecoveryDevice = (raw: any): PasskeyRecoveryDevice => {
+    const data = raw ?? {};
+    return {
+      id: String(data?.id ?? ""),
+      deviceName: String(data?.device_name ?? data?.deviceName ?? ""),
+      createdAt: data?.created_at ?? data?.createdAt ?? undefined,
+      lastUsedAt: data?.last_used_at ?? data?.lastUsedAt ?? undefined,
+    };
+  };
+
+  const unwrapData = (payload: any) =>
+    payload?.data?.data ?? payload?.data ?? payload;
+
+  const bearerHeaders = (token: string) => ({
+    Authorization: `Bearer ${token}`,
+  });
 
   const mapRecoveryCodes = (payload: any): string[] => {
     const data = payload?.data?.data ?? payload?.data ?? payload;
@@ -301,6 +360,157 @@ export function createAuthApi(client: ApiClient): AuthApi {
 
         throw error;
       }
+    },
+
+    async getPasskeyFeatureStatus() {
+      try {
+        await client.request(endpoints.passkeyAuthOptions, {
+          method: "POST",
+          body: { email: "" },
+          headers: { Authorization: "" },
+        });
+        return { enabled: true } satisfies PasskeyFeatureStatus;
+      } catch (error) {
+        if (error instanceof BackendApiError && error.status === 404) {
+          return { enabled: false } satisfies PasskeyFeatureStatus;
+        }
+        // Other errors (e.g. 400 from empty email) still indicate the feature is on.
+        if (error instanceof BackendApiError && error.status && error.status !== 404) {
+          return { enabled: true } satisfies PasskeyFeatureStatus;
+        }
+        throw error;
+      }
+    },
+
+    async passkeyRegisterOptions(input: PasskeyRegisterOptionsInput) {
+      const headers = input.authToken ? bearerHeaders(input.authToken) : undefined;
+      const response = await client.request(endpoints.passkeyRegisterOptions, {
+        method: "POST",
+        body: { device_name: input.deviceName },
+        headers,
+      });
+      const data = unwrapData(response);
+      return {
+        options: (data?.options ?? {}) as Record<string, unknown>,
+        challengeToken: String(data?.challenge_token ?? data?.challengeToken ?? ""),
+      } satisfies PasskeyRegisterOptionsResult;
+    },
+
+    async passkeyRegisterVerify(input: PasskeyRegisterVerifyInput) {
+      const headers = input.authToken ? bearerHeaders(input.authToken) : undefined;
+      const response = await client.request(endpoints.passkeyRegisterVerify, {
+        method: "POST",
+        body: {
+          challenge_token: input.challengeToken,
+          credential: input.credential,
+          device_name: input.deviceName,
+        },
+        headers,
+      });
+      const data = unwrapData(response);
+      return mapPasskeySummary(data?.passkey ?? data);
+    },
+
+    async passkeyAuthOptions(input: PasskeyAuthOptionsInput) {
+      const response = await client.request(endpoints.passkeyAuthOptions, {
+        method: "POST",
+        body: { email: input.email ?? "" },
+        headers: { Authorization: "" },
+      });
+      const data = unwrapData(response);
+      return {
+        options: (data?.options ?? {}) as Record<string, unknown>,
+        challengeToken: String(data?.challenge_token ?? data?.challengeToken ?? ""),
+      } satisfies PasskeyAuthOptionsResult;
+    },
+
+    async passkeyAuthVerify(input: PasskeyAuthVerifyInput) {
+      const response = await client.request(endpoints.passkeyAuthVerify, {
+        method: "POST",
+        body: {
+          challenge_token: input.challengeToken,
+          credential: input.credential,
+        },
+        headers: { Authorization: "" },
+      });
+      return mapSession(response);
+    },
+
+    async listPasskeys() {
+      const response = await client.request(endpoints.passkeyList, {
+        method: "GET",
+      });
+      const data = unwrapData(response);
+      const list = Array.isArray(data?.passkeys)
+        ? data.passkeys
+        : Array.isArray(data)
+          ? data
+          : [];
+      return list.map(mapPasskeySummary);
+    },
+
+    async renamePasskey(id: string, deviceName: string) {
+      const response = await client.request(endpoints.passkeyById(id), {
+        method: "PATCH",
+        body: { device_name: deviceName },
+      });
+      const data = unwrapData(response);
+      return mapPasskeySummary(data?.passkey ?? data);
+    },
+
+    async deletePasskey(id: string) {
+      await client.request(endpoints.passkeyById(id), {
+        method: "DELETE",
+      });
+    },
+
+    async passkeyRecoverStart(input: PasskeyRecoverStartInput) {
+      const response = await client.request(endpoints.passkeyRecoverStart, {
+        method: "POST",
+        body: {
+          email: normalizeEmail(input.email),
+          recovery_code: input.recoveryCode.trim(),
+        },
+        headers: { Authorization: "" },
+      });
+      const data = unwrapData(response);
+      const expiresIn = Number.parseInt(
+        String(data?.expires_in ?? data?.expiresIn ?? "600"),
+        10,
+      );
+      return {
+        recoveryToken: String(data?.access_token ?? data?.accessToken ?? ""),
+        expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 600,
+      } satisfies PasskeyRecoverStartResult;
+    },
+
+    async passkeyRecoverDevices(recoveryToken: string) {
+      const response = await client.request(endpoints.passkeyRecoverDevices, {
+        method: "GET",
+        headers: bearerHeaders(recoveryToken),
+      });
+      const data = unwrapData(response);
+      const list = Array.isArray(data?.devices)
+        ? data.devices
+        : Array.isArray(data)
+          ? data
+          : [];
+      return list.map(mapPasskeyRecoveryDevice);
+    },
+
+    async passkeyRecoverDeleteDevice(recoveryToken: string, id: string) {
+      await client.request(endpoints.passkeyRecoverDeviceById(id), {
+        method: "DELETE",
+        headers: bearerHeaders(recoveryToken),
+      });
+    },
+
+    async passkeyRecoverComplete(recoveryToken: string) {
+      const response = await client.request(endpoints.passkeyRecoverComplete, {
+        method: "POST",
+        headers: bearerHeaders(recoveryToken),
+      });
+      return mapSession(response);
     },
   };
 }

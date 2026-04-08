@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Github, ArrowLeft, Loader2 } from "lucide-react";
+import { Github, ArrowLeft, Loader2, Fingerprint } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { invalidateSessionCache } from "../lib/auth-guards";
 import { getClientGeo } from "@/lib/client-geo";
@@ -16,10 +16,18 @@ import {
 } from "../components/auth/auth-split-layout";
 import {
   finalizeOauthSessionServerFn,
+  getPasskeyAuthOptionsServerFn,
   requestLoginOtpServerFn,
   resendAuthCodeServerFn,
   verifyEmailCodeServerFn,
+  verifyPasskeyAuthServerFn,
 } from "../server/auth/actions";
+import {
+  isPasskeyAutofillSupported,
+  passkeyErrorMessage,
+  runAuthentication,
+} from "@/lib/auth/passkey";
+import { usePasskeyFeature } from "@/hooks/use-passkey-feature";
 import { startOauthPopup, type OauthProvider } from "../lib/auth/oauth-popup";
 import {
   buildTwoFactorChallengeNavigation,
@@ -72,6 +80,9 @@ function EmailStep({
   onBitbucket,
   oauthLoadingProvider,
   lastAuthMethod,
+  passkeyEnabled,
+  onPasskey,
+  passkeyLoading,
 }: {
   email: string;
   onEmailChange: (v: string) => void;
@@ -83,6 +94,9 @@ function EmailStep({
   onBitbucket: () => void;
   oauthLoadingProvider: OauthProvider | null;
   lastAuthMethod?: AuthMethod | null;
+  passkeyEnabled: boolean;
+  onPasskey: () => void;
+  passkeyLoading: boolean;
 }) {
   return (
     <motion.div
@@ -158,6 +172,7 @@ function EmailStep({
           onChange={(e) => onEmailChange(e.target.value)}
           autoFocus
           inputMode="email"
+          autoComplete={passkeyEnabled ? "username webauthn" : "username"}
         />
 
         <button
@@ -176,6 +191,36 @@ function EmailStep({
             </span>
           )}
         </button>
+
+        {passkeyEnabled && (
+          <button
+            type="button"
+            onClick={onPasskey}
+            disabled={passkeyLoading || loading || oauthLoadingProvider !== null}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-dash-border bg-dash-bg text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated disabled:opacity-40"
+          >
+            {passkeyLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <>
+                <Fingerprint className="size-4" />
+                Sign in with passkey
+              </>
+            )}
+          </button>
+        )}
+
+        {passkeyEnabled && (
+          <p className="text-center text-[12px] text-dash-text-faded">
+            Lost your passkey?{" "}
+            <a
+              href="/passkey-recovery"
+              className="font-medium text-[#006fff] transition-colors hover:text-[#0060e0] dark:text-[#4879f8]"
+            >
+              Use a recovery code
+            </a>
+          </p>
+        )}
       </form>
     </motion.div>
   );
@@ -314,6 +359,16 @@ function LoginPage() {
   const resendAuthCode = useServerFn(resendAuthCodeServerFn);
   const verifyEmailCode = useServerFn(verifyEmailCodeServerFn);
   const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn);
+  const getPasskeyAuthOptions = useServerFn(getPasskeyAuthOptionsServerFn as any) as (args: {
+    data: { email?: string };
+  }) => Promise<{ options: Record<string, unknown>; challengeToken: string }>;
+  const verifyPasskeyAuth = useServerFn(verifyPasskeyAuthServerFn as any) as (args: {
+    data: { challengeToken: string; credential: unknown; geo?: any };
+  }) => Promise<{ ok: true; user: { firstName?: string } }>;
+  const passkeyFeature = usePasskeyFeature();
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const autofillStartedRef = useRef(false);
+  const autofillAbortRef = useRef<AbortController | null>(null);
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -373,6 +428,81 @@ function LoginPage() {
       setOauthLoadingProvider(null);
     }
   }
+
+  async function runPasskeyVerify(challengeToken: string, credential: unknown) {
+    const response = await verifyPasskeyAuth({
+      data: {
+        challengeToken,
+        credential,
+        geo: await getClientGeo(),
+      },
+    });
+    saveLastAuthMethod("email");
+    toast.success(
+      `Welcome back${response.user.firstName ? `, ${response.user.firstName}` : ""}`,
+    );
+    invalidateSessionCache();
+    window.location.replace(getNextUrl());
+  }
+
+  async function handlePasskeySignIn() {
+    if (passkeyLoading || loading) return;
+    haptics.selection();
+    setPasskeyLoading(true);
+    try {
+      const { options, challengeToken } = await getPasskeyAuthOptions({
+        data: { email: email.trim() || "" },
+      });
+      const credential = await runAuthentication(options);
+      await runPasskeyVerify(challengeToken, credential);
+    } catch (error) {
+      const msg = passkeyErrorMessage(error);
+      if (msg && !msg.toLowerCase().includes("cancel")) {
+        toast.error(msg);
+      }
+      setPasskeyLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!passkeyFeature.enabled) return;
+    if (autofillStartedRef.current) return;
+    autofillStartedRef.current = true;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    autofillAbortRef.current = controller;
+
+    void (async () => {
+      try {
+        const supportsAutofill = await isPasskeyAutofillSupported();
+        if (cancelled || !supportsAutofill) return;
+        const { options, challengeToken } = await getPasskeyAuthOptions({
+          data: { email: "" },
+        });
+        if (cancelled) return;
+        const credential = await runAuthentication(options, true);
+        if (cancelled) return;
+        await runPasskeyVerify(challengeToken, credential);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "";
+        if (
+          msg &&
+          !msg.toLowerCase().includes("abort") &&
+          !msg.toLowerCase().includes("cancel") &&
+          !msg.toLowerCase().includes("notallowed")
+        ) {
+          // eslint-disable-next-line no-console
+          console.warn("[passkey-autofill]", msg);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [passkeyFeature.enabled]);
 
   async function handleSendOtp() {
     haptics.selection();
@@ -493,6 +623,9 @@ function LoginPage() {
             }}
             oauthLoadingProvider={oauthLoadingProvider}
             lastAuthMethod={lastAuthMethod}
+            passkeyEnabled={passkeyFeature.enabled}
+            onPasskey={handlePasskeySignIn}
+            passkeyLoading={passkeyLoading}
           />
         ) : (
           <OtpStep

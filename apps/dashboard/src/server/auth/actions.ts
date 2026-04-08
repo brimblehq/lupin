@@ -3,6 +3,7 @@ import { createBackendApi } from "@/backend";
 import type {
   AuthSession,
   LoginInput,
+  PasskeyFeatureStatus,
   SignupInput,
   TwoFactorCodeInput,
   UserLookupInput,
@@ -348,5 +349,212 @@ export const finalizeOauthSessionServerFn = createServerFn({ method: "POST" }).h
       ok: true as const,
       user: session.user,
     };
+  },
+);
+
+function createRecoveryBackend(recoveryToken: string) {
+  return createBackendApi({
+    baseUrl: config.apiUrl,
+    getAccessToken: () => recoveryToken,
+  });
+}
+
+export const getPasskeyFeatureStatusServerFn = createServerFn({ method: "GET" }).handler(
+  async (): Promise<PasskeyFeatureStatus> => {
+    try {
+      return await getServerBackendApi().auth.getPasskeyFeatureStatus();
+    } catch (error: any) {
+      authLogger.warn("getPasskeyFeatureStatus failed", getErrorMeta(error));
+      return { enabled: false };
+    }
+  },
+);
+
+export const getPasskeyRegisterOptionsServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { deviceName?: string } | undefined;
+    const deviceName = String(payload?.deviceName ?? "").trim();
+    if (!deviceName) {
+      throw new Error("Enter a name for this device.");
+    }
+    return withTokenRefresh((api) =>
+      api.auth.passkeyRegisterOptions({ deviceName }),
+    );
+  },
+);
+
+export const verifyPasskeyRegistrationServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as
+      | { challengeToken?: string; credential?: unknown; deviceName?: string }
+      | undefined;
+    const challengeToken = String(payload?.challengeToken ?? "").trim();
+    const deviceName = String(payload?.deviceName ?? "").trim();
+    if (!challengeToken) {
+      throw new Error("Missing challenge token. Please restart enrollment.");
+    }
+    if (!payload?.credential) {
+      throw new Error("Missing passkey credential.");
+    }
+    if (!deviceName) {
+      throw new Error("Enter a name for this device.");
+    }
+    return withTokenRefresh((api) =>
+      api.auth.passkeyRegisterVerify({
+        challengeToken,
+        credential: payload.credential,
+        deviceName,
+      }),
+    );
+  },
+);
+
+export const getPasskeyAuthOptionsServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { email?: string } | undefined;
+    return getServerBackendApi().auth.passkeyAuthOptions({
+      email: payload?.email ?? "",
+    });
+  },
+);
+
+export const verifyPasskeyAuthServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as
+      | { challengeToken?: string; credential?: unknown; geo?: ClientGeoData }
+      | undefined;
+    const challengeToken = String(payload?.challengeToken ?? "").trim();
+    if (!challengeToken) {
+      throw new Error("Missing challenge token. Please retry sign-in.");
+    }
+    if (!payload?.credential) {
+      throw new Error("Missing passkey assertion.");
+    }
+    const session = await getServerBackendApi(payload.geo).auth.passkeyAuthVerify({
+      challengeToken,
+      credential: payload.credential,
+    });
+    setServerAuthCookies(session);
+    authLogger.info("verifyPasskeyAuth success", {
+      userId: session.user?.id ?? null,
+      hasAccessToken: Boolean(session.accessToken),
+      hasRefreshToken: Boolean(session.refreshToken),
+    });
+    return { ok: true as const, user: session.user };
+  },
+);
+
+export const listPasskeysServerFn = createServerFn({ method: "GET" }).handler(
+  async () => {
+    return withTokenRefresh((api) => api.auth.listPasskeys());
+  },
+);
+
+export const renamePasskeyServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { id?: string; deviceName?: string } | undefined;
+    const id = String(payload?.id ?? "").trim();
+    const deviceName = String(payload?.deviceName ?? "").trim();
+    if (!id) throw new Error("Missing passkey id.");
+    if (!deviceName) throw new Error("Enter a new device name.");
+    return withTokenRefresh((api) => api.auth.renamePasskey(id, deviceName));
+  },
+);
+
+export const deletePasskeyServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { id?: string } | undefined;
+    const id = String(payload?.id ?? "").trim();
+    if (!id) throw new Error("Missing passkey id.");
+    return withTokenRefresh(async (api) => {
+      await api.auth.deletePasskey(id);
+      return { ok: true } as const;
+    });
+  },
+);
+
+export const startPasskeyRecoveryServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { email?: string; recoveryCode?: string } | undefined;
+    const email = String(payload?.email ?? "").trim();
+    const recoveryCode = String(payload?.recoveryCode ?? "").trim();
+    if (!email) throw new Error("Email is required.");
+    if (!recoveryCode) throw new Error("Recovery code is required.");
+    return getServerBackendApi().auth.passkeyRecoverStart({ email, recoveryCode });
+  },
+);
+
+export const getPasskeyRecoveryDevicesServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { recoveryToken?: string } | undefined;
+    const recoveryToken = String(payload?.recoveryToken ?? "").trim();
+    if (!recoveryToken) throw new Error("Missing recovery token.");
+    return createRecoveryBackend(recoveryToken).auth.passkeyRecoverDevices(recoveryToken);
+  },
+);
+
+export const deletePasskeyRecoveryDeviceServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { recoveryToken?: string; id?: string } | undefined;
+    const recoveryToken = String(payload?.recoveryToken ?? "").trim();
+    const id = String(payload?.id ?? "").trim();
+    if (!recoveryToken) throw new Error("Missing recovery token.");
+    if (!id) throw new Error("Missing device id.");
+    await createRecoveryBackend(recoveryToken).auth.passkeyRecoverDeleteDevice(
+      recoveryToken,
+      id,
+    );
+    return { ok: true } as const;
+  },
+);
+
+export const getPasskeyRecoveryRegisterOptionsServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { recoveryToken?: string; deviceName?: string } | undefined;
+    const recoveryToken = String(payload?.recoveryToken ?? "").trim();
+    const deviceName = String(payload?.deviceName ?? "").trim();
+    if (!recoveryToken) throw new Error("Missing recovery token.");
+    if (!deviceName) throw new Error("Enter a name for this device.");
+    return createRecoveryBackend(recoveryToken).auth.passkeyRegisterOptions({
+      deviceName,
+      authToken: recoveryToken,
+    });
+  },
+);
+
+export const verifyPasskeyRecoveryRegistrationServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as
+      | { recoveryToken?: string; challengeToken?: string; credential?: unknown; deviceName?: string }
+      | undefined;
+    const recoveryToken = String(payload?.recoveryToken ?? "").trim();
+    const challengeToken = String(payload?.challengeToken ?? "").trim();
+    const deviceName = String(payload?.deviceName ?? "").trim();
+    if (!recoveryToken) throw new Error("Missing recovery token.");
+    if (!challengeToken) throw new Error("Missing challenge token.");
+    if (!payload?.credential) throw new Error("Missing passkey credential.");
+    if (!deviceName) throw new Error("Enter a name for this device.");
+    return createRecoveryBackend(recoveryToken).auth.passkeyRegisterVerify({
+      challengeToken,
+      credential: payload.credential,
+      deviceName,
+      authToken: recoveryToken,
+    });
+  },
+);
+
+export const completePasskeyRecoveryServerFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => {
+    const payload = data as { recoveryToken?: string } | undefined;
+    const recoveryToken = String(payload?.recoveryToken ?? "").trim();
+    if (!recoveryToken) throw new Error("Missing recovery token.");
+    const session = await createRecoveryBackend(recoveryToken).auth.passkeyRecoverComplete(
+      recoveryToken,
+    );
+    setServerAuthCookies(session);
+    authLogger.info("completePasskeyRecovery success", {
+      userId: session.user?.id ?? null,
+    });
+    return { ok: true as const, user: session.user };
   },
 );

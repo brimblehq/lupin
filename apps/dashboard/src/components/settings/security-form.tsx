@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { cn } from "@brimble/ui";
 import { Copy, Download, Loader2, TriangleAlert } from "lucide-react";
@@ -7,16 +7,29 @@ import { motion, AnimatePresence } from "motion/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import {
+  deletePasskeyServerFn,
   disableTwoFactorServerFn,
+  getPasskeyRegisterOptionsServerFn,
   getTwoFactorStatusServerFn,
+  listPasskeysServerFn,
   regenerateTwoFactorRecoveryCodesServerFn,
+  renamePasskeyServerFn,
   startTwoFactorSetupServerFn,
+  verifyPasskeyRegistrationServerFn,
   verifyTwoFactorSetupServerFn,
 } from "@/server/auth/actions";
 import type {
+  PasskeyRegisterOptionsResult,
+  PasskeySummary,
   TwoFactorSetup,
   TwoFactorStatus,
 } from "@/backend/auth/types";
+import { usePasskeyFeature } from "@/hooks/use-passkey-feature";
+import {
+  guessDeviceName,
+  passkeyErrorMessage,
+  runRegistration,
+} from "@/lib/auth/passkey";
 import { GlossyButton } from "../shared/glossy-button";
 import {
   Modal,
@@ -77,11 +90,13 @@ function RecoveryCodesGrid({ codes }: { codes: string[] }) {
 
 export function SecurityForm({
   email: initialEmail,
+  firstName,
   initialStatus,
   onStatusChange,
   onChangeEmail,
 }: {
   email: string;
+  firstName?: string;
   initialStatus?: TwoFactorStatus | null;
   onStatusChange?: (status: TwoFactorStatus | null) => void;
   onChangeEmail?: (email: string) => void | Promise<void>;
@@ -103,6 +118,32 @@ export function SecurityForm({
   const regenerateTwoFactorRecoveryCodes = useServerFn(
     regenerateTwoFactorRecoveryCodesServerFn as any,
   ) as (args: { data: { code: string } }) => Promise<{ recoveryCodes: string[] }>;
+
+  const listPasskeys = useServerFn(listPasskeysServerFn as any) as () => Promise<PasskeySummary[]>;
+  const getPasskeyRegisterOptions = useServerFn(
+    getPasskeyRegisterOptionsServerFn as any,
+  ) as (args: { data: { deviceName: string } }) => Promise<PasskeyRegisterOptionsResult>;
+  const verifyPasskeyRegistration = useServerFn(
+    verifyPasskeyRegistrationServerFn as any,
+  ) as (args: {
+    data: { challengeToken: string; credential: unknown; deviceName: string };
+  }) => Promise<PasskeySummary>;
+  const renamePasskey = useServerFn(renamePasskeyServerFn as any) as (args: {
+    data: { id: string; deviceName: string };
+  }) => Promise<PasskeySummary>;
+  const deletePasskey = useServerFn(deletePasskeyServerFn as any) as (args: {
+    data: { id: string };
+  }) => Promise<{ ok: true }>;
+
+  const passkeyFeature = usePasskeyFeature();
+  const [passkeys, setPasskeys] = useState<PasskeySummary[]>([]);
+  const [loadingPasskeys, setLoadingPasskeys] = useState(false);
+  const [enrollingPasskey, setEnrollingPasskey] = useState(false);
+  const [enrollNameOpen, setEnrollNameOpen] = useState(false);
+  const [enrollName, setEnrollName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [email, setEmail] = useState(initialEmail);
   const [emailCopied, setEmailCopied] = useState(false);
@@ -306,6 +347,94 @@ export function SecurityForm({
   const normalizedRemaining = status?.recoveryCodesRemaining ?? 0;
   const lowCodesWarning = Boolean(status?.enabled && normalizedRemaining <= 3);
 
+  const passkeyPanelVisible = passkeyFeature.browserSupported;
+  const lastPasskeyDeleteBlocked = useMemo(() => {
+    if (passkeys.length !== 1) return false;
+    if (status?.enabled) return false;
+    if (status?.hasRecoveryCodes) return false;
+    return true;
+  }, [passkeys.length, status?.enabled, status?.hasRecoveryCodes]);
+
+  async function refreshPasskeys() {
+    setLoadingPasskeys(true);
+    try {
+      const list = await listPasskeys();
+      setPasskeys(list);
+    } catch (error) {
+      toast.error(passkeyErrorMessage(error));
+    } finally {
+      setLoadingPasskeys(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!passkeyPanelVisible) return;
+    void refreshPasskeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passkeyPanelVisible]);
+
+  async function handleEnrollPasskey() {
+    const deviceName = enrollName.trim();
+    if (!deviceName || enrollingPasskey) return;
+    setEnrollingPasskey(true);
+    try {
+      const { options, challengeToken } = await getPasskeyRegisterOptions({
+        data: { deviceName },
+      });
+      const credential = await runRegistration(options);
+      await verifyPasskeyRegistration({
+        data: { challengeToken, credential, deviceName },
+      });
+      setEnrollNameOpen(false);
+      setEnrollName("");
+      await refreshPasskeys();
+      toast.success("Passkey added");
+    } catch (error) {
+      toast.error(passkeyErrorMessage(error));
+    } finally {
+      setEnrollingPasskey(false);
+    }
+  }
+
+  async function handleRenamePasskey(id: string) {
+    const deviceName = renameValue.trim();
+    if (!deviceName) return;
+    try {
+      await renamePasskey({ data: { id, deviceName } });
+      setRenamingId(null);
+      setRenameValue("");
+      await refreshPasskeys();
+      toast.success("Passkey renamed");
+    } catch (error) {
+      toast.error(passkeyErrorMessage(error));
+    }
+  }
+
+  async function handleDeletePasskey(id: string) {
+    if (deletingId) return;
+    setDeletingId(id);
+    try {
+      await deletePasskey({ data: { id } });
+      await refreshPasskeys();
+      toast.success("Passkey removed");
+    } catch (error) {
+      toast.error(passkeyErrorMessage(error));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function formatPasskeyDate(value?: string) {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
   return (
     <>
       <div className="flex max-w-[488px] flex-col gap-8">
@@ -324,7 +453,7 @@ export function SecurityForm({
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className={cn(inputClass, "pr-9 text-dash-text-faded")}
+                className={cn(inputClass, "cursor-text pr-9 text-dash-text-faded")}
               />
               <button
                 type="button"
@@ -430,6 +559,174 @@ export function SecurityForm({
                     {normalizedRemaining === 1 ? "" : "s"} left. Regenerate a
                     new set to avoid being locked out.
                   </span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {passkeyPanelVisible && (
+          <>
+            <hr className="border-dash-border-soft" />
+            <div className="flex flex-col gap-3.5">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
+                  Passkeys
+                </span>
+                <span className="text-sm leading-5 text-dash-text-faded">
+                  Sign in faster and more securely with Touch ID, Windows Hello, or a security key.
+                </span>
+              </div>
+
+              {loadingPasskeys ? (
+                <div className="flex items-center gap-2 text-sm text-dash-text-faded">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Loading passkeys...
+                </div>
+              ) : passkeys.length === 0 ? null : (
+                <ul className="flex flex-col divide-y divide-dash-border-soft rounded-[6px] border border-dash-border">
+                  {passkeys.map((pk) => {
+                    const isRenaming = renamingId === pk.id;
+                    const isLast = passkeys.length === 1;
+                    const deleteBlocked = isLast && lastPasskeyDeleteBlocked;
+                    return (
+                      <li key={pk.id} className="flex flex-col gap-2 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          {isRenaming ? (
+                            <input
+                              autoFocus
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") void handleRenamePasskey(pk.id);
+                                if (e.key === "Escape") {
+                                  setRenamingId(null);
+                                  setRenameValue("");
+                                }
+                              }}
+                              className={cn(inputClass, "max-w-[220px]")}
+                            />
+                          ) : (
+                            <span className="truncate text-sm font-medium text-dash-text-strong">
+                              {pk.deviceName || "Unnamed passkey"}
+                            </span>
+                          )}
+                          <span className="text-xs text-dash-text-faded">
+                            Added {formatPasskeyDate(pk.createdAt)}
+                            {pk.lastUsedAt
+                              ? ` · last used ${formatPasskeyDate(pk.lastUsedAt)}`
+                              : " · never used"}
+                          </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {isRenaming ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => void handleRenamePasskey(pk.id)}
+                                className="text-sm font-medium text-[#006fff] hover:text-[#0060e0]"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRenamingId(null);
+                                  setRenameValue("");
+                                }}
+                                className="text-sm text-dash-text-faded hover:text-dash-text-body"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRenamingId(pk.id);
+                                  setRenameValue(pk.deviceName || "");
+                                }}
+                                className="text-sm text-dash-text-faded hover:text-dash-text-strong"
+                              >
+                                Rename
+                              </button>
+                              <button
+                                type="button"
+                                disabled={deleteBlocked || deletingId === pk.id}
+                                onClick={() => void handleDeletePasskey(pk.id)}
+                                title={
+                                  deleteBlocked
+                                    ? "Enable 2FA or keep at least one passkey to remove this one."
+                                    : undefined
+                                }
+                                className="text-sm text-[#ef2f1f] hover:text-[#c92516] disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {deletingId === pk.id ? "Removing..." : "Delete"}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {enrollNameOpen ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={enrollName}
+                    onChange={(e) => setEnrollName(e.target.value)}
+                    placeholder="e.g. MacBook"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleEnrollPasskey();
+                      if (e.key === "Escape") {
+                        setEnrollNameOpen(false);
+                        setEnrollName("");
+                      }
+                    }}
+                    className={cn(inputClass, "max-w-[260px]")}
+                  />
+                  <GlossyButton
+                    variant="blue"
+                    onClick={() => void handleEnrollPasskey()}
+                    disabled={!enrollName.trim() || enrollingPasskey}
+                  >
+                    {enrollingPasskey ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Adding...
+                      </span>
+                    ) : (
+                      "Add passkey"
+                    )}
+                  </GlossyButton>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEnrollNameOpen(false);
+                      setEnrollName("");
+                    }}
+                    className="text-sm text-dash-text-faded hover:text-dash-text-body"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <GlossyButton
+                    variant="blue"
+                    onClick={() => {
+                      setEnrollNameOpen(true);
+                      const device = guessDeviceName();
+                      const owner = (firstName || "").trim();
+                      setEnrollName(owner ? `${owner}'s ${device}` : device);
+                    }}
+                  >
+                    Add a passkey
+                  </GlossyButton>
                 </div>
               )}
             </div>

@@ -2836,6 +2836,7 @@ export function UserProfileDrawer({
               {activeTab === ProfileTab.Security && (
                 <SecurityForm
                   email={profile?.email ?? ""}
+                  firstName={profile?.firstName ?? profile?.username ?? ""}
                   initialStatus={twoFactorStatus}
                   onStatusChange={setTwoFactorStatus}
                   onChangeEmail={async (email) => {

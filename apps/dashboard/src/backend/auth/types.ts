@@ -83,6 +83,66 @@ export interface AuthSession {
   user: AuthUser;
 }
 
+export interface PasskeySummary {
+  id: string;
+  deviceName: string;
+  transports: string[];
+  createdAt?: string;
+  lastUsedAt?: string;
+}
+
+export interface PasskeyRegisterOptionsResult {
+  options: Record<string, unknown>;
+  challengeToken: string;
+}
+
+export interface PasskeyAuthOptionsResult {
+  options: Record<string, unknown>;
+  challengeToken: string;
+}
+
+export interface PasskeyRegisterOptionsInput {
+  deviceName: string;
+  authToken?: string;
+}
+
+export interface PasskeyRegisterVerifyInput {
+  challengeToken: string;
+  credential: unknown;
+  deviceName: string;
+  authToken?: string;
+}
+
+export interface PasskeyAuthOptionsInput {
+  email?: string;
+}
+
+export interface PasskeyAuthVerifyInput {
+  challengeToken: string;
+  credential: unknown;
+}
+
+export interface PasskeyRecoverStartInput {
+  email: string;
+  recoveryCode: string;
+}
+
+export interface PasskeyRecoverStartResult {
+  recoveryToken: string;
+  expiresIn: number;
+}
+
+export interface PasskeyRecoveryDevice {
+  id: string;
+  deviceName: string;
+  createdAt?: string;
+  lastUsedAt?: string;
+}
+
+export interface PasskeyFeatureStatus {
+  enabled: boolean;
+}
+
 export interface AuthApi {
   login(input: LoginInput): Promise<void>;
   signup(input: SignupInput): Promise<void>;
@@ -104,4 +164,17 @@ export interface AuthApi {
   refreshTokens(refreshToken: string): Promise<AuthSession>;
   logout(refreshToken?: string): Promise<void>;
   getCurrentSession(): Promise<AuthSession | null>;
+
+  getPasskeyFeatureStatus(): Promise<PasskeyFeatureStatus>;
+  passkeyRegisterOptions(input: PasskeyRegisterOptionsInput): Promise<PasskeyRegisterOptionsResult>;
+  passkeyRegisterVerify(input: PasskeyRegisterVerifyInput): Promise<PasskeySummary>;
+  passkeyAuthOptions(input: PasskeyAuthOptionsInput): Promise<PasskeyAuthOptionsResult>;
+  passkeyAuthVerify(input: PasskeyAuthVerifyInput): Promise<AuthSession>;
+  listPasskeys(): Promise<PasskeySummary[]>;
+  renamePasskey(id: string, deviceName: string): Promise<PasskeySummary>;
+  deletePasskey(id: string): Promise<void>;
+  passkeyRecoverStart(input: PasskeyRecoverStartInput): Promise<PasskeyRecoverStartResult>;
+  passkeyRecoverDevices(recoveryToken: string): Promise<PasskeyRecoveryDevice[]>;
+  passkeyRecoverDeleteDevice(recoveryToken: string, id: string): Promise<void>;
+  passkeyRecoverComplete(recoveryToken: string): Promise<AuthSession>;
 }

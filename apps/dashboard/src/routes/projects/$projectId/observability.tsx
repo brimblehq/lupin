@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown } from "lucide-react";
+import { Archive } from "@phosphor-icons/react";
+import { motion, useInView } from "motion/react";
 import { TabHeader } from "../../../components/shared/tab-header";
 import { TimeSeriesChart } from "@/components/observability/time-series-chart";
 import { SemiGauge } from "@/components/observability/semi-gauge";
@@ -398,13 +400,44 @@ function MiniSparkline({ className, color = "#fff" }: { className?: string; colo
   );
 }
 
+function MiniSkyline({ className }: { className?: string }) {
+  const bars = [
+    6, 8, 10, 14, 18, 22, 26, 30, 32, 34, 32, 30, 33, 31, 34, 32, 30, 28, 30,
+    32, 30, 28, 26, 28, 26, 24, 22, 24, 26, 22, 20, 22, 24, 22, 20, 18, 16, 14,
+    12, 10,
+  ];
+  const max = Math.max(...bars);
+  const h = 40;
+  const w = 200;
+  const barW = w / bars.length;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className={className} preserveAspectRatio="none">
+      {bars.map((v, i) => {
+        const barH = (v / max) * h;
+        return (
+          <rect
+            key={i}
+            x={i * barW}
+            y={h - barH}
+            width={barW - 0.5}
+            height={barH}
+            fill="#9cc1ff"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 function VisitorBarChart() {
   const [hovered, setHovered] = useState<number | null>(null);
   const max = Math.max(...visitorData.map((d) => d.value), 1);
-  const barH = 240;
+  const barH = 320;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(containerRef, { once: true, margin: "-80px" });
 
   return (
-    <div className="scrollbar-hidden mt-6 overflow-x-auto">
+    <div ref={containerRef} className="scrollbar-hidden mt-6 overflow-x-auto">
       <div className="flex min-w-[540px] gap-0 sm:min-w-0">
         {visitorData.map((d, i) => {
           const pct = d.value / max;
@@ -431,12 +464,21 @@ function VisitorBarChart() {
                   }}
                 />
 
-                <div
-                  className="absolute inset-x-0 bottom-0 transition-all duration-150"
+                <motion.div
+                  className="absolute inset-x-0 bottom-0 origin-bottom"
                   style={{ height: valH }}
+                  initial={{ scaleY: 0 }}
+                  animate={inView ? { scaleY: 1 } : { scaleY: 0 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 130,
+                    damping: 13,
+                    mass: 1.1,
+                    delay: 0.08 * i,
+                  }}
                 >
                   <div
-                    className="size-full"
+                    className="size-full transition-opacity duration-200 ease-out"
                     style={{
                       backgroundColor: "#ff7a00",
                       opacity: isActive ? 1 : 0.3,
@@ -448,7 +490,7 @@ function VisitorBarChart() {
                       style={{ height: 10, backgroundColor: "#ffa800" }}
                     />
                   )}
-                </div>
+                </motion.div>
               </div>
 
               <span
@@ -500,7 +542,7 @@ const analyticsPeriods = [
   "Last 90 days",
 ];
 
-function AppAnalytics() {
+export function AppAnalytics() {
   const [visitorTab, setVisitorTab] = useState("Visitors");
   const [browserTab, setBrowserTab] = useState("Browsers");
   const [analyticsPeriod, setAnalyticsPeriod] = useState("Last 7 days");
@@ -526,27 +568,43 @@ function AppAnalytics() {
         </a>
       </TabHeader>
 
-      <div className="flex flex-col gap-4 overflow-hidden rounded-lg bg-gradient-to-r from-[#2d2b55] via-[#3b3875] to-[#2d2b55] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
+      <div className="flex flex-col gap-6 overflow-hidden rounded-[4px] bg-[#0a1430] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:pl-7 sm:pr-10 sm:py-7">
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] font-medium uppercase tracking-[1px] text-white/60">
+          <span className="text-[10px] font-medium uppercase tracking-[1.5px] text-[#cfe0ff]/70">
             Analytics TLDR:
           </span>
-          <p className="text-xs font-light leading-[1.4] text-white/50">
+          <p className="text-xs font-light leading-[1.4] text-[#cfe0ff]/50">
             Quick view summary for what's going on
             <br />
-            with 'kemdrim.brimble.app'.
+            with &lsquo;kemdrim.brimble.app&rsquo;.
           </p>
         </div>
-        <div className="flex w-full flex-wrap items-center gap-4 sm:w-auto sm:flex-nowrap sm:gap-8">
-          <div className="flex min-w-[110px] flex-col items-start sm:items-center">
-            <span className="text-3xl font-medium text-white">322</span>
-            <span className="text-[9px] font-medium uppercase tracking-[0.5px] text-white/40">Unique Visitors</span>
+        <div className="flex w-full flex-wrap items-center gap-6 sm:w-auto sm:flex-nowrap sm:gap-10">
+          <div className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-2.5">
+              <Archive className="size-6 shrink-0 text-[#cfe0ff]" weight="fill" />
+              <span className="text-[44px] font-light leading-none text-[#cfe0ff]">322</span>
+            </div>
+            <span className="pl-[34px] text-[9px] font-medium uppercase tracking-[1px] text-[#cfe0ff]/50">
+              Unique Visitors
+            </span>
           </div>
-          <div className="flex min-w-[90px] flex-col items-start sm:items-center">
-            <span className="text-3xl font-medium text-white">21</span>
-            <span className="text-[9px] font-medium uppercase tracking-[0.5px] text-white/40">Countries</span>
+          <div className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-2.5">
+              <Archive className="size-6 shrink-0 text-[#cfe0ff]" weight="fill" />
+              <span className="text-[44px] font-light leading-none text-[#cfe0ff]">21</span>
+            </div>
+            <span className="pl-[34px] text-[9px] font-medium uppercase tracking-[1px] text-[#cfe0ff]/50">
+              Countries
+            </span>
           </div>
-          <MiniSparkline className="h-10 w-[120px] sm:w-[140px]" />
+          <div className="flex flex-col items-stretch gap-1">
+            <MiniSkyline className="h-10 w-[180px] sm:w-[260px]" />
+            <div className="flex items-center justify-between text-[9px] font-medium uppercase tracking-[0.5px] text-[#cfe0ff]/40">
+              <span>31 Jul 2024</span>
+              <span>31 Jul 2024</span>
+            </div>
+          </div>
         </div>
       </div>
 
