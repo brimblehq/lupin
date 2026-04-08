@@ -970,6 +970,7 @@ export function AppAnalytics({
         open={installOpen}
         onOpenChange={setInstallOpen}
         siteId={data.websiteId}
+        snippets={data.snippets}
         serverSnippet={data.snippet}
       />
     </div>

@@ -1,11 +1,9 @@
 import { Fragment, useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Modal, ModalHeader } from "@/components/shared/modal";
-import { SegmentedToggle } from "@/components/observability/segmented-toggle";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
-
-type Framework = "HTML" | "Next.js" | "React" | "Vue";
+import type { AnalyticsSnippets, AnalyticsSnippet } from "@/backend/analytics";
 
 const HIGHLIGHT_RE = new RegExp(
   [
@@ -48,71 +46,42 @@ function highlight(code: string) {
   return out;
 }
 
-const SCRIPT_SRC = "https://cdn.brimble.io/analytics.js";
+const FRAMEWORK_ORDER: (keyof AnalyticsSnippets)[] = [
+  "html",
+  "react",
+  "nextjsApp",
+  "nextjsPages",
+  "vue",
+  "nuxt",
+  "svelte",
+];
 
-function buildSnippet(framework: Framework, siteId: string): string {
-  switch (framework) {
-    case "HTML":
-      return `<script async defer\n  src="${SCRIPT_SRC}"\n  data-site-id="${siteId}"></script>`;
-    case "Next.js":
-      return `import Script from "next/script";
-
-export default function RootLayout({ children }) {
-  return (
-    <html>
-      <body>
-        {children}
-        <Script
-          src="${SCRIPT_SRC}"
-          data-site-id="${siteId}"
-          strategy="afterInteractive"
-        />
-      </body>
-    </html>
-  );
-}`;
-    case "React":
-      return `import { useEffect } from "react";
-
-export function BrimbleAnalytics() {
-  useEffect(() => {
-    const s = document.createElement("script");
-    s.src = "${SCRIPT_SRC}";
-    s.async = true;
-    s.defer = true;
-    s.dataset.siteId = "${siteId}";
-    document.head.appendChild(s);
-    return () => { s.remove(); };
-  }, []);
-  return null;
-}`;
-    case "Vue":
-      return `<script setup>
-import { onMounted } from "vue";
-
-onMounted(() => {
-  const s = document.createElement("script");
-  s.src = "${SCRIPT_SRC}";
-  s.async = true;
-  s.defer = true;
-  s.dataset.siteId = "${siteId}";
-  document.head.appendChild(s);
-});
-</script>`;
-  }
+function fallbackSnippets(rawSnippet: string | undefined, siteId: string): AnalyticsSnippets {
+  const html: AnalyticsSnippet = {
+    label: "HTML",
+    language: "html",
+    file: "index.html",
+    instructions: "Paste this into the <head> of your index.html.",
+    code:
+      rawSnippet ??
+      `<script async defer\n  src="https://cdn.brimble.io/analytics.js"\n  data-site-id="${siteId}"></script>`,
+  };
+  return {
+    html,
+    react: html,
+    nextjsApp: html,
+    nextjsPages: html,
+    vue: html,
+    nuxt: html,
+    svelte: html,
+  };
 }
-
-const INSTRUCTIONS: Record<Framework, string> = {
-  HTML: "Paste this into the <head> of your index.html.",
-  "Next.js": "Drop this into app/layout.tsx (App Router) or pages/_app.tsx.",
-  React: "Mount <BrimbleAnalytics /> once at the root of your app.",
-  Vue: "Place this in your top-level App.vue or layout component.",
-};
 
 export function InstallTrackingModal({
   open,
   onOpenChange,
   siteId,
+  snippets,
   serverSnippet,
   onEnable,
   enabling,
@@ -120,32 +89,33 @@ export function InstallTrackingModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   siteId: string;
-  /** When provided, this exact snippet (from the analytics API) is shown verbatim
-   *  instead of the framework template generator. */
+  /** Full snippets object from the analytics API. Preferred. */
+  snippets?: AnalyticsSnippets;
+  /** Legacy single-string snippet. Used as a fallback when `snippets` isn't available. */
   serverSnippet?: string;
-  /** When provided AND no serverSnippet, render an "Enable analytics" CTA. */
   onEnable?: () => void | Promise<void>;
   enabling?: boolean;
 }) {
   const haptics = useHaptics();
-  const [framework, setFramework] = useState<Framework>("HTML");
+  const resolvedSnippets = snippets ?? fallbackSnippets(serverSnippet, siteId);
+  const [activeKey, setActiveKey] = useState<keyof AnalyticsSnippets>("html");
   const [copied, setCopied] = useState(false);
   const [siteIdCopied, setSiteIdCopied] = useState(false);
 
   useEffect(() => {
     if (!open) {
-      setFramework("HTML");
+      setActiveKey("html");
       setCopied(false);
       setSiteIdCopied(false);
     }
   }, [open]);
 
-  const snippet = serverSnippet ?? buildSnippet(framework, siteId);
-  const showFrameworkTabs = !serverSnippet;
+  const active = resolvedSnippets[activeKey];
+  const code = formatSnippet(active.code);
 
   async function handleCopySnippet() {
     try {
-      await navigator.clipboard.writeText(formatSnippet(snippet));
+      await navigator.clipboard.writeText(code);
       haptics.success();
       setCopied(true);
       toast.success("Copied to clipboard");
@@ -169,7 +139,7 @@ export function InstallTrackingModal({
   }
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} width={560}>
+    <Modal open={open} onOpenChange={onOpenChange} width={620}>
       <ModalHeader
         title="Install tracking"
         description="Drop this snippet into your site to start collecting analytics."
@@ -198,21 +168,43 @@ export function InstallTrackingModal({
           </div>
         </div>
 
-        {showFrameworkTabs && (
-          <SegmentedToggle
-            options={["HTML", "Next.js", "React", "Vue"]}
-            value={framework}
-            onChange={(v) => {
-              haptics.selection();
-              setFramework(v as Framework);
-            }}
-          />
-        )}
+        <div className="flex flex-wrap items-center gap-1 rounded-[4px] border-[0.5px] border-dash-border p-0.5">
+          {FRAMEWORK_ORDER.map((k) => {
+            const opt = resolvedSnippets[k];
+            const isActive = k === activeKey;
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => {
+                  if (!isActive) haptics.selection();
+                  setActiveKey(k);
+                }}
+                className={`shrink-0 whitespace-nowrap rounded-[3px] px-3 py-1 text-xs font-medium transition-colors ${
+                  isActive
+                    ? "bg-dash-bg-elevated text-dash-text-strong"
+                    : "text-dash-text-faded hover:text-dash-text-body"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-start gap-2 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2.5">
+          <div className="flex flex-1 flex-col gap-1">
+            <code className="font-mono text-[11px] text-dash-text-strong">{active.file}</code>
+            <p className="text-[11px] font-light leading-[1.5] text-dash-text-faded">
+              {active.instructions}
+            </p>
+          </div>
+        </div>
 
         <div className="relative">
           <pre className="max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated p-4 pr-14 font-mono text-[11px] leading-[1.7] text-dash-text-body">
             <code>
-              {highlight(formatSnippet(snippet)).map((tok, i) => (
+              {highlight(code).map((tok, i) => (
                 <Fragment key={i}>
                   {tok.cls ? <span className={tok.cls}>{tok.text}</span> : tok.text}
                 </Fragment>
@@ -238,13 +230,7 @@ export function InstallTrackingModal({
           </button>
         </div>
 
-        <p className="text-xs font-light text-dash-text-faded">
-          {serverSnippet
-            ? "Paste this into your <head> tag. Performance metrics need a real page reload to populate."
-            : INSTRUCTIONS[framework]}
-        </p>
-
-        {!serverSnippet && onEnable && (
+        {!snippets && !serverSnippet && onEnable && (
           <button
             type="button"
             disabled={enabling}

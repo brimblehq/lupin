@@ -72,6 +72,9 @@ function EnableAnalyticsEmptyState({
   const [serverSnippet, setServerSnippet] = useState<string | undefined>(
     undefined,
   );
+  const [snippets, setSnippets] = useState<
+    import("@/backend/analytics").AnalyticsSnippets | undefined
+  >(undefined);
   const [siteId, setSiteId] = useState<string>("your-site-id");
   const [planLocked, setPlanLocked] = useState(false);
 
@@ -84,6 +87,7 @@ function EnableAnalyticsEmptyState({
       const result = await enableAnalytics({ data: { projectId } });
       if (result.ok) {
         setServerSnippet(result.data.snippet);
+        setSnippets(result.data.snippets);
         setSiteId(result.data.websiteId);
         toast.success("Analytics enabled");
         onEnabled?.();
@@ -155,6 +159,7 @@ function EnableAnalyticsEmptyState({
         open={open}
         onOpenChange={setOpen}
         siteId={siteId}
+        snippets={snippets}
         serverSnippet={serverSnippet}
         onEnable={planLocked ? undefined : handleEnable}
         enabling={enabling}

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { cn } from "@brimble/ui";
 import { Link, getRouteApi, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Star, Share2, Check, Plug, Bolt, ArrowUp, ChevronDown } from "lucide-react";
+import { Star, Share2, Check, Plug, Bolt, ArrowUp, ChevronDown, MoreHorizontal } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -52,6 +52,7 @@ const baseTabs = [
   { label: "Deployment history", slug: "deployment-history", Icon: RocketLaunch },
   { label: "Logs", slug: "logs", Icon: Scroll },
 ];
+const MAX_VISIBLE_SUBNAV_TABS = 5;
 
 const projectRouteApi = getRouteApi("/projects/$projectId");
 
@@ -110,6 +111,8 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
   const [deploying, setDeploying] = useState(false);
   const [redeployOpen, setRedeployOpen] = useState(false);
   const redeployRef = useRef<HTMLDivElement>(null);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowRef = useRef<HTMLDivElement>(null);
   const [deleting, setDeleting] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [refreshingDb, setRefreshingDb] = useState(false);
@@ -125,6 +128,23 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [redeployOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setOverflowOpen(false);
+      }
+    }
+
+    if (overflowOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [overflowOpen]);
+
+  useEffect(() => {
+    setOverflowOpen(false);
+  }, [pathname]);
 
   const actualProjectId = parentLoaderData?.project?.id || projectId;
   const projectName = parentLoaderData?.project?.name || projectId;
@@ -159,6 +179,24 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
 
     return true;
   });
+  const tabsWithPath = tabs.map((tab) => {
+    const tabPath = tab.slug
+      ? `/projects/${projectId}/${tab.slug}`
+      : `/projects/${projectId}`;
+    const isActive = tab.slug
+      ? pathname === tabPath || pathname === `${tabPath}/`
+      : pathname === `/projects/${projectId}` ||
+        pathname === `/projects/${projectId}/`;
+
+    return {
+      ...tab,
+      tabPath,
+      isActive,
+    };
+  });
+  const visibleTabs = tabsWithPath.slice(0, MAX_VISIBLE_SUBNAV_TABS);
+  const overflowTabs = tabsWithPath.slice(MAX_VISIBLE_SUBNAV_TABS);
+  const overflowHasActive = overflowTabs.some((tab) => tab.isActive);
 
   let visitHref = "";
   if (shouldShowProjectVisitSite(project as any)) {
@@ -283,33 +321,74 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
       <div data-subnav className="flex items-center justify-between border-b-[0.5px] border-dash-border">
         {/* Tabs */}
         <div className="scrollbar-hidden flex min-w-0 flex-1 items-start overflow-x-auto">
-          {tabs.map((tab) => {
-            const tabPath = tab.slug
-              ? `/projects/${projectId}/${tab.slug}`
-              : `/projects/${projectId}`;
-            const isActive = tab.slug
-              ? pathname === tabPath || pathname === `${tabPath}/`
-              : pathname === `/projects/${projectId}` ||
-              pathname === `/projects/${projectId}/`;
-
+          {visibleTabs.map((tab) => {
             return (
               <Link
                 key={tab.label}
-                to={withWorkspaceQuery({ pathname: tabPath, searchStr }) as any}
+                to={withWorkspaceQuery({ pathname: tab.tabPath, searchStr }) as any}
                 preload="intent"
                 onClick={() => haptics.selection()}
                 className={cn(
                   "flex h-14 items-center gap-2 px-2 text-sm tracking-[-0.09px] transition-colors",
-                  isActive
+                  tab.isActive
                     ? "border-b border-[#3c6ce7] text-dash-text-strong"
                     : "text-dash-text-faded font-light hover:text-dash-text-body"
                 )}
               >
-                <tab.Icon className={cn("size-4 shrink-0", !isActive && "dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80")} weight="fill" />
-                <span className={cn("whitespace-nowrap md:inline", isActive ? "inline" : "hidden")}>{tab.label}</span>
+                <tab.Icon className={cn("size-4 shrink-0", !tab.isActive && "dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80")} weight="fill" />
+                <span className={cn("whitespace-nowrap md:inline", tab.isActive ? "inline" : "hidden")}>{tab.label}</span>
               </Link>
             );
           })}
+          {overflowTabs.length > 0 && (
+            <div className="relative" ref={overflowRef}>
+              <button
+                type="button"
+                onClick={() => setOverflowOpen((prev) => !prev)}
+                className={cn(
+                  "flex h-14 items-center px-2 transition-colors",
+                  overflowHasActive
+                    ? "border-b border-[#3c6ce7] text-dash-text-strong"
+                    : "text-dash-text-faded hover:text-dash-text-body",
+                )}
+                aria-label="More tabs"
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+              <AnimatePresence>
+                {overflowOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute left-0 top-full z-50 mt-1 min-w-[220px] origin-top-left overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]"
+                  >
+                    {overflowTabs.map((tab) => (
+                      <Link
+                        key={tab.label}
+                        to={withWorkspaceQuery({ pathname: tab.tabPath, searchStr }) as any}
+                        preload="intent"
+                        onClick={() => {
+                          haptics.selection();
+                          setOverflowOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors",
+                          tab.isActive
+                            ? "bg-dash-bg-elevated text-dash-text-strong"
+                            : "text-dash-text-body hover:bg-dash-bg-elevated",
+                        )}
+                      >
+                        <tab.Icon className="size-4 shrink-0" weight="fill" />
+                        <span className="whitespace-nowrap">{tab.label}</span>
+                      </Link>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
         {/* Right actions */}

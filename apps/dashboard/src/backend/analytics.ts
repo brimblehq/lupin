@@ -1,5 +1,25 @@
 import type { ApiClient } from "./types";
 
+export type AnalyticsSnippetLanguage = "html" | "tsx" | "ts";
+
+export interface AnalyticsSnippet {
+  label: string;
+  language: AnalyticsSnippetLanguage;
+  file: string;
+  instructions: string;
+  code: string;
+}
+
+export interface AnalyticsSnippets {
+  html: AnalyticsSnippet;
+  react: AnalyticsSnippet;
+  nextjsPages: AnalyticsSnippet;
+  nextjsApp: AnalyticsSnippet;
+  vue: AnalyticsSnippet;
+  nuxt: AnalyticsSnippet;
+  svelte: AnalyticsSnippet;
+}
+
 export interface AnalyticsRecord {
   _id: string;
   project: string;
@@ -11,6 +31,7 @@ export interface AnalyticsRecord {
   createdAt: string;
   updatedAt: string;
   snippet: string;
+  snippets: AnalyticsSnippets;
 }
 
 export interface AnalyticsRange {
@@ -89,6 +110,7 @@ export interface AnalyticsPayload {
   websiteId: string;
   domain: string;
   snippet: string;
+  snippets: AnalyticsSnippets;
   range: AnalyticsRange;
   summary: AnalyticsSummary;
   pageviews: AnalyticsPageviewSeries;
