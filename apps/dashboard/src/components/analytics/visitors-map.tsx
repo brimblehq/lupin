@@ -79,7 +79,7 @@ function buildCountryMap(countries: CountryVisitor[]): {
 }
 
 function fillFor(visitors: number | undefined, max: number, isDark: boolean): string {
-  if (!visitors || max <= 0) return isDark ? "#1a2230" : "#eef2f7";
+  if (!visitors || max <= 0) return isDark ? "#243049" : "#dde3ee";
   const intensity = Math.min(1, visitors / max);
   const alpha = 0.25 + intensity * 0.65;
   return `rgba(255, 122, 0, ${alpha})`;
@@ -90,64 +90,172 @@ function FlatMap({ countries }: { countries: CountryVisitor[] }) {
   const isDark = theme === Theme.Dark;
   const stroke = isDark ? "#3b6cf3" : "#9bb6ee";
   const { byName, max } = buildCountryMap(countries);
+  const [tooltip, setTooltip] = useState<{
+    name: string;
+    visitors: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   return (
-    <ComposableMap
-      projection="geoMercator"
-      projectionConfig={{ scale: 130, center: [0, 25] }}
-      width={980}
-      height={420}
-      style={{ width: "100%", height: "100%" }}
+    <div
+      ref={wrapperRef}
+      className="relative flex h-full w-full items-center justify-center"
+      onMouseLeave={() => setTooltip(null)}
     >
-      <Geographies geography={GEO_URL}>
-        {({ geographies }) =>
-          geographies.map((geo) => {
-            const name = geo.properties?.name as string | undefined;
-            const visitors = name ? byName[name] : undefined;
-            const fill = fillFor(visitors, max, isDark);
-            return (
-              <Geography
-                key={geo.rsmKey}
-                geography={geo}
-                style={{
-                  default: {
-                    fill,
-                    stroke,
-                    strokeWidth: 0.5,
-                    outline: "none",
-                  },
-                  hover: {
-                    fill: "rgba(255, 122, 0, 0.95)",
-                    stroke,
-                    strokeWidth: 0.5,
-                    outline: "none",
-                    cursor: "pointer",
-                  },
-                  pressed: {
-                    fill: "rgba(255, 122, 0, 1)",
-                    stroke,
-                    strokeWidth: 0.5,
-                    outline: "none",
-                  },
-                }}
-              />
-            );
-          })
-        }
-      </Geographies>
-    </ComposableMap>
+      <ComposableMap
+        projection="geoMercator"
+        projectionConfig={{ scale: 145, center: [0, 25] }}
+        width={980}
+        height={460}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <Geographies geography={GEO_URL}>
+          {({ geographies }) =>
+            geographies.map((geo) => {
+              const name = geo.properties?.name as string | undefined;
+              const visitors = name ? byName[name] : undefined;
+              const fill = fillFor(visitors, max, isDark);
+              return (
+                <Geography
+                  key={geo.rsmKey}
+                  geography={geo}
+                  onMouseEnter={(e: React.MouseEvent) => {
+                    if (!name) return;
+                    const rect = wrapperRef.current?.getBoundingClientRect();
+                    setTooltip({
+                      name,
+                      visitors: visitors ?? 0,
+                      x: e.clientX - (rect?.left ?? 0),
+                      y: e.clientY - (rect?.top ?? 0),
+                    });
+                  }}
+                  onMouseMove={(e: React.MouseEvent) => {
+                    if (!name) return;
+                    const rect = wrapperRef.current?.getBoundingClientRect();
+                    setTooltip({
+                      name,
+                      visitors: visitors ?? 0,
+                      x: e.clientX - (rect?.left ?? 0),
+                      y: e.clientY - (rect?.top ?? 0),
+                    });
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
+                  style={{
+                    default: {
+                      fill,
+                      stroke,
+                      strokeWidth: 0.5,
+                      outline: "none",
+                    },
+                    hover: {
+                      fill: "rgba(255, 122, 0, 0.95)",
+                      stroke,
+                      strokeWidth: 0.5,
+                      outline: "none",
+                      cursor: "pointer",
+                    },
+                    pressed: {
+                      fill: "rgba(255, 122, 0, 1)",
+                      stroke,
+                      strokeWidth: 0.5,
+                      outline: "none",
+                    },
+                  }}
+                />
+              );
+            })
+          }
+        </Geographies>
+      </ComposableMap>
+      {tooltip && (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-2.5 py-1.5 text-xs shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.18)]"
+          style={{ left: tooltip.x, top: tooltip.y - 8 }}
+        >
+          <div className="font-medium text-dash-text-strong">{tooltip.name}</div>
+          <div className="text-[11px] text-dash-text-faded">
+            {tooltip.visitors} visitor{tooltip.visitors === 1 ? "" : "s"}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 const SIZE = 600;
 
-function Globe() {
+const COUNTRY_LATLNG: Record<string, [number, number]> = {
+  US: [37.7749, -95.7129],
+  GB: [55.3781, -3.436],
+  NG: [9.082, 8.6753],
+  CA: [56.1304, -106.3468],
+  MX: [23.6345, -102.5528],
+  BW: [-22.3285, 24.6849],
+  DE: [51.1657, 10.4515],
+  FR: [46.6034, 1.8883],
+  ES: [40.4637, -3.7492],
+  IT: [41.8719, 12.5674],
+  NL: [52.1326, 5.2913],
+  BR: [-14.235, -51.9253],
+  AR: [-38.4161, -63.6167],
+  IN: [20.5937, 78.9629],
+  CN: [35.8617, 104.1954],
+  JP: [36.2048, 138.2529],
+  KR: [35.9078, 127.7669],
+  AU: [-25.2744, 133.7751],
+  NZ: [-40.9006, 174.886],
+  ZA: [-30.5595, 22.9375],
+  KE: [-0.0236, 37.9062],
+  EG: [26.8206, 30.8025],
+  TR: [38.9637, 35.2433],
+  RU: [61.524, 105.3188],
+  PL: [51.9194, 19.1451],
+  SE: [60.1282, 18.6435],
+  FI: [61.9241, 25.7482],
+  NO: [60.472, 8.4689],
+  DK: [56.2639, 9.5018],
+  IE: [53.4129, -8.2439],
+  PT: [39.3999, -8.2245],
+  CH: [46.8182, 8.2275],
+  AT: [47.5162, 14.5501],
+  BE: [50.5039, 4.4699],
+  SG: [1.3521, 103.8198],
+  HK: [22.3193, 114.1694],
+  TW: [23.6978, 120.9605],
+  TH: [15.87, 100.9925],
+  ID: [-0.7893, 113.9213],
+  PH: [12.8797, 121.774],
+  MY: [4.2105, 101.9758],
+  VN: [14.0583, 108.2772],
+  AE: [23.4241, 53.8478],
+  SA: [23.8859, 45.0792],
+  IL: [31.0461, 34.8516],
+};
+
+function Globe({ countries }: { countries: CountryVisitor[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pointerInteracting = useRef<number | null>(null);
   const pointerInteractionMovement = useRef(0);
   const phiRef = useRef(0);
   const { theme } = useTheme();
   const isDark = theme === Theme.Dark;
+
+  const topCountries = [...countries]
+    .sort((a, b) => b.visitors - a.visitors)
+    .slice(0, 8)
+    .filter((c) => COUNTRY_LATLNG[c.code.toUpperCase()]);
+
+  const labelMarkers = topCountries.map((c) => {
+    const code = c.code.toUpperCase();
+    return {
+      id: `country-${code.toLowerCase()}`,
+      location: COUNTRY_LATLNG[code]!,
+      label: ISO2_TO_NAME[code] ?? code,
+      visitors: c.visitors,
+    };
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -166,9 +274,13 @@ function Globe() {
       mapSamples: 16000,
       mapBrightness: isDark ? 6 : 4,
       baseColor: isDark ? [0.82, 0.83, 0.88] : [0.4, 0.42, 0.48],
-      markerColor: isDark ? [0.82, 0.83, 0.88] : [0.4, 0.42, 0.48],
+      markerColor: [0.024, 0.435, 1],
       glowColor: isDark ? [0.13, 0.14, 0.18] : [0.86, 0.87, 0.92],
-      markers: [],
+      markers: labelMarkers.map((m) => ({
+        location: m.location,
+        size: 0.04,
+        id: m.id,
+      })),
     } as any);
 
     function animate() {
@@ -186,54 +298,101 @@ function Globe() {
       cancelAnimationFrame(frame);
       globe.destroy();
     };
-  }, [isDark]);
+  }, [isDark, labelMarkers.length]);
 
   return (
-    <div
-      style={{
-        height: "100%",
-        maxWidth: "100%",
-        position: "relative",
-        aspectRatio: "1 / 1",
-      }}
-    >
-      <canvas
-        ref={canvasRef}
-        width={SIZE * 2}
-        height={SIZE * 2}
-        onPointerDown={(e) => {
-          pointerInteracting.current = e.clientX - pointerInteractionMovement.current;
-          if (canvasRef.current) canvasRef.current.style.cursor = "grabbing";
-        }}
-        onPointerUp={() => {
-          pointerInteracting.current = null;
-          if (canvasRef.current) canvasRef.current.style.cursor = "grab";
-        }}
-        onPointerOut={() => {
-          pointerInteracting.current = null;
-          if (canvasRef.current) canvasRef.current.style.cursor = "grab";
-        }}
-        onMouseMove={(e) => {
-          if (pointerInteracting.current !== null) {
-            const delta = e.clientX - pointerInteracting.current;
-            pointerInteractionMovement.current = delta / 200;
-          }
-        }}
-        onTouchMove={(e) => {
-          if (pointerInteracting.current !== null && e.touches[0]) {
-            const delta = e.touches[0].clientX - pointerInteracting.current;
-            pointerInteractionMovement.current = delta / 100;
-          }
-        }}
+    <div className="relative flex h-full w-full items-center justify-center">
+      <div
         style={{
-          width: "100%",
           height: "100%",
-          display: "block",
-          cursor: "grab",
-          contain: "layout paint size",
-          touchAction: "none",
+          maxWidth: "100%",
+          position: "relative",
+          aspectRatio: "1 / 1",
         }}
-      />
+      >
+        <canvas
+          ref={canvasRef}
+          width={SIZE * 2}
+          height={SIZE * 2}
+          onPointerDown={(e) => {
+            pointerInteracting.current = e.clientX - pointerInteractionMovement.current;
+            if (canvasRef.current) canvasRef.current.style.cursor = "grabbing";
+          }}
+          onPointerUp={() => {
+            pointerInteracting.current = null;
+            if (canvasRef.current) canvasRef.current.style.cursor = "grab";
+          }}
+          onPointerOut={() => {
+            pointerInteracting.current = null;
+            if (canvasRef.current) canvasRef.current.style.cursor = "grab";
+          }}
+          onMouseMove={(e) => {
+            if (pointerInteracting.current !== null) {
+              const delta = e.clientX - pointerInteracting.current;
+              pointerInteractionMovement.current = delta / 200;
+            }
+          }}
+          onTouchMove={(e) => {
+            if (pointerInteracting.current !== null && e.touches[0]) {
+              const delta = e.touches[0].clientX - pointerInteracting.current;
+              pointerInteractionMovement.current = delta / 100;
+            }
+          }}
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "block",
+            cursor: "grab",
+            contain: "layout paint size",
+            touchAction: "none",
+          }}
+        />
+      </div>
+      {topCountries.length > 0 && (
+        <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-1.5 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg/80 px-3 py-2.5 backdrop-blur-sm">
+          <span className="text-[9px] font-medium uppercase tracking-[1px] text-dash-text-faded">
+            Top countries
+          </span>
+          {topCountries.slice(0, 6).map((c) => {
+            const name = ISO2_TO_NAME[c.code.toUpperCase()] ?? c.code;
+            return (
+              <div key={c.code} className="flex items-center justify-between gap-3 text-xs">
+                <span className="text-dash-text-body">{name}</span>
+                <span className="text-dash-text-faded">{c.visitors}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {labelMarkers.map((m) => (
+        <div
+          key={m.id}
+          style={
+            {
+              position: "absolute",
+              positionAnchor: `--cobe-${m.id}`,
+              bottom: "anchor(top)",
+              left: "anchor(center)",
+              translate: "-50% 0",
+              marginBottom: "8px",
+              padding: "0.2rem 0.5rem",
+              background: "#006fff",
+              color: "#fff",
+              fontSize: "0.65rem",
+              fontWeight: 600,
+              letterSpacing: "0.4px",
+              textTransform: "uppercase",
+              borderRadius: "3px",
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+              opacity: `var(--cobe-visible-${m.id}, 0)`,
+              transition: "opacity 0.3s",
+            } as React.CSSProperties
+          }
+        >
+          {m.label}
+        </div>
+      ))}
     </div>
   );
 }
@@ -271,7 +430,7 @@ export function VisitorsMap({ countries = [] }: { countries?: CountryVisitor[] }
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             className="flex h-full w-full items-center justify-center"
           >
-            {mode === "Map" ? <FlatMap countries={countries} /> : <Globe />}
+            {mode === "Map" ? <FlatMap countries={countries} /> : <Globe countries={countries} />}
           </motion.div>
         </AnimatePresence>
       </div>

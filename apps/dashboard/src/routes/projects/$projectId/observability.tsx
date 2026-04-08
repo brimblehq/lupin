@@ -350,6 +350,33 @@ function AppMetrics({
 }
 
 
+function LiveIndicator({ lastUpdated }: { lastUpdated: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const seconds = Math.max(0, Math.floor((now - lastUpdated) / 1000));
+  const label =
+    seconds < 5 ? "just now" : seconds < 60 ? `${seconds}s ago` : `${Math.floor(seconds / 60)}m ago`;
+  return (
+    <div
+      title={`Last updated ${label}`}
+      className="inline-flex items-center gap-1.5 rounded-full border-[0.5px] border-dash-border bg-dash-bg-elevated px-2.5 py-1 text-[11px] font-medium text-dash-text-faded"
+    >
+      <span className="relative flex size-1.5">
+        <motion.span
+          className="absolute inset-0 rounded-full bg-[#22c55e]"
+          animate={{ scale: [1, 2.4, 1], opacity: [0.7, 0, 0.7] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
+        />
+        <span className="relative size-1.5 rounded-full bg-[#22c55e]" />
+      </span>
+      Live
+    </div>
+  );
+}
+
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-1 flex-col gap-1">
@@ -557,6 +584,7 @@ export function AppAnalytics({
   }) => Promise<AnalyticsLoadResult>;
 
   const [data, setData] = useState<AnalyticsPayload>(initial);
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
   const [preset, setPreset] = useState<RangePreset>(RANGE_PRESETS[1]);
   const [visitorTab, setVisitorTab] = useState<"Visitors" | "Page Views">("Visitors");
   const [browserTab, setBrowserTab] = useState<"Browsers" | "Devices">("Browsers");
@@ -592,6 +620,7 @@ export function AppAnalytics({
         });
         if (result.state === "enabled") {
           setData(result.data);
+          setLastUpdated(Date.now());
         } else if (result.state === "error") {
           toast.error(result.message);
         }
@@ -625,7 +654,7 @@ export function AppAnalytics({
       if (id !== undefined) return;
       id = window.setInterval(() => {
         if (!document.hidden) void refetch();
-      }, 60_000);
+      }, 15_000);
     }
     function stop() {
       if (id !== undefined) {
@@ -634,8 +663,12 @@ export function AppAnalytics({
       }
     }
     function onVisibility() {
-      if (document.hidden) stop();
-      else start();
+      if (document.hidden) {
+        stop();
+      } else {
+        void refetch();
+        start();
+      }
     }
     if (!document.hidden) start();
     document.addEventListener("visibilitychange", onVisibility);
@@ -766,6 +799,7 @@ export function AppAnalytics({
             </span>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+            <LiveIndicator lastUpdated={lastUpdated} />
             <SegmentedToggle
               options={["Visitors", "Page Views"]}
               value={visitorTab}
