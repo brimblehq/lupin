@@ -30,6 +30,7 @@ export interface AnalyticsSummary {
   visitors: AnalyticsSummaryMetric;
   visits: AnalyticsSummaryMetric;
   bounces: AnalyticsSummaryMetric;
+  bounceRate: AnalyticsSummaryMetric;
   totaltime: AnalyticsSummaryMetric;
 }
 

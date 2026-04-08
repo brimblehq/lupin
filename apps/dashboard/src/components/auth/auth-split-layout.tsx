@@ -1,5 +1,6 @@
 import { type ReactNode, useRef, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
+import { useTheme } from "@/hooks/use-theme";
 
 /* ─── Brimble Logo (hourglass mark) ─── */
 
@@ -75,6 +76,7 @@ export function AuthSplitLayout({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  useTheme();
   return (
     <div className="flex min-h-dvh items-center justify-center bg-dash-bg px-6 py-10">
       <div className="w-full max-w-[400px]">

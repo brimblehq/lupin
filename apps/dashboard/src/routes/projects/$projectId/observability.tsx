@@ -539,6 +539,14 @@ const RANGE_PRESETS: RangePreset[] = [
   { label: "Last 30 days", durationMs: 30 * 24 * 60 * 60 * 1000, unit: "day" },
   { label: "Last 12 months", durationMs: 365 * 24 * 60 * 60 * 1000, unit: "month" },
 ];
+const COMPACT_NUMBER_FORMATTER = new Intl.NumberFormat(undefined, {
+  notation: "compact",
+  compactDisplay: "short",
+  maximumFractionDigits: 1,
+});
+const GROUPED_NUMBER_FORMATTER = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 0,
+});
 
 function browserTimezone(): string | undefined {
   try {
@@ -550,9 +558,13 @@ function browserTimezone(): string | undefined {
 
 function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return "—";
-  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return value.toLocaleString();
+  const abs = Math.abs(value);
+
+  if (abs >= 10_000) {
+    return COMPACT_NUMBER_FORMATTER.format(value);
+  }
+
+  return GROUPED_NUMBER_FORMATTER.format(value);
 }
 
 function formatPerf(metric: AnalyticsPerformanceMetric, kind: "ms" | "s" | "cls"): string {
@@ -565,10 +577,9 @@ function formatPerf(metric: AnalyticsPerformanceMetric, kind: "ms" | "s" | "cls"
 }
 
 function bouncePercent(summary: AnalyticsSummary): string {
-  const visits = summary.visits.value;
-  if (!visits) return "—";
-  const pct = Math.round((summary.bounces.value / visits) * 100);
-  return `${pct}%`;
+  const rate = summary.bounceRate?.value;
+  if (rate == null || !Number.isFinite(rate)) return "—";
+  return `${Math.round(rate * 100)}%`;
 }
 
 export function AppAnalytics({
@@ -679,8 +690,14 @@ export function AppAnalytics({
   }, [refetch]);
 
   const summary = data.summary;
-  const hasAnyData = summary.pageviews.value > 0;
   const visitorsRightNow = data.active?.visitors ?? 0;
+  const hasAnyData =
+    summary.pageviews.value > 0 ||
+    summary.visitors.value > 0 ||
+    summary.visits.value > 0 ||
+    visitorsRightNow > 0 ||
+    data.metrics.country.length > 0 ||
+    data.metrics.path.length > 0;
   const bounce = bouncePercent(summary);
   const countriesCount = data.metrics.country.length;
 
@@ -759,7 +776,7 @@ export function AppAnalytics({
           <div className="flex flex-col items-start gap-1">
             <div className="flex items-center gap-2.5">
               <GlobeHemisphereWest className="size-6 shrink-0 text-[#cfe0ff]" weight="duotone" />
-              <span className="text-[44px] font-light leading-none text-[#cfe0ff]">{countriesCount}</span>
+              <span className="text-[44px] font-light leading-none text-[#cfe0ff]">{formatNumber(countriesCount)}</span>
             </div>
             <span className="pl-[34px] text-[9px] font-medium uppercase tracking-[1px] text-[#cfe0ff]/50">
               Countries
@@ -781,7 +798,7 @@ export function AppAnalytics({
                 animate={{ opacity: [1, 0.4, 1] }}
                 transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               />
-              <span className="text-[44px] font-light leading-none text-[#cfe0ff]">{visitorsRightNow}</span>
+              <span className="text-[44px] font-light leading-none text-[#cfe0ff]">{formatNumber(visitorsRightNow)}</span>
             </div>
             <span className="pl-[22px] text-[9px] font-medium uppercase tracking-[1px] text-[#cfe0ff]/50">
               Visitors right now

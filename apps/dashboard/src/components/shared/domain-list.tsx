@@ -3,6 +3,7 @@ import {
   MoreVertical,
   RefreshCw,
   AlertCircle,
+  LifeBuoy,
   Minus,
   Plus,
   Pencil,
@@ -616,7 +617,10 @@ export function DomainList({
 
       {/* Empty state */}
       {filtered.length === 0 && (
-        <div className="flex h-32 items-center justify-center rounded-[4px] border-[0.5px] border-dash-border">
+        <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-[4px] bg-dash-bg-elevated/40">
+          <div className="flex size-8 items-center justify-center rounded-full bg-dash-bg-elevated text-dash-text-faded">
+            <LifeBuoy className="size-4" />
+          </div>
           <span className="text-sm text-dash-text-faded">
             {domains.length === 0
               ? "No domains yet"

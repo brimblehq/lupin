@@ -609,12 +609,6 @@ export function DashboardLayout({
   const layoutPathname = useRouterState({
     select: (s) => s.resolvedLocation?.pathname ?? s.location.pathname,
   });
-  const isRenderedProjectDetailsRoute = useRouterState({
-    select: (s) =>
-      s.matches.some((match) =>
-        /^\/projects\/\$projectId(?:\/|$)/.test(match.routeId),
-      ),
-  });
   const matchedProjectSwitcherProjects = useRouterState({
     select: (s) => {
       const projectMatch = s.matches.find(
@@ -672,7 +666,6 @@ export function DashboardLayout({
     /^\/(login|signup|projects|domains|addons|scaling|workspace)?(\/|$)/;
   const isCatchAll =
     layoutPathname !== "/" && !knownPrefixes.test(layoutPathname);
-  const shouldRenderDesktopSidebar = !isRenderedProjectDetailsRoute;
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const resolvedSearchStr = useRouterState({
     select: (s) => s.resolvedLocation?.searchStr ?? s.location.searchStr,
@@ -689,6 +682,14 @@ export function DashboardLayout({
       next.get("environmentId") !== current.get("environmentId")
     );
   }, [searchStr, resolvedSearchStr]);
+  const sidebarRoutePathname = isWorkspaceOrEnvironmentSwitching
+    ? pathname
+    : layoutPathname;
+  const isRenderedProjectDetailsRoute = useMemo(
+    () => /^\/projects\/[^/]+(?:\/|$)/.test(sidebarRoutePathname),
+    [sidebarRoutePathname],
+  );
+  const shouldRenderDesktopSidebar = !isRenderedProjectDetailsRoute;
 
   // Delay skeleton by 150ms so very fast workspace switches don't flash it
   const [shouldShowRouteSkeleton, setShouldShowRouteSkeleton] = useState(false);
