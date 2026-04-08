@@ -83,5 +83,11 @@ export function passkeyErrorMessage(error: unknown): string {
   if (lower.includes("notallowed")) {
     return "Passkey prompt was cancelled.";
   }
+  if (lower.includes("rp id") && lower.includes("invalid")) {
+    return "Passkeys aren't configured for this site yet. Please try again later or contact support.";
+  }
+  if (lower.includes("securityerror") || lower.includes("relying party")) {
+    return "Passkeys aren't configured for this site yet. Please try again later or contact support.";
+  }
   return msg;
 }
