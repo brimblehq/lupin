@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   createFileRoute,
   getRouteApi,
@@ -261,41 +262,33 @@ function WebAnalyticsPage() {
     };
   }) => Promise<AnalyticsLoadResult>;
 
-  const [result, setResult] = useState<AnalyticsLoadResult | null>(null);
-  const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    if (!projectId) return;
-    let cancelled = false;
-    setLoading(true);
-    const endAt = Date.now();
-    const startAt = endAt - DEFAULT_DURATION_MS;
-    void getAnalytics({
-      data: {
-        projectId,
-        startAt,
-        endAt,
-        unit: "day",
-        timezone: browserTimezone(),
-        host: initialHostRef.current,
-      },
-    })
-      .then((res) => {
-        if (cancelled) return;
-        setResult(res);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setResult({ state: "error", message: friendlyAnalyticsError(error).message });
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [getAnalytics, projectId, refreshKey]);
+  const analyticsQuery = useQuery({
+    queryKey: ["web-analytics", projectId, refreshKey] as const,
+    enabled: Boolean(projectId),
+    staleTime: 300_000,
+    gcTime: 1_800_000,
+    queryFn: async (): Promise<AnalyticsLoadResult> => {
+      try {
+        const endAt = Date.now();
+        const startAt = endAt - DEFAULT_DURATION_MS;
+        return await getAnalytics({
+          data: {
+            projectId,
+            startAt,
+            endAt,
+            unit: "day",
+            timezone: browserTimezone(),
+            host: initialHostRef.current,
+          },
+        });
+      } catch (error) {
+        return { state: "error", message: friendlyAnalyticsError(error).message };
+      }
+    },
+  });
+  const loading = analyticsQuery.isLoading;
+  const result = analyticsQuery.data ?? null;
 
   if (!shouldShowProjectWebAnalyticsTab(project)) {
     return (
