@@ -1118,6 +1118,7 @@ function Phase2Docker({
         Enter the image name including tag and optional registry.
       </p>
       <form
+        autoComplete="off"
         onSubmit={(e) => {
           e.preventDefault();
           if (submitting) return;
@@ -1190,7 +1191,13 @@ function Phase2Docker({
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="octocat"
                       className={inputClass}
-                      autoComplete="username"
+                      autoComplete="off"
+                      name="registry_username_input"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-bwignore="true"
+                      spellCheck={false}
+                      autoCapitalize="none"
                     />
                   </div>
                   <div>
@@ -1204,12 +1211,18 @@ function Phase2Docker({
                         onChange={(e) => setToken(e.target.value)}
                         placeholder="Personal access token"
                         className={`${inputClass} pr-9`}
-                        autoComplete="current-password"
+                        autoComplete="new-password"
+                        name="registry_token_input"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-bwignore="true"
+                        spellCheck={false}
+                        autoCapitalize="none"
                       />
                       <button
                         type="button"
                         onClick={() => setTokenVisible((prev) => !prev)}
-                        className="absolute top-1/2 right-2 -translate-y-1/2 rounded-[4px] p-1 text-dash-text-faded transition-colors hover:text-dash-text-strong"
+                        className="absolute top-1/2 right-2 -translate-y-1/2 rounded-lg p-1 text-dash-text-faded transition-colors hover:text-dash-text-strong"
                       >
                         {tokenVisible ? (
                           <EyeOff className="size-3.5" />

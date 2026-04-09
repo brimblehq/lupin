@@ -115,6 +115,13 @@ export const Route = createRootRoute({
         href: "https://res.cloudinary.com/dgqfojhx4/image/upload/v1772279144/dashboard-assets/Icon_np5cdu.png",
       },
     ],
+    scripts: [
+      {
+        src: "https://scripts.brimble.io/analytics/brimble.js",
+        defer: true,
+        "data-website-id": "dfd2979d-65a0-4b08-9ba2-fe6091bb8fa6",
+      },
+    ],
   }),
   beforeLoad: async ({ location }) => {
     await enforceRouteAuth(location.pathname, location.searchStr);
