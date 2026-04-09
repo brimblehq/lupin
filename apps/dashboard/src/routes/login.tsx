@@ -22,17 +22,11 @@ import {
   verifyEmailCodeServerFn,
   verifyPasskeyAuthServerFn,
 } from "../server/auth/actions";
-import {
-  isPasskeyAutofillSupported,
-  passkeyErrorMessage,
-  runAuthentication,
-} from "@/lib/auth/passkey";
 import { usePasskeyFeature } from "@/hooks/use-passkey-feature";
-import { startOauthPopup, type OauthProvider } from "../lib/auth/oauth-popup";
-import {
-  buildTwoFactorChallengeNavigation,
-  extractTwoFactorChallenge,
-} from "@/lib/auth/two-factor";
+import type { OauthProvider } from "../lib/auth/oauth-popup";
+const loadOauthPopup = () => import("../lib/auth/oauth-popup");
+const loadPasskey = () => import("@/lib/auth/passkey");
+const loadTwoFactor = () => import("@/lib/auth/two-factor");
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -43,17 +37,34 @@ const ease = [0.16, 1, 0.3, 1] as const;
 function GoogleIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4">
-      <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.27-.97 2.34-2.03 3.06l3.28 2.54c1.92-1.77 3.02-4.37 3.02-7.46 0-.7-.06-1.37-.18-2.04H12Z" />
-      <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.45l-3.28-2.54c-.91.61-2.07.97-3.34.97-2.57 0-4.74-1.73-5.52-4.05H3.1v2.62A10 10 0 0 0 12 22Z" />
-      <path fill="#4A90E2" d="M6.48 13.93A5.98 5.98 0 0 1 6.17 12c0-.67.12-1.32.31-1.93V7.45H3.1A10 10 0 0 0 2 12c0 1.61.38 3.14 1.1 4.55l3.38-2.62Z" />
-      <path fill="#FBBC05" d="M12 6.02c1.47 0 2.8.5 3.84 1.48l2.88-2.88C16.96 2.98 14.7 2 12 2A10 10 0 0 0 3.1 7.45l3.38 2.62c.78-2.32 2.95-4.05 5.52-4.05Z" />
+      <path
+        fill="#EA4335"
+        d="M12 10.2v3.9h5.5c-.24 1.27-.97 2.34-2.03 3.06l3.28 2.54c1.92-1.77 3.02-4.37 3.02-7.46 0-.7-.06-1.37-.18-2.04H12Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 22c2.7 0 4.97-.9 6.62-2.45l-3.28-2.54c-.91.61-2.07.97-3.34.97-2.57 0-4.74-1.73-5.52-4.05H3.1v2.62A10 10 0 0 0 12 22Z"
+      />
+      <path
+        fill="#4A90E2"
+        d="M6.48 13.93A5.98 5.98 0 0 1 6.17 12c0-.67.12-1.32.31-1.93V7.45H3.1A10 10 0 0 0 2 12c0 1.61.38 3.14 1.1 4.55l3.38-2.62Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M12 6.02c1.47 0 2.8.5 3.84 1.48l2.88-2.88C16.96 2.98 14.7 2 12 2A10 10 0 0 0 3.1 7.45l3.38 2.62c.78-2.32 2.95-4.05 5.52-4.05Z"
+      />
     </svg>
   );
 }
 
 function GitlabIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="currentColor">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="size-4"
+      fill="currentColor"
+    >
       <path d="M23.955 13.587l-1.342-4.135-2.664-8.189a.455.455 0 0 0-.867 0L16.418 9.45H7.582L4.918 1.263a.455.455 0 0 0-.867 0L1.387 9.452.045 13.587a.924.924 0 0 0 .331 1.023L12 23.054l11.624-8.443a.92.92 0 0 0 .331-1.024" />
     </svg>
   );
@@ -61,7 +72,12 @@ function GitlabIcon() {
 
 function BitbucketIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="currentColor">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="size-4"
+      fill="currentColor"
+    >
       <path d="M.778 1.213a.768.768 0 0 0-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 0 0 .77-.646l3.27-20.03a.768.768 0 0 0-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z" />
     </svg>
   );
@@ -131,11 +147,7 @@ function EmailStep({
         <div className="flex gap-2.5">
           <AuthProviderButton
             icon={<GitlabIcon />}
-            label={
-              oauthLoadingProvider === "gitlab"
-                ? "GitLab..."
-                : "GitLab"
-            }
+            label={oauthLoadingProvider === "gitlab" ? "GitLab..." : "GitLab"}
             onClick={onGitlab}
             disabled={loading || oauthLoadingProvider !== null}
             lastUsed={lastAuthMethod === "gitlab"}
@@ -196,7 +208,9 @@ function EmailStep({
           <button
             type="button"
             onClick={onPasskey}
-            disabled={passkeyLoading || loading || oauthLoadingProvider !== null}
+            disabled={
+              passkeyLoading || loading || oauthLoadingProvider !== null
+            }
             className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-dash-border bg-dash-bg text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated disabled:opacity-40"
           >
             {passkeyLoading ? (
@@ -345,11 +359,15 @@ type AuthMethod = "github" | "google" | "gitlab" | "bitbucket" | "email";
 function getLastAuthMethod(): AuthMethod | null {
   try {
     return localStorage.getItem(AUTH_METHOD_KEY) as AuthMethod | null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function saveLastAuthMethod(method: AuthMethod) {
-  try { localStorage.setItem(AUTH_METHOD_KEY, method); } catch {}
+  try {
+    localStorage.setItem(AUTH_METHOD_KEY, method);
+  } catch {}
 }
 
 function LoginPage() {
@@ -359,10 +377,14 @@ function LoginPage() {
   const resendAuthCode = useServerFn(resendAuthCodeServerFn);
   const verifyEmailCode = useServerFn(verifyEmailCodeServerFn);
   const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn);
-  const getPasskeyAuthOptions = useServerFn(getPasskeyAuthOptionsServerFn as any) as (args: {
+  const getPasskeyAuthOptions = useServerFn(
+    getPasskeyAuthOptionsServerFn as any,
+  ) as (args: {
     data: { email?: string };
   }) => Promise<{ options: Record<string, unknown>; challengeToken: string }>;
-  const verifyPasskeyAuth = useServerFn(verifyPasskeyAuthServerFn as any) as (args: {
+  const verifyPasskeyAuth = useServerFn(
+    verifyPasskeyAuthServerFn as any,
+  ) as (args: {
     data: { challengeToken: string; credential: unknown; geo?: any };
   }) => Promise<{ ok: true; user: { firstName?: string } }>;
   const passkeyFeature = usePasskeyFeature();
@@ -375,8 +397,11 @@ function LoginPage() {
   const otpRef = useRef(otp);
   otpRef.current = otp;
   const [loading, setLoading] = useState(false);
-  const [oauthLoadingProvider, setOauthLoadingProvider] = useState<OauthProvider | null>(null);
-  const [lastAuthMethod] = useState<AuthMethod | null>(() => getLastAuthMethod());
+  const [oauthLoadingProvider, setOauthLoadingProvider] =
+    useState<OauthProvider | null>(null);
+  const [lastAuthMethod] = useState<AuthMethod | null>(() =>
+    getLastAuthMethod(),
+  );
 
   async function handleOauth(provider: OauthProvider) {
     if (oauthLoadingProvider) {
@@ -387,10 +412,16 @@ function LoginPage() {
     setOauthLoadingProvider(provider);
 
     try {
+      const [{ startOauthPopup }, twoFactor] = await Promise.all([
+        loadOauthPopup(),
+        loadTwoFactor(),
+      ]);
       const data = await startOauthPopup(provider);
-      const challenge = extractTwoFactorChallenge(data);
+      const challenge = twoFactor.extractTwoFactorChallenge(data);
       if (challenge) {
-        const nav = buildTwoFactorChallengeNavigation(challenge, { next: getNextUrl() });
+        const nav = twoFactor.buildTwoFactorChallengeNavigation(challenge, {
+          next: getNextUrl(),
+        });
         navigate({ to: "/2fa", search: nav.search, hash: nav.hash });
         return;
       }
@@ -424,7 +455,9 @@ function LoginPage() {
       window.location.replace(getNextUrl());
       return;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "OAuth sign in failed");
+      toast.error(
+        error instanceof Error ? error.message : "OAuth sign in failed",
+      );
       setOauthLoadingProvider(null);
     }
   }
@@ -449,14 +482,15 @@ function LoginPage() {
     if (passkeyLoading || loading) return;
     haptics.selection();
     setPasskeyLoading(true);
+    const passkey = await loadPasskey();
     try {
       const { options, challengeToken } = await getPasskeyAuthOptions({
         data: { email: email.trim() || "" },
       });
-      const credential = await runAuthentication(options);
+      const credential = await passkey.runAuthentication(options);
       await runPasskeyVerify(challengeToken, credential);
     } catch (error) {
-      const msg = passkeyErrorMessage(error);
+      const msg = passkey.passkeyErrorMessage(error);
       if (msg && !msg.toLowerCase().includes("cancel")) {
         toast.error(msg);
       }
@@ -475,6 +509,8 @@ function LoginPage() {
 
     void (async () => {
       try {
+        const { isPasskeyAutofillSupported, runAuthentication } =
+          await loadPasskey();
         const supportsAutofill = await isPasskeyAutofillSupported();
         if (cancelled || !supportsAutofill) return;
         const { options, challengeToken } = await getPasskeyAuthOptions({
@@ -513,7 +549,9 @@ function LoginPage() {
       toast.success("Verification code sent");
       setStep("otp");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send code");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to send code",
+      );
     } finally {
       setLoading(false);
     }
@@ -525,8 +563,11 @@ function LoginPage() {
     if (code.length < 6) return;
     setLoading(true);
     try {
-      const response = await verifyEmailCode({ data: { email, code, geo: await getClientGeo() } });
+      const response = await verifyEmailCode({
+        data: { email, code, geo: await getClientGeo() },
+      });
       if (response.requiresTwoFactor) {
+        const { buildTwoFactorChallengeNavigation } = await loadTwoFactor();
         const nav = buildTwoFactorChallengeNavigation(
           {
             challengeToken: response.challengeToken,
@@ -546,7 +587,9 @@ function LoginPage() {
       window.location.replace(getNextUrl());
       return;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Verification failed");
+      toast.error(
+        error instanceof Error ? error.message : "Verification failed",
+      );
       setLoading(false);
     }
   }
@@ -560,7 +603,9 @@ function LoginPage() {
       await resendAuthCode({ data: { email, geo: await getClientGeo() } });
       toast.success("Code resent");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to resend code");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to resend code",
+      );
     } finally {
       setLoading(false);
     }
@@ -632,7 +677,10 @@ function LoginPage() {
             key="otp"
             email={email}
             otp={otp}
-            onOtpChange={(v) => { setOtp(v); otpRef.current = v; }}
+            onOtpChange={(v) => {
+              setOtp(v);
+              otpRef.current = v;
+            }}
             onVerify={handleVerify}
             onBack={() => {
               haptics.selection();

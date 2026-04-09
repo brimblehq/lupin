@@ -522,7 +522,7 @@ function GeneralSection({
             >
               <div className="flex items-center border-r border-dash-border px-3">
                 <span className="whitespace-nowrap text-sm leading-6 text-dash-text-faded">
-                  brimble.io/
+                  app.brimble.io/projects/
                 </span>
               </div>
               <input
@@ -565,7 +565,10 @@ function GeneralSection({
                 <label className="text-sm font-medium text-dash-text-strong">
                   Root directory
                 </label>
-                <RootDirectoryTrigger value={rootDir} onClick={canWrite ? onOpenDrawer : undefined} />
+                <RootDirectoryTrigger
+                  value={rootDir}
+                  onClick={canWrite ? onOpenDrawer : undefined}
+                />
               </div>
 
               <hr className="border-dash-border" />
@@ -1371,7 +1374,7 @@ function DangerSection({
 
   return (
     <>
-      <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border border-t-2 border-t-red-400/40">
+      <div className="overflow-clip rounded-[4px] border-[0.5px]">
         {/* Row 1: Maintenance mode */}
         <div className="flex items-center justify-between gap-4 px-4 py-4">
           <div className="flex flex-col gap-1">
@@ -1380,10 +1383,7 @@ function DangerSection({
             </h4>
             <p className="text-sm font-light leading-[1.3] text-dash-text-faded">
               Maintenance mode allows your team perform upgrades and tests
-              without deploying to production.{" "}
-              <a href="#" className="text-[#008cff] underline">
-                Learn about Maintenance mode.
-              </a>
+              without deploying to production.
             </p>
           </div>
           <ToggleSwitch
@@ -2007,7 +2007,9 @@ function ConfigurationPage() {
         <RootDirectoryDrawer
           open={drawerOpen}
           onOpenChange={setDrawerOpen}
-          provider={project?.repo?.git?.toLowerCase() === "gitlab" ? "gitlab" : "github"}
+          provider={
+            project?.repo?.git?.toLowerCase() === "gitlab" ? "gitlab" : "github"
+          }
           repoName={project?.repo?.fullName || project?.repo?.name}
           installationId={project?.repo?.installationId}
           branch={generalInitialValues.branch}

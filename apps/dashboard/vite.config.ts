@@ -51,6 +51,21 @@ const config = defineConfig({
   server: {
     allowedHosts: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("@stripe/")) return "stripe";
+          if (id.includes("/ably/")) return "ably";
+          if (id.includes("/motion/") || id.includes("/framer-motion/"))
+            return "motion";
+          if (id.includes("/lucide-react/")) return "lucide";
+          if (id.includes("@sentry/")) return "sentry";
+        },
+      },
+    },
+  },
 });
 
 export default config;

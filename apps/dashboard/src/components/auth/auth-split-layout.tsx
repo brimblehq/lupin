@@ -102,7 +102,7 @@ export function AuthSplitLayout({
     applyStoredTheme();
   }, []);
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-dash-bg px-6 py-10">
+    <main className="flex min-h-dvh items-center justify-center bg-dash-bg px-6 py-10">
       <div className="w-full max-w-[400px]">
         {/* Header row */}
         <div className="mb-10 flex items-center justify-between">
@@ -141,7 +141,7 @@ export function AuthSplitLayout({
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
 

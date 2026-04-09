@@ -61,8 +61,7 @@ export function isGitBackedProject(project?: Pick<Project, "repo"> | null): bool
 
 export function isDockerSourceProject(project?: Pick<Project, "repo" | "framework"> | null): boolean {
   const gitType = normalize(project?.repo?.git);
-  const framework = normalize(project?.framework);
-  return gitType === "docker" || framework === "docker";
+  return gitType === "docker";
 }
 
 export function shouldShowProjectDomainsTab(project?: Pick<Project, "serviceType"> | null): boolean {
@@ -133,7 +132,7 @@ export function shouldShowBranchRootFrameworkFields(
 export function shouldShowDockerSourceFields(
   project?: Pick<Project, "repo" | "framework"> | null,
 ): boolean {
-  return !isGitBackedProject(project as any) || isDockerSourceProject(project);
+  return isDockerSourceProject(project);
 }
 
 export function shouldShowBuildSection(project?: Pick<Project, "serviceType"> | null): boolean {

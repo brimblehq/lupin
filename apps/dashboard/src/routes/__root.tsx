@@ -26,6 +26,7 @@ import { getSubscriptionStatsServerFn } from "@/server/payments/actions";
 import type { SubscriptionStats } from "@/backend/payments";
 
 import appCss from "../styles.css?url";
+import marfaLatinWoff2 from "../assets/fonts/ABCMarfaVariableVF-latin.woff2?url";
 
 const GA_MEASUREMENT_ID = "G-T6EZL8YJW7";
 
@@ -95,11 +96,18 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       {
         name: "viewport",
-        content: "width=device-width, initial-scale=1, maximum-scale=1",
+        content: "width=device-width, initial-scale=1",
       },
       { title: "Brimble Dashboard" },
     ],
     links: [
+      {
+        rel: "preload",
+        href: marfaLatinWoff2,
+        as: "font",
+        type: "font/woff2",
+        crossOrigin: "anonymous",
+      },
       { rel: "stylesheet", href: appCss },
       {
         rel: "icon",
@@ -230,25 +238,35 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
 });
 
+const AUTH_ROUTE_PATTERN =
+  /^\/(login|signup|2fa|passkey-recovery|reset-password)(\/|$)/;
+
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthRoute = AUTH_ROUTE_PATTERN.test(pathname);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <script
-          async
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
+        {!isAuthRoute && (
+          <>
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
             `,
-          }}
-        />
+              }}
+            />
+          </>
+        )}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var d=document.documentElement;var t=localStorage.getItem('theme');var legacy=localStorage.getItem('brimble-theme');if(t!=='light'&&t!=='dark'&&t!=='system'){t=(legacy==='light'||legacy==='dark')?legacy:null}var sys=(t==='system'||(!t));var dark=t==='dark'||(sys&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()`,
@@ -257,7 +275,11 @@ gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
       </head>
       <body>
         {children}
-        <script dangerouslySetInnerHTML={{ __html: chatwootBootstrapScript }} />
+        {!isAuthRoute && (
+          <script
+            dangerouslySetInnerHTML={{ __html: chatwootBootstrapScript }}
+          />
+        )}
         <Scripts />
       </body>
     </html>

@@ -1,3 +1,5 @@
+import { getClientGeoServerFn } from "@/server/shared/client-geo";
+
 export type ClientGeoInfo = {
   ip: string;
   city?: string;
@@ -14,16 +16,10 @@ export function getClientGeo(): Promise<ClientGeoInfo | null> {
   if (typeof window === "undefined") return Promise.resolve(null);
 
   if (!pending) {
-    pending = fetch("https://ipinfo.io/json", { signal: AbortSignal.timeout(3000) })
-      .then((res) => res.json())
+    pending = getClientGeoServerFn()
       .then((data) => {
-        cached = {
-          ip: data.ip ?? "",
-          city: data.city,
-          region: data.region,
-          country: data.country,
-          timezone: data.timezone,
-        };
+        if (!data) return null;
+        cached = data;
         return cached;
       })
       .catch(() => null);
