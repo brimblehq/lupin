@@ -24,6 +24,8 @@ import {
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics, setHapticsEnabled } from "@/hooks/use-haptics";
 import { invalidateSessionCache } from "@/lib/auth-guards";
+import { posthog } from "@/lib/posthog";
+import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { InviteMembersModal } from "../settings/invite-members-modal";
 import { Dropdown } from "./dropdown";
 import { WarningModal } from "./warning-modal";
@@ -2308,6 +2310,7 @@ export function UserProfileDrawer({
     logoutServerFn()
       .catch(() => {})
       .then(() => {
+        posthog.reset();
         invalidateSessionCache();
         window.location.href = "/login";
       });
@@ -2726,6 +2729,7 @@ export function UserProfileDrawer({
                       }
                     }}
                     onDeleteAccount={async () => {
+                      posthog.reset();
                       invalidateSessionCache();
                       window.location.href = "/";
                     }}
@@ -3478,6 +3482,7 @@ function NotificationsForm({
     "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
 
   const { webhookEnabled } = usePlanGate(profile.subscriptionPlanType ?? "");
+  const webhooksFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_WEBHOOKS);
 
   return (
     <div className="flex flex-col gap-[30px]">
@@ -3523,7 +3528,7 @@ function NotificationsForm({
         <Toggle checked={emailNotifs} onChange={setEmailNotifs} />
       </div>
 
-      {webhookEnabled && (
+      {webhookEnabled && webhooksFeatureEnabled && (
         <>
           <hr className="-ml-8 border-dash-border-soft" />
           {/* Webhook URLs */}

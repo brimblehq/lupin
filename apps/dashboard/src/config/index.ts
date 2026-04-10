@@ -67,6 +67,11 @@ export const config = {
 
   turnstileSiteKey:
     readEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY") ?? readEnv("VITE_TURNSTILE_SITE_KEY") ?? "",
+
+  posthogKey:
+    readEnv("NEXT_PUBLIC_POSTHOG_KEY") ?? readEnv("VITE_POSTHOG_KEY") ?? "",
+  posthogHost:
+    readEnv("NEXT_PUBLIC_POSTHOG_HOST") ?? readEnv("VITE_POSTHOG_HOST") ?? "https://us.i.posthog.com",
 } as const;
 
 export default config;

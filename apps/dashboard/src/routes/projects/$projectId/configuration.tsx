@@ -64,6 +64,7 @@ import {
   shouldShowScalingGroupField,
 } from "@/utils/project-capabilities";
 import { isNoBuildFramework } from "@/utils/project-deploy";
+import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import {
   generalConfigSchema,
   databaseConfigSchema,
@@ -1708,7 +1709,8 @@ function ConfigurationPage() {
   const scalingGroupVisible = shouldShowScalingGroupField(project);
   const persistentStorageVisible = shouldShowPersistentStorageField(project);
   const buildCacheToggleVisible = shouldShowBuildCacheToggle(project);
-  const mcpAuthToggleVisible = shouldShowMcpAuthToggle(project);
+  const mcpServersEnabled = useFeatureFlag(FeatureFlags.ENABLE_MCP_SERVERS);
+  const mcpAuthToggleVisible = mcpServersEnabled && shouldShowMcpAuthToggle(project);
 
   const sections = allSections.filter((section) => {
     if (databaseProject && section.id === ConfigSection.Build) {

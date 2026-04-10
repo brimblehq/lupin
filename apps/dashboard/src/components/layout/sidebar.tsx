@@ -1,22 +1,51 @@
 import { cn } from "@brimble/ui";
+import { useMemo } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../../hooks/use-theme";
 import { Theme } from "../../types/enums";
 import { useHaptics } from "@/hooks/use-haptics";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
+import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 
 export const mainNav = [
   { label: "Home", icon: "/icons/home.svg", href: "/" },
   { label: "Projects", icon: "/icons/project.svg", href: "/projects" },
-  { label: "Domains", icon: "/icons/domains.svg", href: "/domains" },
-  { label: "Scaling", icon: "/icons/scaling.svg", href: "/scaling" },
-  { label: "Buckets", icon: "/icons/bucket.svg", href: "#", comingSoon: true },
-  { label: "Sandboxes", icon: "/icons/sandbox.svg", href: "#", comingSoon: true },
+  {
+    label: "Domains",
+    icon: "/icons/domains.svg",
+    href: "/domains",
+    flag: FeatureFlags.ENABLE_DOMAINS,
+  },
+  {
+    label: "Scaling",
+    icon: "/icons/scaling.svg",
+    href: "/scaling",
+    flag: FeatureFlags.ENABLE_AUTO_SCALING,
+  },
+  {
+    label: "Buckets",
+    icon: "/icons/bucket.svg",
+    href: "/buckets",
+    flag: FeatureFlags.ENABLE_BUCKETS,
+    comingSoon: true,
+  },
+  {
+    label: "Sandboxes",
+    icon: "/icons/sandbox.svg",
+    href: "/sandboxes",
+    flag: FeatureFlags.ENABLE_SANDBOX,
+    comingSoon: true,
+  },
 ];
 
 export const moreNav = [
-  { label: "Documentation", icon: "/icons/documentation.svg", href: "https://docs.brimble.io", external: true },
+  {
+    label: "Documentation",
+    icon: "/icons/documentation.svg",
+    href: "https://docs.brimble.io",
+    external: true,
+  },
   { label: "Discover", icon: "/icons/discover.svg", href: "/addons" },
 ];
 
@@ -35,22 +64,56 @@ export function Sidebar({
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+
+  const domainsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DOMAINS);
+  const scalingEnabled = useFeatureFlag(FeatureFlags.ENABLE_AUTO_SCALING);
+  const bucketsEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const sandboxEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
+
+  const flagValues: Record<string, boolean> = useMemo(
+    () => ({
+      [FeatureFlags.ENABLE_DOMAINS]: domainsEnabled,
+      [FeatureFlags.ENABLE_AUTO_SCALING]: scalingEnabled,
+      [FeatureFlags.ENABLE_BUCKETS]: bucketsEnabled,
+      [FeatureFlags.ENABLE_SANDBOX]: sandboxEnabled,
+    }),
+    [domainsEnabled, scalingEnabled, bucketsEnabled, sandboxEnabled],
+  );
+
+  const filteredMainNav = useMemo(
+    () =>
+      mainNav
+        .filter((item) => {
+          if (item.flag && !item.comingSoon)
+            return flagValues[item.flag] !== false;
+          return true;
+        })
+        .map((item) => {
+          if (item.comingSoon && item.flag && flagValues[item.flag]) {
+            return { ...item, comingSoon: false };
+          }
+          return item;
+        }),
+    [flagValues],
+  );
+
   return (
     <>
       <aside className="flex w-[185px] shrink-0 flex-col border-r border-dash-border-soft bg-dash-bg">
         <nav className="scrollbar-hidden flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-6">
           <div className="flex flex-col gap-1">
-            {mainNav.map((item) => {
+            {filteredMainNav.map((item) => {
               if (item.comingSoon) {
                 return (
                   <span
                     key={item.label}
-                    className={cn(
-                      navItemBase,
-                      "cursor-default opacity-40"
-                    )}
+                    className={cn(navItemBase, "cursor-default opacity-40")}
                   >
-                    <img src={item.icon} alt="" className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80" />
+                    <img
+                      src={item.icon}
+                      alt=""
+                      className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
+                    />
                     {item.label}
                     <span className="ml-auto rounded-full bg-dash-bg-elevated px-1.5 py-px text-[10px] font-medium text-dash-text-extra-faded">
                       Soon
@@ -68,7 +131,10 @@ export function Sidebar({
                   onClick={() => {
                     haptics.selection();
                     void navigate({
-                      to: withWorkspaceQuery({ pathname: item.href, searchStr }) as any,
+                      to: withWorkspaceQuery({
+                        pathname: item.href,
+                        searchStr,
+                      }) as any,
                     });
                   }}
                   className={cn(
@@ -76,10 +142,14 @@ export function Sidebar({
                     "w-full",
                     isActive
                       ? "bg-dash-bg-elevated !text-dash-text-strong"
-                      : "hover:bg-dash-bg-elevated"
+                      : "hover:bg-dash-bg-elevated",
                   )}
                 >
-                  <img src={item.icon} alt="" className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80" />
+                  <img
+                    src={item.icon}
+                    alt=""
+                    className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
+                  />
                   {item.label}
                 </button>
               );
@@ -104,7 +174,11 @@ export function Sidebar({
                       onClick={() => haptics.selection()}
                       className={cn(navItemBase, "hover:bg-dash-bg-elevated")}
                     >
-                      <img src={item.icon} alt="" className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80" />
+                      <img
+                        src={item.icon}
+                        alt=""
+                        className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
+                      />
                       {item.label}
                     </a>
                   );
@@ -116,7 +190,10 @@ export function Sidebar({
                     onClick={() => {
                       haptics.selection();
                       void navigate({
-                        to: withWorkspaceQuery({ pathname: item.href, searchStr }) as any,
+                        to: withWorkspaceQuery({
+                          pathname: item.href,
+                          searchStr,
+                        }) as any,
                       });
                     }}
                     className={cn(
@@ -124,10 +201,14 @@ export function Sidebar({
                       "w-full",
                       isActive
                         ? "border border-dash-border-soft bg-dash-bg-elevated !text-dash-text-strong dark:border-transparent"
-                        : "hover:bg-dash-bg-elevated"
+                        : "hover:bg-dash-bg-elevated",
                     )}
                   >
-                    <img src={item.icon} alt="" className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80" />
+                    <img
+                      src={item.icon}
+                      alt=""
+                      className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
+                    />
                     {item.label}
                   </button>
                 );
@@ -164,11 +245,14 @@ export function Sidebar({
             ) : (
               <Moon className="size-4 shrink-0" />
             )}
-            {mode === Theme.System ? "System mode" : theme === Theme.Dark ? "Dark mode" : "Light mode"}
+            {mode === Theme.System
+              ? "System mode"
+              : theme === Theme.Dark
+                ? "Dark mode"
+                : "Light mode"}
           </button>
         </div>
       </aside>
-
     </>
   );
 }

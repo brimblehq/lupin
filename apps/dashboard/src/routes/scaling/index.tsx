@@ -22,6 +22,7 @@ import { formatRelativeTime } from "@/utils/dashboard";
 import { workspaceLoaderDeps } from "@/utils/workspace-route-search";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { PlanUpgradePrompt } from "../../components/shared/plan-upgrade-prompt";
 
 export const Route = createFileRoute("/scaling/")({
@@ -519,6 +520,7 @@ function ScalingPage() {
   const { canWrite } = useWorkspaceRole();
   const router = useRouter();
   const { autoscalingEnabled } = usePlanGate();
+  const scalingFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_AUTO_SCALING);
   const { groups: serverGroups, workspace } = Route.useLoaderData();
   const saveScalingGroup = useServerFn(saveScalingGroupServerFn as any) as (args: {
     data: {
@@ -710,7 +712,7 @@ function ScalingPage() {
     }
   }
 
-  if (!autoscalingEnabled) {
+  if (!autoscalingEnabled || !scalingFeatureEnabled) {
     return (
       <div className="max-w-[1000px]">
         <PageHeader title="Scaling" image="/images/scaling-tab.svg">

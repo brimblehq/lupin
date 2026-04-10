@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
 } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -44,6 +45,8 @@ import { ProfileTab, Theme } from "../../types/enums";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
 import { getSettingsSidebarSnapshotServerFn } from "@/server/settings/actions";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
+import { usePostHog } from "posthog-js/react";
+import { isPostHogEnabled } from "@/lib/posthog";
 
 const dashboardQueryClient = new QueryClient({
   defaultOptions: {
@@ -851,6 +854,32 @@ export function DashboardLayout({
       setHapticsEnabled(p.haptics !== false);
     }
   }, [activeSettingsSnapshot?.profile]);
+
+  const phIdentify = usePostHog();
+  const lastIdentifiedRef = useRef<{ id: string; email: string; username: string; plan: string | undefined } | null>(null);
+
+  useEffect(() => {
+    if (!isPostHogEnabled) return;
+    if (!phIdentify || !userProfile?.id) return;
+
+    const plan = userProfile.subscription?.planType;
+    const current = { id: userProfile.id, email: userProfile.email, username: userProfile.username, plan };
+    const prev = lastIdentifiedRef.current;
+
+    if (prev && prev.id === current.id && prev.email === current.email && prev.username === current.username && prev.plan === current.plan) {
+      return;
+    }
+
+    phIdentify.identify(userProfile.id, {
+      email: userProfile.email,
+      username: userProfile.username,
+      name: [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" "),
+      plan,
+    });
+
+    lastIdentifiedRef.current = current;
+  }, [phIdentify, userProfile?.id, userProfile?.email, userProfile?.username, userProfile?.firstName, userProfile?.lastName, userProfile?.subscription?.planType]);
+
   const activeWorkspaceTeamMembers =
     currentWorkspace && isKnownWorkspace
       ? (workspaceTeamMembersCache[currentWorkspace] ?? null)

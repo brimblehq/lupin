@@ -41,7 +41,9 @@ import {
   shouldShowProjectVisitSite,
 } from "@/utils/project-capabilities";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
+import { useHasActiveDeployment } from "@/hooks/use-has-active-deployment";
 import { DatabaseConnectionModal } from "./database-connection-modal";
+import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 
 const baseTabs = [
   { label: "Projects details", slug: "", Icon: GlobeSimple },
@@ -185,9 +187,16 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
   const actualProjectId = parentLoaderData?.project?.id || projectId;
   const projectName = parentLoaderData?.project?.name || projectId;
   const project = parentLoaderData?.project;
+  const workspaceParam = new URLSearchParams(searchStr || "").get("workspace") || undefined;
+  const hasActiveDeployment = useHasActiveDeployment(actualProjectId, workspaceParam);
   const databaseProject = isDatabaseProject(project as any);
   const databaseStatus = String(project?.status || "").toUpperCase();
   const canOpenDatabaseConnection = databaseProject && databaseStatus === "ACTIVE";
+
+  const domainsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DOMAINS);
+  const deploymentsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DEPLOYMENTS);
+  const databasesEnabled = useFeatureFlag(FeatureFlags.ENABLE_DATABASES);
+
   const tabs = baseTabs.filter((tab) => {
     if (tab.slug === "observability" && !shouldShowProjectObservabilityTab(project as any)) {
       return false;
@@ -197,11 +206,11 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
       return false;
     }
 
-    if (tab.slug === "domains" && !shouldShowProjectDomainsTab(project as any)) {
+    if (tab.slug === "domains" && (!domainsEnabled || !shouldShowProjectDomainsTab(project as any))) {
       return false;
     }
 
-    if (tab.slug === "deployment-history" && !shouldShowDeploymentHistoryTab(project as any)) {
+    if (tab.slug === "deployment-history" && (!deploymentsEnabled || !shouldShowDeploymentHistoryTab(project as any))) {
       return false;
     }
 
@@ -382,7 +391,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
               type="button"
               onClick={() => setOverflowOpen((prev) => !prev)}
               className={cn(
-                "flex h-14 items-center px-2 transition-colors",
+                "relative flex h-14 items-center px-2 transition-colors",
                 overflowHasActive
                   ? "border-b border-[#3c6ce7] text-dash-text-strong"
                   : "text-dash-text-faded hover:text-dash-text-body",
@@ -390,13 +399,16 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
               aria-label="More tabs"
             >
               <MoreHorizontal className="size-4" />
+              {hasActiveDeployment && (
+                <span className="absolute right-1 top-3.5 size-2 rounded-full bg-[#fc391e]" />
+              )}
             </button>
           )}
         </div>
 
         {/* Right actions */}
         <div className="flex shrink-0 items-center gap-5 px-3.5">
-          {databaseProject && (
+          {databaseProject && databasesEnabled && (
             <>
               <button
                 disabled={!canOpenDatabaseConnection}
@@ -430,7 +442,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
               )}
             </>
           )}
-          {canRedeployProject(project as any) && (
+          {deploymentsEnabled && canRedeployProject(project as any) && (
             <div className="relative" ref={redeployRef}>
               <button
                 disabled={deploying}

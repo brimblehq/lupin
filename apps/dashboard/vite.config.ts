@@ -48,6 +48,9 @@ const config = defineConfig({
       : []),
     viteReact(),
   ],
+  ssr: {
+    noExternal: ["posthog-js"],
+  },
   server: {
     allowedHosts: true,
   },

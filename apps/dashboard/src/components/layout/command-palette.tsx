@@ -27,6 +27,7 @@ import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import { logoutServerFn } from "@/server/auth/actions";
 import { invalidateSessionCache } from "@/lib/auth-guards";
+import { posthog } from "@/lib/posthog";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -745,6 +746,7 @@ export function CommandPalette() {
                                   logoutServerFn()
                                     .catch(() => {})
                                     .then(() => {
+                                      posthog.reset();
                                       invalidateSessionCache();
                                       window.location.href = "/login";
                                     });

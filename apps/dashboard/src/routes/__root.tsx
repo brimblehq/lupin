@@ -6,6 +6,9 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { PostHogProvider } from "posthog-js/react";
+import { usePostHog } from "posthog-js/react";
+import { initPostHog, isPostHogEnabled, posthog } from "@/lib/posthog";
 import { useTheme } from "../hooks/use-theme";
 import { DashboardLayout } from "../components/layout/dashboard-layout";
 import { enforceRouteAuth } from "../lib/auth-guards";
@@ -27,6 +30,8 @@ import type { SubscriptionStats } from "@/backend/payments";
 
 import appCss from "../styles.css?url";
 import marfaLatinWoff2 from "../assets/fonts/ABCMarfaVariableVF-latin.woff2?url";
+
+initPostHog();
 
 const GA_MEASUREMENT_ID = "G-T6EZL8YJW7";
 
@@ -281,7 +286,11 @@ gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
         />
       </head>
       <body>
-        {children}
+        {isPostHogEnabled ? (
+          <PostHogProvider client={posthog}>{children}</PostHogProvider>
+        ) : (
+          children
+        )}
         {!isAuthRoute && (
           <script
             dangerouslySetInnerHTML={{ __html: chatwootBootstrapScript }}
@@ -324,6 +333,8 @@ function RootComponent() {
   const storeWorkspace = useTagsStore((s) => s._workspace);
   const fetchTags = useTagsStore((s) => s.fetchTags);
 
+  const ph = usePostHog();
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -341,6 +352,12 @@ function RootComponent() {
       page_title: document.title,
     });
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isPostHogEnabled) return;
+    if (!ph) return;
+    ph.capture("$pageview", { $current_url: window.location.href });
+  }, [pathname, ph]);
 
   useEffect(() => {
     // Initial hydration can use root loader data.

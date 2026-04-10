@@ -222,6 +222,17 @@ export interface ProjectsApi {
     input: { environmentId: string; inheritEnvVars?: boolean; teamId?: string },
   ): Promise<{ id: string; environmentId: string; inheritEnvVars: boolean }>;
   remove(projectId: string, input?: { teamId?: string }): Promise<void>;
+  linkRepo(
+    projectId: string,
+    input: {
+      repo: { name: string; installationId: number | string; git: string };
+      teamId?: string;
+    },
+  ): Promise<{ message?: string }>;
+  unlinkRepo(
+    projectId: string,
+    input?: { teamId?: string },
+  ): Promise<{ message?: string }>;
 }
 
 export interface PaginatedProjectsResponse extends ApiListResponse<Project> {
