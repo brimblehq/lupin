@@ -171,10 +171,13 @@ Information may be used to: operate the platform, authenticate users, process pa
 
 ## 3. Cookies and Tracking
 Brimble may use cookies and similar technologies to: authenticate sessions, remember preferences, analyze usage patterns
+This includes PostHog for product analytics, feature usage measurement, and product improvement.
+Depending on context, PostHog may process pseudonymous identifiers, page URLs, interaction events, browser/device metadata, and session replay data with masking controls.
 Users may disable cookies in their browser settings.
 
 ## 4. Third-Party Services
 Brimble relies on external service providers for infrastructure and operations. These providers may process limited data necessary to deliver services.
+This includes analytics providers such as PostHog.
 
 ## 5. Data Security
 Brimble implements reasonable security measures including: encrypted communications, access controls, monitoring systems, security incident response procedures
@@ -335,7 +338,7 @@ Data Processed: Application performance metrics and debugging information.
 ## 6. Analytics
 ### PostHog
 Purpose: Product analytics and platform usage insights.
-Data Processed: Usage analytics, feature interaction data, and anonymous event tracking.
+Data Processed: Usage analytics, feature interaction data, pseudonymous identifiers, page and event metadata, and session replay data with masking controls.
 
 ## 7. AI Model Providers
 ### Together AI

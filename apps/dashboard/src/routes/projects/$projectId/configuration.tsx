@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import {
   createFileRoute,
@@ -14,6 +14,8 @@ import {
   Cpu,
   Warning,
   DatabaseIcon,
+  MagnifyingGlass,
+  GithubLogo,
 } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -22,6 +24,8 @@ import { Formik } from "formik";
 import { GlossyButton } from "../../../components/shared/glossy-button";
 import { TabHeader } from "../../../components/shared/tab-header";
 import { WarningModal } from "../../../components/shared/warning-modal";
+import { Modal, ModalHeader } from "../../../components/shared/modal";
+import { DashButton } from "../../../components/shared/dash-button";
 import { RootDirectoryDrawer } from "../../../components/project/root-directory-drawer";
 import { RangeSlider } from "../../../components/shared/range-slider";
 import { Dropdown } from "../../../components/shared/dropdown";
@@ -65,6 +69,19 @@ import {
 } from "@/utils/project-capabilities";
 import { isNoBuildFramework } from "@/utils/project-deploy";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
+import {
+  linkRepoServerFn,
+  unlinkRepoServerFn,
+} from "@/server/projects/actions";
+import {
+  listGithubAccountsServerFn,
+  listGithubReposServerFn,
+  listGitlabAccountsServerFn,
+  listGitlabReposServerFn,
+  listBitbucketAccountsServerFn,
+  listBitbucketReposServerFn,
+} from "@/server/repositories/actions";
+import type { GithubRepoListItem } from "@/backend/repositories";
 import {
   generalConfigSchema,
   databaseConfigSchema,
@@ -449,6 +466,374 @@ function EnvironmentSection({
         </div>
       )}
     </div>
+  );
+}
+
+function GitlabLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M23.955 13.587l-1.342-4.135-2.664-8.189a.455.455 0 0 0-.867 0L16.418 9.45H7.582L4.918 1.263a.455.455 0 0 0-.867 0L1.387 9.452.045 13.587a.924.924 0 0 0 .331 1.023L12 23.054l11.624-8.443a.92.92 0 0 0 .331-1.024" />
+    </svg>
+  );
+}
+
+function BitbucketLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M.778 1.213a.768.768 0 0 0-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 0 0 .77-.646l3.27-20.03a.768.768 0 0 0-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z" />
+    </svg>
+  );
+}
+
+const gitProviders = [
+  { id: "github" as const, label: "GitHub", Icon: GithubLogo },
+  { id: "gitlab" as const, label: "GitLab", Icon: GitlabLogo },
+  { id: "bitbucket" as const, label: "Bitbucket", Icon: BitbucketLogo },
+];
+
+type GitProviderId = "github" | "gitlab" | "bitbucket";
+
+function RepoSection({
+  project,
+  workspace,
+  canWrite,
+  onRepoChanged,
+}: {
+  project: any;
+  workspace?: string;
+  canWrite: boolean;
+  onRepoChanged: () => void;
+}) {
+  const haptics = useHaptics();
+  const linkRepo = useServerFn(linkRepoServerFn as any) as (args: {
+    data: {
+      projectId: string;
+      workspace?: string;
+      repo: { name: string; installationId: number | string; git: string };
+    };
+  }) => Promise<{ message?: string }>;
+  const unlinkRepo = useServerFn(unlinkRepoServerFn as any) as (args: {
+    data: { projectId: string; workspace?: string };
+  }) => Promise<{ message?: string }>;
+
+  const listGithubAccounts = useServerFn(listGithubAccountsServerFn as any) as () => Promise<any>;
+  const listGithubRepos = useServerFn(listGithubReposServerFn as any) as (args: {
+    data: { q?: string; installationId?: number | string };
+  }) => Promise<any>;
+  const listGitlabAccounts = useServerFn(listGitlabAccountsServerFn as any) as () => Promise<any>;
+  const listGitlabRepos = useServerFn(listGitlabReposServerFn as any) as (args: {
+    data: { q?: string; installationId?: number | string };
+  }) => Promise<any>;
+  const listBitbucketAccounts = useServerFn(listBitbucketAccountsServerFn as any) as () => Promise<any>;
+  const listBitbucketRepos = useServerFn(listBitbucketReposServerFn as any) as (args: {
+    data: { q?: string; installationId?: number | string };
+  }) => Promise<any>;
+
+  const connectedRepo = project?.repo;
+  const hasRepo = Boolean(connectedRepo?.fullName || connectedRepo?.name);
+  const repoDisplay = connectedRepo?.fullName || connectedRepo?.name || "";
+  const repoGit = connectedRepo?.git || "";
+
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerProvider, setPickerProvider] = useState<GitProviderId>("github");
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerRepos, setPickerRepos] = useState<GithubRepoListItem[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerAccounts, setPickerAccounts] = useState<Array<{ id?: string; name?: string; installationId?: number | string }>>([]);
+  const [pickerAccount, setPickerAccount] = useState<string>("");
+  const [connecting, setConnecting] = useState<string | null>(null);
+
+  const fetchAccounts = useCallback(async (provider: GitProviderId) => {
+    try {
+      const listAccounts =
+        provider === "github"
+          ? listGithubAccounts
+          : provider === "gitlab"
+            ? listGitlabAccounts
+            : listBitbucketAccounts;
+      const result = await listAccounts();
+      const accounts = result?.accounts || [];
+      setPickerAccounts(accounts);
+      if (accounts.length > 0) {
+        setPickerAccount(String(accounts[0].installationId || accounts[0].id || ""));
+      }
+      return accounts;
+    } catch {
+      setPickerAccounts([]);
+      return [];
+    }
+  }, [listGithubAccounts, listGitlabAccounts, listBitbucketAccounts]);
+
+  const fetchRepos = useCallback(async (provider: GitProviderId, installationId?: string, search?: string) => {
+    setPickerLoading(true);
+    try {
+      const listRepos =
+        provider === "github"
+          ? listGithubRepos
+          : provider === "gitlab"
+            ? listGitlabRepos
+            : listBitbucketRepos;
+      const result = await listRepos({
+        data: {
+          q: search || undefined,
+          installationId: installationId || undefined,
+        },
+      });
+      setPickerRepos(result?.repositories || []);
+    } catch {
+      setPickerRepos([]);
+    } finally {
+      setPickerLoading(false);
+    }
+  }, [listGithubRepos, listGitlabRepos, listBitbucketRepos]);
+
+  const openPicker = useCallback(async () => {
+    setPickerOpen(true);
+    setPickerSearch("");
+    setPickerRepos([]);
+    const accounts = await fetchAccounts(pickerProvider);
+    if (accounts.length > 0) {
+      const installId = String(accounts[0].installationId || accounts[0].id || "");
+      await fetchRepos(pickerProvider, installId);
+    }
+  }, [fetchAccounts, fetchRepos, pickerProvider]);
+
+  const handleProviderChange = useCallback(async (provider: GitProviderId) => {
+    setPickerProvider(provider);
+    setPickerSearch("");
+    setPickerRepos([]);
+    const accounts = await fetchAccounts(provider);
+    if (accounts.length > 0) {
+      const installId = String(accounts[0].installationId || accounts[0].id || "");
+      await fetchRepos(provider, installId);
+    }
+  }, [fetchAccounts, fetchRepos]);
+
+  const handleAccountChange = useCallback(async (installId: string) => {
+    setPickerAccount(installId);
+    setPickerSearch("");
+    await fetchRepos(pickerProvider, installId);
+  }, [fetchRepos, pickerProvider]);
+
+  const handleSearch = useCallback(async (q: string) => {
+    setPickerSearch(q);
+    await fetchRepos(pickerProvider, pickerAccount, q);
+  }, [fetchRepos, pickerProvider, pickerAccount]);
+
+  const handleConnect = useCallback(async (repo: GithubRepoListItem) => {
+    setConnecting(repo.fullName);
+    try {
+      await linkRepo({
+        data: {
+          projectId: project?.id,
+          workspace,
+          repo: {
+            name: repo.fullName,
+            installationId: repo.installationId as number,
+            git: pickerProvider,
+          },
+        },
+      });
+      haptics.success();
+      toast.success("Repository connected");
+      setPickerOpen(false);
+      onRepoChanged();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to connect repository",
+      );
+    } finally {
+      setConnecting(null);
+    }
+  }, [linkRepo, project?.id, workspace, pickerProvider, haptics, onRepoChanged]);
+
+  const handleDisconnect = useCallback(async () => {
+    setDisconnecting(true);
+    try {
+      await unlinkRepo({ data: { projectId: project?.id, workspace } });
+      haptics.success();
+      toast.success("Repository disconnected");
+      setConfirmOpen(false);
+      onRepoChanged();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to disconnect repository",
+      );
+    } finally {
+      setDisconnecting(false);
+    }
+  }, [unlinkRepo, project?.id, workspace, haptics, onRepoChanged]);
+
+  const providerOptions = gitProviders.map((p) => ({
+    id: p.id,
+    label: p.label,
+  }));
+
+  const accountOptions = pickerAccounts.map((acc) => ({
+    id: String(acc.installationId || acc.id || ""),
+    label: acc.name || String(acc.id || "Account"),
+  }));
+
+  return (
+    <>
+      <div className="mb-4 rounded-[4px] border-[0.5px] border-dash-border">
+        <div className="flex items-center justify-between px-4 py-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-dash-text-strong">
+              Connected repository
+            </label>
+            {hasRepo ? (
+              <div className="flex items-center gap-2">
+                <img
+                  src="/icons/git-circle.svg"
+                  alt=""
+                  className="size-5 shrink-0"
+                />
+                <span className="text-sm text-dash-text-body">
+                  {repoDisplay}
+                </span>
+              </div>
+            ) : (
+              <span className="text-sm text-dash-text-faded">
+                No repository connected
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {hasRepo && canWrite && (
+              <GlossyButton
+                variant="white"
+                onClick={() => setConfirmOpen(true)}
+              >
+                Disconnect
+              </GlossyButton>
+            )}
+            {canWrite && (
+              <GlossyButton
+                variant="black"
+                onClick={openPicker}
+              >
+                {hasRepo ? "Switch" : "Connect"}
+              </GlossyButton>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Disconnect confirm */}
+      <WarningModal
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Disconnect repository"
+        description="This will remove the connected repository from this project. You can reconnect a repository at any time."
+        confirmLabel="Disconnect"
+        confirmLoadingLabel="Disconnecting..."
+        onConfirm={handleDisconnect}
+      />
+
+      {/* Repo picker modal */}
+      <Modal open={pickerOpen} onOpenChange={setPickerOpen} width={520}>
+        <ModalHeader
+          title="Connect a repository"
+          description="Select a git provider and choose a repository to connect."
+        />
+
+        <div className="flex flex-col gap-3 px-6 py-4">
+          {/* Provider + Account inline */}
+          <div className="flex items-start gap-2">
+            <motion.div
+              className="shrink-0"
+              animate={{ width: pickerAccounts.length > 0 ? "30%" : "100%" }}
+              transition={{ duration: 0.25, ease }}
+            >
+              <Dropdown
+                value={pickerProvider}
+                options={providerOptions}
+                onChange={(id) => handleProviderChange(id as GitProviderId)}
+              />
+            </motion.div>
+            <AnimatePresence>
+              {pickerAccounts.length > 0 && (
+                <motion.div
+                  className="min-w-0 flex-1"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2, ease }}
+                >
+                  <Dropdown
+                    value={pickerAccount}
+                    options={accountOptions}
+                    onChange={handleAccountChange}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dash-text-extra-faded" />
+            <input
+              type="text"
+              value={pickerSearch}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search repositories..."
+              className="w-full input-base input-focus py-2.5 pl-9 pr-3 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]"
+            />
+          </div>
+
+          {/* Repo list */}
+          <div className="max-h-[320px] overflow-y-auto overflow-clip rounded-[4px] border-[0.5px] border-dash-border" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.1) transparent" }}>
+            {pickerLoading ? (
+              <div className="px-4 py-8 text-center text-sm text-dash-text-faded">
+                Loading repositories…
+              </div>
+            ) : pickerRepos.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-dash-text-faded">
+                {pickerAccounts.length === 0
+                  ? `No ${gitProviders.find((p) => p.id === pickerProvider)?.label} accounts connected`
+                  : "No repositories found."}
+              </div>
+            ) : (
+              pickerRepos.map((repo, i) => (
+                <motion.div
+                  key={repo.fullName}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: 0.04 * i, ease }}
+                  className={`flex items-center justify-between px-4 py-3 ${
+                    i > 0 ? "border-t-[0.5px] border-dash-border" : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src="/icons/git-circle.svg"
+                      alt=""
+                      className="size-6 shrink-0"
+                    />
+                    <span className="text-sm font-medium text-dash-text-strong">
+                      {repo.name}
+                    </span>
+                  </div>
+                  <DashButton
+                    size="sm"
+                    onClick={() => handleConnect(repo)}
+                    disabled={connecting !== null}
+                  >
+                    {connecting === repo.fullName
+                      ? "Connecting…"
+                      : "Connect"}
+                  </DashButton>
+                </motion.div>
+              ))
+            )}
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -1945,6 +2330,12 @@ function ConfigurationPage() {
                   />
                 ) : (
                   <>
+                    <RepoSection
+                      project={project}
+                      workspace={workspace}
+                      canWrite={canWrite}
+                      onRepoChanged={() => router.invalidate()}
+                    />
                     <EnvironmentSection
                       projectId={project?.id || params.projectId}
                       currentEnvironmentId={project?.projectEnvironmentId}

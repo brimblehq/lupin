@@ -733,3 +733,56 @@ export const deleteProjectServerFn = createServerFn({
     return { success: true };
   });
 });
+
+export const linkRepoServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        projectId: string;
+        workspace?: string;
+        repo: { name: string; installationId: number | string; git: string };
+      }
+    | undefined;
+
+  const projectId = payload?.projectId?.trim();
+  if (!projectId) throw new Error("Project ID is required");
+  if (!payload?.repo?.name) throw new Error("Repository name is required");
+
+  const workspaceSlug = payload.workspace?.trim().toLowerCase();
+
+  return withTokenRefresh(async (api) => {
+    let teamId: string | undefined;
+    if (workspaceSlug) {
+      const teams = await api.workspaces.list();
+      const match = teams.items.find((item) => item.slug === workspaceSlug);
+      if (match?.id) teamId = match.id;
+    }
+
+    return api.projects.linkRepo(projectId, { repo: payload.repo, teamId });
+  });
+});
+
+export const unlinkRepoServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | { projectId: string; workspace?: string }
+    | undefined;
+
+  const projectId = payload?.projectId?.trim();
+  if (!projectId) throw new Error("Project ID is required");
+
+  const workspaceSlug = payload?.workspace?.trim().toLowerCase();
+
+  return withTokenRefresh(async (api) => {
+    let teamId: string | undefined;
+    if (workspaceSlug) {
+      const teams = await api.workspaces.list();
+      const match = teams.items.find((item) => item.slug === workspaceSlug);
+      if (match?.id) teamId = match.id;
+    }
+
+    return api.projects.unlinkRepo(projectId, { teamId });
+  });
+});

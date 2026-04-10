@@ -810,5 +810,29 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
         method: "DELETE",
       });
     },
+    async linkRepo(projectId, input) {
+      const response = await client.request<any>(
+        `${listEndpoint}/link/${encodeURIComponent(projectId)}`,
+        {
+          method: "POST",
+          body: { type: "repo", repo: input.repo },
+          query: { teamId: input.teamId },
+        },
+      );
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      return { message: pickString(asRecord(root), "message") };
+    },
+    async unlinkRepo(projectId, input) {
+      const response = await client.request<any>(
+        `${listEndpoint}/unlink/${encodeURIComponent(projectId)}`,
+        {
+          method: "POST",
+          body: { type: "repo" },
+          query: { teamId: input?.teamId },
+        },
+      );
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      return { message: pickString(asRecord(root), "message") };
+    },
   };
 }
