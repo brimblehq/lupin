@@ -116,8 +116,31 @@ const levelFilterOptions: FilterOption[] = [
 /** Detect URLs for auto-linking. */
 const urlRe = /(https?:\/\/[^\s]+)/g;
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightMatches(text: string, query: string): React.ReactNode {
+  const trimmed = query.trim();
+  if (!trimmed) return text;
+  const re = new RegExp(`(${escapeRegExp(trimmed)})`, "ig");
+  const parts = text.split(re);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark
+        key={i}
+        className="rounded-sm bg-[#b37a10]/30 px-0.5 text-[#b37a10] dark:bg-[#f5a623]/25 dark:text-[#f5a623]"
+      >
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
 /** Render a log message with auto-linked URLs and preserved whitespace. */
-function LogMessage({ text }: { text: string }) {
+function LogMessage({ text, highlight }: { text: string; highlight?: string }) {
   const parts = text.split(urlRe);
   return (
     <span className="whitespace-pre-wrap break-words">
@@ -134,7 +157,9 @@ function LogMessage({ text }: { text: string }) {
             {part}
           </a>
         ) : (
-          <span key={i}>{part}</span>
+          <span key={i}>
+            {highlight ? highlightMatches(part, highlight) : part}
+          </span>
         ),
       )}
     </span>
@@ -850,7 +875,7 @@ function ApplicationLogs({
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="min-h-[640px] max-h-[820px] overflow-y-auto px-4 py-3 font-logs text-xs leading-[22px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.12)_transparent]"
+            className="min-h-[640px] max-h-[820px] overflow-y-auto px-4 py-3 font-logs text-[11px] leading-[20px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.12)_transparent]"
           >
             {filteredLogs.length > 0 ? (
               filteredLogs.map((line, i) => (
@@ -883,7 +908,7 @@ function ApplicationLogs({
                     {levelBadge[line.level]}
                   </span>
                   <span className="min-w-0 flex-1 text-white/60">
-                    <LogMessage text={line.message} />
+                    <LogMessage text={line.message} highlight={searchQuery} />
                   </span>
                   {copiedIdx === i && (
                     <span className="shrink-0 select-none pt-px text-[10px] text-white/80">
