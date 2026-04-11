@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { Drawer } from "vaul";
@@ -820,7 +820,10 @@ function DangerZone({
       : 0;
   const hasRemainingProjects = normalizedProjectCount > 0;
   const projectsLabel = normalizedProjectCount === 1 ? "project" : "projects";
-  const [disconnectProvider, setDisconnectProvider] = useState<{ id: string; name: string } | null>(null);
+  const [disconnectProvider, setDisconnectProvider] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [disconnectConfirm, setDisconnectConfirm] = useState("");
   const [gitMenuOpen, setGitMenuOpen] = useState(false);
   const gitMenuRef = useRef<HTMLDivElement>(null);
@@ -832,7 +835,10 @@ function DangerZone({
   useEffect(() => {
     if (!gitMenuOpen) return;
     function handleClick(e: MouseEvent) {
-      if (gitMenuRef.current && !gitMenuRef.current.contains(e.target as Node)) {
+      if (
+        gitMenuRef.current &&
+        !gitMenuRef.current.contains(e.target as Node)
+      ) {
         setGitMenuOpen(false);
       }
     }
@@ -878,7 +884,10 @@ function DangerZone({
             variant={connectedProviders.length > 0 ? "red" : "black"}
             onClick={() => {
               haptics.selection();
-              if (connectedProviders.length === 1 && disconnectedProviders.length === 0) {
+              if (
+                connectedProviders.length === 1 &&
+                disconnectedProviders.length === 0
+              ) {
                 setDisconnectProvider(connectedProviders[0]);
               } else {
                 setGitMenuOpen((prev) => !prev);
@@ -2005,13 +2014,18 @@ export function UserProfileDrawer({
   ) as (args: { data?: { device?: string } }) => Promise<{ url: string }>;
   const listGitlabAccounts = useServerFn(listGitlabAccountsServerFn);
   const listBitbucketAccounts = useServerFn(listBitbucketAccountsServerFn);
-  const [gitConnectionStatus, setGitConnectionStatus] = useState<Record<string, boolean | null>>({
+  const [gitConnectionStatus, setGitConnectionStatus] = useState<
+    Record<string, boolean | null>
+  >({
     github: null,
     gitlab: null,
     bitbucket: null,
   });
-  const getTwoFactorStatus = useServerFn(getTwoFactorStatusServerFn as any) as () => Promise<TwoFactorStatus>;
-  const [twoFactorStatus, setTwoFactorStatus] = useState<TwoFactorStatus | null>(null);
+  const getTwoFactorStatus = useServerFn(
+    getTwoFactorStatusServerFn as any,
+  ) as () => Promise<TwoFactorStatus>;
+  const [twoFactorStatus, setTwoFactorStatus] =
+    useState<TwoFactorStatus | null>(null);
   const decryptApiKey = useServerFn(
     decryptSettingsApiKeyServerFn as any,
   ) as (args: { data: { encryptedApiKey: string } }) => Promise<string | null>;
@@ -2214,13 +2228,22 @@ export function UserProfileDrawer({
 
     const refreshGitStatuses = () => {
       for (const check of checks) {
-        check.fn()
+        check
+          .fn()
           .then((result) => {
-            const accounts = Array.isArray(result) ? result : (result?.accounts ?? []);
-            setGitConnectionStatus((prev) => ({ ...prev, [check.id]: accounts.length > 0 }));
+            const accounts = Array.isArray(result)
+              ? result
+              : (result?.accounts ?? []);
+            setGitConnectionStatus((prev) => ({
+              ...prev,
+              [check.id]: accounts.length > 0,
+            }));
           })
           .catch(() => {
-            setGitConnectionStatus((prev) => ({ ...prev, [check.id]: prev[check.id] ?? false }));
+            setGitConnectionStatus((prev) => ({
+              ...prev,
+              [check.id]: prev[check.id] ?? false,
+            }));
           });
       }
     };
@@ -2228,7 +2251,10 @@ export function UserProfileDrawer({
     refreshGitStatuses();
 
     const handleConnectionChanged = () => refreshGitStatuses();
-    window.addEventListener("brimble:git-connection-changed", handleConnectionChanged);
+    window.addEventListener(
+      "brimble:git-connection-changed",
+      handleConnectionChanged,
+    );
 
     if (!twoFactorStatus) {
       getTwoFactorStatus()
@@ -2237,7 +2263,10 @@ export function UserProfileDrawer({
     }
 
     return () => {
-      window.removeEventListener("brimble:git-connection-changed", handleConnectionChanged);
+      window.removeEventListener(
+        "brimble:git-connection-changed",
+        handleConnectionChanged,
+      );
     };
   }, [open]);
 
@@ -2613,48 +2642,104 @@ export function UserProfileDrawer({
                       }
                     }}
                     gitConnections={[
-                      { id: "github", name: "GitHub", connected: gitConnectionStatus.github ?? false },
-                      { id: "gitlab", name: "GitLab", connected: gitConnectionStatus.gitlab ?? false },
-                      { id: "bitbucket", name: "Bitbucket", connected: gitConnectionStatus.bitbucket ?? false },
+                      {
+                        id: "github",
+                        name: "GitHub",
+                        connected: gitConnectionStatus.github ?? false,
+                      },
+                      {
+                        id: "gitlab",
+                        name: "GitLab",
+                        connected: gitConnectionStatus.gitlab ?? false,
+                      },
+                      {
+                        id: "bitbucket",
+                        name: "Bitbucket",
+                        connected: gitConnectionStatus.bitbucket ?? false,
+                      },
                     ]}
                     onDisconnectGitProvider={async (providerId) => {
                       try {
                         await disconnectGitProvider({
                           data: { provider: providerId as any },
                         });
-                        setGitConnectionStatus((prev) => ({ ...prev, [providerId]: false }));
-                        window.dispatchEvent(new Event("brimble:git-connection-changed"));
-                        toast.success(`${providerId.charAt(0).toUpperCase() + providerId.slice(1)} disconnected successfully`);
+                        setGitConnectionStatus((prev) => ({
+                          ...prev,
+                          [providerId]: false,
+                        }));
+                        window.dispatchEvent(
+                          new Event("brimble:git-connection-changed"),
+                        );
+                        toast.success(
+                          `${providerId.charAt(0).toUpperCase() + providerId.slice(1)} disconnected successfully`,
+                        );
                       } catch (error) {
                         toast.error(
-                          error instanceof Error ? error.message : `Failed to disconnect ${providerId}`,
+                          error instanceof Error
+                            ? error.message
+                            : `Failed to disconnect ${providerId}`,
                         );
                       }
                     }}
                     onConnectGitProvider={async (providerId) => {
                       try {
-                        const connectFns: Record<string, () => Promise<{ url: string }>> = {
+                        const connectFns: Record<
+                          string,
+                          () => Promise<{ url: string }>
+                        > = {
                           github: () => getGithubInstallUrl(),
-                          gitlab: () => getGitlabConnectUrl({ data: { device: window.sessionStorage.getItem("brimble.oauth.device_id") ?? undefined } }),
-                          bitbucket: () => getBitbucketConnectUrl({ data: { device: window.sessionStorage.getItem("brimble.oauth.device_id") ?? undefined } }),
+                          gitlab: () =>
+                            getGitlabConnectUrl({
+                              data: {
+                                device:
+                                  window.sessionStorage.getItem(
+                                    "brimble.oauth.device_id",
+                                  ) ?? undefined,
+                              },
+                            }),
+                          bitbucket: () =>
+                            getBitbucketConnectUrl({
+                              data: {
+                                device:
+                                  window.sessionStorage.getItem(
+                                    "brimble.oauth.device_id",
+                                  ) ?? undefined,
+                              },
+                            }),
                         };
                         const getFn = connectFns[providerId];
                         if (!getFn) {
-                          toast.error(`${providerId} connection is not available yet.`);
+                          toast.error(
+                            `${providerId} connection is not available yet.`,
+                          );
                           return;
                         }
                         const result = await getFn();
                         const url = result?.url?.trim();
-                        if (!url) throw new Error(`Could not start ${providerId} connection.`);
+                        if (!url)
+                          throw new Error(
+                            `Could not start ${providerId} connection.`,
+                          );
 
-                        const popup = window.open(url, "_blank", "width=900,height=760");
+                        const popup = window.open(
+                          url,
+                          "_blank",
+                          "width=900,height=760",
+                        );
                         if (!popup) {
-                          toast.error("Popup blocked. Please allow popups and try again.");
+                          toast.error(
+                            "Popup blocked. Please allow popups and try again.",
+                          );
                           return;
                         }
 
-                        toast.success(`Complete the ${providerId} authorization in the popup, then refresh.`);
-                        setGitConnectionStatus((prev) => ({ ...prev, [providerId]: null }));
+                        toast.success(
+                          `Complete the ${providerId} authorization in the popup, then refresh.`,
+                        );
+                        setGitConnectionStatus((prev) => ({
+                          ...prev,
+                          [providerId]: null,
+                        }));
 
                         const checkFns: Record<string, () => Promise<any>> = {
                           github: listGithubAccounts,
@@ -2666,26 +2751,38 @@ export function UserProfileDrawer({
                           const interval = window.setInterval(async () => {
                             try {
                               const accounts = await checkFn();
-                              const items = Array.isArray(accounts) ? accounts : (accounts?.accounts ?? []);
+                              const items = Array.isArray(accounts)
+                                ? accounts
+                                : (accounts?.accounts ?? []);
                               if (items.length > 0) {
-                                setGitConnectionStatus((prev) => ({ ...prev, [providerId]: true }));
+                                setGitConnectionStatus((prev) => ({
+                                  ...prev,
+                                  [providerId]: true,
+                                }));
                                 window.clearInterval(interval);
-                                window.dispatchEvent(new Event("brimble:git-connection-changed"));
-                                toast.success(`${providerId.charAt(0).toUpperCase() + providerId.slice(1)} connected successfully`);
+                                window.dispatchEvent(
+                                  new Event("brimble:git-connection-changed"),
+                                );
+                                toast.success(
+                                  `${providerId.charAt(0).toUpperCase() + providerId.slice(1)} connected successfully`,
+                                );
                               }
                             } catch {}
                           }, 3000);
                           window.setTimeout(() => {
                             window.clearInterval(interval);
                             setGitConnectionStatus((prev) => {
-                              if (prev[providerId] === null) return { ...prev, [providerId]: false };
+                              if (prev[providerId] === null)
+                                return { ...prev, [providerId]: false };
                               return prev;
                             });
                           }, 90_000);
                         }
                       } catch (error) {
                         toast.error(
-                          error instanceof Error ? error.message : `Could not open ${providerId} connection.`,
+                          error instanceof Error
+                            ? error.message
+                            : `Could not open ${providerId} connection.`,
                         );
                       }
                     }}
@@ -3004,29 +3101,29 @@ interface EventGroup {
   events: EventItem[];
 }
 
-const eventGroups: EventGroup[] = [
+const fallbackEventGroups: EventGroup[] = [
   {
     key: "domain",
     title: "Domain Events",
     icon: "/icons/domains.svg",
     events: [
       {
-        key: "domain_purchased",
+        key: "domain.purchased",
         title: "Domain Purchased",
         description: "Notify when a domain is purchased successfully",
       },
       {
-        key: "domain_created",
+        key: "domain.created",
         title: "Domain Created",
         description: "Notify when a domain is created in the system",
       },
       {
-        key: "domain_renewed",
+        key: "domain.renewed",
         title: "Domain Renewed",
         description: "Notify when a domain is renewed successfully",
       },
       {
-        key: "domain_expired",
+        key: "domain.expired",
         title: "Domain Expired",
         description: "Notify when a domain expires",
       },
@@ -3038,22 +3135,27 @@ const eventGroups: EventGroup[] = [
     icon: "/icons/project.svg",
     events: [
       {
-        key: "deployment_failed",
+        key: "deployment.failed",
         title: "Deployment Failed",
         description: "Notify when deployments fail or encounter errors",
       },
       {
-        key: "deployment_started",
+        key: "deployment.started",
         title: "Deployment Started",
         description: "Notify when deployments are initiated",
       },
       {
-        key: "project_domain_updated",
+        key: "deployment.success",
+        title: "Deployment Success",
+        description: "Notify when deployments complete successfully",
+      },
+      {
+        key: "project.domain.updated",
         title: "Project Domain Updated",
         description: "Notify when a project domain has been updated",
       },
       {
-        key: "deployment_created",
+        key: "deployment.created",
         title: "Deployment Created",
         description: "Notify when deployments are initiated",
       },
@@ -3065,12 +3167,12 @@ const eventGroups: EventGroup[] = [
     icon: "/icons/payment.svg",
     events: [
       {
-        key: "payment_successful",
+        key: "payment.successful",
         title: "Payment Successful",
         description: "Notify when payment is processed successfully",
       },
       {
-        key: "payment_failed",
+        key: "payment.failed",
         title: "Payment Failed",
         description: "Notify when payment fails",
       },
@@ -3082,14 +3184,58 @@ const eventGroups: EventGroup[] = [
     icon: "/icons/integrations.svg",
     events: [
       {
-        key: "database_created",
+        key: "database.created",
         title: "Database Created",
         description: "Notify when a database is created",
       },
       {
-        key: "database_backup_completed",
+        key: "database.backup.completed",
         title: "Database Backup Completed",
         description: "Notify when database backup completes",
+      },
+    ],
+  },
+  {
+    key: "project",
+    title: "Project Events",
+    icon: "/icons/project.svg",
+    events: [
+      {
+        key: "project.created",
+        title: "Project Created",
+        description: "Notify when a project has been successfully created",
+      },
+      {
+        key: "project.updated",
+        title: "Project Updated",
+        description: "Notify when a project has been successfully updated",
+      },
+      {
+        key: "project.deleted",
+        title: "Project Deleted",
+        description: "Notify when a project has been successfully deleted",
+      },
+    ],
+  },
+  {
+    key: "autoscaling",
+    title: "Autoscaling Events",
+    icon: "/icons/scaling.svg",
+    events: [
+      {
+        key: "autoscaling.group.created",
+        title: "Autoscaling Group Created",
+        description: "Notify when an autoscaling group has been created",
+      },
+      {
+        key: "autoscaling.group.updated",
+        title: "Autoscaling Group Updated",
+        description: "Notify when an autoscaling group has been updated",
+      },
+      {
+        key: "autoscaling.group.deleted",
+        title: "Autoscaling Group Deleted",
+        description: "Notify when an autoscaling group has been deleted",
       },
     ],
   },
@@ -3099,17 +3245,17 @@ const eventGroups: EventGroup[] = [
     icon: "/icons/settings.svg",
     events: [
       {
-        key: "env_added",
+        key: "environment.variables.added",
         title: "Environment Variables Added",
         description: "Notify when environment variables have been added",
       },
       {
-        key: "env_updated",
+        key: "environment.variables.updated",
         title: "Environment Variables Updated",
         description: "Notify when environment variables have been updated",
       },
       {
-        key: "env_deleted",
+        key: "environment.variables.deleted",
         title: "Environment Variables Deleted",
         description: "Notify when environment variables have been deleted",
       },
@@ -3121,23 +3267,93 @@ const eventGroups: EventGroup[] = [
     icon: "/icons/discover.svg",
     events: [
       {
-        key: "dns_record_created",
+        key: "dns.record.created",
         title: "DNS Record Created",
         description: "Notify when a DNS record has been created",
       },
       {
-        key: "dns_record_updated",
+        key: "dns.record.updated",
         title: "DNS Record Updated",
         description: "Notify when a DNS record has been updated",
       },
       {
-        key: "dns_record_deleted",
+        key: "dns.record.deleted",
         title: "DNS Record Deleted",
         description: "Notify when a DNS record has been deleted",
       },
     ],
   },
 ];
+
+function toEventGroupKey(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function normalizeServerWebhookGroups(
+  groups?: ServerWebhookGroup[] | null,
+): EventGroup[] {
+  if (!Array.isArray(groups)) {
+    return [];
+  }
+
+  const fallbackIconsByTitle = new Map(
+    fallbackEventGroups.map((group) => [
+      group.title.trim().toLowerCase(),
+      group.icon,
+    ]),
+  );
+
+  return groups
+    .map((group) => {
+      const title = String(group?.title ?? "").trim();
+      if (!title || title.toLowerCase() === "all events") {
+        return null;
+      }
+
+      const events = Array.isArray(group?.events)
+        ? group.events
+            .map((event) => {
+              const key = String(event?.key ?? "").trim();
+              if (!key || key === "*") {
+                return null;
+              }
+
+              return {
+                key,
+                title: String(event?.label ?? key).trim() || key,
+                description: String(event?.description ?? "").trim(),
+              } satisfies EventItem;
+            })
+            .filter((event): event is EventItem => event !== null)
+        : [];
+
+      if (events.length === 0) {
+        return null;
+      }
+
+      return {
+        key: toEventGroupKey(title),
+        title,
+        icon: fallbackIconsByTitle.get(title.toLowerCase()),
+        events,
+      } satisfies EventGroup;
+    })
+    .filter((group): group is EventGroup => group !== null);
+}
+
+function hasWildcardEventEnabled(
+  groups?: ServerWebhookGroup[] | null,
+): boolean {
+  if (!Array.isArray(groups)) {
+    return false;
+  }
+
+  return groups.some((group) =>
+    Array.isArray(group?.events)
+      ? group.events.some((event) => event?.key === "*" && event?.enabled)
+      : false,
+  );
+}
 
 function Checkbox({
   checked,
@@ -3186,6 +3402,8 @@ function Checkbox({
 
 function EventGroupCard({
   group,
+  expanded,
+  onExpandedChange,
   groupEnabled,
   onGroupToggle,
   eventStates,
@@ -3193,13 +3411,14 @@ function EventGroupCard({
   disabled,
 }: {
   group: EventGroup;
+  expanded: boolean;
+  onExpandedChange: (next: boolean) => void;
   groupEnabled: boolean;
   onGroupToggle: (v: boolean) => void;
   eventStates: Record<string, boolean>;
   onEventToggle: (key: string, v: boolean) => void;
   disabled?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const checkedCount = group.events.filter(
     (e) => groupEnabled && (eventStates[e.key] ?? false),
   ).length;
@@ -3209,7 +3428,7 @@ function EventGroupCard({
       {/* Collapsible header row */}
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => onExpandedChange(!expanded)}
         className="flex items-center gap-2.5 py-3 text-left transition-colors hover:opacity-80"
       >
         <motion.span
@@ -3292,6 +3511,37 @@ function EventGroupCard({
       </AnimatePresence>
     </div>
   );
+}
+
+function isValidWebhookUrl(
+  value: string,
+  type: "discord" | "slack" | "custom",
+): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "https:") return false;
+
+  const host = parsed.hostname.toLowerCase();
+  if (type === "discord") {
+    return (
+      (host === "discord.com" || host === "discordapp.com") &&
+      parsed.pathname.startsWith("/api/webhooks/")
+    );
+  }
+  if (type === "slack") {
+    return (
+      host === "hooks.slack.com" && parsed.pathname.startsWith("/services/")
+    );
+  }
+  return true;
 }
 
 function NotificationsForm({
@@ -3377,23 +3627,35 @@ function NotificationsForm({
 
   // Group-level toggles
   const [groupToggles, setGroupToggles] = useState<Record<string, boolean>>({});
-  // Individual event toggles
-  const [eventToggles, setEventToggles] = useState<Record<string, boolean>>({});
 
+  const [eventToggles, setEventToggles] = useState<Record<string, boolean>>({});
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+
+  const normalizedServerGroups = useMemo(
+    () => normalizeServerWebhookGroups(webhooks?.groups),
+    [webhooks?.groups],
+  );
   const groupsForUi: EventGroup[] =
-    webhooks?.groups.map((group) => ({
-      key: group.title.toLowerCase().replace(/\s+/g, "_"),
-      title: group.title,
-      events: group.events.map((event) => ({
-        key: event.key,
-        title: event.label || event.key,
-        description: event.description || "",
-      })),
-    })) ?? eventGroups;
+    normalizedServerGroups.length > 0
+      ? normalizedServerGroups
+      : fallbackEventGroups;
+  const wildcardEventEnabled = useMemo(
+    () => hasWildcardEventEnabled(webhooks?.groups),
+    [webhooks?.groups],
+  );
 
   useEffect(() => {
     setEmailNotifs(profile.notifications?.email ?? false);
   }, [profile.notifications?.email]);
+
+  useEffect(() => {
+    if (
+      expandedGroupKey &&
+      !groupsForUi.some((group) => group.key === expandedGroupKey)
+    ) {
+      setExpandedGroupKey(null);
+    }
+  }, [expandedGroupKey, groupsForUi]);
 
   useEffect(() => {
     setWebhookUrl(webhooks?.webhookUrl ?? "");
@@ -3402,15 +3664,34 @@ function NotificationsForm({
 
     const nextEvents: Record<string, boolean> = {};
     const nextGroups: Record<string, boolean> = {};
-    const sourceGroups = webhooks?.groups ?? [];
 
-    for (const group of sourceGroups) {
-      const groupKey = group.title.toLowerCase().replace(/\s+/g, "_");
-      let allEnabled = true;
+    const serverEventStates = new Map<string, boolean>();
+    if (Array.isArray(webhooks?.groups)) {
+      for (const group of webhooks.groups) {
+        if (!Array.isArray(group?.events)) {
+          continue;
+        }
+
+        for (const event of group.events) {
+          const key = String(event?.key ?? "").trim();
+          if (!key || key === "*") {
+            continue;
+          }
+          serverEventStates.set(key, Boolean(event?.enabled));
+        }
+      }
+    }
+
+    for (const group of groupsForUi) {
+      const groupKey = group.key;
+      let allEnabled = group.events.length > 0;
 
       for (const event of group.events) {
-        nextEvents[event.key] = Boolean(event.enabled);
-        if (!event.enabled) {
+        const enabled = wildcardEventEnabled
+          ? true
+          : (serverEventStates.get(event.key) ?? false);
+        nextEvents[event.key] = enabled;
+        if (!enabled) {
           allEnabled = false;
         }
       }
@@ -3420,7 +3701,7 @@ function NotificationsForm({
 
     setEventToggles(nextEvents);
     setGroupToggles(nextGroups);
-  }, [webhooks]);
+  }, [groupsForUi, webhooks, wildcardEventEnabled]);
 
   function handleAllEventsToggle(v: boolean) {
     setAllEvents(v);
@@ -3477,6 +3758,10 @@ function NotificationsForm({
 
   const { webhookEnabled } = usePlanGate(profile.subscriptionPlanType ?? "");
   const webhooksFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_WEBHOOKS);
+
+  const discordUrlValid = isValidWebhookUrl(discordUrl, "discord");
+  const slackUrlValid = isValidWebhookUrl(slackUrl, "slack");
+  const webhookUrlValid = isValidWebhookUrl(webhookUrl, "custom");
 
   return (
     <div className="flex flex-col gap-[30px]">
@@ -3538,10 +3823,13 @@ function NotificationsForm({
                   onChange={(e) => setDiscordUrl(e.target.value)}
                   placeholder="https://discord.com/api/webhooks/..."
                   disabled={!canEdit}
+                  aria-invalid={!discordUrlValid}
                   className={cn(
                     inputClass,
                     "flex-1",
                     !canEdit && "opacity-60 cursor-not-allowed",
+                    !discordUrlValid &&
+                      "!shadow-[0px_1px_2px_rgba(239,68,68,0.2),0px_0px_0px_1px_#ef4444]",
                   )}
                 />
                 <button
@@ -3549,6 +3837,7 @@ function NotificationsForm({
                   disabled={
                     !canEdit ||
                     !discordUrl.trim() ||
+                    !discordUrlValid ||
                     testingWebhook === "discord"
                   }
                   className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
@@ -3557,6 +3846,12 @@ function NotificationsForm({
                   {testingWebhook === "discord" ? "Sending..." : "Test"}
                 </button>
               </div>
+              {!discordUrlValid && (
+                <p className="text-xs text-red-500">
+                  Must be a Discord webhook URL
+                  (https://discord.com/api/webhooks/...)
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
@@ -3569,16 +3864,22 @@ function NotificationsForm({
                   onChange={(e) => setSlackUrl(e.target.value)}
                   placeholder="https://hooks.slack.com/services/..."
                   disabled={!canEdit}
+                  aria-invalid={!slackUrlValid}
                   className={cn(
                     inputClass,
                     "flex-1",
                     !canEdit && "opacity-60 cursor-not-allowed",
+                    !slackUrlValid &&
+                      "!shadow-[0px_1px_2px_rgba(239,68,68,0.2),0px_0px_0px_1px_#ef4444]",
                   )}
                 />
                 <button
                   onClick={() => handleTestWebhook(slackUrl, "slack")}
                   disabled={
-                    !canEdit || !slackUrl.trim() || testingWebhook === "slack"
+                    !canEdit ||
+                    !slackUrl.trim() ||
+                    !slackUrlValid ||
+                    testingWebhook === "slack"
                   }
                   className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
                 >
@@ -3586,6 +3887,12 @@ function NotificationsForm({
                   {testingWebhook === "slack" ? "Sending..." : "Test"}
                 </button>
               </div>
+              {!slackUrlValid && (
+                <p className="text-xs text-red-500">
+                  Must be a Slack webhook URL
+                  (https://hooks.slack.com/services/...)
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">
@@ -3598,10 +3905,13 @@ function NotificationsForm({
                   onChange={(e) => setWebhookUrl(e.target.value)}
                   placeholder="https://your-server.com/webhook"
                   disabled={!canEdit}
+                  aria-invalid={!webhookUrlValid}
                   className={cn(
                     inputClass,
                     "flex-1",
                     !canEdit && "opacity-60 cursor-not-allowed",
+                    !webhookUrlValid &&
+                      "!shadow-[0px_1px_2px_rgba(239,68,68,0.2),0px_0px_0px_1px_#ef4444]",
                   )}
                 />
                 <button
@@ -3609,6 +3919,7 @@ function NotificationsForm({
                   disabled={
                     !canEdit ||
                     !webhookUrl.trim() ||
+                    !webhookUrlValid ||
                     testingWebhook === "custom"
                   }
                   className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
@@ -3617,6 +3928,11 @@ function NotificationsForm({
                   {testingWebhook === "custom" ? "Sending..." : "Test"}
                 </button>
               </div>
+              {!webhookUrlValid && (
+                <p className="text-xs text-red-500">
+                  Must be a valid https:// URL
+                </p>
+              )}
             </div>
           </div>
 
@@ -3663,6 +3979,10 @@ function NotificationsForm({
                 <div key={group.key}>
                   <EventGroupCard
                     group={group}
+                    expanded={expandedGroupKey === group.key}
+                    onExpandedChange={(next) =>
+                      setExpandedGroupKey(next ? group.key : null)
+                    }
                     groupEnabled={groupToggles[group.key] ?? false}
                     onGroupToggle={(v) => handleGroupToggle(group.key, v)}
                     eventStates={eventToggles}

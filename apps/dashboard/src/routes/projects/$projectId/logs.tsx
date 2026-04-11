@@ -1,19 +1,52 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Drawer } from "vaul";
-import { motion } from "motion/react";
-import { Activity, Forward, Pause, Play, ArrowDown, X, Copy, Check, Search, Calendar, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Activity,
+  Forward,
+  ArrowDown,
+  Download,
+  X,
+  Copy,
+  Check,
+  Calendar,
+  ChevronDown,
+} from "lucide-react";
+import {
+  Pause,
+  Play,
+  Clock,
+  MagnifyingGlass,
+  CircleNotch,
+} from "@phosphor-icons/react";
 import type { DateRange } from "react-day-picker";
 import { endOfDay, format, startOfDay, subDays, subHours } from "date-fns";
 import { TabHeader } from "../../../components/shared/tab-header";
-import { FilterDropdown, type FilterOption } from "../../../components/shared/filter-dropdown";
+import {
+  FilterDropdown,
+  type FilterOption,
+} from "../../../components/shared/filter-dropdown";
 import { SearchFilterBar } from "../../../components/shared/search-filter-bar";
 import { DateRangePicker } from "../../../components/shared/date-range-picker";
 import { NumberPagination } from "../../../components/shared/pagination";
-import type { DropdownOption } from "../../../components/shared/dropdown";
-import { listRequestLogsServerFn } from "@/server/logs/actions";
-import type { RequestLogsPage as RequestLogsResponse, RequestLogEntry as ApiRequestLogEntry } from "@/backend/logs";
+import {
+  listRequestLogsServerFn,
+  getLogTrendsServerFn,
+} from "@/server/logs/actions";
+import type {
+  RequestLogsPage as RequestLogsResponse,
+  LogTrendsResponse,
+} from "@/backend/logs";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useLiveApplicationLogs } from "@/hooks/use-live-application-logs";
 import {
@@ -30,7 +63,11 @@ import {
   type UiLogLevel,
   type UiRequestLogEntry as RequestLogEntry,
 } from "@/utils/project-logs";
-import { isDatabaseProject, isStaticProject } from "@/utils/project-capabilities";
+import {
+  isDatabaseProject,
+  isStaticProject,
+} from "@/utils/project-capabilities";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 
 export const Route = createFileRoute("/projects/$projectId/logs")({
   staleTime: 300_000,
@@ -47,13 +84,14 @@ import { LogTab } from "../../../types/enums";
    ───────────────────────────────────────────── */
 
 interface LogLine {
+  epochMs: number;
   timestamp: string;
   level: UiLogLevel;
   message: string;
 }
 
 const levelColors: Record<LogLine["level"], string> = {
-  info: "text-[#28c840]",
+  info: "text-white/55",
   warn: "text-[#ff9b01]",
   error: "text-[#ff5f57]",
   debug: "text-white/35",
@@ -68,7 +106,7 @@ const levelBadge: Record<LogLine["level"], string> = {
 
 const levelFilterOptions: FilterOption[] = [
   { label: "All Levels", value: "all" },
-  { label: "Info", value: "info", dot: "#28c840" },
+  { label: "Info", value: "info", dot: "rgba(255,255,255,0.4)" },
   { label: "Warn", value: "warn", dot: "#ff9b01" },
   { label: "Error", value: "error", dot: "#ff5f57" },
   { label: "Debug", value: "debug", dot: "rgba(255,255,255,0.35)" },
@@ -103,38 +141,425 @@ function LogMessage({ text }: { text: string }) {
   );
 }
 
-function ApplicationLogs({
-  allocationOptions,
-  allocationContainerByOptionId,
+function clampDateToBounds(date: Date, minDate: Date, maxDate: Date): Date {
+  const value = Math.min(
+    Math.max(date.getTime(), minDate.getTime()),
+    maxDate.getTime(),
+  );
+  return new Date(value);
+}
+
+function clampRangeToBounds(
+  range: DateRange | undefined,
+  minDate: Date,
+  maxDate: Date,
+): DateRange | undefined {
+  if (!range) return undefined;
+
+  const next: DateRange = {};
+  if (range.from) next.from = clampDateToBounds(range.from, minDate, maxDate);
+  if (range.to) next.to = clampDateToBounds(range.to, minDate, maxDate);
+  if (!next.from && next.to) next.from = next.to;
+  if (next.from && next.to && next.from.getTime() > next.to.getTime()) {
+    next.to = next.from;
+  }
+  return next;
+}
+
+interface LogsActionItem {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  onSelect: () => void;
+  disabled?: boolean;
+}
+
+function createLogExportFilename(prefix: string): string {
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${prefix}-${yyyy}-${mm}-${dd}-${hh}${min}.log`;
+}
+
+function downloadLogsText(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function LogsActionsMenu({ actions }: { actions: LogsActionItem[] }) {
+  const haptics = useHaptics();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const hasEnabledAction = actions.some((action) => !action.disabled);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative flex h-full items-stretch">
+      <button
+        type="button"
+        aria-label="Log actions"
+        disabled={!hasEnabledAction}
+        onClick={() => {
+          if (!hasEnabledAction) return;
+          haptics.selection();
+          setOpen((prev) => !prev);
+        }}
+        className="flex h-full items-center border-l-[0.5px] border-dash-border px-2 py-3 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronDown
+          className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            data-dropdown-menu
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute right-0 top-full z-50 mt-1 w-[170px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
+          >
+            {actions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                disabled={action.disabled}
+                onClick={() => {
+                  if (action.disabled) return;
+                  action.onSelect();
+                  setOpen(false);
+                }}
+                className="mx-1 flex w-[calc(100%-8px)] items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-sm text-dash-text-body transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {action.icon}
+                <span>{action.label}</span>
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+interface VolumeBucket {
+  tsStart: number;
+  info: number;
+  warn: number;
+  error: number;
+  debug: number;
+  total: number;
+}
+
+interface VolumeTotals {
+  total: number;
+  warn: number;
+  error: number;
+}
+
+const SKELETON_HEIGHTS: number[] = (() => {
+  let seed = 42;
+  const next = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  return Array.from({ length: 60 }, () => Math.round(15 + next() * 70));
+})();
+
+function VolumeGraphSkeleton() {
+  return (
+    <div className="px-4 pt-3 pb-3">
+      <div className="flex h-4 items-center">
+        <span className="h-2.5 w-24 animate-pulse rounded-sm bg-white/10" />
+      </div>
+      <div className="mt-2 flex h-[56px] items-end gap-[1px]">
+        {SKELETON_HEIGHTS.map((h, i) => (
+          <div
+            key={i}
+            className="relative flex h-full flex-1 flex-col justify-end"
+          >
+            <div
+              className="w-full animate-pulse rounded-[1px] bg-white/10"
+              style={{
+                height: `${h}%`,
+                animationDelay: `${(i % 12) * 60}ms`,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VolumeGraph({
+  buckets,
+  totals,
+  isLoading,
 }: {
-  allocationOptions: DropdownOption[];
-  allocationContainerByOptionId: Record<string, string>;
+  buckets: VolumeBucket[];
+  totals: VolumeTotals;
+  isLoading: boolean;
+}) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  const maxBucketTotal = useMemo(
+    () => Math.max(1, ...buckets.map((b) => b.total)),
+    [buckets],
+  );
+
+  const showSkeleton = isLoading && buckets.length === 0;
+  const active = hoveredIdx !== null ? (buckets[hoveredIdx] ?? null) : null;
+
+  if (showSkeleton) {
+    return <VolumeGraphSkeleton />;
+  }
+
+  return (
+    <div className="px-4 pt-3 pb-3">
+      {/* Header — totals + hovered bucket details cross-fade */}
+      <div className="relative h-4 font-logs text-[10px] font-medium uppercase tracking-wider text-white/40">
+        <div
+          className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-200 ease-out ${
+            active ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          <span className="text-white/70">
+            {totals.total.toLocaleString()} events
+          </span>
+          {totals.warn > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-[#b37a10] dark:text-[#f5a623]">
+                {totals.warn.toLocaleString()} warn
+              </span>
+            </>
+          )}
+          {totals.error > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-[#c92414] dark:text-[#ff5544]">
+                {totals.error.toLocaleString()} error
+              </span>
+            </>
+          )}
+        </div>
+        <div
+          className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-200 ease-out ${
+            active ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          {active && (
+            <>
+              <span className="text-white/70">
+                {format(new Date(active.tsStart), "MMM d HH:mm")}
+              </span>
+              <span>·</span>
+              <span className="text-white/70">
+                {active.total.toLocaleString()} total
+              </span>
+              {active.warn > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="text-[#b37a10] dark:text-[#f5a623]">
+                    {active.warn.toLocaleString()} warn
+                  </span>
+                </>
+              )}
+              {active.error > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="text-[#c92414] dark:text-[#ff5544]">
+                    {active.error.toLocaleString()} err
+                  </span>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Bars */}
+      <div
+        className="mt-2 flex h-[56px] items-end gap-[1px]"
+        onMouseLeave={() => setHoveredIdx(null)}
+      >
+        {buckets.map((b, i) => {
+          const heightPct = (b.total / maxBucketTotal) * 100;
+          const isEmpty = b.total === 0;
+          const isDimmed = hoveredIdx !== null && hoveredIdx !== i;
+          return (
+            <div
+              key={i}
+              onMouseEnter={() => setHoveredIdx(i)}
+              className="relative flex h-full flex-1 cursor-default flex-col justify-end"
+            >
+              {isEmpty ? (
+                <div className="h-px w-full bg-white/[0.04]" />
+              ) : (
+                <motion.div
+                  initial={{ scaleY: 0, opacity: 0 }}
+                  animate={{ scaleY: 1, opacity: isDimmed ? 0.3 : 1 }}
+                  transition={{
+                    scaleY: {
+                      delay: i * 0.008,
+                      type: "spring",
+                      stiffness: 180,
+                      damping: 12,
+                      mass: 0.6,
+                    },
+                    opacity: { duration: 0.25, ease: [0.16, 1, 0.3, 1] },
+                  }}
+                  style={{
+                    height: `${Math.max(3, heightPct)}%`,
+                    transformOrigin: "bottom",
+                  }}
+                  className="flex w-full flex-col-reverse overflow-hidden rounded-[1px]"
+                >
+                  {b.info + b.debug > 0 && (
+                    <div
+                      className="w-full bg-[#4879f8]/45 dark:bg-[#5b87fa]/30"
+                      style={{ flex: b.info + b.debug }}
+                    />
+                  )}
+                  {b.warn > 0 && (
+                    <div
+                      className="w-full bg-[#b37a10]/85 dark:bg-[#f5a623]/75"
+                      style={{ flex: b.warn }}
+                    />
+                  )}
+                  {b.error > 0 && (
+                    <div
+                      className="w-full bg-[#c92414] dark:bg-[#ff5544]"
+                      style={{ flex: b.error }}
+                    />
+                  )}
+                </motion.div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ApplicationLogsEmptyState({
+  isConnecting,
+  hasActiveFilters,
+}: {
+  isConnecting: boolean;
+  hasActiveFilters: boolean;
+}) {
+  let icon: ReactNode;
+  let title: string;
+  let body: ReactNode;
+
+  if (isConnecting) {
+    icon = <CircleNotch className="size-6 animate-spin text-white/50" />;
+    title = "Connecting to log stream";
+    body = (
+      <p>
+        Establishing a connection to your container's log output. This usually
+        takes a moment.
+      </p>
+    );
+  } else if (hasActiveFilters) {
+    icon = <MagnifyingGlass className="size-6 text-white/50" />;
+    title = "No logs match your filters";
+    body = (
+      <p>
+        Try clearing the search query or switching the level filter back to "All
+        Levels". Adjusting the date range above can also surface older activity.
+      </p>
+    );
+  } else {
+    icon = <Clock className="size-6 text-white/50" />;
+    title = "Nothing to show yet";
+    body = (
+      <>
+        <p>
+          We'll show your app's activity here as soon as it starts running. If
+          you just deployed, give it a few seconds.
+        </p>
+        <p>
+          Try widening the date range above to look further back, or head to
+          Deployments to make sure your latest build is live.
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <div className="flex h-[420px] flex-col items-center justify-center px-8 text-center">
+      {icon}
+      <h3 className="mt-4 text-base font-semibold text-white">{title}</h3>
+      <div className="mt-2 flex max-w-[520px] flex-col gap-2 text-sm leading-6 text-white/55">
+        {body}
+      </div>
+    </div>
+  );
+}
+
+function ApplicationLogs({
+  projectId,
+  containers,
+  logRetentionDays,
+}: {
+  projectId: string;
+  containers: string[];
+  logRetentionDays: number;
 }) {
   const haptics = useHaptics();
   const [autoScroll, setAutoScroll] = useState(true);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [selectedAllocation, setSelectedAllocation] = useState("");
+  const maxSelectableDate = useMemo(() => endOfDay(new Date()), []);
+  const minSelectableDate = useMemo(
+    () =>
+      startOfDay(subDays(maxSelectableDate, Math.max(0, logRetentionDays - 1))),
+    [logRetentionDays, maxSelectableDate],
+  );
 
   const [searchQuery, setSearchQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState("all");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(
-    defaultApplicationLogsDateRange,
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() =>
+    clampRangeToBounds(
+      defaultApplicationLogsDateRange(),
+      minSelectableDate,
+      maxSelectableDate,
+    ),
   );
 
   useEffect(() => {
-    if (allocationOptions.length === 0) {
-      setSelectedAllocation("");
-      return;
-    }
-
-    const stillExists = allocationOptions.some((option) => option.id === selectedAllocation);
-    if (stillExists) {
-      return;
-    }
-
-    setSelectedAllocation(allocationOptions[0].id);
-  }, [allocationOptions, selectedAllocation]);
+    setDateRange((prev) =>
+      clampRangeToBounds(
+        prev ?? defaultApplicationLogsDateRange(),
+        minSelectableDate,
+        maxSelectableDate,
+      ),
+    );
+  }, [minSelectableDate, maxSelectableDate]);
 
   const rangeStart = useMemo(() => {
     if (dateRange?.from) {
@@ -142,7 +567,7 @@ function ApplicationLogs({
     }
 
     return subHours(new Date(), 1);
-  }, [dateRange?.from]);
+  }, [dateRange]);
 
   const rangeEnd = useMemo(() => {
     if (dateRange?.to) {
@@ -150,16 +575,82 @@ function ApplicationLogs({
     }
 
     return undefined;
-  }, [dateRange?.to]);
+  }, [dateRange]);
 
-  const selectedContainer = (allocationContainerByOptionId[selectedAllocation] || "").trim();
+  const getLogTrends = useServerFn(getLogTrendsServerFn as any) as (args: {
+    data: {
+      projectId: string;
+      from?: number;
+      to?: number;
+      step?: string;
+      interval?: string;
+      container?: string;
+    };
+  }) => Promise<LogTrendsResponse>;
+
+  const stepSec = useMemo(() => {
+    const duration =
+      ((rangeEnd ?? new Date()).getTime() - rangeStart.getTime()) / 1000;
+    return Math.max(15, Math.min(3600, Math.floor(duration / 60)));
+  }, [rangeStart, rangeEnd]);
+
+  const trendsQuery = useQuery({
+    queryKey: [
+      "log-trends",
+      projectId,
+      rangeStart.getTime(),
+      rangeEnd?.getTime() ?? null,
+      stepSec,
+    ] as const,
+    enabled: Boolean(projectId && containers.length > 0),
+    staleTime: 30_000,
+    queryFn: () =>
+      getLogTrends({
+        data: {
+          projectId,
+          from: rangeStart.getTime(),
+          to: (rangeEnd ?? new Date()).getTime(),
+          step: `${stepSec}s`,
+          interval: `${stepSec}s`,
+        },
+      }),
+  });
+
+  const trendBuckets = useMemo<VolumeBucket[]>(() => {
+    const data = trendsQuery.data;
+    if (!data) return [];
+    const total = data.series.totalLogs ?? [];
+    const errors = data.series.errorLogs ?? [];
+    const warns = data.series.warningLogs ?? [];
+    return total.map((p, i) => {
+      const errorVal = errors[i]?.value ?? 0;
+      const warnVal = warns[i]?.value ?? 0;
+      return {
+        tsStart: p.timestamp,
+        error: errorVal,
+        warn: warnVal,
+        info: Math.max(0, p.value - errorVal - warnVal),
+        debug: 0,
+        total: p.value,
+      };
+    });
+  }, [trendsQuery.data]);
+
+  const trendTotals = useMemo<VolumeTotals>(() => {
+    const summary = trendsQuery.data?.summary;
+    return {
+      total: summary?.totalLogs ?? 0,
+      warn: summary?.warningLogs ?? 0,
+      error: summary?.errorLogs ?? 0,
+    };
+  }, [trendsQuery.data]);
 
   const liveLogs = useLiveApplicationLogs({
-    container: selectedContainer,
-    searchQuery,
+    containers,
+    searchQuery: null,
     start: rangeStart,
     end: rangeEnd,
-    enabled: Boolean(selectedContainer),
+    enabled: containers.length > 0,
     limit: 200,
   });
 
@@ -170,9 +661,11 @@ function ApplicationLogs({
         // Strip leading ISO timestamp that Loki sometimes embeds
         const message = item.message.replace(embeddedIsoTimestampRegex, "");
         const level = detectAppLogLevel(message);
+        const epochMs = item.epochMs > 0 ? item.epochMs : 0;
 
         return {
-          timestamp: formatAppLogTime(new Date(item.epochMs || Date.now())),
+          epochMs,
+          timestamp: formatAppLogTime(new Date(epochMs)),
           level,
           message,
         };
@@ -181,18 +674,58 @@ function ApplicationLogs({
 
   const filteredLogs = useMemo(() => {
     return logs.filter((line) => {
-      if (searchQuery && !line.message.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (
+        searchQuery &&
+        !line.message.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+        return false;
       if (levelFilter !== "all" && line.level !== levelFilter) return false;
+      if (line.epochMs < rangeStart.getTime()) return false;
+      if (rangeEnd && line.epochMs > rangeEnd.getTime()) return false;
       return true;
     });
-  }, [logs, searchQuery, levelFilter]);
+  }, [levelFilter, logs, rangeEnd, rangeStart, searchQuery]);
 
-  // Auto-scroll
+  const filteredLogsExportText = useMemo(() => {
+    return filteredLogs
+      .map(
+        (line) =>
+          `[${line.timestamp}] ${levelBadge[line.level]} ${line.message}`,
+      )
+      .join("\n");
+  }, [filteredLogs]);
+
+  const handleCopyFilteredLogs = useCallback(async () => {
+    if (!filteredLogsExportText) return;
+    haptics.light();
+    await navigator.clipboard.writeText(filteredLogsExportText);
+  }, [filteredLogsExportText, haptics]);
+
+  const handleDownloadFilteredLogs = useCallback(() => {
+    if (!filteredLogsExportText) return;
+    downloadLogsText(
+      filteredLogsExportText,
+      createLogExportFilename("application-logs"),
+    );
+    haptics.light();
+  }, [filteredLogsExportText, haptics]);
+
+  // Mirror autoScroll into a ref so the auto-scroll effect below only
+  // re-runs on new logs, not when the user toggles autoScroll itself
+  // (which would otherwise instant-snap and interrupt the smooth scroll).
+  const autoScrollRef = useRef(autoScroll);
   useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [filteredLogs, autoScroll]);
+    autoScrollRef.current = autoScroll;
+  }, [autoScroll]);
+
+  // Auto-scroll on new logs
+  useEffect(() => {
+    if (!autoScrollRef.current || !scrollRef.current) return;
+    scrollRef.current.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [filteredLogs]);
 
   function handleScroll() {
     if (!scrollRef.current) return;
@@ -202,16 +735,22 @@ function ApplicationLogs({
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
       setAutoScroll(true);
     }
   }, []);
 
-  if (allocationOptions.length === 0) {
+  if (containers.length === 0) {
     return (
-      <div className="flex h-[420px] items-center justify-center rounded-[4px] border border-dash-border bg-dash-bg-elevated">
-        <span className="text-sm text-dash-text-faded">
-          No application log container available for this project yet.
+      <div className="flex h-[420px] flex-col items-center justify-center gap-1.5 rounded-[4px] border border-dash-border bg-dash-bg-elevated px-6 text-center">
+        <span className="text-sm font-medium text-dash-text-strong">
+          Logs will appear here once your app starts running
+        </span>
+        <span className="text-[13px] text-dash-text-faded">
+          Deploy your project to start streaming application logs.
         </span>
       </div>
     );
@@ -225,8 +764,8 @@ function ApplicationLogs({
           value={searchQuery}
           onChange={setSearchQuery}
           placeholder="Search logs..."
-          className="flex-1 bg-dash-bg shadow-[0px_1px_2px_rgba(18,18,23,0.05)]"
-          rightSlot={(
+          className="flex-1 bg-dash-bg"
+          rightSlot={
             <FilterDropdown
               value={levelFilter}
               onChange={setLevelFilter}
@@ -234,97 +773,84 @@ function ApplicationLogs({
               placeholder="All Levels"
               align="left"
             />
-          )}
+          }
         />
 
-        <DateRangePicker value={dateRange} onChange={setDateRange}>
-          <button className="flex items-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated">
-            <span className="flex items-center gap-2 px-3 py-3">
+        <div className="flex items-stretch rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            minDate={minSelectableDate}
+            maxDate={maxSelectableDate}
+          >
+            <button
+              type="button"
+              className="flex items-center gap-2 px-3 py-3 transition-colors hover:bg-dash-bg-elevated"
+            >
               <Calendar className="size-3.5 text-dash-text-faded" />
               {dateRange?.from && dateRange?.to
                 ? `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`
                 : "Select date range"}
-            </span>
-            <span className="flex h-full items-center border-l-[0.5px] border-dash-border px-2 py-3">
-              <ChevronDown className="size-4 text-dash-text-faded" />
-            </span>
-          </button>
-        </DateRangePicker>
+            </button>
+          </DateRangePicker>
+          <LogsActionsMenu
+            actions={[
+              {
+                id: "copy-application-logs",
+                label: "Copy logs",
+                icon: <Copy className="size-3.5 text-dash-text-faded" />,
+                onSelect: () => void handleCopyFilteredLogs(),
+                disabled: filteredLogs.length === 0,
+              },
+              {
+                id: "download-application-logs",
+                label: "Download logs",
+                icon: <Download className="size-3.5 text-dash-text-faded" />,
+                onSelect: handleDownloadFilteredLogs,
+                disabled: filteredLogs.length === 0,
+              },
+            ]}
+          />
+        </div>
 
+        <button
+          type="button"
+          onClick={() => {
+            haptics.selection();
+            if (liveLogs.isPaused) {
+              liveLogs.resume();
+            } else {
+              liveLogs.pause();
+            }
+          }}
+          aria-label={
+            liveLogs.isPaused ? "Resume log stream" : "Pause log stream"
+          }
+          title={liveLogs.isPaused ? "Resume" : "Pause"}
+          className="flex size-[42px] shrink-0 items-center justify-center rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+        >
+          {liveLogs.isPaused ? (
+            <Play weight="fill" className="size-4 text-dash-text-faded" />
+          ) : (
+            <Pause weight="fill" className="size-4 text-dash-text-faded" />
+          )}
+        </button>
       </div>
 
       {/* Terminal */}
-      <div className="overflow-hidden rounded-[4px] bg-[#222528] shadow-[0_4px_32px_rgba(0,0,0,0.12)]">
-        {/* Terminal header */}
-        <div className="flex items-center justify-end border-b border-[#31363a] px-4 py-2">
-          <div className="flex items-center gap-2">
-            {!liveLogs.isPaused && (
-              <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-[#28c840]">
-                <span className="size-1.5 animate-pulse rounded-full bg-[#28c840]" />
-                Live
-              </span>
-            )}
-            {allocationOptions.length > 0 && (
-              <select
-                value={selectedAllocation}
-                onChange={(e) => setSelectedAllocation(e.target.value)}
-                className="hidden cursor-pointer appearance-none rounded-md border border-white/10 bg-transparent px-2 py-1 font-logs text-[10px] tracking-wider text-white/40 outline-none transition-colors hover:border-white/20 hover:text-white/60 sm:inline"
-              >
-                {allocationOptions.map((option) => (
-                  <option key={option.id} value={option.id} className="bg-[#222528] text-white/60">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            {liveLogs.isPaused && liveLogs.pendingLogsCount > 0 && (
-              <span className="text-[10px] font-medium uppercase tracking-wider text-[#ff9b01]">
-                {liveLogs.pendingLogsCount} pending
-              </span>
-            )}
-            <button
-              onClick={() => {
-                if (liveLogs.isPaused) {
-                  liveLogs.resume();
-                } else {
-                  liveLogs.pause();
-                }
-              }}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/40 transition-colors hover:bg-white/5 hover:text-white/60"
-            >
-              {liveLogs.isPaused ? (
-                <>
-                  <Play className="size-3" />
-                  Resume
-                </>
-              ) : (
-                <>
-                  <Pause className="size-3" />
-                  Pause
-                </>
-              )}
-            </button>
-            <button
-              onClick={liveLogs.reconnect}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/40 transition-colors hover:bg-white/5 hover:text-white/60"
-            >
-              <Activity className="size-3" />
-              Reconnect
-            </button>
-          </div>
-        </div>
-        {liveLogs.error && (
-          <div className="border-b border-[#442424] bg-[#2b1717] px-4 py-2 text-xs text-[#ff9f95]">
-            {liveLogs.error}
-          </div>
-        )}
-
+      <div className="overflow-hidden rounded-[4px] border border-[#1f2123] bg-[#0d0e10]">
+        {/* Volume graph */}
+        <VolumeGraph
+          buckets={trendBuckets}
+          totals={trendTotals}
+          isLoading={trendsQuery.isLoading}
+        />
         {/* Log output */}
         <div className="relative">
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="min-h-[400px] max-h-[600px] overflow-y-auto px-4 py-3 font-logs text-xs leading-[22px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.12)_transparent]"
+            className="min-h-[640px] max-h-[820px] overflow-y-auto px-4 py-3 font-logs text-xs leading-[22px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.12)_transparent]"
           >
             {filteredLogs.length > 0 ? (
               filteredLogs.map((line, i) => (
@@ -335,7 +861,10 @@ function ApplicationLogs({
                     navigator.clipboard.writeText(raw);
                     haptics.light();
                     setCopiedIdx(i);
-                    setTimeout(() => setCopiedIdx((prev) => (prev === i ? null : prev)), 1200);
+                    setTimeout(
+                      () => setCopiedIdx((prev) => (prev === i ? null : prev)),
+                      1200,
+                    );
                   }}
                   className={`flex cursor-pointer gap-3 rounded-[2px] px-1 py-1.5 transition-colors hover:bg-white/[0.04] ${
                     line.level === "error"
@@ -357,18 +886,19 @@ function ApplicationLogs({
                     <LogMessage text={line.message} />
                   </span>
                   {copiedIdx === i && (
-                    <span className="shrink-0 select-none pt-px text-[10px] text-[#28c840]">
+                    <span className="shrink-0 select-none pt-px text-[10px] text-white/80">
                       Copied
                     </span>
                   )}
                 </div>
               ))
             ) : (
-              <div className="flex h-[360px] items-center justify-center">
-                <span className="text-sm text-white/30">
-                  {liveLogs.isConnecting ? "Connecting to logs..." : "No logs matching your filters"}
-                </span>
-              </div>
+              <ApplicationLogsEmptyState
+                isConnecting={liveLogs.isConnecting}
+                hasActiveFilters={
+                  searchQuery.trim().length > 0 || levelFilter !== "all"
+                }
+              />
             )}
           </div>
 
@@ -411,7 +941,8 @@ const statusFilterOptions: FilterOption[] = [
 /** Tokenize a single line of JSON and return colored spans */
 function JsonLine({ text }: { text: string }) {
   const tokens: { value: string; color: string }[] = [];
-  const re = /("(?:[^"\\]|\\.)*")(\s*:\s*)?|(\d+(?:\.\d+)?)|(\btrue\b|\bfalse\b|\bnull\b)|([^"\d\w]+|\w+)/g;
+  const re =
+    /("(?:[^"\\]|\\.)*")(\s*:\s*)?|(\d+(?:\.\d+)?)|(\btrue\b|\bfalse\b|\bnull\b)|([^"\d\w]+|\w+)/g;
   let m: RegExpExecArray | null;
 
   while ((m = re.exec(text)) !== null) {
@@ -436,7 +967,9 @@ function JsonLine({ text }: { text: string }) {
   return (
     <span>
       {tokens.map((t, i) => (
-        <span key={i} className={t.color}>{t.value}</span>
+        <span key={i} className={t.color}>
+          {t.value}
+        </span>
       ))}
     </span>
   );
@@ -462,7 +995,15 @@ function RequestDetailDrawer({
   const rawJson = JSON.stringify(rawData, null, 2);
   const rawLines = rawJson.split("\n");
 
-  const groups = [
+  const groups: Array<{
+    title: string;
+    items: Array<{
+      label: string;
+      value: string;
+      color?: string;
+      dot?: string;
+    }>;
+  }> = [
     {
       title: "Request",
       items: [
@@ -475,7 +1016,11 @@ function RequestDetailDrawer({
     {
       title: "Response",
       items: [
-        { label: "Status", value: String(log.status), dot: statusDot(log.status) },
+        {
+          label: "Status",
+          value: String(log.status),
+          dot: statusDot(log.status),
+        },
         { label: "Duration", value: log.duration },
         { label: "Response", value: log.response },
       ],
@@ -485,7 +1030,10 @@ function RequestDetailDrawer({
       items: [
         { label: "IP Address", value: log.ip },
         { label: "Browser", value: log.browser },
-        { label: "Time", value: log.isoTimestamp.replace("T", " ").replace("Z", "") },
+        {
+          label: "Time",
+          value: log.isoTimestamp.replace("T", " ").replace("Z", ""),
+        },
       ],
     },
   ];
@@ -498,7 +1046,12 @@ function RequestDetailDrawer({
   }
 
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} direction="bottom" modal={false}>
+    <Drawer.Root
+      open={open}
+      onOpenChange={onOpenChange}
+      direction="bottom"
+      modal={false}
+    >
       <Drawer.Portal>
         <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 flex flex-col outline-none">
           <motion.div
@@ -511,12 +1064,20 @@ function RequestDetailDrawer({
             {/* Top bar */}
             <div className="flex shrink-0 items-center justify-between border-b-[0.5px] border-[#e5e5e5] px-5 py-2.5 dark:border-dash-border">
               <div className="flex items-center gap-2">
-                <span className={`font-logs text-xs font-medium ${methodColors[log.method] ?? "text-dash-text-body"}`}>
+                <span
+                  className={`font-logs text-xs font-medium ${methodColors[log.method] ?? "text-dash-text-body"}`}
+                >
                   {log.method}
                 </span>
-                <span className="font-logs text-xs leading-[1.3] tracking-[-0.0224px] text-dash-text-strong">{log.path}</span>
-                <span className={`flex items-center gap-1 font-logs text-xs ${statusColor(log.status)}`}>
-                  <span className={`size-1.5 rounded-full ${statusDot(log.status)}`} />
+                <span className="font-logs text-xs leading-[1.3] tracking-[-0.0224px] text-dash-text-strong">
+                  {log.path}
+                </span>
+                <span
+                  className={`flex items-center gap-1 font-logs text-xs ${statusColor(log.status)}`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${statusDot(log.status)}`}
+                  />
                   {log.status}
                 </span>
               </div>
@@ -525,7 +1086,9 @@ function RequestDetailDrawer({
                 className="flex items-center gap-2 rounded p-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
               >
                 <X className="size-4" />
-                <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">Close</span>
+                <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">
+                  Close
+                </span>
               </button>
             </div>
 
@@ -560,7 +1123,10 @@ function RequestDetailDrawer({
                   {/* Request + Response side by side */}
                   <div className="grid grid-cols-2 gap-4">
                     {groups.slice(0, 2).map((group) => (
-                      <div key={group.title} className="rounded-[4px] border-[0.5px] border-dash-border">
+                      <div
+                        key={group.title}
+                        className="rounded-[4px] border-[0.5px] border-dash-border"
+                      >
                         <div className="border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3.5 py-2">
                           <span className="font-logs text-[10px] uppercase tracking-widest text-dash-text-faded">
                             {group.title}
@@ -572,9 +1138,17 @@ function RequestDetailDrawer({
                               key={item.label}
                               className={`flex justify-between px-3.5 py-2 ${j < group.items.length - 1 ? "border-b-[0.5px] border-dash-border" : ""}`}
                             >
-                              <span className="font-logs text-xs text-dash-text-faded">{item.label}</span>
-                              <span className={`font-logs text-xs text-right ${item.color ?? "text-dash-text-strong"}`}>
-                                {item.dot && <span className={`mr-1.5 inline-block size-1.5 rounded-full align-middle ${item.dot}`} />}
+                              <span className="font-logs text-xs text-dash-text-faded">
+                                {item.label}
+                              </span>
+                              <span
+                                className={`font-logs text-xs text-right ${item.color ?? "text-dash-text-strong"}`}
+                              >
+                                {item.dot && (
+                                  <span
+                                    className={`mr-1.5 inline-block size-1.5 rounded-full align-middle ${item.dot}`}
+                                  />
+                                )}
                                 {item.value}
                               </span>
                             </div>
@@ -596,8 +1170,12 @@ function RequestDetailDrawer({
                           key={item.label}
                           className={`flex justify-between px-3.5 py-2 ${j < groups[2].items.length - 1 ? "border-b-[0.5px] border-dash-border" : ""}`}
                         >
-                          <span className="font-logs text-xs text-dash-text-faded">{item.label}</span>
-                          <span className="font-logs text-xs text-dash-text-strong">{item.value}</span>
+                          <span className="font-logs text-xs text-dash-text-faded">
+                            {item.label}
+                          </span>
+                          <span className="font-logs text-xs text-dash-text-strong">
+                            {item.value}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -610,7 +1188,11 @@ function RequestDetailDrawer({
                     onClick={handleCopy}
                     className="absolute right-3 top-2 flex items-center gap-1 rounded p-0.5 font-logs text-[10px] leading-[1.4] tracking-[-0.01px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
                   >
-                    {copied ? <Check className="size-3 text-[#28c840]" /> : <Copy className="size-3" />}
+                    {copied ? (
+                      <Check className="size-3 text-[#28c840]" />
+                    ) : (
+                      <Copy className="size-3" />
+                    )}
                     {copied ? "Copied" : "Copy"}
                   </button>
 
@@ -639,10 +1221,19 @@ function RequestDetailDrawer({
 function RequestLogs({
   projectId,
   workspace,
+  logRetentionDays,
 }: {
   projectId: string;
   workspace?: string;
+  logRetentionDays: number;
 }) {
+  const haptics = useHaptics();
+  const maxSelectableDate = useMemo(() => endOfDay(new Date()), []);
+  const minSelectableDate = useMemo(
+    () =>
+      startOfDay(subDays(maxSelectableDate, Math.max(0, logRetentionDays - 1))),
+    [logRetentionDays, maxSelectableDate],
+  );
   const [selectedLog, setSelectedLog] = useState<RequestLogEntry | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [requestLogs, setRequestLogs] = useState<RequestLogEntry[]>([]);
@@ -654,9 +1245,23 @@ function RequestLogs({
   const [searchQuery, setSearchQuery] = useState("");
   const [methodFilter, setMethodFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(
-    defaultRequestLogsDateRange,
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() =>
+    clampRangeToBounds(
+      defaultRequestLogsDateRange(),
+      minSelectableDate,
+      maxSelectableDate,
+    ),
   );
+
+  useEffect(() => {
+    setDateRange((prev) =>
+      clampRangeToBounds(
+        prev ?? defaultRequestLogsDateRange(),
+        minSelectableDate,
+        maxSelectableDate,
+      ),
+    );
+  }, [minSelectableDate, maxSelectableDate]);
 
   const getRequestLogs = useServerFn(listRequestLogsServerFn as any) as (args: {
     data: {
@@ -730,7 +1335,8 @@ function RequestLogs({
     return requestLogs.filter((log) => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const searchable = `${log.method} ${log.path} ${log.response} ${log.status}`.toLowerCase();
+        const searchable =
+          `${log.method} ${log.path} ${log.response} ${log.status}`.toLowerCase();
         if (!searchable.includes(q)) return false;
       }
       if (methodFilter !== "all" && log.method !== methodFilter) return false;
@@ -752,6 +1358,38 @@ function RequestLogs({
     });
   }, [requestLogs, searchQuery, methodFilter, statusFilter, dateRange]);
 
+  const filteredRequestLogsExportText = useMemo(() => {
+    return filteredRequestLogs
+      .map((log) =>
+        [
+          `[${log.isoTimestamp}]`,
+          log.method,
+          log.path,
+          String(log.status),
+          log.duration,
+          log.response,
+        ]
+          .filter((token) => token.trim().length > 0)
+          .join(" "),
+      )
+      .join("\n");
+  }, [filteredRequestLogs]);
+
+  const handleCopyFilteredRequestLogs = useCallback(async () => {
+    if (!filteredRequestLogsExportText) return;
+    haptics.light();
+    await navigator.clipboard.writeText(filteredRequestLogsExportText);
+  }, [filteredRequestLogsExportText, haptics]);
+
+  const handleDownloadFilteredRequestLogs = useCallback(() => {
+    if (!filteredRequestLogsExportText) return;
+    downloadLogsText(
+      filteredRequestLogsExportText,
+      createLogExportFilename("request-logs"),
+    );
+    haptics.light();
+  }, [filteredRequestLogsExportText, haptics]);
+
   function handleRowClick(log: RequestLogEntry) {
     setSelectedLog(log);
     setDrawerOpen(true);
@@ -765,8 +1403,8 @@ function RequestLogs({
           value={searchQuery}
           onChange={setSearchQuery}
           placeholder="Search requests..."
-          className="flex-1 bg-dash-bg shadow-[0px_1px_2px_rgba(18,18,23,0.05)]"
-          rightSlot={(
+          className="flex-1 bg-dash-bg"
+          rightSlot={
             <div className="flex items-center">
               <FilterDropdown
                 value={methodFilter}
@@ -784,33 +1422,66 @@ function RequestLogs({
                 align="left"
               />
             </div>
-          )}
+          }
         />
 
-        <DateRangePicker value={dateRange} onChange={setDateRange}>
-          <button className="flex items-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated">
-            <span className="flex items-center gap-2 px-3 py-3">
+        <div className="flex items-stretch rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            minDate={minSelectableDate}
+            maxDate={maxSelectableDate}
+          >
+            <button
+              type="button"
+              className="flex items-center gap-2 px-3 py-3 transition-colors hover:bg-dash-bg-elevated"
+            >
               <Calendar className="size-3.5 text-dash-text-faded" />
               {dateRange?.from && dateRange?.to
                 ? `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`
                 : "Select date range"}
-            </span>
-            <span className="flex h-full items-center border-l-[0.5px] border-dash-border px-2 py-3">
-              <ChevronDown className="size-4 text-dash-text-faded" />
-            </span>
-          </button>
-        </DateRangePicker>
+            </button>
+          </DateRangePicker>
+          <LogsActionsMenu
+            actions={[
+              {
+                id: "copy-request-logs",
+                label: "Copy logs",
+                icon: <Copy className="size-3.5 text-dash-text-faded" />,
+                onSelect: () => void handleCopyFilteredRequestLogs(),
+                disabled: filteredRequestLogs.length === 0,
+              },
+              {
+                id: "download-request-logs",
+                label: "Download logs",
+                icon: <Download className="size-3.5 text-dash-text-faded" />,
+                onSelect: handleDownloadFilteredRequestLogs,
+                disabled: filteredRequestLogs.length === 0,
+              },
+            ]}
+          />
+        </div>
       </div>
 
       {/* Table */}
       <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
         {/* Table header */}
         <div className="grid grid-cols-[64px_1fr_60px_80px_100px] items-center gap-2 border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-2.5">
-          <span className="font-logs text-xs font-medium text-dash-text-faded">Method</span>
-          <span className="font-logs text-xs font-medium text-dash-text-faded">Path</span>
-          <span className="font-logs text-xs font-medium text-dash-text-faded">Status</span>
-          <span className="font-logs text-xs font-medium text-dash-text-faded">Duration</span>
-          <span className="font-logs text-xs font-medium text-dash-text-faded">Time</span>
+          <span className="font-logs text-xs font-medium text-dash-text-faded">
+            Method
+          </span>
+          <span className="font-logs text-xs font-medium text-dash-text-faded">
+            Path
+          </span>
+          <span className="font-logs text-xs font-medium text-dash-text-faded">
+            Status
+          </span>
+          <span className="font-logs text-xs font-medium text-dash-text-faded">
+            Duration
+          </span>
+          <span className="font-logs text-xs font-medium text-dash-text-faded">
+            Time
+          </span>
         </div>
 
         {/* Rows */}
@@ -834,17 +1505,25 @@ function RequestLogs({
               onClick={() => handleRowClick(log)}
               className="grid w-full grid-cols-[64px_1fr_60px_80px_100px] items-center gap-2 border-b-[0.5px] border-dash-border px-4 py-2.5 text-left transition-colors hover:bg-dash-bg-elevated"
             >
-              <span className={`font-logs text-xs font-medium ${methodColors[log.method] ?? "text-dash-text-body"}`}>
+              <span
+                className={`font-logs text-xs font-medium ${methodColors[log.method] ?? "text-dash-text-body"}`}
+              >
                 {log.method}
               </span>
               <span className="truncate font-logs text-sm font-light text-dash-text-strong">
                 {log.path}
               </span>
-              <span className={`font-logs text-xs font-medium ${statusColor(log.status)}`}>
+              <span
+                className={`font-logs text-xs font-medium ${statusColor(log.status)}`}
+              >
                 {log.status}
               </span>
-              <span className="font-logs text-xs font-light text-dash-text-faded">{log.duration}</span>
-              <span className="font-logs text-xs font-light text-dash-text-faded">{log.timestamp}</span>
+              <span className="font-logs text-xs font-light text-dash-text-faded">
+                {log.duration}
+              </span>
+              <span className="font-logs text-xs font-light text-dash-text-faded">
+                {log.timestamp}
+              </span>
             </button>
           ))
         ) : (
@@ -878,9 +1557,13 @@ function RequestLogs({
 function LogsPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const haptics = useHaptics();
+  const plan = usePlanGate();
+  const logRetentionDays = Math.max(1, Number(plan.logRetention ?? 1));
   const staticProject = isStaticProject(project);
   const databaseProject = isDatabaseProject(project as any);
-  const [activeTab, setActiveTab] = useState<LogTab>(staticProject ? LogTab.Request : LogTab.Application);
+  const [activeTab, setActiveTab] = useState<LogTab>(
+    staticProject ? LogTab.Request : LogTab.Application,
+  );
 
   useEffect(() => {
     if (staticProject && activeTab !== LogTab.Request) {
@@ -891,29 +1574,19 @@ function LogsPage() {
     }
   }, [staticProject, databaseProject, activeTab]);
 
-  const { allocationOptions, allocationContainerByOptionId } = useMemo(() => {
-    const options: DropdownOption[] = [];
-    const containerMap: Record<string, string> = {};
-    const seenIds = new Set<string>();
-
-    function resolveId(rawId: unknown): string {
-      if (rawId && typeof rawId === "object" && (rawId as any).$oid) return String((rawId as any).$oid);
-      if (rawId != null && typeof rawId !== "object") return String(rawId).trim();
-      return "";
-    }
+  const applicationLogContainers = useMemo(() => {
+    const containers: string[] = [];
+    const seenContainers = new Set<string>();
 
     if (Array.isArray(project?.job?.allocations)) {
-      for (const [index, allocation] of project.job.allocations.entries()) {
+      for (const allocation of project.job.allocations) {
         const container =
-          typeof allocation?.container === "string" ? allocation.container.trim() : "";
-        if (!container) continue;
-
-        const optionId = resolveId(allocation?.id) || `${container}-${index}`;
-        if (seenIds.has(optionId)) continue;
-
-        seenIds.add(optionId);
-        options.push({ id: optionId, label: container });
-        containerMap[optionId] = container;
+          typeof allocation?.container === "string"
+            ? allocation.container.trim()
+            : "";
+        if (!container || seenContainers.has(container)) continue;
+        seenContainers.add(container);
+        containers.push(container);
       }
     }
 
@@ -922,17 +1595,13 @@ function LogsPage() {
         ? project.job.commonContainer.trim()
         : "";
 
-    if (commonContainer && options.length === 0) {
-      options.push({ id: commonContainer, label: commonContainer });
-      containerMap[commonContainer] = commonContainer;
+    if (commonContainer && !seenContainers.has(commonContainer)) {
+      seenContainers.add(commonContainer);
+      containers.push(commonContainer);
     }
 
-    if (options.length === 1 && commonContainer && !containerMap[options[0].id]) {
-      containerMap[options[0].id] = commonContainer;
-    }
-
-    return { allocationOptions: options, allocationContainerByOptionId: containerMap };
-  }, [project?.job?.allocations, project?.job?.commonContainer]);
+    return containers;
+  }, [project]);
 
   return (
     <div className="mx-auto flex max-w-[1000px] flex-col gap-6 py-8">
@@ -981,11 +1650,16 @@ function LogsPage() {
       {/* Content */}
       {activeTab === LogTab.Application ? (
         <ApplicationLogs
-          allocationOptions={allocationOptions}
-          allocationContainerByOptionId={allocationContainerByOptionId}
+          projectId={project?.id ?? ""}
+          containers={applicationLogContainers}
+          logRetentionDays={logRetentionDays}
         />
       ) : (
-        <RequestLogs projectId={project?.id || project?.name || ""} workspace={workspace} />
+        <RequestLogs
+          projectId={project?.id || project?.name || ""}
+          workspace={workspace}
+          logRetentionDays={logRetentionDays}
+        />
       )}
     </div>
   );

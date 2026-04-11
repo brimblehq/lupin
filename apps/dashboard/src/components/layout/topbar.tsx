@@ -12,6 +12,8 @@ import {
   Menu,
   X,
   ArrowRightLeft,
+  Copy,
+  Check,
 } from "lucide-react";
 import { House, ShoppingBag } from "@phosphor-icons/react";
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
@@ -84,6 +86,7 @@ function ProjectSwitcher({
 }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
+  const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -113,8 +116,19 @@ function ProjectSwitcher({
   const activeProjectLabel =
     currentProjectName?.trim() || currentProject?.name || displayProjectId;
 
+  async function handleCopyProjectName(e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(activeProjectLabel);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — silently ignore */
+    }
+  }
+
   return (
-    <div className="relative min-w-0" ref={ref}>
+    <div className="relative flex min-w-0 items-center gap-1" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
         className="flex min-w-0 max-w-[136px] items-center gap-1 text-sm font-medium text-dash-text-faded transition-colors hover:text-dash-text-strong sm:max-w-[260px]"
@@ -127,6 +141,19 @@ function ProjectSwitcher({
         >
           <ChevronDown className="size-4" />
         </motion.span>
+      </button>
+      <button
+        type="button"
+        onClick={handleCopyProjectName}
+        aria-label={copied ? "Project name copied" : "Copy project name"}
+        title={copied ? "Copied" : "Copy project name"}
+        className="flex size-6 shrink-0 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+      >
+        {copied ? (
+          <Check className="size-3.5 text-[#4879f8]" />
+        ) : (
+          <Copy className="size-3.5" />
+        )}
       </button>
 
       <AnimatePresence>

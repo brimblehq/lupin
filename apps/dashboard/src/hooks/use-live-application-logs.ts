@@ -12,7 +12,7 @@ export interface LiveApplicationLogEntry {
 }
 
 interface UseLiveApplicationLogsInput {
-  container: string;
+  containers: string[];
   searchQuery?: string | null;
   start?: Date;
   end?: Date;
@@ -27,8 +27,27 @@ interface LokiStreamPayload {
   }>;
 }
 
-function buildLokiQuery(input: { container: string; searchQuery?: string | null }) {
-  const base = `{container="${input.container}"}`;
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/"/g, '\\"');
+}
+
+function buildLokiQuery(input: {
+  containers: string[];
+  searchQuery?: string | null;
+}) {
+  const normalizedContainers = Array.from(
+    new Set(
+      input.containers
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
+  const containerPattern = normalizedContainers
+    .map((value) => escapeRegexLiteral(value))
+    .join("|");
+  const base = containerPattern
+    ? `{container=~"^(${containerPattern})$"}`
+    : `{container=""}`;
   const rawSearch = input.searchQuery?.trim();
 
   if (!rawSearch) {
@@ -133,30 +152,158 @@ function mergeUniqueLogs(
   return merged.slice(-1000);
 }
 
+interface TailRequestParams {
+  query: string;
+  start: string;
+  limit: string;
+  delay_for: string;
+  end?: string;
+}
+
+const CONCURRENT_TAIL_LIMIT_RE = /max concurrent tail requests limit exceeded/i;
+const MAX_RANGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+let sharedSocket: Socket | null = null;
+let sharedSocketInitPromise: Promise<Socket | null> | null = null;
+let sharedSocketConsumers = 0;
+
+function extractMessage(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value instanceof Error) {
+    return value.message;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const next = extractMessage(item);
+      if (next) {
+        return next;
+      }
+    }
+    return "";
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (typeof record.message === "string") return record.message;
+    if (typeof record.reason === "string") return record.reason;
+    if (typeof record.error === "string") return record.error;
+    if (typeof record.data === "string") return record.data;
+
+    if (record.data && typeof record.data === "object") {
+      const nested = extractMessage(record.data);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+
+  return "";
+}
+
+function isConcurrentTailLimitError(value: unknown): boolean {
+  return CONCURRENT_TAIL_LIMIT_RE.test(extractMessage(value));
+}
+
+async function getOrCreateSharedSocket(): Promise<Socket | null> {
+  if (sharedSocket) {
+    return sharedSocket;
+  }
+
+  if (sharedSocketInitPromise) {
+    return sharedSocketInitPromise;
+  }
+
+  sharedSocketInitPromise = (async () => {
+    let token: string | null = null;
+    try {
+      token =
+        await (getAccessTokenServerFn as unknown as (input: {
+          data?: undefined;
+        }) => Promise<string | null>)({ data: undefined });
+    } catch {
+      // continue without token
+    }
+
+    const parsed = new URL(config.logsSocketUrl);
+    const pathPrefix = parsed.pathname === "/" ? "" : parsed.pathname;
+
+    const socket = io(`${parsed.origin}/loki`, {
+      transports: ["websocket", "polling"],
+      timeout: 10_000,
+      // Keep connection behavior explicit so server-side limits are easier to control.
+      reconnection: false,
+      autoConnect: false,
+      path: `${pathPrefix}/socket.io/`,
+      auth: token ? { token } : undefined,
+    });
+
+    sharedSocket = socket;
+    sharedSocketInitPromise = null;
+    return socket;
+  })().catch(() => {
+    sharedSocketInitPromise = null;
+    return null;
+  });
+
+  return sharedSocketInitPromise;
+}
+
+function retainSharedSocket() {
+  sharedSocketConsumers += 1;
+}
+
+function releaseSharedSocket() {
+  sharedSocketConsumers = Math.max(0, sharedSocketConsumers - 1);
+  if (sharedSocketConsumers === 0 && sharedSocket) {
+    sharedSocket.disconnect();
+    sharedSocket = null;
+    sharedSocketInitPromise = null;
+  }
+}
+
 export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
   const [logs, setLogs] = useState<LiveApplicationLogEntry[]>([]);
   const [isPaused, setIsPaused] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const socketRef = useRef<Socket | null>(null);
-  const lastTailKeyRef = useRef("");
-  const pendingLogsRef = useRef<LiveApplicationLogEntry[]>([]);
-  const isPausedRef = useRef(false);
   const [pendingLogsCount, setPendingLogsCount] = useState(0);
 
-  const enabled = Boolean(input.enabled && input.container.trim());
+  const socketRef = useRef<Socket | null>(null);
+  const pendingLogsRef = useRef<LiveApplicationLogEntry[]>([]);
+  const isPausedRef = useRef(false);
+  const activeTailKeyRef = useRef("");
+  const desiredTailRef = useRef<{ key: string; params: TailRequestParams } | null>(
+    null,
+  );
+  const isTailRestartRef = useRef(false);
+  const blockedByLimitRef = useRef(false);
+
+  const normalizedContainers = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          input.containers
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0),
+        ),
+      ),
+    [input.containers],
+  );
+  const enabled = Boolean(input.enabled && normalizedContainers.length > 0);
 
   const lokiQuery = useMemo(
     () =>
       buildLokiQuery({
-        container: input.container.trim(),
+        containers: normalizedContainers,
         searchQuery: input.searchQuery,
       }),
-    [input.container, input.searchQuery],
+    [normalizedContainers, input.searchQuery],
   );
-
-  const MAX_RANGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
   const rangeStartMs = useMemo(() => {
     if (input.start instanceof Date) {
@@ -170,7 +317,6 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
     if (!(input.end instanceof Date)) return null;
 
     const endMs = input.end.getTime();
-    // Cap range to 30 days — Loki rejects anything larger
     if (endMs - rangeStartMs > MAX_RANGE_MS) {
       return rangeStartMs + MAX_RANGE_MS;
     }
@@ -178,43 +324,71 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
     return endMs;
   }, [input.end, rangeStartMs]);
 
-  const emitTail = useCallback(
-    (force = false) => {
-      const socket = socketRef.current;
+  const tailParams = useMemo(() => {
+    const params: TailRequestParams = {
+      query: lokiQuery,
+      start: String(rangeStartMs * 1_000_000),
+      limit: String(input.limit ?? 150),
+      delay_for: "0",
+    };
 
-      if (!enabled || !socket || !socket.connected) {
-        return;
-      }
+    if (rangeEndMs !== null) {
+      params.end = String(rangeEndMs * 1_000_000);
+    }
 
-      const params = {
-        query: lokiQuery,
-        start: String(rangeStartMs * 1_000_000),
-        limit: String(input.limit ?? 150),
-        delay_for: "0",
-      };
+    return params;
+  }, [input.limit, lokiQuery, rangeEndMs, rangeStartMs]);
 
-      if (rangeEndMs !== null) {
-        (params as Record<string, string>).end = String(rangeEndMs * 1_000_000);
-      }
+  const tailKey = useMemo(() => JSON.stringify(tailParams), [tailParams]);
 
-      const tailKey = JSON.stringify(params);
-
-      if (!force && tailKey === lastTailKeyRef.current) {
-        return;
-      }
-
-      lastTailKeyRef.current = tailKey;
-      socket.emit("tail", params);
-    },
-    [enabled, input.limit, lokiQuery, rangeEndMs, rangeStartMs],
-  );
+  useEffect(() => {
+    desiredTailRef.current = { key: tailKey, params: tailParams };
+  }, [tailKey, tailParams]);
 
   const clearLogs = useCallback(() => {
     setLogs([]);
     pendingLogsRef.current = [];
     setPendingLogsCount(0);
-    lastTailKeyRef.current = "";
+    activeTailKeyRef.current = "";
   }, []);
+
+  const emitDesiredTail = useCallback(
+    (force = false) => {
+      const socket = socketRef.current;
+      const desired = desiredTailRef.current;
+
+      if (!enabled || !socket || !desired || blockedByLimitRef.current) {
+        return;
+      }
+
+      if (!socket.connected) {
+        setIsConnecting(true);
+        socket.connect();
+        return;
+      }
+
+      if (!force && desired.key === activeTailKeyRef.current) {
+        return;
+      }
+
+      if (
+        activeTailKeyRef.current &&
+        desired.key !== activeTailKeyRef.current
+      ) {
+        // Grafana tail sessions accumulate server-side; restart transport before re-tail.
+        isTailRestartRef.current = true;
+        activeTailKeyRef.current = "";
+        setIsConnecting(true);
+        socket.disconnect();
+        socket.connect();
+        return;
+      }
+
+      socket.emit("tail", desired.params);
+      activeTailKeyRef.current = desired.key;
+    },
+    [enabled],
+  );
 
   const pause = useCallback(() => {
     isPausedRef.current = true;
@@ -229,24 +403,27 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
       pendingLogsRef.current = [];
       setPendingLogsCount(0);
     }
-    emitTail(true);
-  }, [emitTail]);
+    emitDesiredTail(true);
+  }, [emitDesiredTail]);
 
   const reconnect = useCallback(() => {
     clearLogs();
+    blockedByLimitRef.current = false;
+    setError(null);
+
     const socket = socketRef.current;
     if (!socket) {
       return;
     }
 
-    setError(null);
-    if (!socket.connected) {
-      socket.connect();
-      return;
+    activeTailKeyRef.current = "";
+    isTailRestartRef.current = true;
+    if (socket.connected) {
+      socket.disconnect();
     }
-
-    emitTail(true);
-  }, [clearLogs, emitTail]);
+    setIsConnecting(true);
+    socket.connect();
+  }, [clearLogs]);
 
   useEffect(() => {
     if (!enabled) {
@@ -257,44 +434,51 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
 
     let cancelled = false;
     let socket: Socket | null = null;
+    let handlers:
+      | {
+          onConnect: () => void;
+          onConnected: () => void;
+          onLogs: (payload: unknown) => void;
+          onSocketDisconnect: (reason?: unknown) => void;
+          onServerDisconnected: (reason?: unknown) => void;
+          onError: (evt: unknown) => void;
+          onConnectError: (evt: unknown) => void;
+        }
+      | null = null;
 
+    retainSharedSocket();
     setIsConnecting(true);
     setError(null);
 
     (async () => {
-      let token: string | null = null;
-      try {
-        token = await (getAccessTokenServerFn as unknown as (input: { data?: undefined }) => Promise<string | null>)({ data: undefined });
-      } catch {
-        // continue without token
+      const shared = await getOrCreateSharedSocket();
+      if (cancelled) {
+        return;
       }
 
-      if (cancelled) return;
+      if (!shared) {
+        setIsConnecting(false);
+        setError((prev) => prev ?? "Unable to initialize log stream");
+        releaseSharedSocket();
+        return;
+      }
 
-      const parsed = new URL(config.logsSocketUrl);
-      const pathPrefix = parsed.pathname === "/" ? "" : parsed.pathname;
+      socket = shared;
+      socketRef.current = shared;
 
-      socket = io(`${parsed.origin}/loki`, {
-        transports: ["websocket", "polling"],
-        timeout: 10_000,
-        reconnection: true,
-        path: `${pathPrefix}/socket.io/`,
-        auth: token ? { token } : undefined,
-      });
-
-      socketRef.current = socket;
-
-      const handleConnect = () => {
+      const onConnect = () => {
         setIsConnected(true);
         setIsConnecting(false);
-        setError(null);
-        lastTailKeyRef.current = "";
+        if (!blockedByLimitRef.current) {
+          setError(null);
+        }
+        isTailRestartRef.current = false;
         if (!isPausedRef.current) {
-          emitTail(true);
+          emitDesiredTail(true);
         }
       };
 
-      const handleLogs = (payload: unknown) => {
+      const onLogs = (payload: unknown) => {
         const items = parseSocketPayload(payload);
         if (items.length === 0) return;
 
@@ -307,50 +491,104 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
         setLogs((prev) => mergeUniqueLogs(prev, items));
       };
 
-      function extractMessage(value: unknown): string {
-        if (typeof value === "string") return value;
-        if (value instanceof Error) return value.message;
-        if (value && typeof value === "object" && "message" in value) return String((value as any).message);
-        return "";
-      }
-
-      const handleDisconnect = (reason?: unknown) => {
+      const onSocketDisconnect = (reason?: unknown) => {
         setIsConnected(false);
         setIsConnecting(false);
-        const msg = extractMessage(reason);
-        if (msg) {
-          setError(msg);
-          // Server rejected the query — stop reconnecting
-          if (socket) {
-            socket.disconnect();
-          }
+        activeTailKeyRef.current = "";
+
+        const reasonText = extractMessage(reason);
+        if (
+          isTailRestartRef.current ||
+          reasonText === "io client disconnect"
+        ) {
+          isTailRestartRef.current = false;
+          return;
         }
-        lastTailKeyRef.current = "";
+
+        if (isConcurrentTailLimitError(reason)) {
+          blockedByLimitRef.current = true;
+          setError(
+            reasonText ||
+              "Log stream limit reached. Click reconnect to retry with one active stream.",
+          );
+        }
       };
 
-      const handleError = (evt: unknown) => {
+      const onServerDisconnected = (reason?: unknown) => {
+        const reasonText = extractMessage(reason);
+        if (!reasonText) {
+          return;
+        }
+
         setIsConnected(false);
         setIsConnecting(false);
-        setError(extractMessage(evt) || "Unable to stream application logs");
+        activeTailKeyRef.current = "";
+        setError(reasonText);
+
+        if (isConcurrentTailLimitError(reason)) {
+          blockedByLimitRef.current = true;
+          socketRef.current?.disconnect();
+        }
       };
 
-      socket.on("connect", handleConnect);
-      socket.on("connected", handleConnect);
-      socket.on("logs", handleLogs);
-      socket.on("disconnect", handleDisconnect);
-      socket.on("disconnected", handleDisconnect);
-      socket.on("error", handleError);
-      socket.on("connect_error", handleError);
+      const onError = (evt: unknown) => {
+        setIsConnected(false);
+        setIsConnecting(false);
+        const message = extractMessage(evt) || "Unable to stream application logs";
+        setError(message);
+        if (isConcurrentTailLimitError(evt)) {
+          blockedByLimitRef.current = true;
+          socketRef.current?.disconnect();
+        }
+      };
+
+      handlers = {
+        onConnect,
+        onConnected: onConnect,
+        onLogs,
+        onSocketDisconnect,
+        onServerDisconnected,
+        onError,
+        onConnectError: onError,
+      };
+
+      shared.on("connect", handlers.onConnect);
+      shared.on("connected", handlers.onConnected);
+      shared.on("logs", handlers.onLogs);
+      shared.on("disconnect", handlers.onSocketDisconnect);
+      shared.on("disconnected", handlers.onServerDisconnected);
+      shared.on("error", handlers.onError);
+      shared.on("connect_error", handlers.onConnectError);
+
+      if (!shared.connected) {
+        shared.connect();
+      } else {
+        onConnect();
+      }
     })();
 
     return () => {
       cancelled = true;
-      if (socket) {
-        socket.disconnect();
+
+      if (socket && handlers) {
+        socket.off("connect", handlers.onConnect);
+        socket.off("connected", handlers.onConnected);
+        socket.off("logs", handlers.onLogs);
+        socket.off("disconnect", handlers.onSocketDisconnect);
+        socket.off("disconnected", handlers.onServerDisconnected);
+        socket.off("error", handlers.onError);
+        socket.off("connect_error", handlers.onConnectError);
+      }
+
+      if (socketRef.current === socket) {
         socketRef.current = null;
       }
+
+      activeTailKeyRef.current = "";
+      isTailRestartRef.current = false;
+      releaseSharedSocket();
     };
-  }, [emitTail, enabled]);
+  }, [emitDesiredTail, enabled]);
 
   useEffect(() => {
     if (!enabled) {
@@ -359,9 +597,9 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
 
     clearLogs();
     if (!isPausedRef.current) {
-      emitTail(true);
+      emitDesiredTail();
     }
-  }, [clearLogs, emitTail, enabled, input.container, lokiQuery, rangeEndMs, rangeStartMs]);
+  }, [clearLogs, emitDesiredTail, enabled, tailKey]);
 
   return {
     logs,

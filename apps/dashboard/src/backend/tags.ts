@@ -13,8 +13,15 @@ export interface BackendTag {
 
 export interface TagsApi {
   list(input?: { teamId?: string }): Promise<BackendTag[]>;
-  create(input: { name: string; color: string; teamId?: string }): Promise<BackendTag>;
-  update(tagId: string, input: { name?: string; color?: string }): Promise<BackendTag>;
+  create(input: {
+    name: string;
+    color: string;
+    teamId?: string;
+  }): Promise<BackendTag>;
+  update(
+    tagId: string,
+    input: { name?: string; color?: string },
+  ): Promise<BackendTag>;
   remove(tagId: string): Promise<void>;
   toggleAssignment(input: {
     tagId: string;
@@ -82,10 +89,9 @@ export function createTagsApi(client: ApiClient): TagsApi {
     },
 
     async remove(tagId) {
-      await client.request<any>(
-        `${endpoint}/${encodeURIComponent(tagId)}`,
-        { method: "DELETE" },
-      );
+      await client.request<any>(`${endpoint}/${encodeURIComponent(tagId)}`, {
+        method: "DELETE",
+      });
     },
 
     async toggleAssignment(input) {
@@ -99,22 +105,7 @@ export function createTagsApi(client: ApiClient): TagsApi {
           },
         },
       );
-      if (shouldDebugTags()) {
-        console.log("[tags-api] toggleAssignment raw response", {
-          tagId: input.tagId,
-          projectId: input.projectId,
-          response,
-        });
-      }
       const root = asRecord(response?.data ?? response) ?? {};
-      if (shouldDebugTags()) {
-        console.log("[tags-api] toggleAssignment normalized root", {
-          tagId: input.tagId,
-          projectId: input.projectId,
-          root,
-          assigned: root.assigned === true,
-        });
-      }
       return { assigned: root.assigned === true };
     },
   };

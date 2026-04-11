@@ -3531,10 +3531,6 @@ function NewProjectPage() {
       } else {
         setSavingProject(true);
       }
-      console.log(
-        "[projects/new] createProject payload",
-        debugMaskDeployPayload(payload),
-      );
       const created = await createProject({ data: payload });
       const targetProjectId = created.slug || created.name || normalizedName;
       const createdLogId =

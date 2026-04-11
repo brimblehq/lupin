@@ -25,6 +25,54 @@ function isForbiddenError(error: unknown): boolean {
   return false;
 }
 
+function isNetworkError(error: unknown): boolean {
+  const err = error as { name?: unknown; message?: unknown } | null;
+  const name = typeof err?.name === "string" ? err.name : "";
+  const message = typeof err?.message === "string" ? err.message.toLowerCase() : "";
+  return (
+    name === "TypeError" ||
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network error") ||
+    message.includes("load failed")
+  );
+}
+
+function getFriendlyError(error: unknown): { title: string; description: string } {
+  if (isNetworkError(error)) {
+    return {
+      title: "Can't reach our servers",
+      description:
+        "Check your internet connection and try again. If the problem persists, our systems may be temporarily unavailable.",
+    };
+  }
+
+  const err = error as { status?: unknown; code?: unknown } | null;
+  const status =
+    typeof err?.status === "number" ? err.status : undefined;
+
+  if (status === 404 || err?.code === "HTTP_404") {
+    return {
+      title: "We couldn't find that page",
+      description: "The page you're looking for doesn't exist or may have been moved.",
+    };
+  }
+
+  if (status && status >= 500) {
+    return {
+      title: "Something went wrong on our end",
+      description:
+        "We're looking into it. Please try again in a moment — your data is safe.",
+    };
+  }
+
+  return {
+    title: "Something went wrong",
+    description:
+      "We hit an unexpected error. Please try again in a moment — if it keeps happening, let us know.",
+  };
+}
+
 export function DefaultErrorComponent({ error }: { error: Error }) {
   const router = useRouter();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
@@ -49,11 +97,13 @@ export function DefaultErrorComponent({ error }: { error: Error }) {
     );
   }
 
+  const friendly = getFriendlyError(error);
+
   return (
     <AccessDenied
       imageSrc="/images/error.svg"
-      title="That shouldn't have happened."
-      description={error.message || "An unexpected error occurred. Please try again."}
+      title={friendly.title}
+      description={friendly.description}
       action={{
         label: "Try again",
         onClick: () => router.invalidate(),

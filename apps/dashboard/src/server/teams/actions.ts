@@ -31,15 +31,19 @@ export const getWorkspaceTeamMembersServerFn = createServerFn({
 
     try {
       const team = await api.teams.getByName(teamName);
-      teamsLogger.info(
-        `getWorkspaceTeamMembersServerFn response (workspace=${payload?.workspace ?? "unknown"}, lookup=slug:${teamName}):\n${JSON.stringify(team, null, 2)}`,
-      );
+      teamsLogger.info("getWorkspaceTeamMembersServerFn response", {
+        workspace: payload?.workspace ?? "unknown",
+        lookup: `slug:${teamName}`,
+        team,
+      });
       return team;
     } catch {
       const team = await api.teams.getByName(teamId);
-      teamsLogger.info(
-        `getWorkspaceTeamMembersServerFn response (workspace=${payload?.workspace ?? "unknown"}, lookup=id:${teamId}):\n${JSON.stringify(team, null, 2)}`,
-      );
+      teamsLogger.info("getWorkspaceTeamMembersServerFn response", {
+        workspace: payload?.workspace ?? "unknown",
+        lookup: `id:${teamId}`,
+        team,
+      });
       return team;
     }
   });
@@ -215,9 +219,7 @@ export const transferOwnershipServerFn = createServerFn({
     throw new Error("Member ID is required");
   }
 
-  teamsLogger.info(
-    `transferOwnershipServerFn payload:\n${JSON.stringify(payload, null, 2)}`,
-  );
+  teamsLogger.info("transferOwnershipServerFn payload", { payload });
 
   return withTokenRefresh(async (api) => {
     const { teamId } = await resolveWorkspaceTeam(api, payload?.workspace);

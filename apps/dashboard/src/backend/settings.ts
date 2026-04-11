@@ -92,25 +92,66 @@ function mapProfile(payload: any): SettingsUserProfile {
 }
 
 function mapWebhookGroups(groups: any[]): SettingsWebhookGroup[] {
-  return (groups ?? []).map((group) => ({
-    title: String(group?.title ?? ""),
-    events: (group?.events ?? []).map((event: any) => ({
-      key: String(event?.key ?? ""),
-      label: String(event?.label ?? ""),
-      description: String(event?.description ?? ""),
-      enabled: Boolean(event?.enabled),
-    })),
-  }));
+  if (!Array.isArray(groups)) {
+    return [];
+  }
+
+  return groups
+    .map((group) => {
+      if (!group || typeof group !== "object") {
+        return null;
+      }
+
+      const title = String(group?.title ?? "").trim();
+      const events = Array.isArray(group?.events)
+        ? group.events
+            .map((event: any) => {
+              const key = String(event?.key ?? "").trim();
+              if (!key) {
+                return null;
+              }
+
+              return {
+                key,
+                label: String(event?.label ?? "").trim(),
+                description: String(event?.description ?? "").trim(),
+                enabled: Boolean(event?.enabled),
+              };
+            })
+            .filter((event): event is SettingsWebhookGroup["events"][number] => Boolean(event))
+        : [];
+
+      if (!title && events.length === 0) {
+        return null;
+      }
+
+      return { title, events } satisfies SettingsWebhookGroup;
+    })
+    .filter((group): group is SettingsWebhookGroup => group !== null);
+}
+
+function normalizeWebhookUrlValue(value: unknown): string {
+  const normalized = String(value ?? "").trim();
+  if (!normalized || normalized.toLowerCase() === "false") {
+    return "";
+  }
+
+  return normalized;
 }
 
 function mapWebhooks(payload: any): SettingsWebhookState {
   const data = unwrapData<any>(payload) ?? {};
+  const rawGroups = Array.isArray(data?.events)
+    ? data.events
+    : Array.isArray(data?.groups)
+      ? data.groups
+      : [];
 
   return {
-    webhookUrl: String(data?.webhookUrl ?? ""),
-    discordUrl: String(data?.discordUrl ?? ""),
-    slackUrl: String(data?.slackUrl ?? ""),
-    groups: mapWebhookGroups(data?.events ?? []),
+    webhookUrl: normalizeWebhookUrlValue(data?.webhookUrl),
+    discordUrl: normalizeWebhookUrlValue(data?.discordUrl),
+    slackUrl: normalizeWebhookUrlValue(data?.slackUrl),
+    groups: mapWebhookGroups(rawGroups),
   };
 }
 
@@ -321,7 +362,7 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
     builds: `${config.authApiUrl}/user/builds`,
     haptics: `${config.authApiUrl}/user/haptics`,
     followedX: `${config.authApiUrl}/user/followed-x`,
-    webhooks: "/core/v1/webhooks",
+    webhooks: "/v1/webhooks",
     apiKeyCreate: "/core/v1/api-key/create",
     apiKeyReset: "/core/v1/api-key/reset",
     decrypt: "/core/v1/decrypt",

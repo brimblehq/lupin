@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type AxiosError } from "axios";
+import pino from "pino";
 import { BackendApiError } from "./errors";
 import type { ApiClient, ApiRequestOptions } from "./types";
 import appConfig from "@/config";
@@ -12,6 +13,34 @@ export interface BackendClientConfig {
 export interface BackendClient extends ApiClient {
   readonly config: BackendClientConfig;
 }
+
+type SupportedLogLevel = "debug" | "info" | "warn" | "error";
+
+function resolveLogLevel(): SupportedLogLevel {
+  const runtimeLevel =
+    (typeof process !== "undefined" ? process.env.LOG_LEVEL : undefined) ??
+    import.meta.env.VITE_LOG_LEVEL;
+  const normalized = runtimeLevel?.trim().toLowerCase();
+
+  if (
+    normalized === "debug" ||
+    normalized === "info" ||
+    normalized === "warn" ||
+    normalized === "error"
+  ) {
+    return normalized;
+  }
+
+  return import.meta.env.DEV ? "debug" : "info";
+}
+
+const backendClientLogger = pino({
+  name: "backend-client",
+  level: resolveLogLevel(),
+  browser: {
+    asObject: true,
+  },
+});
 
 function bytesToBase64(bytes: Uint8Array): string {
   if (typeof Buffer !== "undefined") {
@@ -215,18 +244,14 @@ export function createBackendClient(
       } catch (error) {
         const axiosError = error as AxiosError<any>;
         const payload = axiosError.response?.data;
-        console.error(
-          "[backend-client] error response:",
-          JSON.stringify(
-            {
-              method,
-              requestUrl,
-              status: axiosError.response?.status,
-              data: payload,
-            },
-            null,
-            2,
-          ),
+        backendClientLogger.error(
+          {
+            method,
+            requestUrl,
+            status: axiosError.response?.status,
+            data: payload,
+          },
+          "Backend client request failed",
         );
         throw new BackendApiError({
           code:

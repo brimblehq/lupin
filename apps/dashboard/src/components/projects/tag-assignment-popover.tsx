@@ -1,4 +1,10 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Search, Plus, Check } from "lucide-react";
@@ -22,10 +28,8 @@ function isTagDebugEnabled() {
 function tagDebug(message: string, payload?: Record<string, unknown>) {
   if (!isTagDebugEnabled()) return;
   if (payload) {
-    console.log(`[tags-debug][popover] ${message}`, payload);
     return;
   }
-  console.log(`[tags-debug][popover] ${message}`);
 }
 
 interface TagAssignmentPopoverProps {
@@ -52,16 +56,21 @@ export function TagAssignmentPopover({
   const inputRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const [pendingToggles, setPendingToggles] = useState<Set<string>>(new Set());
-  const [localAssigned, setLocalAssigned] = useState<Set<string>>(new Set(assignedTagIds));
+  const [localAssigned, setLocalAssigned] = useState<Set<string>>(
+    new Set(assignedTagIds),
+  );
   const [creatingTag, setCreatingTag] = useState(false);
 
   useEffect(() => {
     setLocalAssigned(new Set(assignedTagIds));
   }, [assignedTagIds]);
 
-  const publishAssigned = useCallback((next: Set<string>) => {
-    onAssignedTagIdsChange?.(Array.from(next));
-  }, [onAssignedTagIdsChange]);
+  const publishAssigned = useCallback(
+    (next: Set<string>) => {
+      onAssignedTagIdsChange?.(Array.from(next));
+    },
+    [onAssignedTagIdsChange],
+  );
 
   const updatePos = useCallback(() => {
     if (!anchorRef.current) return;
@@ -72,7 +81,10 @@ export function TagAssignmentPopover({
   useLayoutEffect(() => {
     if (!open) return;
     updatePos();
-    window.addEventListener("scroll", updatePos, { capture: true, passive: true });
+    window.addEventListener("scroll", updatePos, {
+      capture: true,
+      passive: true,
+    });
     window.addEventListener("resize", updatePos, { passive: true });
     return () => {
       window.removeEventListener("scroll", updatePos, { capture: true });
@@ -104,7 +116,9 @@ export function TagAssignmentPopover({
   }, [open, anchorRef, onOpenChange]);
 
   const trimmed = query.trim().toLowerCase();
-  const filtered = tags.filter((t) => (trimmed ? t.name.includes(trimmed) : true));
+  const filtered = tags.filter((t) =>
+    trimmed ? t.name.includes(trimmed) : true,
+  );
   const exactMatch = tags.some((t) => t.name === trimmed);
 
   async function handleToggle(tagId: string) {
@@ -150,7 +164,6 @@ export function TagAssignmentPopover({
         tagId,
         error: err instanceof Error ? err.message : String(err),
       });
-      console.error("[tag-popover] toggle failed", err);
       const rollback = new Set(localAssigned);
       setLocalAssigned(rollback);
       publishAssigned(rollback);
@@ -194,7 +207,6 @@ export function TagAssignmentPopover({
         projectId,
         error: err instanceof Error ? err.message : String(err),
       });
-      console.error("[tag-popover] create+assign failed", err);
       setLocalAssigned(beforeCreate);
       publishAssigned(beforeCreate);
     } finally {
@@ -264,11 +276,18 @@ export function TagAssignmentPopover({
                   className="size-2 shrink-0 rounded-full"
                   style={{ backgroundColor: tag.color }}
                 />
-                <span className="flex-1 truncate text-dash-text-faded">{tag.name}</span>
+                <span className="flex-1 truncate text-dash-text-faded">
+                  {tag.name}
+                </span>
                 {isPending ? (
-                  <Spinner size="size-3.5" className="shrink-0 text-dash-text-extra-faded" />
+                  <Spinner
+                    size="size-3.5"
+                    className="shrink-0 text-dash-text-extra-faded"
+                  />
                 ) : (
-                  isAssigned && <Check className="size-3.5 shrink-0 text-dash-text-strong" />
+                  isAssigned && (
+                    <Check className="size-3.5 shrink-0 text-dash-text-strong" />
+                  )
                 )}
               </button>
             );
@@ -290,14 +309,14 @@ export function TagAssignmentPopover({
               ) : (
                 <Plus className="size-3.5 shrink-0" />
               )}
-              <span>
-                Create &ldquo;{normalizeTagName(trimmed)}&rdquo;
-              </span>
+              <span>Create &ldquo;{normalizeTagName(trimmed)}&rdquo;</span>
             </button>
           )}
 
           {filtered.length === 0 && !trimmed && (
-            <div className="px-3 py-2 text-sm text-dash-text-faded">No tags yet</div>
+            <div className="px-3 py-2 text-sm text-dash-text-faded">
+              No tags yet
+            </div>
           )}
         </motion.div>
       )}

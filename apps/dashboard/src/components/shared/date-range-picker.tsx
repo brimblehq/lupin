@@ -7,23 +7,66 @@ import { motion, AnimatePresence } from "motion/react";
 interface DateRangePickerProps {
   value?: DateRange;
   onChange: (range: DateRange | undefined) => void;
+  minDate?: Date;
+  maxDate?: Date;
   /** Trigger element — the button that opens the picker */
   children: React.ReactNode;
+}
+
+function clampDateToBounds(date: Date, minDate?: Date, maxDate?: Date): Date {
+  let value = date.getTime();
+  if (minDate) {
+    value = Math.max(value, minDate.getTime());
+  }
+  if (maxDate) {
+    value = Math.min(value, maxDate.getTime());
+  }
+  return new Date(value);
+}
+
+function clampRangeToBounds(
+  range: DateRange | undefined,
+  minDate?: Date,
+  maxDate?: Date,
+): DateRange | undefined {
+  if (!range) return undefined;
+
+  const next: Partial<DateRange> = {};
+  if (range.from instanceof Date) {
+    next.from = clampDateToBounds(range.from, minDate, maxDate);
+  }
+  if (range.to instanceof Date) {
+    next.to = clampDateToBounds(range.to, minDate, maxDate);
+  }
+
+  if (!next.from && next.to) {
+    next.from = next.to;
+  }
+
+  if (next.from && next.to && next.from.getTime() > next.to.getTime()) {
+    next.to = next.from;
+  }
+
+  return { from: next.from, to: next.to };
 }
 
 export function DateRangePicker({
   value,
   onChange,
+  minDate,
+  maxDate,
   children,
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<DateRange | undefined>(value);
+  const [draft, setDraft] = useState<DateRange | undefined>(
+    clampRangeToBounds(value, minDate, maxDate),
+  );
   const ref = useRef<HTMLDivElement>(null);
 
   // Sync draft when value changes externally
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    setDraft(clampRangeToBounds(value, minDate, maxDate));
+  }, [value, minDate, maxDate]);
 
   // Close on outside click
   useEffect(() => {
@@ -37,7 +80,7 @@ export function DateRangePicker({
   }, [open]);
 
   function handleApply() {
-    onChange(draft);
+    onChange(clampRangeToBounds(draft, minDate, maxDate));
     setOpen(false);
   }
 
@@ -73,6 +116,10 @@ export function DateRangePicker({
                 numberOfMonths={2}
                 selected={draft}
                 onSelect={setDraft}
+                disabled={[
+                  ...(minDate ? [{ before: minDate }] : []),
+                  ...(maxDate ? [{ after: maxDate }] : []),
+                ]}
                 showOutsideDays
                 weekStartsOn={1}
                 classNames={{

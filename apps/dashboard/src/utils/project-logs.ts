@@ -37,13 +37,13 @@ export function defaultRequestLogsDateRange(): DateRange {
 
 export function defaultApplicationLogsDateRange(): DateRange {
   return {
-    from: new Date(),
+    from: subDays(new Date(), 7),
     to: new Date(),
   };
 }
 
 export function formatAppLogTime(date: Date): string {
-  return format(date, "HH:mm:ss.SSS");
+  return format(date, "MMM d yyyy HH:mm:ss");
 }
 
 export function detectAppLogLevel(message: string): UiLogLevel {

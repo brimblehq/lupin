@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { RequestLogsPage } from "@/backend/logs";
+import type { LogTrendsResponse, RequestLogsPage } from "@/backend/logs";
 import { withTokenRefresh } from "@/server/shared/backend";
 
 export const listRequestLogsServerFn = createServerFn({
@@ -43,4 +43,36 @@ export const listRequestLogsServerFn = createServerFn({
   });
 });
 
-export type { RequestLogsPage };
+export const getLogTrendsServerFn = createServerFn({
+  method: "GET",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        projectId: string;
+        from?: number;
+        to?: number;
+        step?: string;
+        interval?: string;
+        search?: string;
+        container?: string;
+      }
+    | undefined;
+
+  const projectId = payload?.projectId?.trim();
+  if (!projectId) {
+    throw new Error("Project ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    return api.logs.getLogTrends(projectId, {
+      from: payload?.from,
+      to: payload?.to,
+      step: payload?.step,
+      interval: payload?.interval,
+      search: payload?.search,
+      container: payload?.container,
+    });
+  });
+});
+
+export type { LogTrendsResponse, RequestLogsPage };

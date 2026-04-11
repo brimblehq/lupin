@@ -454,7 +454,6 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
       );
 
       const root = response?.data?.data ?? response?.data ?? response ?? null;
-      console.log("[domains.getByName] response:", root);
       if (!root) {
         return null;
       }
