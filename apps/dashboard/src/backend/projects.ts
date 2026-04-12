@@ -414,7 +414,10 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       updatedAt: asString(row.updatedAt),
       status: asString(row.status),
       region,
-      serviceType: asString(row.serviceType) ?? asString(row.service_type),
+      serviceType:
+        asString(row.serviceType) ??
+        asString(row.service_type) ??
+        asString(row.type),
       authEnabled,
       buildCacheEnabled,
       hasUpdates,

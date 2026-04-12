@@ -29,8 +29,6 @@ import {
 import type { ProjectEnvironment } from "@/backend/environments";
 import { redeployProjectServerFn } from "@/server/projects/actions";
 import {
-  canDeleteProjectEnv,
-  canEditProjectEnvs,
   filterEnvironmentRows,
   formatEnvRowRelativeTime,
   fromEnvText,
@@ -38,7 +36,6 @@ import {
   getEnvironmentDescription,
   highlightEnvText,
   highlightJsonText,
-  isDatabaseService,
   isNonEditableEnvName,
   sanitizeEnvironmentEntries,
   shouldShowEnvironmentTab,
@@ -49,6 +46,7 @@ import {
   type RawEnvFormat,
   validateEnvironmentEntries,
 } from "@/utils/project-environment";
+import { isDatabaseProject as getIsDatabaseProject } from "@/utils/project-capabilities";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
 
 const parentRoute = getRouteApi("/projects/$projectId");
@@ -178,7 +176,7 @@ function EnvRowsSkeleton() {
 function EnvAccordionRow({
   row,
   projectId,
-  serviceType,
+  databaseProject,
   isExpanded,
   isDecrypting,
   decryptedValue,
@@ -189,7 +187,7 @@ function EnvAccordionRow({
 }: {
   row: ProjectEnvironmentVariable;
   projectId: string;
-  serviceType?: string;
+  databaseProject: boolean;
   isExpanded: boolean;
   isDecrypting: boolean;
   decryptedValue?: string;
@@ -232,8 +230,8 @@ function EnvAccordionRow({
     }
   }, [isExpanded]);
 
-  const canEdit = canEditProjectEnvs(serviceType) && canWrite;
-  const canDelete = canDeleteProjectEnv(serviceType) && canWrite;
+  const canEdit = !databaseProject && canWrite;
+  const canDelete = !databaseProject && canWrite;
   const disableNameInput = !canEdit || isNonEditableEnvName(row.name);
   const isDirty = name !== row.name || value !== row.value;
 
@@ -796,11 +794,10 @@ function EnvironmentPage() {
   const { canWrite } = useWorkspaceRole();
 
   const projectId = project?.id as string | undefined;
-  const serviceType = project?.serviceType as string | undefined;
   const framework = project?.framework as string | undefined;
   const projectEnvironmentId = project?.projectEnvironmentId as string | null | undefined;
-  const canEdit = canEditProjectEnvs(serviceType) && canWrite;
-  const databaseProject = isDatabaseService(serviceType);
+  const databaseProject = getIsDatabaseProject(project);
+  const canEdit = !databaseProject && canWrite;
   const envTabSupported = shouldShowEnvironmentTab(framework);
 
   const getEnvSnapshot = useServerFn(getProjectEnvironmentServerFn as any) as (args: {
@@ -1394,7 +1391,7 @@ function EnvironmentPage() {
                             key={row.id}
                             row={row}
                             projectId={projectId || ""}
-                            serviceType={serviceType}
+                            databaseProject={databaseProject}
                             isExpanded={expandedRowId === row.id}
                             isDecrypting={decryptingRowId === row.id}
                             decryptedValue={decryptedCache[row.id]}

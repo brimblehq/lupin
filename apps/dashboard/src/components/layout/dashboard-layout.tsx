@@ -486,12 +486,23 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
     () =>
       [...mainNav, ...moreNav]
         .filter((item) => {
-          if ("flag" in item && item.flag && !("comingSoon" in item && item.comingSoon))
+          if (
+            "flag" in item &&
+            item.flag &&
+            !("comingSoon" in item && item.comingSoon)
+          )
             return flagValues[item.flag] !== false;
           return true;
         })
         .map((item) => {
-          if ("comingSoon" in item && item.comingSoon && "flag" in item && item.flag && isPostHogEnabled && flagValues[item.flag]) {
+          if (
+            "comingSoon" in item &&
+            item.comingSoon &&
+            "flag" in item &&
+            item.flag &&
+            isPostHogEnabled &&
+            flagValues[item.flag]
+          ) {
             return { ...item, comingSoon: false };
           }
           return item;
@@ -788,8 +799,8 @@ export function DashboardLayout({
   const [workspaceTeamMembersCache, setWorkspaceTeamMembersCache] = useState<
     Record<string, TeamDetails | null>
   >(() =>
-    initialWorkspaceSlug
-      ? { [initialWorkspaceSlug]: initialWorkspaceTeamMembers ?? null }
+    initialWorkspaceSlug && initialWorkspaceTeamMembers
+      ? { [initialWorkspaceSlug]: initialWorkspaceTeamMembers }
       : {},
   );
 
@@ -959,13 +970,13 @@ export function DashboardLayout({
   }, [initialSettingsSnapshot, initialWorkspaceSlug]);
 
   useEffect(() => {
-    if (!initialWorkspaceSlug) {
+    if (!initialWorkspaceSlug || !initialWorkspaceTeamMembers) {
       return;
     }
 
     setWorkspaceTeamMembersCache((prev) => ({
       ...prev,
-      [initialWorkspaceSlug]: initialWorkspaceTeamMembers ?? null,
+      [initialWorkspaceSlug]: initialWorkspaceTeamMembers,
     }));
   }, [initialWorkspaceSlug, initialWorkspaceTeamMembers]);
 
@@ -1020,12 +1031,8 @@ export function DashboardLayout({
       return;
     }
 
-    if (
-      Object.prototype.hasOwnProperty.call(
-        workspaceTeamMembersCache,
-        currentWorkspace,
-      )
-    ) {
+    const cachedTeamMembers = workspaceTeamMembersCache[currentWorkspace];
+    if (cachedTeamMembers) {
       return;
     }
 
@@ -1039,21 +1046,16 @@ export function DashboardLayout({
           return;
         }
 
-        setWorkspaceTeamMembersCache((prev) => ({
-          ...prev,
-          [currentWorkspace]: result ?? null,
-        }));
-      })
-      .catch(() => {
-        if (cancelled) {
+        if (!result) {
           return;
         }
 
         setWorkspaceTeamMembersCache((prev) => ({
           ...prev,
-          [currentWorkspace]: null,
+          [currentWorkspace]: result,
         }));
-      });
+      })
+      .catch(() => null);
 
     return () => {
       cancelled = true;
