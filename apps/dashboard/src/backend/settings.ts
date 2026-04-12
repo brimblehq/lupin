@@ -362,7 +362,7 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
     builds: `${config.authApiUrl}/user/builds`,
     haptics: `${config.authApiUrl}/user/haptics`,
     followedX: `${config.authApiUrl}/user/followed-x`,
-    webhooks: "/v1/webhooks",
+    webhooks: "/core/v1/webhooks",
     apiKeyCreate: "/core/v1/api-key/create",
     apiKeyReset: "/core/v1/api-key/reset",
     decrypt: "/core/v1/decrypt",

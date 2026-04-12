@@ -45,6 +45,7 @@ export function initPostHog() {
     defaults: "2026-01-30",
     capture_pageview: false,
     capture_pageleave: true,
+    disable_surveys: true,
     session_recording: {
       maskAllInputs: true,
       maskTextSelector: "[data-ph-mask]",
