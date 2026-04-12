@@ -446,6 +446,12 @@ function RouteTransitionSkeleton({
   );
 }
 
+function isProjectDetailsPath(path: string): boolean {
+  const match = path.match(/^\/projects\/([^/]+)(?:\/|$)/);
+  if (!match) return false;
+  return match[1] !== "new";
+}
+
 function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
   const { theme, mode, cycleTheme } = useTheme();
   const navigate = useNavigate();
@@ -683,12 +689,14 @@ export function DashboardLayout({
       next.get("environmentId") !== current.get("environmentId")
     );
   }, [searchStr, resolvedSearchStr]);
-  const isRenderedProjectDetailsRoute = useMemo(() => {
-    const match = pathname.match(/^\/projects\/([^/]+)(?:\/|$)/);
-    if (!match) return false;
-    return match[1] !== "new";
-  }, [pathname]);
-  const shouldRenderDesktopSidebar = !isRenderedProjectDetailsRoute;
+  const isRenderedProjectDetailsRoute = useMemo(
+    () => isProjectDetailsPath(layoutPathname),
+    [layoutPathname],
+  );
+  const isIncomingProjectDetailsRoute = useMemo(
+    () => isProjectDetailsPath(pathname),
+    [pathname],
+  );
 
   const [shouldShowRouteSkeleton, setShouldShowRouteSkeleton] = useState(false);
 
@@ -704,6 +712,10 @@ export function DashboardLayout({
 
     return () => clearTimeout(timer);
   }, [isWorkspaceOrEnvironmentSwitching]);
+
+  const shouldRenderDesktopSidebar = shouldShowRouteSkeleton
+    ? !isIncomingProjectDetailsRoute
+    : !isRenderedProjectDetailsRoute;
 
   const currentWorkspace = useMemo(() => {
     const params = new URLSearchParams(searchStr || "");
