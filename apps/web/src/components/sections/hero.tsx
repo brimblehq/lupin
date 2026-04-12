@@ -1,10 +1,10 @@
-import { useState, useCallback, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { siteConfig } from "@/config/site";
 import { Button } from "@brimble/ui";
 import beeHero from "@/assets/images/bee.svg";
 import arrowRight from "@/assets/icons/arrow-right.svg";
 
+/*
 const YOUTUBE_VIDEO_ID = "dQw4w9WgXcQ";
 
 function VideoModal({ onClose }: { onClose: () => void }) {
@@ -54,11 +54,9 @@ function VideoModal({ onClose }: { onClose: () => void }) {
     </motion.div>
   );
 }
+*/
 
 export function Hero() {
-  const [showVideo, setShowVideo] = useState(false);
-  const closeVideo = useCallback(() => setShowVideo(false), []);
-
   return (
     <>
       <section className="bg-brimble-surface transition-colors duration-300 px-6 pb-16 pt-10">
@@ -121,6 +119,7 @@ export function Hero() {
                   <img src={arrowRight} alt="" className="size-3 dark:brightness-0" />
                 </a>
               </Button>
+              {/* Demo video temporarily disabled.
               <Button
                 variant="ghost-nav"
                 size="sm"
@@ -137,14 +136,15 @@ export function Hero() {
                 </svg>
                 {siteConfig.hero.secondaryCta}
               </Button>
+              */}
             </motion.div>
           </div>
         </div>
       </section>
 
-      <AnimatePresence>
+      {/* <AnimatePresence>
         {showVideo && <VideoModal onClose={closeVideo} />}
-      </AnimatePresence>
+      </AnimatePresence> */}
     </>
   );
 }

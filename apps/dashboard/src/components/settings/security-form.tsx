@@ -584,43 +584,36 @@ export function SecurityForm({
                   Loading passkeys...
                 </div>
               ) : passkeys.length === 0 ? null : (
-                <ul className="flex flex-col divide-y divide-dash-border-soft rounded-[6px] border border-dash-border">
+                <ul className="flex flex-col divide-y divide-dash-border-soft">
                   {passkeys.map((pk) => {
                     const isRenaming = renamingId === pk.id;
                     const isLast = passkeys.length === 1;
                     const deleteBlocked = isLast && lastPasskeyDeleteBlocked;
                     return (
-                      <li key={pk.id} className="flex flex-col gap-2 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          {isRenaming ? (
-                            <input
-                              autoFocus
-                              value={renameValue}
-                              onChange={(e) => setRenameValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") void handleRenamePasskey(pk.id);
-                                if (e.key === "Escape") {
-                                  setRenamingId(null);
-                                  setRenameValue("");
-                                }
-                              }}
-                              className={cn(inputClass, "max-w-[220px]")}
-                            />
-                          ) : (
-                            <span className="truncate text-sm font-medium text-dash-text-strong">
-                              {pk.deviceName || "Unnamed passkey"}
-                            </span>
-                          )}
-                          <span className="text-xs text-dash-text-faded">
-                            Added {formatPasskeyDate(pk.createdAt)}
-                            {pk.lastUsedAt
-                              ? ` · last used ${formatPasskeyDate(pk.lastUsedAt)}`
-                              : " · never used"}
-                          </span>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {isRenaming ? (
-                            <>
+                      <li key={pk.id} className="py-3">
+                        <AnimatePresence mode="wait" initial={false}>
+                        {isRenaming ? (
+                          <motion.div
+                            key="rename-mode"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                            className="flex items-center gap-2"
+                          >
+                              <input
+                                autoFocus
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") void handleRenamePasskey(pk.id);
+                                  if (e.key === "Escape") {
+                                    setRenamingId(null);
+                                    setRenameValue("");
+                                  }
+                                }}
+                                className={cn(inputClass, "max-w-[260px]")}
+                              />
                               <button
                                 type="button"
                                 onClick={() => void handleRenamePasskey(pk.id)}
@@ -638,16 +631,35 @@ export function SecurityForm({
                               >
                                 Cancel
                               </button>
-                            </>
-                          ) : (
-                            <>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="display-mode"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                            className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <span className="truncate text-sm font-medium text-dash-text-strong">
+                                {pk.deviceName || "Unnamed passkey"}
+                              </span>
+                              <span className="text-xs text-dash-text-faded">
+                                Added {formatPasskeyDate(pk.createdAt)}
+                                {pk.lastUsedAt
+                                  ? ` · last used ${formatPasskeyDate(pk.lastUsedAt)}`
+                                  : " · never used"}
+                              </span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setRenamingId(pk.id);
                                   setRenameValue(pk.deviceName || "");
                                 }}
-                                className="text-sm text-dash-text-faded hover:text-dash-text-strong"
+                                className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-2.5 py-1 text-xs font-medium text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
                               >
                                 Rename
                               </button>
@@ -660,20 +672,21 @@ export function SecurityForm({
                                     ? "Enable 2FA or keep at least one passkey to remove this one."
                                     : undefined
                                 }
-                                className="text-sm text-[#ef2f1f] hover:text-[#c92516] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="rounded-[4px] border-[0.5px] border-dash-border px-2.5 py-1 text-xs font-medium text-[#ef2f1f] transition-colors hover:bg-[#ef2f1f]/5 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 {deletingId === pk.id ? "Removing..." : "Delete"}
                               </button>
-                            </>
-                          )}
-                        </div>
+                            </div>
+                          </motion.div>
+                        )}
+                        </AnimatePresence>
                       </li>
                     );
                   })}
                 </ul>
               )}
 
-              {enrollNameOpen ? (
+              {passkeys.length > 0 ? null : enrollNameOpen ? (
                 <div className="flex items-center gap-2">
                   <input
                     autoFocus
