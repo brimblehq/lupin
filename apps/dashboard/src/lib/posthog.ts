@@ -23,21 +23,21 @@ function isLocalhostHost(hostname: string): boolean {
 function shouldEnablePostHog(): boolean {
   if (!config.posthogKey) return false;
 
-  const viteEnv =
-    typeof import.meta !== "undefined"
-      ? ((import.meta as ImportMeta).env as
-          | { DEV?: boolean }
-          | undefined)
-      : undefined;
-  if (viteEnv?.DEV) return false;
+  // const viteEnv =
+  //   typeof import.meta !== "undefined"
+  //     ? ((import.meta as ImportMeta).env as
+  //         | { DEV?: boolean }
+  //         | undefined)
+  //     : undefined;
+  // if (viteEnv?.DEV) return false;
 
-  const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } })
-    .process?.env?.NODE_ENV;
-  if (nodeEnv && nodeEnv !== "production") return false;
+  // const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } })
+  //   .process?.env?.NODE_ENV;
+  // if (nodeEnv && nodeEnv !== "production") return false;
 
-  if (typeof window !== "undefined" && isLocalhostHost(window.location.hostname)) {
-    return false;
-  }
+  // if (typeof window !== "undefined" && isLocalhostHost(window.location.hostname)) {
+  //   return false;
+  // }
 
   return true;
 }

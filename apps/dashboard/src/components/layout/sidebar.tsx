@@ -6,7 +6,7 @@ import { useTheme } from "../../hooks/use-theme";
 import { Theme } from "../../types/enums";
 import { useHaptics } from "@/hooks/use-haptics";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
-import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
+import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/feature-flags";
 import { isPostHogEnabled } from "@/lib/posthog";
 
 export const mainNav = [
@@ -71,6 +71,9 @@ export function Sidebar({
   const bucketsEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
   const sandboxEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
 
+  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS);
+  const sandboxStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
+
   const flagValues: Record<string, boolean> = useMemo(
     () => ({
       [FeatureFlags.ENABLE_DOMAINS]: domainsEnabled,
@@ -79,6 +82,14 @@ export function Sidebar({
       [FeatureFlags.ENABLE_SANDBOX]: sandboxEnabled,
     }),
     [domainsEnabled, scalingEnabled, bucketsEnabled, sandboxEnabled],
+  );
+
+  const strictFlagValues: Record<string, boolean> = useMemo(
+    () => ({
+      [FeatureFlags.ENABLE_BUCKETS]: bucketsStrict,
+      [FeatureFlags.ENABLE_SANDBOX]: sandboxStrict,
+    }),
+    [bucketsStrict, sandboxStrict],
   );
 
   const filteredMainNav = useMemo(
@@ -90,12 +101,12 @@ export function Sidebar({
           return true;
         })
         .map((item) => {
-          if (item.comingSoon && item.flag && isPostHogEnabled && flagValues[item.flag]) {
+          if (item.comingSoon && item.flag && isPostHogEnabled && strictFlagValues[item.flag]) {
             return { ...item, comingSoon: false };
           }
           return item;
         }),
-    [flagValues],
+    [flagValues, strictFlagValues],
   );
 
   return (
