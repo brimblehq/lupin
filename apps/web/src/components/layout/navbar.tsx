@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { Sun, Moon } from "lucide-react";
 import { siteConfig } from "@/config/site";
@@ -16,6 +16,7 @@ function StatusDot() {
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
     <motion.header
@@ -31,7 +32,11 @@ export function Navbar() {
         <div className="flex items-center gap-1 overflow-x-auto sm:gap-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {siteConfig.navLinks.map((link, i) => {
             const isExternal = link.href.startsWith("http");
-            const linkClass = "inline-flex items-center gap-1.5 rounded px-2 py-1 font-body text-sm font-medium text-brimble-black shadow-[var(--shadow-button)] transition-colors duration-150 hover:bg-brimble-air-gray dark:hover:bg-white/10";
+            const isActive = !isExternal && pathname === link.href;
+            const linkBase = "relative inline-flex items-center gap-1.5 rounded px-2 py-1 font-body text-sm font-medium transition-colors duration-150 hover:bg-brimble-air-gray dark:hover:bg-white/10";
+            const linkClass = isActive
+              ? `${linkBase} text-brimble-black shadow-[var(--shadow-button)]`
+              : `${linkBase} text-brimble-black/50 dark:text-white/50 shadow-none`;
 
             return (
               <motion.div
@@ -41,7 +46,7 @@ export function Navbar() {
                 transition={{ duration: 0.4, delay: 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
               >
                 {isExternal ? (
-                  <a href={link.href} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                  <a href={link.href} target="_blank" rel="noopener noreferrer" className={`${linkBase} text-brimble-black/50 dark:text-white/50 shadow-none`}>
                     {link.status && <StatusDot />}
                     {link.label}
                   </a>

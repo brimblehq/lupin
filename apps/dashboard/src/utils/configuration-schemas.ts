@@ -41,14 +41,8 @@ export const resourcesConfigSchema = Yup.object({
   memoryValue: Yup.number().min(0.5).max(12).default(0.5),
   scalingGroup: Yup.string().default(""),
   diskEnabled: Yup.boolean().default(false),
-  diskSize: Yup.string().default("").when("diskEnabled", {
-    is: true,
-    then: (s) => s.required("Disk size is required"),
-  }),
-  mountPath: Yup.string().default("").when("diskEnabled", {
-    is: true,
-    then: (s) => s.required("Mount path is required"),
-  }),
+  diskSize: Yup.string().default(""),
+  mountPath: Yup.string().default(""),
 });
 
 export type ResourcesConfigValues = {

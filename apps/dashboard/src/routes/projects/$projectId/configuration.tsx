@@ -2311,6 +2311,33 @@ function ConfigurationPage() {
   }
 
   async function handleSubmitResources(values: ResourcesConfigValues) {
+    if (!databaseProject) {
+      await saveGeneralConfig({
+        data: {
+          projectId: project?.id || params.projectId,
+          workspace,
+          name: project?.name || params.projectId,
+          branch: generalInitialValues.branch,
+          rootDirectory: rootDir,
+          framework: generalInitialValues.framework,
+          region: generalInitialValues.region,
+          cpu: values.cpuValue,
+          memory: values.memoryValue,
+          storage: normalizeStorageValue(project?.specs?.storage),
+          authEnabled: generalInitialValues.authEnabled,
+          buildCacheEnabled: generalInitialValues.buildCacheEnabled,
+        },
+      });
+
+      markDeploymentHistoryForRefresh({
+        projectId: project?.id || params.projectId,
+        workspace,
+      });
+      toast.success("Resources updated. Redeploy started.");
+      router.invalidate();
+      return;
+    }
+
     const nextConfigurations: Record<string, unknown> = {
       cpu: values.cpuValue,
       memory: values.memoryValue,
@@ -2449,12 +2476,12 @@ function ConfigurationPage() {
               {activeSection === ConfigSection.Resources && (
                 <ResourcesSection
                   initialValues={resourcesInitialValues}
-                  onSubmit={databaseProject ? handleSubmitResources : undefined}
+                  onSubmit={handleSubmitResources}
                   scalingGroupOptions={scalingGroupOptions}
                   showScalingGroup={scalingGroupVisible}
                   showPersistentStorage={persistentStorageVisible}
                   storageAlwaysOn={databaseProject}
-                  canSave={databaseProject}
+                  canSave
                   canWrite={canWrite}
                 />
               )}
