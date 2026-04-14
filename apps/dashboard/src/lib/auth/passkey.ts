@@ -19,7 +19,8 @@ export async function isPasskeyAutofillSupported(): Promise<boolean> {
 }
 
 export async function runRegistration(options: Record<string, unknown>) {
-  return startRegistration({ optionsJSON: options as any });
+  const optionsJSON = normalizeRegistrationOptions(options);
+  return startRegistration({ optionsJSON: optionsJSON as any });
 }
 
 export async function runAuthentication(options: Record<string, unknown>, useBrowserAutofill = false) {
@@ -103,6 +104,29 @@ function getErrorName(value: unknown): string {
   if (!value || typeof value !== "object") return "";
   const maybeName = (value as { name?: unknown }).name;
   return typeof maybeName === "string" ? maybeName : "";
+}
+
+function normalizeRegistrationOptions(options: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...options };
+
+  const rawSelection = normalized.authenticatorSelection;
+  const selection: Record<string, unknown> =
+    rawSelection && typeof rawSelection === "object" ? { ...(rawSelection as Record<string, unknown>) } : {};
+
+  if (selection.residentKey == null) selection.residentKey = "preferred";
+  if (selection.requireResidentKey == null) selection.requireResidentKey = selection.residentKey === "required";
+  if (selection.userVerification == null) selection.userVerification = "preferred";
+  if (selection.authenticatorAttachment == null) selection.authenticatorAttachment = "platform";
+
+  normalized.authenticatorSelection = selection;
+
+  const existingHints = Array.isArray(normalized.hints)
+    ? normalized.hints.filter((value): value is string => typeof value === "string")
+    : [];
+  const dedupedHints = ["client-device", ...existingHints].filter((hint, index, all) => all.indexOf(hint) === index);
+  normalized.hints = dedupedHints;
+
+  return normalized;
 }
 
 function normalizeAuthenticationOptions(options: Record<string, unknown>, useBrowserAutofill: boolean): Record<string, unknown> {

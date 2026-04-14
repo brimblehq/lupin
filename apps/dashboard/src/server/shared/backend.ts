@@ -176,25 +176,49 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
   }
 }
 
+const SERIALIZED_HTTP_STATUS_PREFIX = /^\[HTTP (\d{3})\]\s*/;
+
 /**
  * TanStack Start serializes errors across the SSR/client boundary using
  * seroval's ShallowErrorPlugin, which only preserves `message` and `stack`.
- * Custom fields like `status` and `code` on BackendApiError get stripped —
- * so the client-side error boundary can't tell a 403 from a 500.
+ * Custom fields like `status` and `code` on BackendApiError get stripped.
  *
- * We fix that by encoding the HTTP status into the message itself, which
- * survives serialization. The format `[HTTP 403]` is matched by
- * `isForbiddenError` (via /\b403\b/) and can be stripped for display.
+ * Preserve HTTP status in `stack` for downstream checks while keeping
+ * `message` clean for user-facing toasts and UI copy.
  */
 function makeSerializableError(error: any): any {
-  const status = typeof error?.status === "number" ? error.status : undefined;
-  if (!status || !error?.message) {
+  if (!error || typeof error !== "object") {
     return error;
   }
-  if (error.message.startsWith(`[HTTP ${status}]`)) {
+
+  const rawMessage = typeof error.message === "string" ? error.message : "";
+  const statusFromMessage = (() => {
+    const match = rawMessage.match(SERIALIZED_HTTP_STATUS_PREFIX);
+    if (!match) {
+      return undefined;
+    }
+    return Number(match[1]);
+  })();
+  const status = typeof error.status === "number" ? error.status : statusFromMessage;
+
+  if (!status) {
     return error;
   }
-  error.message = `[HTTP ${status}] ${error.message}`;
+
+  const cleanMessage = rawMessage.replace(SERIALIZED_HTTP_STATUS_PREFIX, "");
+  if (cleanMessage) {
+    error.message = cleanMessage;
+  }
+
+  const stackPrefix = `[HTTP ${status}]`;
+  if (typeof error.stack === "string") {
+    if (!error.stack.startsWith(stackPrefix)) {
+      error.stack = `${stackPrefix}\n${error.stack}`;
+    }
+  } else {
+    error.stack = stackPrefix;
+  }
+
   return error;
 }
 

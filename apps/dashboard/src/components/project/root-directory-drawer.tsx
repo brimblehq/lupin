@@ -8,10 +8,14 @@ import { getGithubRootDirServerFn, getGitlabRootDirServerFn } from "@/server/rep
 const HTTP_STATUS_PREFIX = /^\[HTTP (\d{3})\]\s*/;
 
 function getHttpStatus(error: unknown): number | undefined {
-  const err = error as { status?: unknown; message?: unknown } | null;
+  const err = error as { status?: unknown; message?: unknown; stack?: unknown } | null;
   if (typeof err?.status === "number") return err.status;
   if (typeof err?.message === "string") {
     const match = err.message.match(HTTP_STATUS_PREFIX);
+    if (match) return Number(match[1]);
+  }
+  if (typeof err?.stack === "string") {
+    const match = err.stack.match(HTTP_STATUS_PREFIX);
     if (match) return Number(match[1]);
   }
   return undefined;
