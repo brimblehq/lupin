@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "@phosphor-icons/react";
 import { parseTokens, validateReferences, type ReferenceValidationContext } from "@/utils/env-references";
 
 export function ReferenceCountBadge({ value }: { value: string }) {
@@ -9,8 +10,12 @@ export function ReferenceCountBadge({ value }: { value: string }) {
   const tooltip = tokens.map((t) => (t.kind === "shared" ? `shared.${t.name}` : `@${t.projectSlug}.${t.name}`)).join("\n");
 
   return (
-    <span title={tooltip} className="shrink-0 rounded-full bg-dash-syntax/10 px-1.5 py-0.5 text-[10px] font-medium text-dash-syntax">
-      🔗 {label}
+    <span
+      title={tooltip}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-dash-syntax/10 px-1.5 py-0.5 text-[10px] font-medium text-dash-syntax"
+    >
+      <Link size={10} weight="bold" />
+      {label}
     </span>
   );
 }

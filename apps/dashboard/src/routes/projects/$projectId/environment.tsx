@@ -45,7 +45,11 @@ import {
 } from "@/utils/project-environment";
 import { isDatabaseProject as getIsDatabaseProject } from "@/utils/project-capabilities";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
-import { type ReferenceValidationContext } from "@/utils/env-references";
+import {
+  hasReferenceTrigger,
+  highlightReferences,
+  type ReferenceValidationContext,
+} from "@/utils/env-references";
 import type { ProjectOption, ProjectVarOption, SharedVarOption } from "@/components/project/env-reference-autocomplete";
 import { ReferenceHighlightInput } from "@/components/project/reference-highlight-input";
 import { ReferenceCountBadge, ReferenceWarnings } from "@/components/project/env-reference-widgets";
@@ -89,6 +93,8 @@ type LoaderData = {
   initialTarget: string;
   initialSnapshot: ProjectEnvironmentSnapshot;
   targets: string[];
+  initialEnvLevelVars: EffectiveEnvironmentVariable[];
+  initialEnvLevelVarsKey: string | null;
 };
 
 export const Route = createFileRoute("/projects/$projectId/environment")({
@@ -97,20 +103,45 @@ export const Route = createFileRoute("/projects/$projectId/environment")({
   loader: async ({ context }) => {
     const project = (context as any).project;
     const projectId = project?.id;
+    const workspace = (context as any).workspace as string | undefined;
+    const projectEnvironmentId = project?.projectEnvironmentId as string | null | undefined;
+    const inheritEnvironmentVars = project?.inheritEnvironmentVars as boolean | undefined;
+    const sharedLayerEnabled = Boolean(projectEnvironmentId) && inheritEnvironmentVars !== false;
 
-    const [snapshot, targets] = await Promise.all([
+    const [snapshot, targets, envLevelResult] = await Promise.all([
       (getProjectEnvironmentServerFn as any)({
         data: { projectId, target: DEFAULT_TARGET },
       }).catch(() => ({ envs: [] })),
       (listProjectEnvironmentTargetsServerFn as any)({
         data: { projectId },
       }).catch(() => [DEFAULT_TARGET]),
+      sharedLayerEnabled && projectEnvironmentId
+        ? (getEnvironmentVariablesServerFn as any)({
+            data: { environmentId: projectEnvironmentId, workspace },
+          })
+            .then((vars: unknown) => ({
+              loaded: true,
+              vars: Array.isArray(vars) ? (vars as EffectiveEnvironmentVariable[]) : [],
+            }))
+            .catch(() => ({
+              loaded: false,
+              vars: [] as EffectiveEnvironmentVariable[],
+            }))
+        : Promise.resolve({
+            loaded: true,
+            vars: [] as EffectiveEnvironmentVariable[],
+          }),
     ]);
 
     const data = {
       initialTarget: DEFAULT_TARGET,
       initialSnapshot: snapshot,
       targets: sortEnvironmentTargets(targets),
+      initialEnvLevelVars: envLevelResult.vars,
+      initialEnvLevelVarsKey:
+        sharedLayerEnabled && projectEnvironmentId && envLevelResult.loaded
+          ? `${projectEnvironmentId}:${workspace ?? ""}`
+          : null,
     } satisfies LoaderData;
     return data;
   },
@@ -510,13 +541,26 @@ function EnvAccordionRow({
               className="input-base input-focus h-[36px] w-full px-3 font-mono text-sm text-dash-text-strong disabled:opacity-60"
             />
             <div className="input-base input-focus-within relative flex h-[36px] items-center">
+              {showValue && hasReferenceTrigger(value) && (
+                <pre
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre px-3 pr-16 font-mono text-sm italic leading-[36px] text-dash-text-strong"
+                  dangerouslySetInnerHTML={{ __html: highlightReferences(value) }}
+                />
+              )}
               <input
                 type="text"
                 autoComplete="off"
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 readOnly={!canEdit}
-                className={`h-full w-full bg-transparent px-3 pr-16 text-sm text-dash-text-strong outline-none ${!canEdit ? "cursor-default" : ""} ${!showValue ? "[text-security:disc] [-webkit-text-security:disc]" : ""}`}
+                className={`h-full w-full bg-transparent px-3 pr-16 text-sm outline-none ${!canEdit ? "cursor-default" : ""} ${
+                  !showValue
+                    ? "text-dash-text-strong [text-security:disc] [-webkit-text-security:disc]"
+                    : hasReferenceTrigger(value)
+                      ? "font-mono italic text-transparent caret-dash-text-strong [&::selection]:bg-dash-syntax/25 [&::selection]:text-transparent"
+                      : "text-dash-text-strong"
+                }`}
               />
               <div className="absolute right-2 flex items-center gap-1.5">
                 <button type="button" onClick={revealValue} className="shrink-0 text-dash-text-faded hover:text-dash-text-strong">
@@ -825,7 +869,13 @@ function EnvLevelVarRow({
 function EnvironmentPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const router = useRouter();
-  const { initialTarget, initialSnapshot, targets: initialTargets } = Route.useLoaderData() as LoaderData;
+  const {
+    initialTarget,
+    initialSnapshot,
+    targets: initialTargets,
+    initialEnvLevelVars,
+    initialEnvLevelVarsKey,
+  } = Route.useLoaderData() as LoaderData;
   const { canWrite } = useWorkspaceRole();
 
   const projectId = project?.id as string | undefined;
@@ -897,10 +947,11 @@ function EnvironmentPage() {
   const [expandedRowId, setExpandedRowId] = useState<string | undefined>(undefined);
   const [decryptingRowId, setDecryptingRowId] = useState<string | undefined>(undefined);
   const [decryptedCache, setDecryptedCache] = useState<Record<string, string>>({});
-  const [envLevelVars, setEnvLevelVars] = useState<EffectiveEnvironmentVariable[]>([]);
+  const [envLevelVars, setEnvLevelVars] = useState<EffectiveEnvironmentVariable[]>(initialEnvLevelVars);
   const [siblingProjects, setSiblingProjects] = useState<ProjectOption[]>([]);
   const projectVarsCache = useRef(new Map<string, ProjectVarOption[]>());
   const projectVarsBySlug = useRef(new Map<string, Set<string>>());
+  const hydratedEnvLevelVarsKeyRef = useRef<string | null>(initialEnvLevelVarsKey);
 
   useEffect(() => {
     setSelectedTarget(initialTarget);
@@ -910,7 +961,9 @@ function EnvironmentPage() {
     setSearch("");
     setDecryptedCache({});
     setExpandedRowId(undefined);
-  }, [initialTarget, initialSnapshot, initialTargets]);
+    setEnvLevelVars(initialEnvLevelVars);
+    hydratedEnvLevelVarsKeyRef.current = initialEnvLevelVarsKey;
+  }, [initialTarget, initialSnapshot, initialTargets, initialEnvLevelVars, initialEnvLevelVarsKey]);
 
   useEffect(() => {
     setDraftRows([{ id: createDraftId(), name: "", value: "", shared: false }]);
@@ -928,8 +981,14 @@ function EnvironmentPage() {
   }, [projectEnvironmentId, sharedLayerEnabled, workspace, getEnvLevelVars]);
 
   useEffect(() => {
+    const envLevelVarsKey = projectEnvironmentId && sharedLayerEnabled ? `${projectEnvironmentId}:${workspace ?? ""}` : null;
+    if (envLevelVarsKey && hydratedEnvLevelVarsKeyRef.current === envLevelVarsKey) {
+      hydratedEnvLevelVarsKeyRef.current = null;
+      return;
+    }
+
     void fetchEnvLevelVars();
-  }, [fetchEnvLevelVars]);
+  }, [fetchEnvLevelVars, projectEnvironmentId, sharedLayerEnabled, workspace]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1410,7 +1469,7 @@ function EnvironmentPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
+    <div data-ph-mask className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
       <TabHeader title="Secrets">
         {getEnvironmentDescription(canEdit)}{" "}
         <a href="#" className="text-[#4879f8] underline">

@@ -595,6 +595,9 @@ export function DashboardLayout({
       return typeof value === "number" && Number.isFinite(value) ? value : null;
     },
   });
+  const hasRenderedProjectDetailsMatch = useRouterState({
+    select: (s) => s.matches.some((match) => match.routeId === "/projects/$projectId"),
+  });
   const navigate = useNavigate();
   const isAuthRoute = /^\/(login|signup)$/.test(layoutPathname) || /^\/(login|signup)$/.test(pathname);
   const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace)?(\/|$)/;
@@ -610,7 +613,6 @@ export function DashboardLayout({
 
     return next.get("workspace") !== current.get("workspace") || next.get("environmentId") !== current.get("environmentId");
   }, [searchStr, resolvedSearchStr]);
-  const isRenderedProjectDetailsRoute = useMemo(() => isProjectDetailsPath(layoutPathname), [layoutPathname]);
   const isIncomingProjectDetailsRoute = useMemo(() => isProjectDetailsPath(pathname), [pathname]);
 
   const [shouldShowRouteSkeleton, setShouldShowRouteSkeleton] = useState(false);
@@ -628,7 +630,7 @@ export function DashboardLayout({
     return () => clearTimeout(timer);
   }, [isWorkspaceOrEnvironmentSwitching]);
 
-  const shouldRenderDesktopSidebar = shouldShowRouteSkeleton ? !isIncomingProjectDetailsRoute : !isRenderedProjectDetailsRoute;
+  const shouldRenderDesktopSidebar = shouldShowRouteSkeleton ? !isIncomingProjectDetailsRoute : !hasRenderedProjectDetailsMatch;
 
   const currentWorkspace = useMemo(() => {
     const params = new URLSearchParams(searchStr || "");
