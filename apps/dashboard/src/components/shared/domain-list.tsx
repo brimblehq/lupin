@@ -440,11 +440,7 @@ export function DomainList({
     }
   }
 
-  const filtered = domains.filter((d) => {
-    const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "All" || d.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filtered = domains.filter((d) => statusFilter === "All" || d.status === statusFilter);
 
   const failedDomains = filtered.filter((d) => d.status === "Failed");
   const expiredDomains = filtered.filter((d) => d.status === "Active" && d.isExpired);

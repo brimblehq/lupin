@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, getRouteApi, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import {
+  parsePositivePageSearchValue,
+  parseTextSearchValue,
+} from "@/utils/workspace-route-search";
 import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { DomainList, type Domain } from "../../../../components/shared/domain-list";
@@ -31,50 +35,40 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
   validateSearch: (search: Record<string, unknown>) => {
-    const next: { page?: number; workspace?: string } = {};
+    const next: { page?: number; workspace?: string; q?: string } = {};
 
-    const rawPage = search.page;
-    if (typeof rawPage === "number" && Number.isFinite(rawPage) && rawPage > 0) {
-      next.page = Math.floor(rawPage);
-    } else if (typeof rawPage === "string") {
-      const parsed = Number(rawPage);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        next.page = Math.floor(parsed);
-      }
-    }
+    const page = parsePositivePageSearchValue(search.page);
+    if (page !== undefined) next.page = page;
 
     const rawWorkspace = search.workspace;
     if (typeof rawWorkspace === "string" && rawWorkspace.trim()) {
       next.workspace = rawWorkspace.trim();
     }
 
+    const q = parseTextSearchValue(search.q);
+    if (q !== undefined) next.q = q;
+
     return next;
   },
-  loader: async ({ params, context }) => {
-    const project = (context as any).project;
-    const workspace = (context as any).workspace;
-
-    const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-    const rawPage = searchParams.get("page");
-
-    let page = 1;
-    if (rawPage) {
-      const parsed = Number(rawPage);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        page = Math.floor(parsed);
-      }
-    }
+  loaderDeps: ({ search }) => ({
+    page: search.page ?? 1,
+    workspace: search.workspace,
+    q: search.q,
+  }),
+  loader: async ({ params, deps, context }) => {
+    const workspace = deps.workspace ?? (context as any).workspace;
 
     const [domains, projects] = await Promise.all([
       (
         listDomainsPageServerFn as unknown as (input: {
-          data: { page?: number; workspace?: string; projectName?: string };
+          data: { page?: number; workspace?: string; projectName?: string; q?: string };
         }) => Promise<PaginatedDomainsResponse>
       )({
         data: {
-          page,
+          page: deps.page,
           workspace,
           projectName: params.projectId,
+          q: deps.q,
         },
       }),
       (listDomainProjectsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<PaginatedProjectsResponse>)({
@@ -183,6 +177,7 @@ function ProjectDomainsPage() {
 
   const { domains: domainsResult, projects } = Route.useLoaderData();
   const [addDomainOpen, setAddDomainOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(search.q ?? "");
   const [rows, setRows] = useState<Domain[]>(() => domainsResult.items.map((item) => mapDomainToRow(item, project.name)));
   const navigate = useNavigate({ from: "/projects/$projectId/domains/" });
   const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
@@ -220,6 +215,32 @@ function ProjectDomainsPage() {
   useEffect(() => {
     setRows(domainsResult.items.map((item) => mapDomainToRow(item, project.name)));
   }, [domainsResult.items, project.name]);
+
+  useEffect(() => {
+    setSearchQuery(search.q ?? "");
+  }, [search.q]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const nextQ = searchQuery.trim() || undefined;
+      if ((search.q ?? undefined) === nextQ) return;
+
+      navigate({
+        to: "/projects/$projectId/domains/",
+        params: { projectId },
+        replace: true,
+        search: {
+          ...(search || {}),
+          q: nextQ,
+          page: undefined,
+        },
+      });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [navigate, projectId, search, searchQuery]);
 
   function handlePageChange(page: number) {
     if (page < 1 || page === domainsResult.currentPage || page > domainsResult.totalPages) {
@@ -428,6 +449,9 @@ function ProjectDomainsPage() {
         domains={rows}
         basePath={`/projects/${projectId}/domains`}
         projects={projects}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        searchLoading={searchQuery.trim() !== (search.q?.trim() ?? "") || (isRouterLoading && (search.q?.trim() ?? "") !== "")}
         onAddDomain={canWrite ? () => setAddDomainOpen(true) : undefined}
         onRefreshDomain={handleRefreshDomain}
         onConfigureDomain={canWrite ? handleConfigureDomain : undefined}

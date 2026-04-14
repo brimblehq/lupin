@@ -78,6 +78,8 @@ function getPageRange(current: number, total: number, max: number): (number | "e
   return pages;
 }
 
+type ClickedControl = { type: "page"; page: number } | { type: "prev" } | { type: "next" };
+
 export function NumberPagination({
   currentPage,
   totalPages,
@@ -87,13 +89,11 @@ export function NumberPagination({
   loadingPage: loadingPageProp = null,
 }: NumberPaginationProps) {
   const haptics = useHaptics();
-  const [clickedPage, setClickedPage] = useState<number | null>(null);
+  const [clicked, setClicked] = useState<ClickedControl | null>(null);
 
   useEffect(() => {
-    if (!isLoading) setClickedPage(null);
+    if (!isLoading) setClicked(null);
   }, [isLoading, currentPage]);
-
-  const loadingPage = loadingPageProp ?? (isLoading ? clickedPage : null);
 
   if (totalPages <= 1) return null;
 
@@ -101,23 +101,28 @@ export function NumberPagination({
   const isFirst = currentPage === 1;
   const isLast = currentPage === totalPages;
 
+  const pageLoading = (page: number) => {
+    if (!isLoading) return false;
+    if (clicked?.type === "page") return clicked.page === page;
+    if (clicked == null && loadingPageProp != null) return loadingPageProp === page;
+    return false;
+  };
+  const prevLoading = isLoading && clicked?.type === "prev";
+  const nextLoading = isLoading && clicked?.type === "next";
+
   return (
     <nav aria-label="Pagination" className="flex items-center justify-center gap-1">
       <button
         onClick={() => {
           haptics.selection();
-          setClickedPage(currentPage - 1);
+          setClicked({ type: "prev" });
           onPageChange(currentPage - 1);
         }}
         disabled={isFirst || isLoading}
         aria-label="Previous page"
         className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
       >
-        {isLoading && loadingPage === currentPage - 1 ? (
-          <Spinner size="size-4" className="text-dash-text-faded" />
-        ) : (
-          <ChevronLeft className="size-4" />
-        )}
+        {prevLoading ? <Spinner size="size-4" className="text-dash-text-faded" /> : <ChevronLeft className="size-4" />}
       </button>
 
       {pages.map((page, i) =>
@@ -130,7 +135,7 @@ export function NumberPagination({
             key={page}
             onClick={() => {
               haptics.selection();
-              setClickedPage(page);
+              setClicked({ type: "page", page });
               onPageChange(page);
             }}
             disabled={isLoading}
@@ -142,7 +147,7 @@ export function NumberPagination({
                 : "text-dash-text-faded hover:bg-dash-bg-elevated"
             } disabled:opacity-70`}
           >
-            {isLoading && loadingPage === page ? <Spinner size="size-4" className="text-dash-text-faded" /> : page}
+            {pageLoading(page) ? <Spinner size="size-4" className="text-dash-text-faded" /> : page}
           </button>
         ),
       )}
@@ -150,18 +155,14 @@ export function NumberPagination({
       <button
         onClick={() => {
           haptics.selection();
-          setClickedPage(currentPage + 1);
+          setClicked({ type: "next" });
           onPageChange(currentPage + 1);
         }}
         disabled={isLast || isLoading}
         aria-label="Next page"
         className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
       >
-        {isLoading && loadingPage === currentPage + 1 ? (
-          <Spinner size="size-4" className="text-dash-text-faded" />
-        ) : (
-          <ChevronRight className="size-4" />
-        )}
+        {nextLoading ? <Spinner size="size-4" className="text-dash-text-faded" /> : <ChevronRight className="size-4" />}
       </button>
     </nav>
   );

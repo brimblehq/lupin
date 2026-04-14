@@ -116,7 +116,7 @@ export const Route = createRootRoute({
       {
         src: "https://scripts.brimble.io/analytics/brimble.js",
         defer: true,
-        "data-website-id": "dfd2979d-65a0-4b08-9ba2-fe6091bb8fa6",
+        "data-website-id": "48de2c0e-55ae-4397-8362-6d913a5c1e4e",
       },
     ],
   }),
