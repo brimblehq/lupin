@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Github, ArrowLeft, Loader2, Fingerprint } from "lucide-react";
@@ -71,6 +71,7 @@ function BitbucketIcon() {
 
 function EmailStep({
   email,
+  emailError,
   onEmailChange,
   onSubmit,
   loading,
@@ -85,6 +86,7 @@ function EmailStep({
   passkeyLoading,
 }: {
   email: string;
+  emailError?: string;
   onEmailChange: (v: string) => void;
   onSubmit: () => void;
   loading: boolean;
@@ -153,6 +155,7 @@ function EmailStep({
           label="Work email"
           placeholder="name@company.com"
           value={email}
+          error={emailError}
           onChange={(e) => onEmailChange(e.target.value)}
           autoFocus
           inputMode="email"
@@ -302,6 +305,18 @@ function getNextUrl(): string {
 
 const AUTH_METHOD_KEY = "brimble:last-auth-method";
 type AuthMethod = "github" | "google" | "gitlab" | "bitbucket" | "email";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateEmailInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "Enter your work email to continue.";
+  }
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return "Enter a valid email address.";
+  }
+  return null;
+}
 
 function getLastAuthMethod(): AuthMethod | null {
   try {
@@ -336,6 +351,7 @@ function LoginPage() {
   const autofillAbortRef = useRef<AbortController | null>(null);
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
   const otpRef = useRef(otp);
   otpRef.current = otp;
@@ -395,7 +411,7 @@ function LoginPage() {
     }
   }
 
-  async function runPasskeyVerify(challengeToken: string, credential: unknown) {
+  const runPasskeyVerify = useCallback(async (challengeToken: string, credential: unknown) => {
     const response = await verifyPasskeyAuth({
       data: {
         challengeToken,
@@ -407,16 +423,25 @@ function LoginPage() {
     toast.success(`Welcome back${response.user.firstName ? `, ${response.user.firstName}` : ""}`);
     invalidateSessionCache();
     window.location.replace(getNextUrl());
-  }
+  }, [verifyPasskeyAuth]);
 
   async function handlePasskeySignIn() {
     if (passkeyLoading || loading) return;
+    const validationError = validateEmailInput(email);
+    if (validationError) {
+      setEmailError(validationError);
+      return;
+    }
+
+    setEmailError(null);
+    const normalizedEmail = email.trim().toLowerCase();
+
     haptics.selection();
     setPasskeyLoading(true);
     const passkey = await loadPasskey();
     try {
       const { options, challengeToken } = await getPasskeyAuthOptions({
-        data: { email: email.trim() || "" },
+        data: { email: normalizedEmail },
       });
       const credential = await passkey.runAuthentication(options);
       await runPasskeyVerify(challengeToken, credential);
@@ -431,6 +456,8 @@ function LoginPage() {
 
   useEffect(() => {
     if (!passkeyFeature.enabled) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
     if (autofillStartedRef.current) return;
     autofillStartedRef.current = true;
 
@@ -444,7 +471,7 @@ function LoginPage() {
         const supportsAutofill = await isPasskeyAutofillSupported();
         if (cancelled || !supportsAutofill) return;
         const { options, challengeToken } = await getPasskeyAuthOptions({
-          data: { email: "" },
+          data: { email: normalizedEmail },
         });
         if (cancelled) return;
         const credential = await runAuthentication(options, true);
@@ -458,7 +485,6 @@ function LoginPage() {
           !msg.toLowerCase().includes("cancel") &&
           !msg.toLowerCase().includes("notallowed")
         ) {
-          // eslint-disable-next-line no-console
           console.warn("[passkey-autofill]", msg);
         }
       }
@@ -468,11 +494,17 @@ function LoginPage() {
       cancelled = true;
       controller.abort();
     };
-  }, [passkeyFeature.enabled]);
+  }, [passkeyFeature.enabled, email, getPasskeyAuthOptions, runPasskeyVerify]);
 
   async function handleSendOtp() {
     haptics.selection();
-    if (!email.trim()) return;
+    const validationError = validateEmailInput(email);
+    if (validationError) {
+      setEmailError(validationError);
+      return;
+    }
+
+    setEmailError(null);
     setLoading(true);
     try {
       await requestLoginOtp({ data: { email, geo: await getClientGeo() } });
@@ -573,7 +605,13 @@ function LoginPage() {
           <EmailStep
             key="email"
             email={email}
-            onEmailChange={setEmail}
+            emailError={emailError ?? undefined}
+            onEmailChange={(next) => {
+              setEmail(next);
+              if (emailError) {
+                setEmailError(null);
+              }
+            }}
             onSubmit={handleSendOtp}
             loading={loading}
             onGithub={() => {

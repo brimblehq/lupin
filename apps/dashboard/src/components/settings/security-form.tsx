@@ -107,7 +107,9 @@ export function SecurityForm({
   const renamePasskey = useServerFn(renamePasskeyServerFn as any) as (args: {
     data: { id: string; deviceName: string };
   }) => Promise<PasskeySummary>;
-  const deletePasskey = useServerFn(deletePasskeyServerFn as any) as (args: { data: { id: string } }) => Promise<{ ok: true }>;
+  const deletePasskey = useServerFn(deletePasskeyServerFn as any) as (args: {
+    data: { id: string; code?: string };
+  }) => Promise<{ ok: true }>;
 
   const passkeyFeature = usePasskeyFeature();
   const [passkeys, setPasskeys] = useState<PasskeySummary[]>([]);
@@ -118,6 +120,10 @@ export function SecurityForm({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [stepUpPasskeyId, setStepUpPasskeyId] = useState<string | null>(null);
+  const [stepUpCode, setStepUpCode] = useState("");
+  const [stepUpError, setStepUpError] = useState<string | null>(null);
+  const [stepUpLoading, setStepUpLoading] = useState(false);
 
   const [email, setEmail] = useState(initialEmail);
   const [emailCopied, setEmailCopied] = useState(false);
@@ -303,11 +309,10 @@ export function SecurityForm({
 
   const passkeyPanelVisible = passkeyFeature.browserSupported;
   const lastPasskeyDeleteBlocked = useMemo(() => {
-    if (passkeys.length !== 1) return false;
     if (status?.enabled) return false;
     if (status?.hasRecoveryCodes) return false;
     return true;
-  }, [passkeys.length, status?.enabled, status?.hasRecoveryCodes]);
+  }, [status?.enabled, status?.hasRecoveryCodes]);
 
   async function refreshPasskeys() {
     setLoadingPasskeys(true);
@@ -365,7 +370,13 @@ export function SecurityForm({
   }
 
   async function handleDeletePasskey(id: string) {
-    if (deletingId) return;
+    if (deletingId || stepUpPasskeyId) return;
+    if (status?.enabled) {
+      setStepUpPasskeyId(id);
+      setStepUpCode("");
+      setStepUpError(null);
+      return;
+    }
     setDeletingId(id);
     try {
       await deletePasskey({ data: { id } });
@@ -375,6 +386,23 @@ export function SecurityForm({
       toast.error(passkeyErrorMessage(error));
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleStepUpDeletePasskey() {
+    if (!stepUpPasskeyId || !/^\d{6}$/.test(stepUpCode) || stepUpLoading) return;
+    setStepUpLoading(true);
+    setStepUpError(null);
+    try {
+      await deletePasskey({ data: { id: stepUpPasskeyId, code: stepUpCode } });
+      setStepUpPasskeyId(null);
+      setStepUpCode("");
+      await refreshPasskeys();
+      toast.success("Passkey removed");
+    } catch (error) {
+      setStepUpError(passkeyErrorMessage(error));
+    } finally {
+      setStepUpLoading(false);
     }
   }
 
@@ -858,6 +886,56 @@ export function SecurityForm({
             loadingLabel="Disabling..."
           >
             Disable
+          </ModalContinueButton>
+        </ModalFooter>
+      </Modal>
+
+      <Modal
+        open={Boolean(stepUpPasskeyId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setStepUpPasskeyId(null);
+            setStepUpCode("");
+            setStepUpError(null);
+            setStepUpLoading(false);
+          }
+        }}
+        width={440}
+      >
+        <ModalHeader
+          title="Remove passkey"
+          description={(() => {
+            const name = passkeys.find((p) => p.id === stepUpPasskeyId)?.deviceName;
+            return name
+              ? `Enter your authenticator code to remove "${name}"`
+              : "Enter your authenticator code to remove this passkey";
+          })()}
+        />
+        <div className="flex flex-col items-center gap-4 px-6 py-6">
+          <div className="w-full max-w-[320px]">
+            <OtpInput
+              value={stepUpCode}
+              onChange={(value) => {
+                setStepUpCode(value);
+                setStepUpError(null);
+              }}
+              autoFocus
+              error={Boolean(stepUpError)}
+            />
+          </div>
+          {stepUpError && <p className="text-xs text-[#ef2f1f]">{stepUpError}</p>}
+        </div>
+        <ModalFooter>
+          <ModalCancelButton />
+          <ModalContinueButton
+            onClick={() => {
+              void handleStepUpDeletePasskey();
+            }}
+            disabled={!/^\d{6}$/.test(stepUpCode)}
+            loading={stepUpLoading}
+            loadingLabel="Removing..."
+          >
+            Remove
           </ModalContinueButton>
         </ModalFooter>
       </Modal>

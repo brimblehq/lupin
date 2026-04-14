@@ -390,9 +390,10 @@ export function createAuthApi(client: ApiClient): AuthApi {
     },
 
     async passkeyAuthOptions(input: PasskeyAuthOptionsInput) {
+      const normalizedEmail = String(input.email ?? "").trim();
       const response = await client.request(endpoints.passkeyAuthOptions, {
         method: "POST",
-        body: { email: input.email ?? "" },
+        body: { email: normalizedEmail ? normalizeEmail(normalizedEmail) : "" },
         headers: { Authorization: "" },
       });
       const data = unwrapData(response);
@@ -432,9 +433,10 @@ export function createAuthApi(client: ApiClient): AuthApi {
       return mapPasskeySummary(data?.passkey ?? data);
     },
 
-    async deletePasskey(id: string) {
+    async deletePasskey(id: string, code?: string) {
       await client.request(endpoints.passkeyById(id), {
         method: "DELETE",
+        body: code ? { code } : undefined,
       });
     },
 

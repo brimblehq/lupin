@@ -110,7 +110,7 @@ export function Sidebar({ profileOpen, onProfileOpenChange }: { profileOpen: boo
             {filteredMainNav.map((item) => {
               if (item.comingSoon) {
                 return (
-                  <span key={item.label} className={cn(navItemBase, "cursor-default opacity-40")}>
+                  <span key={item.label} className={cn(navItemBase, "cursor-not-allowed opacity-40")}>
                     <img
                       src={item.icon}
                       alt=""

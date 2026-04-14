@@ -402,11 +402,12 @@ export const renamePasskeyServerFn = createServerFn({ method: "POST" }).handler(
 });
 
 export const deletePasskeyServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
-  const payload = data as { id?: string } | undefined;
+  const payload = data as { id?: string; code?: string } | undefined;
   const id = String(payload?.id ?? "").trim();
   if (!id) throw new Error("Missing passkey id.");
+  const code = String(payload?.code ?? "").trim();
   return withTokenRefresh(async (api) => {
-    await api.auth.deletePasskey(id);
+    await api.auth.deletePasskey(id, code || undefined);
     return { ok: true } as const;
   });
 });

@@ -179,6 +179,7 @@ export function AuthField({
   id,
   label,
   hint,
+  error,
   type = "text",
   placeholder,
   value,
@@ -192,6 +193,7 @@ export function AuthField({
   id: string;
   label: string;
   hint?: string;
+  error?: string;
   type?: string;
   placeholder?: string;
   value?: string;
@@ -202,6 +204,8 @@ export function AuthField({
   className?: string;
   autoComplete?: string;
 }) {
+  const hasError = Boolean(error?.trim());
+
   return (
     <label htmlFor={id} className="block">
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
@@ -218,8 +222,14 @@ export function AuthField({
         maxLength={maxLength}
         inputMode={inputMode}
         autoComplete={autoComplete}
-        className={`h-11 w-full rounded-[10px] border border-dash-border bg-dash-bg px-3.5 text-sm text-dash-text-strong outline-none transition-shadow placeholder:text-dash-text-extra-faded focus:border-[#006fff] focus:shadow-[0_0_0_3px_rgba(0,111,255,0.1)] ${className ?? ""}`}
+        aria-invalid={hasError}
+        className={`h-11 w-full rounded-[10px] border bg-dash-bg px-3.5 text-sm text-dash-text-strong outline-none transition-shadow placeholder:text-dash-text-extra-faded ${
+          hasError
+            ? "border-[#ef4444] focus:border-[#ef4444] focus:shadow-[0_0_0_3px_rgba(239,68,68,0.15)]"
+            : "border-dash-border focus:border-[#006fff] focus:shadow-[0_0_0_3px_rgba(0,111,255,0.1)]"
+        } ${className ?? ""}`}
       />
+      {hasError ? <p className="mt-1.5 text-xs text-[#ef4444]">{error}</p> : null}
     </label>
   );
 }

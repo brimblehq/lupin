@@ -457,7 +457,7 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
           <>
             {i > 0 && <hr className="mx-4 border-dash-border-soft" />}
             {"comingSoon" in item && item.comingSoon ? (
-              <span className={cn(mobileNavItemBase, "cursor-default opacity-40")}>
+              <span className={cn(mobileNavItemBase, "cursor-not-allowed opacity-40")}>
                 {icon}
                 {item.label}
                 <span className="ml-auto rounded-full bg-dash-bg-elevated px-2 py-0.5 text-[10px] font-medium text-dash-text-extra-faded">
