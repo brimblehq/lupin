@@ -54,6 +54,8 @@ const config = defineConfig({
     allowedHosts: true,
   },
   build: {
+    sourcemap: false,
+    minify: "esbuild",
     rollupOptions: {
       output: {
         manualChunks(id) {

@@ -67,11 +67,7 @@ type MergedEnvRow = ProjectEnvironmentVariable & {
   meta: EnvRowMeta;
 };
 
-function getEnvActivityLabel(input: {
-  authoredAtLabel: string;
-  isShared?: boolean;
-  sharedSource?: SharedSource;
-}): string {
+function getEnvActivityLabel(input: { authoredAtLabel: string; isShared?: boolean; sharedSource?: SharedSource }): string {
   const { authoredAtLabel, isShared, sharedSource } = input;
   if (authoredAtLabel !== "Unknown") {
     return authoredAtLabel;
@@ -929,7 +925,6 @@ function EnvironmentPage() {
     deployId: undefined,
   };
 
-  // Merge project-level and environment-level vars for display
   const mergedRows = useMemo<MergedEnvRow[]>(() => {
     const sharedByName = new Map<string, EffectiveEnvironmentVariable>();
     for (const variable of envLevelVars) {

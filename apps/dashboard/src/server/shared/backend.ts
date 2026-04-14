@@ -176,7 +176,37 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
   }
 }
 
+/**
+ * TanStack Start serializes errors across the SSR/client boundary using
+ * seroval's ShallowErrorPlugin, which only preserves `message` and `stack`.
+ * Custom fields like `status` and `code` on BackendApiError get stripped —
+ * so the client-side error boundary can't tell a 403 from a 500.
+ *
+ * We fix that by encoding the HTTP status into the message itself, which
+ * survives serialization. The format `[HTTP 403]` is matched by
+ * `isForbiddenError` (via /\b403\b/) and can be stripped for display.
+ */
+function makeSerializableError(error: any): any {
+  const status = typeof error?.status === "number" ? error.status : undefined;
+  if (!status || !error?.message) {
+    return error;
+  }
+  if (error.message.startsWith(`[HTTP ${status}]`)) {
+    return error;
+  }
+  error.message = `[HTTP ${status}] ${error.message}`;
+  return error;
+}
+
 export async function withTokenRefresh<T>(fn: (api: BackendApi) => Promise<T>): Promise<T> {
+  try {
+    return await withTokenRefreshImpl(fn);
+  } catch (error: any) {
+    throw makeSerializableError(error);
+  }
+}
+
+async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Promise<T> {
   const accessToken = getServerAccessToken();
   const refreshToken = getServerRefreshToken();
 

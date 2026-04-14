@@ -5,24 +5,25 @@ import { BackendApiError } from "@/backend/errors";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { AccessDenied } from "./access-denied";
 
+const HTTP_STATUS_PREFIX = /^\[HTTP (\d{3})\]\s*/;
+
+function getHttpStatus(error: unknown): number | undefined {
+  const err = error as { status?: unknown; message?: unknown } | null;
+  if (typeof err?.status === "number") return err.status;
+  if (typeof err?.message === "string") {
+    const match = err.message.match(HTTP_STATUS_PREFIX);
+    if (match) return Number(match[1]);
+  }
+  return undefined;
+}
+
 function isForbiddenError(error: unknown): boolean {
   if (error instanceof BackendApiError) {
     return error.isForbidden;
   }
-
-  // Server functions serialize errors across the network boundary,
-  // so instanceof may fail. Fall back to duck-typing.
   const err = error as Record<string, unknown> | null;
-  if (err?.code === "HTTP_403" || err?.status === 403) {
-    return true;
-  }
-
-  // TanStack Start wraps server errors — check the message as last resort
-  if (typeof err?.message === "string" && /\b403\b/.test(err.message)) {
-    return true;
-  }
-
-  return false;
+  if (err?.code === "HTTP_403") return true;
+  return getHttpStatus(error) === 403;
 }
 
 function isNetworkError(error: unknown): boolean {
@@ -46,10 +47,9 @@ function getFriendlyError(error: unknown): { title: string; description: string 
     };
   }
 
-  const err = error as { status?: unknown; code?: unknown } | null;
-  const status = typeof err?.status === "number" ? err.status : undefined;
+  const status = getHttpStatus(error);
 
-  if (status === 404 || err?.code === "HTTP_404") {
+  if (status === 404) {
     return {
       title: "We couldn't find that page",
       description: "The page you're looking for doesn't exist or may have been moved.",
@@ -83,12 +83,9 @@ export function DefaultErrorComponent({ error }: { error: Error }) {
   if (forbidden) {
     return (
       <AccessDenied
+        imageSrc="/images/error.svg"
         title="Access Denied"
-        description={
-          error.message && !/\b403\b/.test(error.message)
-            ? error.message
-            : "You don't have permission to view this page. Contact the workspace owner if you believe this is a mistake."
-        }
+        description="You don't have permission to view this resource. Reach out to a workspace admin to request an invite or access."
       />
     );
   }

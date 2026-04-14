@@ -1,6 +1,4 @@
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { TanStackDevtools } from "@tanstack/react-devtools";
 
 import appCss from "../styles.css?url";
 import brimbleLogoIcon from "../assets/icons/brimble-logo.svg?url";
@@ -105,17 +103,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <script dangerouslySetInnerHTML={{ __html: chatwootBootstrapScript }} />
-        <TanStackDevtools
-          config={{
-            position: "bottom-right",
-          }}
-          plugins={[
-            {
-              name: "Tanstack Router",
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
         <Scripts />
       </body>
     </html>
