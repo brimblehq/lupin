@@ -141,7 +141,7 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
     },
 
     async cancelSubscription(): Promise<void> {
-      await client.request(`${base}/subscriptions/cancel`, {
+      await client.request(`${base}/subscription/cancel`, {
         method: "POST",
       });
     },
