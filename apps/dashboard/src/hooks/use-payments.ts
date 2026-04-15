@@ -10,6 +10,7 @@ import {
   createSubscriptionServerFn,
   swapPlanServerFn,
   cancelSubscriptionServerFn,
+  payInvoiceServerFn,
   purchaseServerFn,
   updateSpendingLimitServerFn,
   updateTeamSpendingLimitServerFn,
@@ -51,6 +52,10 @@ const purchase = purchaseServerFn as unknown as (args: {
     metadata: Record<string, unknown>;
     team_id?: string;
   };
+}) => Promise<any>;
+
+const payInvoice = payInvoiceServerFn as unknown as (args: {
+  data: { invoice_id: string; team_id?: string };
 }) => Promise<any>;
 
 const updateLimit = updateSpendingLimitServerFn as unknown as (args: { data: { spending_limit: number } }) => Promise<any>;
@@ -159,6 +164,17 @@ export function useCancelSubscription() {
     mutationFn: () => cancelSubscriptionServerFn(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: paymentKeys.subscription() });
+    },
+  });
+}
+
+export function usePayInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { invoice_id: string; team_id?: string }) => payInvoice({ data: input }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...paymentKeys.all, "invoices"] });
+      void qc.invalidateQueries({ queryKey: paymentKeys.methods() });
     },
   });
 }

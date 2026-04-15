@@ -2442,14 +2442,16 @@ export function UserProfileDrawer({
                           mute: data.mute,
                         },
                       });
-                      const nextWebhooks = await updateWebhooks({
-                        data: {
-                          webhookUrl: data.webhookUrl,
-                          discordUrl: data.discordUrl,
-                          slackUrl: data.slackUrl,
-                          events: data.events,
-                        },
-                      });
+                      const nextWebhooks = data.updateWebhooks
+                        ? await updateWebhooks({
+                            data: {
+                              webhookUrl: data.webhookUrl,
+                              discordUrl: data.discordUrl,
+                              slackUrl: data.slackUrl,
+                              events: data.events,
+                            },
+                          })
+                        : snapshot?.webhooks;
 
                       setSnapshot((prev) => {
                         if (!prev) {
@@ -3031,6 +3033,7 @@ function NotificationsForm({
     discordUrl: string | null;
     slackUrl: string | null;
     events: string[];
+    updateWebhooks: boolean;
   }) => Promise<void> | void;
 }) {
   const [emailNotifs, setEmailNotifs] = useState(profile.notifications?.email ?? false);
@@ -3195,6 +3198,7 @@ function NotificationsForm({
 
   const { webhookEnabled } = usePlanGate(profile.subscriptionPlanType ?? "");
   const webhooksFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_WEBHOOKS);
+  const webhookInteractionsEnabled = canEdit && webhookEnabled;
 
   const discordUrlValid = isValidWebhookUrl(discordUrl, "discord");
   const slackUrlValid = isValidWebhookUrl(slackUrl, "slack");
@@ -3234,9 +3238,14 @@ function NotificationsForm({
         <Toggle checked={emailNotifs} onChange={setEmailNotifs} />
       </div>
 
-      {webhookEnabled && webhooksFeatureEnabled && (
+      {webhooksFeatureEnabled && (
         <>
           <hr className="-ml-8 border-dash-border-soft" />
+          {!webhookEnabled && (
+            <div className="max-w-[488px] rounded-[6px] border border-[#f5a623]/25 bg-[#f5a623]/8 px-3.5 py-3 text-sm text-dash-text-faded">
+              Webhooks are available on paid plans. Upgrade your plan to configure webhook URLs and event subscriptions.
+            </div>
+          )}
           {/* Webhook URLs */}
           <div className="flex max-w-[488px] flex-col gap-4">
             <div className="flex flex-col gap-1.5">
@@ -3247,18 +3256,18 @@ function NotificationsForm({
                   value={discordUrl}
                   onChange={(e) => setDiscordUrl(e.target.value)}
                   placeholder="https://discord.com/api/webhooks/..."
-                  disabled={!canEdit}
+                  disabled={!webhookInteractionsEnabled}
                   aria-invalid={!discordUrlValid}
                   className={cn(
                     inputClass,
                     "flex-1",
-                    !canEdit && "opacity-60 cursor-not-allowed",
+                    !webhookInteractionsEnabled && "opacity-60 cursor-not-allowed",
                     !discordUrlValid && "!shadow-[0px_1px_2px_rgba(239,68,68,0.2),0px_0px_0px_1px_#ef4444]",
                   )}
                 />
                 <button
                   onClick={() => handleTestWebhook(discordUrl, "discord")}
-                  disabled={!canEdit || !discordUrl.trim() || !discordUrlValid || testingWebhook === "discord"}
+                  disabled={!webhookInteractionsEnabled || !discordUrl.trim() || !discordUrlValid || testingWebhook === "discord"}
                   className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
                 >
                   <Send className="size-3.5" />
@@ -3277,18 +3286,18 @@ function NotificationsForm({
                   value={slackUrl}
                   onChange={(e) => setSlackUrl(e.target.value)}
                   placeholder="https://hooks.slack.com/services/..."
-                  disabled={!canEdit}
+                  disabled={!webhookInteractionsEnabled}
                   aria-invalid={!slackUrlValid}
                   className={cn(
                     inputClass,
                     "flex-1",
-                    !canEdit && "opacity-60 cursor-not-allowed",
+                    !webhookInteractionsEnabled && "opacity-60 cursor-not-allowed",
                     !slackUrlValid && "!shadow-[0px_1px_2px_rgba(239,68,68,0.2),0px_0px_0px_1px_#ef4444]",
                   )}
                 />
                 <button
                   onClick={() => handleTestWebhook(slackUrl, "slack")}
-                  disabled={!canEdit || !slackUrl.trim() || !slackUrlValid || testingWebhook === "slack"}
+                  disabled={!webhookInteractionsEnabled || !slackUrl.trim() || !slackUrlValid || testingWebhook === "slack"}
                   className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
                 >
                   <Send className="size-3.5" />
@@ -3305,18 +3314,18 @@ function NotificationsForm({
                   value={webhookUrl}
                   onChange={(e) => setWebhookUrl(e.target.value)}
                   placeholder="https://your-server.com/webhook"
-                  disabled={!canEdit}
+                  disabled={!webhookInteractionsEnabled}
                   aria-invalid={!webhookUrlValid}
                   className={cn(
                     inputClass,
                     "flex-1",
-                    !canEdit && "opacity-60 cursor-not-allowed",
+                    !webhookInteractionsEnabled && "opacity-60 cursor-not-allowed",
                     !webhookUrlValid && "!shadow-[0px_1px_2px_rgba(239,68,68,0.2),0px_0px_0px_1px_#ef4444]",
                   )}
                 />
                 <button
                   onClick={() => handleTestWebhook(webhookUrl, "custom")}
-                  disabled={!canEdit || !webhookUrl.trim() || !webhookUrlValid || testingWebhook === "custom"}
+                  disabled={!webhookInteractionsEnabled || !webhookUrl.trim() || !webhookUrlValid || testingWebhook === "custom"}
                   className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
                 >
                   <Send className="size-3.5" />
@@ -3342,7 +3351,7 @@ function NotificationsForm({
             {/* All Events */}
             <div className="flex items-center py-2">
               <div className="flex items-center gap-2.5">
-                <Checkbox checked={allEvents} onChange={handleAllEventsToggle} disabled={!canEdit} />
+                <Checkbox checked={allEvents} onChange={handleAllEventsToggle} disabled={!webhookInteractionsEnabled} />
                 <div className="flex flex-col">
                   <span className="text-sm font-medium leading-5 text-dash-text-strong">All Events</span>
                   <span className="text-[13px] leading-5 text-dash-text-faded">Subscribe to all current and future events</span>
@@ -3364,7 +3373,7 @@ function NotificationsForm({
                     onGroupToggle={(v) => handleGroupToggle(group.key, v)}
                     eventStates={eventToggles}
                     onEventToggle={handleEventToggle}
-                    disabled={!canEdit}
+                    disabled={!webhookInteractionsEnabled}
                   />
                   {i < groupsForUi.length - 1 && <hr className="border-dash-border-soft" />}
                 </div>
@@ -3382,7 +3391,7 @@ function NotificationsForm({
           loading={isSaving}
           loadingLabel="Saving..."
           onClick={async () => {
-            const selectedEvents = !webhookEnabled
+            const selectedEvents = !webhookInteractionsEnabled
               ? []
               : Object.entries(eventToggles)
                   .filter(([, enabled]) => enabled)
@@ -3398,6 +3407,7 @@ function NotificationsForm({
                 discordUrl: !webhookEnabled ? null : discordUrl.trim() || null,
                 slackUrl: !webhookEnabled ? null : slackUrl.trim() || null,
                 events: selectedEvents,
+                updateWebhooks: webhookInteractionsEnabled,
               });
             } finally {
               setIsSaving(false);

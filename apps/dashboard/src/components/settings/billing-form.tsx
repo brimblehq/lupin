@@ -25,6 +25,7 @@ import {
   useRemovePaymentMethod,
   useSetDefaultPaymentMethod,
   useCancelSubscription,
+  usePayInvoice,
   useUpdateSpendingLimit,
   useSpendingLimitStatus,
 } from "@/hooks/use-payments";
@@ -118,6 +119,7 @@ function BillingFormInner({
   const { data: spendingLimitStatus } = useSpendingLimitStatus();
   const { data: invoices } = useInvoices(invoiceCursor, teamId, initialInvoices);
   const cancelMutation = useCancelSubscription();
+  const payInvoiceMutation = usePayInvoice();
   const spendingLimitMutation = useUpdateSpendingLimit(teamId);
   const isTeamMode = hideCurrentPlan || Boolean(teamId);
 
@@ -202,6 +204,42 @@ function BillingFormInner({
 
   const currentUsage = spendingLimitStatus?.current_usage ?? 0;
   const hasSpendingLimit = typeof savedSpendingLimit === "number" && savedSpendingLimit >= 5;
+  const payingInvoiceId = payInvoiceMutation.isPending
+    ? ((payInvoiceMutation.variables as { invoice_id?: string } | undefined)?.invoice_id ?? null)
+    : null;
+
+  function handlePayInvoice(invoice: { id: string; hosted_invoice_url?: string }) {
+    payInvoiceMutation.mutate(
+      {
+        invoice_id: invoice.id,
+        ...(teamId ? { team_id: teamId } : {}),
+      },
+      {
+        onSuccess: (result) => {
+          const outcome = String(result?.outcome ?? "");
+          const status = String(result?.status ?? "").toLowerCase();
+
+          if (outcome === "paid" || status === "paid") {
+            toast.success("Invoice paid successfully");
+            router.invalidate();
+            return;
+          }
+
+          const hostedInvoiceUrl = result?.hosted_invoice_url ?? invoice.hosted_invoice_url;
+          if (hostedInvoiceUrl) {
+            window.open(hostedInvoiceUrl, "_blank", "noopener,noreferrer");
+            toast.success("Opening Stripe to complete invoice payment");
+            return;
+          }
+
+          toast.error("Unable to pay invoice right now");
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "Failed to pay invoice");
+        },
+      },
+    );
+  }
 
   return (
     <div className="flex max-w-[488px] flex-col gap-8">
@@ -411,6 +449,8 @@ function BillingFormInner({
           setInvoiceCursor(invoices.previous_cursor);
           setInvoicePage((current) => Math.max(1, current - 1));
         }}
+        onPayInvoice={handlePayInvoice}
+        payingInvoiceId={payingInvoiceId}
       />
 
       {hasActivePaidSubscription && (
@@ -860,6 +900,8 @@ function InvoicesSection({
   page,
   onNextPage,
   onPreviousPage,
+  onPayInvoice,
+  payingInvoiceId,
 }: {
   invoices?: {
     items: Array<{
@@ -881,6 +923,8 @@ function InvoicesSection({
   page: number;
   onNextPage: () => void;
   onPreviousPage: () => void;
+  onPayInvoice: (invoice: { id: string; hosted_invoice_url?: string }) => void;
+  payingInvoiceId: string | null;
 }) {
   const items = invoices?.items ?? [];
 
@@ -932,15 +976,15 @@ function InvoicesSection({
                   )}
                   {invoice.status} {invoice.total ? `• ${invoice.total}` : ""}
                 </span>
-                {isOpen && invoice.hosted_invoice_url ? (
-                  <a
-                    href={invoice.hosted_invoice_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-[8px] border border-dash-border bg-dash-bg px-3 py-1.5 text-sm leading-5 tracking-[-0.0224px] text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+                {isOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => onPayInvoice({ id: invoice.id, hosted_invoice_url: invoice.hosted_invoice_url })}
+                    disabled={payingInvoiceId === invoice.id}
+                    className="rounded-[8px] border border-dash-border bg-dash-bg px-3 py-1.5 text-sm leading-5 tracking-[-0.0224px] text-dash-text-body transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Pay now
-                  </a>
+                    {payingInvoiceId === invoice.id ? "Paying..." : "Pay now"}
+                  </button>
                 ) : invoice.invoice_pdf ? (
                   isPurchase ? (
                     <a

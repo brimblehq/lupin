@@ -11,8 +11,10 @@ import type {
   CreateSubscriptionInput,
   SwapPlanInput,
   InvoicePage,
+  InvoicePaymentResult,
   PurchaseInput,
   PurchaseResult,
+  VerifyTransactionResult,
   UpdateSpendingLimitInput,
   UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
@@ -30,6 +32,7 @@ export type {
   SwapPlanInput,
   Invoice,
   InvoicePage,
+  InvoicePaymentResult,
   PurchaseInput,
   PurchaseResult,
   VerifyTransactionResult,
@@ -174,6 +177,25 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
         previous_cursor: typeof data?.previous_cursor === "string" ? data.previous_cursor : null,
         has_more: Boolean(data?.has_more),
         per_page: Number(data?.per_page ?? perPage),
+      };
+    },
+
+    async payInvoice(input: { invoice_id: string; team_id?: string }): Promise<InvoicePaymentResult> {
+      const invoiceId = String(input.invoice_id ?? "").trim();
+      if (!invoiceId) throw new Error("Invoice ID is required");
+
+      const res = await client.request<any>(`${base}/payment/invoices/${encodeURIComponent(invoiceId)}/pay`, {
+        method: "POST",
+        body: { ...(input.team_id ? { team_id: input.team_id } : {}) },
+      });
+
+      const data = unwrapData<any>(res);
+
+      return {
+        outcome: (data?.outcome ?? "fallback_hosted_invoice") as InvoicePaymentResult["outcome"],
+        invoice_id: String(data?.invoice_id ?? invoiceId),
+        status: String(data?.status ?? "open"),
+        hosted_invoice_url: typeof data?.hosted_invoice_url === "string" ? data.hosted_invoice_url : undefined,
       };
     },
 

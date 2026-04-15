@@ -49,6 +49,13 @@ export interface InvoicePage {
   per_page: number;
 }
 
+export interface InvoicePaymentResult {
+  outcome: "paid" | "fallback_hosted_invoice" | "already_settled";
+  invoice_id: string;
+  status: string;
+  hosted_invoice_url?: string;
+}
+
 /* ── Subscription stats (forecasted bill) ── */
 
 export interface SubscriptionStats {
@@ -150,6 +157,7 @@ export interface PaymentsApi {
   swapPlan(input: SwapPlanInput): Promise<Subscription>;
   cancelSubscription(): Promise<void>;
   listInvoices(input?: { cursor?: string | null; per_page?: number; team_id?: string }): Promise<InvoicePage>;
+  payInvoice(input: { invoice_id: string; team_id?: string }): Promise<InvoicePaymentResult>;
   purchase(input: PurchaseInput): Promise<PurchaseResult>;
   verifyTransaction(reference: string): Promise<VerifyTransactionResult>;
   updateSpendingLimit(input: UpdateSpendingLimitInput): Promise<void>;

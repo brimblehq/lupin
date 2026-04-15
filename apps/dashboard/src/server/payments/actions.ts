@@ -131,6 +131,24 @@ export const cancelSubscriptionServerFn = createServerFn({
   });
 });
 
+export const payInvoiceServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const input = data as unknown as { invoice_id: string; team_id?: string };
+
+  const invoiceId = String(input?.invoice_id ?? "").trim();
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    return api.payments.payInvoice({
+      invoice_id: invoiceId,
+      ...(input?.team_id ? { team_id: input.team_id } : {}),
+    });
+  });
+});
+
 export const purchaseServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
