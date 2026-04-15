@@ -36,10 +36,11 @@ import { CheckCircle, XCircle, TreeStructure, CopySimple } from "@phosphor-icons
 import {
   confirmDeleteAccountServerFn,
   getTwoFactorStatusServerFn,
+  listPasskeysServerFn,
   logoutServerFn,
   requestDeleteAccountOtpServerFn,
 } from "@/server/auth/actions";
-import type { TwoFactorStatus } from "@/backend/auth/types";
+import type { PasskeySummary, TwoFactorStatus } from "@/backend/auth/types";
 import { listActivityLogsServerFn } from "@/server/activity-logs/actions";
 import { listProjectEnvironmentsServerFn } from "@/server/environments/actions";
 import type { ProjectEnvironment } from "@/backend/environments";
@@ -1707,7 +1708,9 @@ export function UserProfileDrawer({
     bitbucket: null,
   });
   const getTwoFactorStatus = useServerFn(getTwoFactorStatusServerFn as any) as () => Promise<TwoFactorStatus>;
+  const listPasskeys = useServerFn(listPasskeysServerFn as any) as () => Promise<PasskeySummary[]>;
   const [twoFactorStatus, setTwoFactorStatus] = useState<TwoFactorStatus | null>(null);
+  const [prefetchedPasskeys, setPrefetchedPasskeys] = useState<PasskeySummary[] | undefined>(undefined);
   const decryptApiKey = useServerFn(decryptSettingsApiKeyServerFn as any) as (args: {
     data: { encryptedApiKey: string };
   }) => Promise<string | null>;
@@ -1917,10 +1920,18 @@ export function UserProfileDrawer({
         .catch(() => {});
     }
 
+    if (!hasActiveWorkspace && typeof prefetchedPasskeys === "undefined") {
+      listPasskeys()
+        .then((list) => {
+          setPrefetchedPasskeys(list);
+        })
+        .catch(() => {});
+    }
+
     return () => {
       window.removeEventListener("brimble:git-connection-changed", handleConnectionChanged);
     };
-  }, [open]);
+  }, [open, getTwoFactorStatus, hasActiveWorkspace, listPasskeys, prefetchedPasskeys, twoFactorStatus]);
 
   useEffect(() => {
     if (!hasActiveWorkspace && activeTab === ProfileTab.Members) {
@@ -2514,7 +2525,9 @@ export function UserProfileDrawer({
                   email={profile?.email ?? ""}
                   firstName={profile?.firstName ?? profile?.username ?? ""}
                   initialStatus={twoFactorStatus}
+                  initialPasskeys={prefetchedPasskeys}
                   onStatusChange={setTwoFactorStatus}
+                  onPasskeysChange={setPrefetchedPasskeys}
                   onChangeEmail={async (email) => {
                     try {
                       await requestEmailVerification({ data: { email } });

@@ -76,13 +76,17 @@ export function SecurityForm({
   email: initialEmail,
   firstName,
   initialStatus,
+  initialPasskeys,
   onStatusChange,
+  onPasskeysChange,
   onChangeEmail,
 }: {
   email: string;
   firstName?: string;
   initialStatus?: TwoFactorStatus | null;
+  initialPasskeys?: PasskeySummary[];
   onStatusChange?: (status: TwoFactorStatus | null) => void;
+  onPasskeysChange?: (passkeys: PasskeySummary[]) => void;
   onChangeEmail?: (email: string) => void | Promise<void>;
 }) {
   const haptics = useHaptics();
@@ -111,9 +115,10 @@ export function SecurityForm({
     data: { id: string; code?: string };
   }) => Promise<{ ok: true }>;
 
+  const hasInitialPasskeys = typeof initialPasskeys !== "undefined";
   const passkeyFeature = usePasskeyFeature();
-  const [passkeys, setPasskeys] = useState<PasskeySummary[]>([]);
-  const [loadingPasskeys, setLoadingPasskeys] = useState(false);
+  const [passkeys, setPasskeys] = useState<PasskeySummary[]>(initialPasskeys ?? []);
+  const [loadingPasskeys, setLoadingPasskeys] = useState(!hasInitialPasskeys);
   const [enrollingPasskey, setEnrollingPasskey] = useState(false);
   const [enrollNameOpen, setEnrollNameOpen] = useState(false);
   const [enrollName, setEnrollName] = useState("");
@@ -164,6 +169,15 @@ export function SecurityForm({
   useEffect(() => {
     setEmail(initialEmail);
   }, [initialEmail]);
+
+  useEffect(() => {
+    if (!hasInitialPasskeys) {
+      return;
+    }
+
+    setPasskeys(initialPasskeys ?? []);
+    setLoadingPasskeys(false);
+  }, [hasInitialPasskeys, initialPasskeys]);
 
   async function refreshStatus() {
     setLoadingStatus(true);
@@ -319,6 +333,7 @@ export function SecurityForm({
     try {
       const list = await listPasskeys();
       setPasskeys(list);
+      onPasskeysChange?.(list);
     } catch (error) {
       toast.error(passkeyErrorMessage(error));
     } finally {
@@ -328,9 +343,10 @@ export function SecurityForm({
 
   useEffect(() => {
     if (!passkeyPanelVisible) return;
+    if (hasInitialPasskeys) return;
     void refreshPasskeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passkeyPanelVisible]);
+  }, [hasInitialPasskeys, passkeyPanelVisible]);
 
   async function handleEnrollPasskey() {
     const deviceName = enrollName.trim();

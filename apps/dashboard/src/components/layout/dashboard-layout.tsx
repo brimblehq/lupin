@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
 import { Moon, Sun } from "lucide-react";
+import { Desktop } from "@phosphor-icons/react";
 import { cn } from "@brimble/ui";
 import { Sidebar, mainNav, moreNav } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -511,7 +512,13 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
       </button>
       <hr className="mx-4 border-dash-border-soft" />
       <button onClick={cycleTheme} className={cn(mobileNavItemBase, "text-dash-text-faded hover:bg-dash-bg-elevated")}>
-        {theme === "dark" ? <Sun className="size-5 shrink-0" /> : <Moon className="size-5 shrink-0" />}
+        {mode === Theme.System ? (
+          <Desktop className="size-5 shrink-0" />
+        ) : theme === "dark" ? (
+          <Sun className="size-5 shrink-0" />
+        ) : (
+          <Moon className="size-5 shrink-0" />
+        )}
         {mode === Theme.System ? "System mode" : theme === Theme.Dark ? "Dark mode" : "Light mode"}
       </button>
     </nav>

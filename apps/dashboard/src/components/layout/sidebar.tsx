@@ -2,6 +2,7 @@ import { cn } from "@brimble/ui";
 import { useMemo } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
+import { Desktop } from "@phosphor-icons/react";
 import { useTheme } from "../../hooks/use-theme";
 import { Theme } from "../../types/enums";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -235,7 +236,13 @@ export function Sidebar({ profileOpen, onProfileOpenChange }: { profileOpen: boo
             }}
             className={cn(navItemBase, "hover:bg-dash-bg-elevated")}
           >
-            {theme === "dark" ? <Sun className="size-4 shrink-0" /> : <Moon className="size-4 shrink-0" />}
+            {mode === Theme.System ? (
+              <Desktop className="size-4 shrink-0" />
+            ) : theme === "dark" ? (
+              <Sun className="size-4 shrink-0" />
+            ) : (
+              <Moon className="size-4 shrink-0" />
+            )}
             {mode === Theme.System ? "System mode" : theme === Theme.Dark ? "Dark mode" : "Light mode"}
           </button>
         </div>

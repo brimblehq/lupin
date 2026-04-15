@@ -15,7 +15,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { House, ShoppingBag } from "@phosphor-icons/react";
+import { House, ShoppingBag, Desktop } from "@phosphor-icons/react";
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Moon, Sun } from "lucide-react";
@@ -1274,7 +1274,13 @@ export function Topbar({
               className="flex items-center gap-1.5 text-sm hover:text-dash-text-strong"
               title={mode === Theme.System ? "System theme" : theme === Theme.Dark ? "Dark theme" : "Light theme"}
             >
-              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              {mode === Theme.System ? (
+                <Desktop className="size-4" />
+              ) : theme === "dark" ? (
+                <Sun className="size-4" />
+              ) : (
+                <Moon className="size-4" />
+              )}
             </button>
           </div>
         </div>

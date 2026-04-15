@@ -24,15 +24,9 @@ export function ChangePlanModal({
   defaultSelectedPlan?: string;
   initialPaymentMethods?: PaymentMethod[] | null;
 }) {
-  const [selectedPlan, setSelectedPlan] = useState(defaultSelectedPlan ?? "");
+  const [selectedPlan, setSelectedPlan] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const pricing = usePricing();
-
-  useEffect(() => {
-    if (open && defaultSelectedPlan) {
-      setSelectedPlan(defaultSelectedPlan);
-    }
-  }, [open, defaultSelectedPlan]);
 
   const { data: paymentMethods = [] } = usePaymentMethods(initialPaymentMethods ?? undefined);
   const { data: subscription } = useSubscription();
@@ -54,7 +48,33 @@ export function ChangePlanModal({
     [pricing.plans],
   );
 
-  const currentIdx = billingPlans.findIndex((p) => p.name === currentPlan);
+  const currentPlanLower = currentPlan.trim().toLowerCase();
+  const defaultPlanLower = defaultSelectedPlan?.trim().toLowerCase() ?? "";
+  const currentIdx = billingPlans.findIndex((p) => p.name.trim().toLowerCase() === currentPlanLower);
+  const suggestedPlan = useMemo(() => {
+    if (defaultPlanLower) {
+      const explicit = billingPlans.find((p) => p.name.trim().toLowerCase() === defaultPlanLower);
+      if (explicit && explicit.name.trim().toLowerCase() !== currentPlanLower) {
+        return explicit.name;
+      }
+    }
+
+    if (currentIdx >= 0 && currentIdx + 1 < billingPlans.length) {
+      return billingPlans[currentIdx + 1]?.name ?? "";
+    }
+
+    return billingPlans.find((p) => p.name.trim().toLowerCase() !== currentPlanLower)?.name ?? "";
+  }, [billingPlans, currentIdx, currentPlanLower, defaultPlanLower]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setSelectedPlan(suggestedPlan);
+    setAcceptedTerms(false);
+  }, [open, suggestedPlan]);
+
   const selectedIdx = billingPlans.findIndex((p) => p.name === selectedPlan);
   const selectedObj = billingPlans[selectedIdx];
   const currentObj = billingPlans[currentIdx];
@@ -141,7 +161,7 @@ export function ChangePlanModal({
       open={open}
       onOpenChange={(v) => {
         if (!v) {
-          setSelectedPlan(defaultSelectedPlan ?? "");
+          setSelectedPlan(suggestedPlan);
           setAcceptedTerms(false);
         }
         onOpenChange(v);
