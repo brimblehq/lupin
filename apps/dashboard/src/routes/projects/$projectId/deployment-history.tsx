@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import {
   Search,
   ChevronDown,
@@ -55,6 +54,17 @@ function normalizeMemberRole(member: TeamMember): string {
 }
 
 const PAGE_LIMIT = 10;
+
+function createEmptyDeployments(): PaginatedDeploymentsResponse {
+  return {
+    items: [],
+    currentPage: 1,
+    totalPages: 1,
+    total: 0,
+    environments: [],
+    statuses: [],
+  };
+}
 
 export const Route = createFileRoute("/projects/$projectId/deployment-history")({
   staleTime: 300_000,
@@ -645,12 +655,15 @@ function DeploymentHistoryPage() {
 
     return document.visibilityState === "visible";
   });
-  const { drawerOpen, openDeploymentDrawer } = useProjectDeploymentLogsDrawer();
+  const { openDeploymentDrawer } = useProjectDeploymentLogsDrawer();
   const { sendNotification } = usePushNotification(workspace);
   const prevStatusMapRef = useRef<Record<string, string>>({});
+  const latestRequestRef = useRef(0);
+  const previousProjectScopeRef = useRef<string | null>(null);
 
   const projectId = project?.id || project?.name;
   const projectName = project?.name || projectId;
+  const projectScope = `${projectId ?? ""}::${workspace ?? ""}`;
 
   const statusFilterMap: Record<string, string> = {
     Successful: "ACTIVE",
@@ -663,6 +676,7 @@ function DeploymentHistoryPage() {
   const fetchDeployments = useCallback(
     async (page: number, options?: { silent?: boolean }) => {
       const silent = options?.silent === true;
+      const requestId = ++latestRequestRef.current;
 
       if (!silent) {
         setFetching(true);
@@ -696,6 +710,10 @@ function DeploymentHistoryPage() {
             search: search.trim() || undefined,
           },
         });
+
+        if (requestId !== latestRequestRef.current) {
+          return;
+        }
 
         // Detect status transitions on silent polls for push notifications
         if (silent && result?.items) {
@@ -740,13 +758,36 @@ function DeploymentHistoryPage() {
       } catch {
         // keep existing data
       } finally {
-        if (!silent) {
+        if (!silent && requestId === latestRequestRef.current) {
           setFetching(false);
         }
       }
     },
     [projectId, workspace, environment, status, dateRange, search, projectName, sendNotification],
   );
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    if (previousProjectScopeRef.current === null) {
+      previousProjectScopeRef.current = projectScope;
+      return;
+    }
+
+    if (previousProjectScopeRef.current === projectScope) {
+      return;
+    }
+
+    previousProjectScopeRef.current = projectScope;
+    latestRequestRef.current += 1;
+    prevStatusMapRef.current = {};
+    setCurrentPage(1);
+    setDeployments(createEmptyDeployments());
+    setFetching(true);
+    void fetchDeployments(1);
+  }, [projectId, projectScope, fetchDeployments]);
 
   useEffect(() => {
     if (!projectId) {

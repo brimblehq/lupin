@@ -319,11 +319,27 @@ function validateEmailInput(value: string): string | null {
 }
 
 function getLastAuthMethod(): AuthMethod | null {
-  return localStorage.getItem(AUTH_METHOD_KEY) as AuthMethod | null;
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(AUTH_METHOD_KEY) as AuthMethod | null;
+  } catch {
+    return null;
+  }
 }
 
 function saveLastAuthMethod(method: AuthMethod) {
-  localStorage.setItem(AUTH_METHOD_KEY, method);
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(AUTH_METHOD_KEY, method);
+  } catch {
+    // ignore storage unavailability
+  }
 }
 
 function LoginPage() {
