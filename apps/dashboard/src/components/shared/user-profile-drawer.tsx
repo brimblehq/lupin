@@ -391,6 +391,7 @@ function ProfileForm({
   const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
   const normalizedPlanType = (profile.subscriptionPlanType ?? "").toUpperCase();
   const isFreePlan = !normalizedPlanType || normalizedPlanType === SUBSCRIPTION_PLAN_TYPE.FreePlan;
+  const buildLockReason = getBuildLockReason(profile.buildDisabledBy);
 
   function handleSave() {
     void onSave?.({
@@ -584,18 +585,26 @@ function ProfileForm({
           <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Builds</span>
           <span className="text-sm leading-5 text-dash-text-faded">Enable or disable builds for your projects</span>
         </div>
-        <Toggle
-          checked={buildsEnabled}
-          onChange={async (nextValue) => {
-            setBuildsEnabled(nextValue);
-            try {
-              await onBuildsChange?.(nextValue);
-            } catch (error) {
-              setBuildsEnabled(!nextValue);
-              throw error;
-            }
-          }}
-        />
+        {buildLockReason ? (
+          <SimpleTooltip content={buildLockReason} side="left" delayDuration={100}>
+            <span>
+              <Toggle checked={false} onChange={() => {}} disabled />
+            </span>
+          </SimpleTooltip>
+        ) : (
+          <Toggle
+            checked={buildsEnabled}
+            onChange={async (nextValue) => {
+              setBuildsEnabled(nextValue);
+              try {
+                await onBuildsChange?.(nextValue);
+              } catch (error) {
+                setBuildsEnabled(!nextValue);
+                throw error;
+              }
+            }}
+          />
+        )}
       </div>
 
       <hr className="border-dash-border-soft" />
@@ -1160,6 +1169,7 @@ function WorkspaceProfileForm({
   const isDirty = name !== (team.name || "") || description !== (team.description || "") || avatarUrl !== (team.avatarUrl || "");
 
   const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+  const buildLockReason = getBuildLockReason(team.buildDisabledBy);
 
   useEffect(() => {
     setName(team.name || "");
@@ -1309,7 +1319,13 @@ function WorkspaceProfileForm({
           <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Builds</span>
           <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">Enable or disable builds for this workspace.</span>
         </div>
-        {canEdit ? (
+        {buildLockReason ? (
+          <SimpleTooltip content={buildLockReason} side="left" delayDuration={100}>
+            <span>
+              <Toggle checked={false} onChange={() => {}} disabled />
+            </span>
+          </SimpleTooltip>
+        ) : canEdit ? (
           <Toggle
             checked={buildsEnabled}
             onChange={async (next) => {
@@ -2515,6 +2531,17 @@ export function UserProfileDrawer({
       </Drawer.Portal>
     </Drawer.Root>
   );
+}
+
+function getBuildLockReason(buildDisabledBy?: string | null): string | null {
+  switch (buildDisabledBy?.toLowerCase()) {
+    case "system":
+      return "Builds were disabled by the system. Contact support to re-enable.";
+    case "payment_failure":
+      return "Builds were disabled due to a failed payment. Update your billing to re-enable.";
+    default:
+      return null;
+  }
 }
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean }) {

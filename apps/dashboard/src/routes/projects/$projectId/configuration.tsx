@@ -64,11 +64,11 @@ import {
   getGitlabRootDirServerFn,
   getBitbucketRootDirServerFn,
 } from "@/server/repositories/actions";
-import type { RepositoryDirectoryEntry, RepositoryRootDirResult } from "@/backend/repositories";
 import type { GithubRepoListItem } from "@/backend/repositories";
 import { generalConfigSchema, databaseConfigSchema, resourcesConfigSchema } from "@/utils/configuration-schemas";
 import type { GeneralConfigValues, DatabaseConfigValues, ResourcesConfigValues } from "@/utils/configuration-schemas";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
+import { collectWatchPathEntries, deriveWatchPathSuggestions, type RootDirFetcher } from "@/utils/watch-path-suggestions";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -221,22 +221,6 @@ const ease = [0.16, 1, 0.3, 1] as const;
 const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
 
 const PERSISTENT_STORAGE_PRICE_PER_GB = 0.25;
-
-const COMMON_WATCH_PATTERNS = ["/**", "package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json"];
-
-function deriveWatchPathSuggestions(entries: RepositoryDirectoryEntry[]): string[] {
-  const out = new Set<string>();
-  for (const entry of entries) {
-    if (!entry?.path) continue;
-    if (entry.type === "dir") {
-      out.add(`/${entry.path}/**`);
-    } else if (entry.type === "file") {
-      out.add(`/${entry.path}`);
-    }
-  }
-  for (const pattern of COMMON_WATCH_PATTERNS) out.add(pattern);
-  return Array.from(out).sort();
-}
 
 function normalizeStorageValue(value: unknown, fallback = 1): number {
   const parsed = typeof value === "number" ? value : Number(value);
@@ -1753,15 +1737,9 @@ function ConfigurationPage() {
     setRepoMetadata(repo ?? null);
   }, [repo]);
 
-  const getGithubRootDir = useServerFn(getGithubRootDirServerFn as any) as (args: {
-    data: { repoName: string; branch: string; installationId?: number | string; path?: string };
-  }) => Promise<RepositoryRootDirResult>;
-  const getGitlabRootDir = useServerFn(getGitlabRootDirServerFn as any) as (args: {
-    data: { repoName: string; branch: string; installationId?: number | string; path?: string };
-  }) => Promise<RepositoryRootDirResult>;
-  const getBitbucketRootDir = useServerFn(getBitbucketRootDirServerFn as any) as (args: {
-    data: { repoName: string; branch: string; installationId?: number | string; path?: string };
-  }) => Promise<RepositoryRootDirResult>;
+  const getGithubRootDir = useServerFn(getGithubRootDirServerFn as any) as RootDirFetcher;
+  const getGitlabRootDir = useServerFn(getGitlabRootDirServerFn as any) as RootDirFetcher;
+  const getBitbucketRootDir = useServerFn(getBitbucketRootDirServerFn as any) as RootDirFetcher;
 
   const [watchPathSuggestions, setWatchPathSuggestions] = useState<string[]>([]);
 
@@ -1778,10 +1756,10 @@ function ConfigurationPage() {
     let cancelled = false;
     const input = { repoName, branch, installationId };
 
-    const fetchers: Record<string, () => Promise<RepositoryRootDirResult>> = {
-      github: () => getGithubRootDir({ data: input }),
-      gitlab: () => getGitlabRootDir({ data: input }),
-      bitbucket: () => getBitbucketRootDir({ data: input }),
+    const fetchers: Record<string, RootDirFetcher> = {
+      github: getGithubRootDir,
+      gitlab: getGitlabRootDir,
+      bitbucket: getBitbucketRootDir,
     };
 
     const fetcherKey = Object.keys(fetchers).find((key) => provider.includes(key));
@@ -1790,10 +1768,12 @@ function ConfigurationPage() {
       return;
     }
 
-    fetchers[fetcherKey]()
-      .then((result) => {
+    const fetchRootDir = fetchers[fetcherKey];
+
+    collectWatchPathEntries(fetchRootDir, input, () => !cancelled)
+      .then((entries) => {
         if (cancelled) return;
-        setWatchPathSuggestions(deriveWatchPathSuggestions(result.rootDir ?? []));
+        setWatchPathSuggestions(deriveWatchPathSuggestions(entries));
       })
       .catch(() => {
         if (!cancelled) setWatchPathSuggestions([]);
