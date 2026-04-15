@@ -1,6 +1,5 @@
-import { useFeatureFlagEnabled } from "posthog-js/react";
-import type { ReactNode } from "react";
-import { isPostHogEnabled } from "@/lib/posthog";
+import { useEffect, useState, type ReactNode } from "react";
+import { getPostHogFeatureFlag, isPostHogEnabled, subscribePostHogFeatureFlag } from "@/lib/posthog";
 
 export const FeatureFlags = {
   ENABLE_WEBHOOKS: "enable_webhooks",
@@ -16,15 +15,47 @@ export const FeatureFlags = {
 
 export type FeatureFlagKey = (typeof FeatureFlags)[keyof typeof FeatureFlags];
 
+function usePostHogFeatureFlag(flag: FeatureFlagKey): boolean | undefined {
+  const [value, setValue] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    if (!isPostHogEnabled) {
+      setValue(undefined);
+      return;
+    }
+
+    let mounted = true;
+
+    void getPostHogFeatureFlag(flag).then((next) => {
+      if (mounted) {
+        setValue(next);
+      }
+    });
+
+    const unsubscribe = subscribePostHogFeatureFlag(flag, (next) => {
+      if (mounted) {
+        setValue(next);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [flag]);
+
+  return value;
+}
+
 export function useFeatureFlag(flag: FeatureFlagKey): boolean {
-  const value = useFeatureFlagEnabled(flag);
+  const value = usePostHogFeatureFlag(flag);
   if (!isPostHogEnabled) return true;
   if (value === undefined) return true;
   return value === true;
 }
 
 export function useFeatureFlagStrict(flag: FeatureFlagKey): boolean {
-  const value = useFeatureFlagEnabled(flag);
+  const value = usePostHogFeatureFlag(flag);
   if (!isPostHogEnabled) return false;
   return value === true;
 }

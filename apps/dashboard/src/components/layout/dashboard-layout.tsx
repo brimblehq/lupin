@@ -39,8 +39,7 @@ import { ProfileTab, Theme } from "../../types/enums";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
 import { getSettingsSidebarSnapshotServerFn } from "@/server/settings/actions";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
-import { usePostHog } from "posthog-js/react";
-import { isPostHogEnabled } from "@/lib/posthog";
+import { identifyPostHog, isPostHogEnabled } from "@/lib/posthog";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 
 const dashboardQueryClient = new QueryClient({
@@ -742,7 +741,6 @@ export function DashboardLayout({
     }
   }, [activeSettingsSnapshot?.profile]);
 
-  const phIdentify = usePostHog();
   const lastIdentifiedRef = useRef<{
     id: string;
     email: string;
@@ -752,7 +750,7 @@ export function DashboardLayout({
 
   useEffect(() => {
     if (!isPostHogEnabled) return;
-    if (!phIdentify || !userProfile?.id) return;
+    if (!userProfile?.id) return;
 
     const plan = userProfile.subscription?.planType;
     const current = {
@@ -773,7 +771,7 @@ export function DashboardLayout({
       return;
     }
 
-    phIdentify.identify(userProfile.id, {
+    identifyPostHog(userProfile.id, {
       email: userProfile.email,
       username: userProfile.username,
       name: [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" "),
@@ -782,7 +780,6 @@ export function DashboardLayout({
 
     lastIdentifiedRef.current = current;
   }, [
-    phIdentify,
     userProfile?.id,
     userProfile?.email,
     userProfile?.username,
