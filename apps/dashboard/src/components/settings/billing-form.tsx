@@ -7,7 +7,7 @@ import { useRouter } from "@tanstack/react-router";
 import { cn } from "@brimble/ui";
 import { usePricing } from "@/contexts/pricing-context";
 import { ArrowSquareOut, CreditCard, PencilSimple } from "@phosphor-icons/react";
-import { Plus, Star, X } from "lucide-react";
+import { Check, Copy, Plus, Star, X } from "lucide-react";
 import { FolderTrashIcon } from "../shared/folder-trash-icon";
 import { PaymentProvider } from "@/providers/payment-provider";
 import { GlossyButton } from "../shared/glossy-button";
@@ -963,7 +963,12 @@ function InvoicesSection({
           return (
             <div key={invoice.id} className="flex items-center justify-between gap-4">
               <div className="flex min-w-0 flex-col gap-0.5">
-                <p className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">{displayNumber}</p>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <p className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">{displayNumber}</p>
+                  {invoice.number ? (
+                    <InvoiceReferenceCopyButton reference={invoice.number} />
+                  ) : null}
+                </div>
                 <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">{label}</p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
@@ -1025,5 +1030,37 @@ function InvoicesSection({
         </div>
       )}
     </div>
+  );
+}
+
+function InvoiceReferenceCopyButton({ reference }: { reference: string }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timeout);
+  }, [copied]);
+
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(reference);
+          setCopied(true);
+        } catch {
+          setCopied(false);
+        }
+      }}
+      className="shrink-0 rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-body"
+      title={copied ? "Copied" : "Copy reference"}
+      aria-label={copied ? "Reference copied" : "Copy reference"}
+    >
+      {copied ? <Check className="size-3.5 text-[#34d399]" /> : <Copy className="size-3.5" />}
+    </button>
   );
 }
