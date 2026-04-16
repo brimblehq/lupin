@@ -1323,7 +1323,7 @@ function Phase3DatabaseConfigure({
   const [memIdx, setMemIdx] = useState(() => {
     const recommendedMemory = engine.recommendations?.[0]?.compute?.memory;
     const exactIndex = typeof recommendedMemory === "number" ? memorySteps.indexOf(recommendedMemory) : -1;
-    return exactIndex >= 0 ? exactIndex : 1;
+    return exactIndex >= 0 ? exactIndex : 0;
   });
   const [dbDiskSize, setDbDiskSize] = useState(() => {
     const recommendedStorage = engine.recommendations?.[0]?.compute?.storage;

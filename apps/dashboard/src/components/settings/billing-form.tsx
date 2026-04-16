@@ -477,17 +477,15 @@ function BillingFormInner({
             description={`Your plan will be cancelled at the end of the current billing period. You will be moved to the Free plan and lose access to ${currentPlan} features.`}
             confirmLabel="Cancel subscription"
             cancelLabel="Keep my plan"
-            onConfirm={() => {
-              cancelMutation.mutate(undefined, {
-                onSuccess: () => {
-                  toast.success("Subscription cancelled. You'll keep access until the end of this billing period.");
-                  setCancelOpen(false);
-                  router.invalidate();
-                },
-                onError: (err) => {
-                  toast.error(err instanceof Error ? err.message : "Failed to cancel subscription");
-                },
-              });
+            confirmLoadingLabel="Cancelling..."
+            onConfirm={async () => {
+              try {
+                await cancelMutation.mutateAsync();
+                toast.success("Subscription cancelled. You'll keep access until the end of this billing period.");
+                router.invalidate();
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Failed to cancel subscription");
+              }
             }}
           />
         </>
