@@ -1,6 +1,7 @@
 import config from "@/config";
 import { BackendApiError } from "./errors";
 import type { ApiClient } from "./types";
+import type { BackendClient } from "./client";
 import type {
   PaymentsApi,
   PaymentMethod,
@@ -55,6 +56,8 @@ function generateIdempotencyKey(): string {
 
 export function createPaymentsApi(client: ApiClient): PaymentsApi {
   const base = config.paymentApiUrl;
+  const clientWithConfig = client as BackendClient;
+  const serverApiKey = clientWithConfig.config.apiKey?.trim();
 
   return {
     async listPaymentMethods(): Promise<PaymentMethod[]> {
@@ -245,7 +248,7 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       const res = await client.request<any>(`${base}/verify-transaction`, {
         method: "GET",
         query: { reference },
-        headers: config.apiKey ? { "X-API-Key": config.apiKey } : {},
+        headers: serverApiKey ? { "X-API-Key": serverApiKey } : {},
       });
       const data = unwrapData<any>(res);
       return {

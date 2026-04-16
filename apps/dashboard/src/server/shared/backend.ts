@@ -1,5 +1,5 @@
 import { createBackendApi, type AuthSession, type BackendApi } from "@/backend";
-import config from "@/config";
+import serverConfig from "@/config/server";
 import {
   getServerAccessToken,
   getServerRefreshToken,
@@ -158,9 +158,11 @@ export function getServerBackendApi(geo?: ClientGeoData | null) {
     headers["X-Client-Timezone"] = geo.timezone;
   }
   return createBackendApi({
-    baseUrl: config.apiUrl,
+    baseUrl: serverConfig.apiUrl,
     getAccessToken: getServerAccessToken,
     defaultHeaders: headers,
+    signatureSecret: serverConfig.hmacSecretKey,
+    apiKey: serverConfig.apiKey,
   });
 }
 
@@ -297,9 +299,11 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
 
       setServerAuthCookies(recentSession);
       const recentApi = createBackendApi({
-        baseUrl: config.apiUrl,
+        baseUrl: serverConfig.apiUrl,
         getAccessToken: () => recentSession.accessToken ?? null,
         defaultHeaders: getClientHeaders(),
+        signatureSecret: serverConfig.hmacSecretKey,
+        apiKey: serverConfig.apiKey,
       });
 
       try {
@@ -336,9 +340,11 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
       });
 
       const freshApi = createBackendApi({
-        baseUrl: config.apiUrl,
+        baseUrl: serverConfig.apiUrl,
         getAccessToken: () => session.accessToken ?? null,
         defaultHeaders: getClientHeaders(),
+        signatureSecret: serverConfig.hmacSecretKey,
+        apiKey: serverConfig.apiKey,
       });
 
       return await fn(freshApi);
@@ -372,9 +378,11 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
         });
 
         const freshApi = createBackendApi({
-          baseUrl: config.apiUrl,
+          baseUrl: serverConfig.apiUrl,
           getAccessToken: () => session.accessToken ?? null,
           defaultHeaders: getClientHeaders(),
+          signatureSecret: serverConfig.hmacSecretKey,
+          apiKey: serverConfig.apiKey,
         });
 
         return await fn(freshApi);
@@ -424,9 +432,11 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
       });
 
       const freshApi = createBackendApi({
-        baseUrl: config.apiUrl,
+        baseUrl: serverConfig.apiUrl,
         getAccessToken: () => session.accessToken ?? null,
         defaultHeaders: getClientHeaders(),
+        signatureSecret: serverConfig.hmacSecretKey,
+        apiKey: serverConfig.apiKey,
       });
       return await fn(freshApi);
     } catch (refreshError: any) {

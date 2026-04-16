@@ -30,7 +30,7 @@ function staleAssetGuard(): Plugin {
 }
 
 const config = defineConfig({
-  envPrefix: ["VITE_", "NEXT_PUBLIC_"],
+  envPrefix: ["VITE_"],
   plugins: [
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),

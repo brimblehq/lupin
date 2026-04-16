@@ -2,12 +2,13 @@ import axios, { type AxiosInstance, type AxiosError } from "axios";
 import pino from "pino";
 import { BackendApiError } from "./errors";
 import type { ApiClient, ApiRequestOptions } from "./types";
-import appConfig from "@/config";
 
 export interface BackendClientConfig {
   baseUrl: string;
   getAccessToken?: () => string | null | Promise<string | null>;
   defaultHeaders?: Record<string, string>;
+  signatureSecret?: string | null;
+  apiKey?: string | null;
 }
 
 export interface BackendClient extends ApiClient {
@@ -71,9 +72,9 @@ async function hmacSha256Hex(input: string, secret: string): Promise<string> {
   return crypto.createHmac("sha256", secret).update(input).digest("hex");
 }
 
-async function createBrimbleSignatureHeader(data: unknown, expiryInSeconds: number) {
-  const secret = appConfig.hmacSecretKey?.trim();
-  if (!secret) {
+async function createBrimbleSignatureHeader(data: unknown, expiryInSeconds: number, secret: string | null | undefined) {
+  const normalizedSecret = secret?.trim();
+  if (!normalizedSecret) {
     return "";
   }
 
@@ -82,7 +83,7 @@ async function createBrimbleSignatureHeader(data: unknown, expiryInSeconds: numb
     expiry: Date.now() + expiryInSeconds * 1000,
   };
   const payloadJson = JSON.stringify(payload);
-  const hmacHex = await hmacSha256Hex(payloadJson, secret);
+  const hmacHex = await hmacSha256Hex(payloadJson, normalizedSecret);
   const payloadBase64 = bytesToBase64(utf8ToBytes(payloadJson));
 
   return `${hmacHex}.${payloadBase64}`;
@@ -178,7 +179,7 @@ export function createBackendClient(config: BackendClientConfig): BackendClient 
       };
 
       if (!headers["X-Brimble-Signature"]) {
-        const signature = await createBrimbleSignatureHeader({}, 30);
+        const signature = await createBrimbleSignatureHeader({}, 30, config.signatureSecret);
         if (signature) {
           headers["X-Brimble-Signature"] = signature;
         }

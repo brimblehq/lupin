@@ -1,13 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createBackendApi } from "@/backend";
 import type { McpServerListResult, McpServerTemplate } from "@/backend/mcp";
-import config from "@/config";
+import serverConfig from "@/config/server";
 import { withTokenRefresh } from "@/server/shared/backend";
 import { mcpLogger } from "@/server/shared/logger";
 
 function getPublicBackendApi() {
   return createBackendApi({
-    baseUrl: config.apiUrl,
+    baseUrl: serverConfig.apiUrl,
+    signatureSecret: serverConfig.hmacSecretKey,
+    apiKey: serverConfig.apiKey,
   });
 }
 

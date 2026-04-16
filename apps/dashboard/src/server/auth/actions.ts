@@ -10,7 +10,7 @@ import type {
   VerifyEmailCodeInput,
   VerifyTwoFactorChallengeInput,
 } from "@/backend/auth/types";
-import config from "@/config";
+import serverConfig from "@/config/server";
 import { clearServerAuthCookies, getServerAccessToken, getServerRefreshToken, setServerAuthCookies } from "./cookies";
 import { getServerBackendApi, refreshServerSession, withTokenRefresh, type ClientGeoData } from "@/server/shared/backend";
 import { authLogger } from "@/server/shared/logger";
@@ -276,9 +276,11 @@ export const finalizeOauthSessionServerFn = createServerFn({ method: "POST" }).h
   if (geo?.timezone) geoHeaders["X-Client-Timezone"] = geo.timezone;
 
   const backendWithOauthToken = createBackendApi({
-    baseUrl: config.apiUrl,
+    baseUrl: serverConfig.apiUrl,
     getAccessToken: () => payload.accessToken,
     defaultHeaders: geoHeaders,
+    signatureSecret: serverConfig.hmacSecretKey,
+    apiKey: serverConfig.apiKey,
   });
 
   const currentSession = await backendWithOauthToken.auth.getCurrentSession();
@@ -314,8 +316,10 @@ export const finalizeOauthSessionServerFn = createServerFn({ method: "POST" }).h
 
 function createRecoveryBackend(recoveryToken: string) {
   return createBackendApi({
-    baseUrl: config.apiUrl,
+    baseUrl: serverConfig.apiUrl,
     getAccessToken: () => recoveryToken,
+    signatureSecret: serverConfig.hmacSecretKey,
+    apiKey: serverConfig.apiKey,
   });
 }
 

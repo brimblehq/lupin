@@ -11,7 +11,7 @@ function readEnv(key: string): string | undefined {
   return undefined;
 }
 
-const gatewayUrl = readEnv("NEXT_PUBLIC_GATEWAY_URL") ?? readEnv("VITE_GATEWAY_URL") ?? "https://api.brimble.io";
+const gatewayUrl = readEnv("VITE_GATEWAY_URL") ?? "https://api.brimble.io";
 
 export const config = {
   gatewayUrl,
@@ -20,19 +20,15 @@ export const config = {
   dnsApiUrl: `${gatewayUrl}/dns`,
   paymentApiUrl: `${gatewayUrl}/payment/api`,
   logsSocketUrl: `${gatewayUrl}/core`,
-  avatarUrl: readEnv("NEXT_PUBLIC_AVATAR_URL") ?? readEnv("VITE_AVATAR_URL") ?? "https://api.dicebear.com/7.x",
-  uploadUrl: readEnv("NEXT_PUBLIC_UPLOAD_URL") ?? readEnv("VITE_UPLOAD_URL") ?? "https://api.cloudinary.com/v1_1/dgqfojhx4/image/upload",
+  avatarUrl: readEnv("VITE_AVATAR_URL") ?? "https://api.dicebear.com/7.x",
+  uploadUrl: readEnv("VITE_UPLOAD_URL") ?? "https://api.cloudinary.com/v1_1/dgqfojhx4/image/upload",
   accessTokenCookie: "brimble_access_token",
   refreshTokenCookie: "brimble_refresh_token",
   environmentPreferenceCookiePrefix: "brimble_env_pref_",
-  authToken: readEnv("NEXT_PUBLIC_AUTH_TOKEN") ?? readEnv("VITE_AUTH_TOKEN") ?? "",
-  hmacSecretKey: readEnv("NEXT_PUBLIC_HMAC_SECRET_KEY") ?? readEnv("VITE_HMAC_SECRET_KEY") ?? "",
-  supabaseUrl: readEnv("NEXT_PUBLIC_SUPABASE_URL") ?? readEnv("VITE_SUPABASE_URL") ?? "",
-  supabaseKey: readEnv("NEXT_PUBLIC_SUPABASE_KEY") ?? readEnv("VITE_SUPABASE_KEY") ?? "",
-  supabaseTableName: readEnv("NEXT_PUBLIC_SUPABASE_TABLE_NAME") ?? readEnv("VITE_SUPABASE_TABLE_NAME") ?? "BRIMBLE_DEPLOYMENT_LOGS",
-  apiKey: readEnv("NEXT_PUBLIC_AUTH_TOKEN") ?? readEnv("VITE_AUTH_TOKEN") ?? "",
-  api_key: readEnv("NEXT_PUBLIC_AUTH_TOKEN") ?? readEnv("VITE_AUTH_TOKEN") ?? "",
-  stripePublishableKey: readEnv("NEXT_PUBLIC_STRIPE_KEY") ?? readEnv("VITE_STRIPE_KEY") ?? "",
+  supabaseUrl: readEnv("VITE_SUPABASE_URL") ?? "",
+  supabaseKey: readEnv("VITE_SUPABASE_KEY") ?? "",
+  supabaseTableName: readEnv("VITE_SUPABASE_TABLE_NAME") ?? "BRIMBLE_DEPLOYMENT_LOGS",
+  stripePublishableKey: readEnv("VITE_STRIPE_KEY") ?? "",
 
   defaultPlanFreePrice: Number(readEnv("VITE_DEFAULT_PLAN_FREE_PRICE") ?? "0"),
   defaultPlanHackerPrice: Number(readEnv("VITE_DEFAULT_PLAN_HACKER_PRICE") ?? "5"),
@@ -49,10 +45,10 @@ export const config = {
   accessTokenTtl: Number(readEnv("VITE_ACCESS_TOKEN_TTL") ?? String(60 * 30)),
   refreshTokenTtl: Number(readEnv("VITE_REFRESH_TOKEN_TTL") ?? String(60 * 60 * 24 * 14)),
 
-  turnstileSiteKey: readEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY") ?? readEnv("VITE_TURNSTILE_SITE_KEY") ?? "",
+  turnstileSiteKey: readEnv("VITE_TURNSTILE_SITE_KEY") ?? "",
 
-  posthogKey: readEnv("NEXT_PUBLIC_POSTHOG_KEY") ?? readEnv("VITE_POSTHOG_KEY") ?? "",
-  posthogHost: readEnv("NEXT_PUBLIC_POSTHOG_HOST") ?? readEnv("VITE_POSTHOG_HOST") ?? "https://us.i.posthog.com",
+  posthogKey: readEnv("VITE_POSTHOG_KEY") ?? "",
+  posthogHost: readEnv("VITE_POSTHOG_HOST") ?? "https://us.i.posthog.com",
 } as const;
 
 export default config;
