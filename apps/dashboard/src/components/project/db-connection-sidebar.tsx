@@ -104,7 +104,7 @@ export function DbConnectionCard({ connectionUri, isActive }: DbConnectionCardPr
   }
 
   return (
-    <div className="flex flex-col overflow-clip rounded-[4px]">
+    <div className="flex flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
       <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
         <span className="text-dash-text-strong">Connection</span>
         <div className="flex items-center gap-2">
@@ -142,12 +142,14 @@ export function DbConnectionCard({ connectionUri, isActive }: DbConnectionCardPr
               copied={fieldCopied === "Port"}
               onCopy={() => void handleCopyField("Port", parsed.port)}
             />
-            <ConnectionField
-              label="Database"
-              value={parsed.database}
-              copied={fieldCopied === "Database"}
-              onCopy={() => void handleCopyField("Database", parsed.database)}
-            />
+            {parsed.database && (
+              <ConnectionField
+                label="Database"
+                value={parsed.database}
+                copied={fieldCopied === "Database"}
+                onCopy={() => void handleCopyField("Database", parsed.database)}
+              />
+            )}
             <ConnectionField
               label="User"
               value={parsed.user}
@@ -170,7 +172,7 @@ export function DbConnectionCard({ connectionUri, isActive }: DbConnectionCardPr
 
 export function DbQuickActionsCard({ onDownloadBackup, onRestart, hasBackup, canRestart, restarting = false }: DbQuickActionsCardProps) {
   return (
-    <div className="flex flex-col overflow-clip rounded-[4px]">
+    <div className="flex flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
       <div className="flex h-10 items-center border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
         <span className="text-dash-text-strong">Quick actions</span>
       </div>

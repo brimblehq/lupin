@@ -340,9 +340,7 @@ function ProjectDetailPage() {
           {isDatabaseProject ? <DbConnectionCard connectionUri={project?.connectionUri} isActive={projectStatus === "ACTIVE"} /> : null}
 
           {/* Project meta card */}
-          <div
-            className={`flex flex-1 flex-col overflow-clip rounded-[4px] ${isDatabaseProject ? "" : "border-[0.5px] border-dash-border"}`}
-          >
+          <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
             <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
               <span className="text-dash-text-strong">Project meta</span>
             </div>
@@ -479,7 +477,7 @@ function ProjectDetailPage() {
 
           {/* Backups card (database projects) */}
           {isDatabaseProject ? (
-            <div className="flex flex-1 flex-col overflow-clip rounded-[4px]">
+            <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
               <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
                 <span className="text-dash-text-strong">Manage Backups</span>
               </div>
