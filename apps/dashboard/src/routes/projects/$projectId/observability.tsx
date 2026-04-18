@@ -12,7 +12,7 @@ import { SemiGauge } from "@/components/observability/semi-gauge";
 import { SegmentedToggle } from "@/components/observability/segmented-toggle";
 import { formatTimeLabel, toKbps, hoursAgoForInterval } from "@/utils/observability";
 import type { ResourceObservabilityMetrics } from "@/backend/observability";
-import { getObservabilityGrafanaUrlServerFn, getProjectObservabilityMetricsServerFn } from "@/server/observability/actions";
+import { getProjectObservabilityMetricsServerFn } from "@/server/observability/actions";
 import { normalizeMemoryGbValue } from "@/utils/project-configuration";
 import { useHaptics } from "@/hooks/use-haptics";
 import { isDatabaseProject, shouldShowProjectObservabilityTab } from "@/utils/project-capabilities";
@@ -35,20 +35,15 @@ export const Route = createFileRoute("/projects/$projectId/observability")({
     const project = (context as any).project;
     const workspace = (context as any).workspace;
 
-    const [metrics, grafanaUrl] = await Promise.all([
-      (
-        getProjectObservabilityMetricsServerFn as unknown as (input: {
-          data: { projectId: string; workspace?: string; hrsAgo?: number };
-        }) => Promise<ResourceObservabilityMetrics>
-      )({
-        data: { projectId: project?.id, workspace, hrsAgo: 1 },
-      }).catch(() => ({}) as ResourceObservabilityMetrics),
-      (getObservabilityGrafanaUrlServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<string | null>)({
-        data: { workspace },
-      }).catch(() => null),
-    ]);
+    const metrics = await (
+      getProjectObservabilityMetricsServerFn as unknown as (input: {
+        data: { projectId: string; workspace?: string; hrsAgo?: number };
+      }) => Promise<ResourceObservabilityMetrics>
+    )({
+      data: { projectId: project?.id, workspace, hrsAgo: 1 },
+    }).catch(() => ({}) as ResourceObservabilityMetrics);
 
-    return { metrics, grafanaUrl };
+    return { metrics };
   },
   component: ObservabilityPage,
 });
@@ -105,12 +100,10 @@ function TimeIntervalDropdown({ value, onChange }: { value: string; onChange: (v
 function AppMetrics({
   project,
   initialMetrics,
-  grafanaUrl,
   workspace,
 }: {
   project: Project;
   initialMetrics: ResourceObservabilityMetrics;
-  grafanaUrl: string | null;
   workspace?: string;
 }) {
   const fetchMetrics = useServerFn(getProjectObservabilityMetricsServerFn as any) as (args: {
@@ -239,23 +232,12 @@ function AppMetrics({
   const cpuPercent = Number(metrics?.average?.cpu?.totalInPercentage ?? 0);
   const cpuSize = Number(metrics?.average?.cpu?.size ?? 0);
   const memoryPercent = Number(metrics?.average?.memory?.totalInPercentage ?? 0);
-  const memoryUsedGb = Number(metrics?.average?.memory?.size ?? 0);
   const memoryLimitGb = normalizeMemoryGbValue(project?.specs?.memory);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <TabHeader title="Metrics & Observability">
-          Monitor your app's key metrics and health.
-          {grafanaUrl ? (
-            <>
-              {" "}
-              <a href={grafanaUrl} target="_blank" rel="noreferrer" className="text-[#4879f8] underline">
-                View in Grafana
-              </a>
-            </>
-          ) : null}
-        </TabHeader>
+        <TabHeader title="Metrics & Observability">Monitor your app's key metrics and health.</TabHeader>
         <TimeIntervalDropdown value={timeInterval} onChange={setTimeInterval} />
       </div>
 
@@ -1232,6 +1214,7 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
 
 function ObservabilityPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
+  const { metrics } = Route.useLoaderData();
   const plan = usePlanGate();
   if (!shouldShowProjectObservabilityTab(project)) {
     return (
@@ -1251,11 +1234,10 @@ function ObservabilityPage() {
       </div>
     );
   }
-  const { metrics, grafanaUrl } = Route.useLoaderData();
 
   return (
     <div className="mx-auto flex max-w-[1000px] flex-col gap-6 px-4 py-8 sm:px-0">
-      <AppMetrics project={project} initialMetrics={metrics} grafanaUrl={grafanaUrl} workspace={workspace} />
+      <AppMetrics project={project} initialMetrics={metrics} workspace={workspace} />
     </div>
   );
 }

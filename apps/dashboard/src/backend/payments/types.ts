@@ -58,9 +58,28 @@ export interface InvoicePaymentResult {
 
 /* ── Subscription stats (forecasted bill) ── */
 
+export interface UsageBreakdownResource {
+  amount: number;
+  quantity: number;
+}
+
+export interface UsageBreakdown {
+  cpu: UsageBreakdownResource;
+  memory: UsageBreakdownResource;
+  storage: UsageBreakdownResource;
+  bandwidth: UsageBreakdownResource;
+  compute: UsageBreakdownResource;
+  metered_total: number;
+}
+
 export interface SubscriptionStats {
   total: string;
+  raw_total?: number;
   next_payment_date: string | null;
+  usage_breakdown?: UsageBreakdown;
+  outstanding_invoice_count?: number;
+  outstanding_amount_due?: number;
+  outstanding_invoices?: unknown[];
 }
 
 /* ── Spending limit status ── */

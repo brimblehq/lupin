@@ -40,30 +40,3 @@ export const getProjectObservabilityMetricsServerFn = createServerFn({
     });
   });
 });
-
-export const getObservabilityGrafanaUrlServerFn = createServerFn({
-  method: "GET",
-}).handler(async ({ data }) => {
-  const payload = data as
-    | {
-        workspace?: string;
-      }
-    | undefined;
-
-  return withTokenRefresh(async (api) => {
-    const workspaceSlug = payload?.workspace?.trim().toLowerCase();
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
-
-    return api.observability.getGrafanaUrl({
-      teamId,
-    });
-  });
-});

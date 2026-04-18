@@ -29,7 +29,7 @@ import {
   useUpdateSpendingLimit,
   useSpendingLimitStatus,
 } from "@/hooks/use-payments";
-import type { PaymentMethod, SubscriptionStats } from "@/backend/payments";
+import type { PaymentMethod, SubscriptionStats, UsageBreakdown as UsageBreakdownData } from "@/backend/payments";
 import type { TeamDetails } from "@/backend/teams";
 import type { DrawerUserProfile } from "@/utils/dashboard";
 
@@ -245,40 +245,16 @@ function BillingFormInner({
     <div className="flex max-w-[488px] flex-col gap-8">
       <PaymentFailureBanner daysSinceFailure={daysSinceFailure} />
 
-      {/* ── Current plan ── */}
-      {!hideCurrentPlan && (
-        <div className="relative overflow-hidden rounded-[4px] bg-[#fcfcfc] dark:bg-[#121418]">
-          <div className="px-6 py-3 pr-[116px]">
-            <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body dark:text-dash-text-faded">
-              You are currently on the Brimble <span className="text-dash-text-strong dark:text-dash-text-strong">{currentPlan}</span> plan
-              {activePlanPrice > 0 ? (
-                <>
-                  , you pay <span className="text-dash-text-strong dark:text-dash-text-strong">${activePlanPrice}</span> per month.
-                </>
-              ) : (
-                "."
-              )}
-            </p>
-            {canChangePlan && (
-              <button
-                onClick={() => setChangePlanOpen(true)}
-                className="mt-1.5 text-sm font-medium text-[#4879f8] underline underline-offset-2 hover:text-[#3a6ae6]"
-              >
-                Change plan
-              </button>
-            )}
-          </div>
-          <div className="absolute inset-y-0 right-0 hidden w-[96px] items-center justify-center sm:flex">
-            <img src="/images/construction-trowel.svg" alt="" className="size-16 opacity-60 dark:invert dark:opacity-40" />
-          </div>
-        </div>
-      )}
-
       {/* ── Forecasted bill ── */}
       <BillForecast stats={initialSubscriptionStats} hasOpenInvoice={invoices?.items?.some((inv) => inv.status === "open") ?? false} />
 
       {/* ── Usage / Bill estimate ── */}
       <UsageSection spendingLimit={savedSpendingLimit} usage={currentUsage} />
+
+      {/* ── Usage breakdown (per-resource) ── */}
+      {initialSubscriptionStats?.usage_breakdown && (
+        <UsageBreakdown breakdown={initialSubscriptionStats.usage_breakdown} planName={currentPlan} planAmount={activePlanPrice} />
+      )}
 
       {!hidePaymentMethods && (
         <>
@@ -626,6 +602,63 @@ function UsageBar({
   );
 }
 
+/* ── Usage breakdown (per-resource) ── */
+
+const USAGE_RESOURCES: ReadonlyArray<{
+  key: keyof Omit<UsageBreakdownData, "metered_total" | "compute">;
+  label: string;
+  iconSrc: string;
+  unit: string;
+}> = [
+  { key: "cpu", label: "CPU", iconSrc: "/icons/cpu.svg", unit: "GB-hrs" },
+  { key: "memory", label: "Memory", iconSrc: "/icons/memory.svg", unit: "GB-hrs" },
+  { key: "storage", label: "Storage", iconSrc: "/icons/disk.svg", unit: "GB-hrs" },
+  { key: "bandwidth", label: "Bandwidth", iconSrc: "/icons/outgoing-data.svg", unit: "GB" },
+];
+
+const quantityFormatter = new Intl.NumberFormat("en-US");
+
+function UsageBreakdown({ breakdown, planName, planAmount }: { breakdown: UsageBreakdownData; planName: string; planAmount: number }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-[2px]">
+        <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">Usage breakdown</p>
+        <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">Metered charges for the current period</p>
+      </div>
+
+      <div className="flex flex-col">
+        {USAGE_RESOURCES.map(({ key, label, iconSrc, unit }) => {
+          const resource = breakdown[key];
+          return (
+            <div key={key} className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-2.5">
+                <img src={iconSrc} alt="" className="size-4 invert dark:invert-0" />
+                <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">{label}</span>
+              </div>
+              <div className="flex items-baseline gap-3">
+                <span className="text-xs tabular-nums text-dash-text-faded">
+                  {quantityFormatter.format(resource.quantity)} {unit}
+                </span>
+                <span className="text-sm tabular-nums text-dash-text-strong">${resource.amount.toFixed(2)}</span>
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="my-1 border-t border-dash-border-soft" />
+
+        <div className="flex items-center justify-between py-2">
+          <div className="flex items-center gap-2.5">
+            <img src="/icons/renew.svg" alt="" className="size-4 invert dark:invert-0" />
+            <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">{planName} plan</span>
+          </div>
+          <span className="text-sm tabular-nums text-dash-text-strong">${planAmount.toFixed(2)}/mo</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Card chip visual (matches add-domain-modal / domains/buy) ── */
 
 function CardChip() {
@@ -963,9 +996,7 @@ function InvoicesSection({
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <p className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">{displayNumber}</p>
-                  {invoice.number ? (
-                    <InvoiceReferenceCopyButton reference={invoice.number} />
-                  ) : null}
+                  {invoice.number ? <InvoiceReferenceCopyButton reference={invoice.number} /> : null}
                 </div>
                 <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">{label}</p>
               </div>

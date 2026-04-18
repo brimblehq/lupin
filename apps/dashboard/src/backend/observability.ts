@@ -75,7 +75,6 @@ export interface ObservabilityApi {
     breakdown?: "per-replica";
     teamId?: string;
   }): Promise<ResourceObservabilityMetrics>;
-  getGrafanaUrl(input?: { teamId?: string }): Promise<string | null>;
 }
 
 function parseNumber(value: unknown): number {
@@ -207,27 +206,6 @@ export function createObservabilityApi(client: ApiClient): ObservabilityApi {
         results,
         responseTime,
       };
-    },
-    async getGrafanaUrl(input) {
-      const response = await client.request<any>("/core/v1/projects/stats/grafana", {
-        method: "GET",
-        query: {
-          teamId: input?.teamId,
-        },
-      });
-
-      const root = response?.data?.data ?? response?.data ?? response ?? {};
-      const rootRecord = asRecord(root);
-
-      if (asNonEmptyString(root)) {
-        return asNonEmptyString(root)!;
-      }
-
-      if (pickNonEmptyString(rootRecord, "url")) {
-        return pickNonEmptyString(rootRecord, "url")!;
-      }
-
-      return null;
     },
   };
 }

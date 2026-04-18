@@ -39,6 +39,8 @@ export type {
   VerifyTransactionResult,
   UpdateSpendingLimitInput,
   SubscriptionStats,
+  UsageBreakdown,
+  UsageBreakdownResource,
   UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
   SpendingLimitStatus,
@@ -289,10 +291,15 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
         method: "GET",
         query: teamId ? { team_id: teamId } : undefined,
       });
-      const data = unwrapData<any>(res);
+      const data = unwrapData<SubscriptionStats>(res);
       return {
-        total: typeof data?.total === "string" ? data.total : "$0.00",
+        total: data?.total ?? "$0.00",
+        raw_total: data?.raw_total,
         next_payment_date: data?.next_payment_date ?? null,
+        usage_breakdown: data?.usage_breakdown,
+        outstanding_invoice_count: data?.outstanding_invoice_count,
+        outstanding_amount_due: data?.outstanding_amount_due,
+        outstanding_invoices: data?.outstanding_invoices,
       };
     },
 

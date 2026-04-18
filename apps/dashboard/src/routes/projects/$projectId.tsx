@@ -60,6 +60,12 @@ function mergeDeploymentDrawerEntries(
 const projectCache = new Map<string, { data: BackendProject; fetchedAt: number }>();
 const PROJECT_CACHE_TTL = 300_000;
 
+function getProjectIdentityCandidates(project: BackendProject): string[] {
+  return [project.slug, project.id, project.name]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim().toLowerCase());
+}
+
 export function clearProjectCache() {
   projectCache.clear();
 }
@@ -91,28 +97,75 @@ export const Route = createFileRoute("/projects/$projectId")({
       return { project: cached.data, workspace };
     }
 
-    const project = await (
-      getProjectDetailsServerFn as unknown as (input: { data: { projectId: string; workspace?: string } }) => Promise<BackendProject>
-    )({
-      data: {
-        projectId: params.projectId,
-        workspace,
-      },
-    });
+    try {
+      const project = await (
+        getProjectDetailsServerFn as unknown as (input: {
+          data: { projectId: string; workspace?: string };
+        }) => Promise<BackendProject>
+      )({
+        data: {
+          projectId: params.projectId,
+          workspace,
+        },
+      });
 
-    projectCache.set(cacheKey, { data: project, fetchedAt: Date.now() });
+      projectCache.set(cacheKey, { data: project, fetchedAt: Date.now() });
 
-    return { project, workspace };
+      return { project, workspace };
+    } catch (error) {
+      if (cached) {
+        console.warn("[project-route] using cached project after details fetch failed", {
+          projectId: params.projectId,
+          workspace,
+        });
+        return { project: cached.data, workspace };
+      }
+
+      try {
+        const projects = await (
+          listHomeProjectsServerFn as unknown as (input: {
+            data: { workspace?: string; environmentId?: string };
+          }) => Promise<ApiListResponse<BackendProject>>
+        )({
+          data: { workspace },
+        });
+
+        const requestedProjectId = params.projectId.trim().toLowerCase();
+        const recoveredProject = projects.items.find((item) => getProjectIdentityCandidates(item).includes(requestedProjectId));
+
+        if (recoveredProject) {
+          console.warn("[project-route] recovered project from list after details fetch failed", {
+            projectId: params.projectId,
+            workspace,
+          });
+          projectCache.set(cacheKey, { data: recoveredProject, fetchedAt: Date.now() });
+          return { project: recoveredProject, workspace };
+        }
+      } catch (fallbackError) {
+        console.warn("[project-route] fallback project list lookup failed", {
+          projectId: params.projectId,
+          workspace,
+          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+        });
+      }
+
+      throw error;
+    }
   },
   loader: async ({ params, deps, context }) => {
     const requestedProjectId = params.projectId.trim().toLowerCase();
     const workspace = deps.workspace;
 
-    projectCache.delete(`${params.projectId}:${workspace ?? ""}`);
     const searchEnvironmentId = deps.environmentId;
     const hasExplicitEnvironment = hasExplicitEnvironmentSelection(searchEnvironmentId);
 
-    const [environments, persistedEnvironmentId, allProjects] = await Promise.all([
+    const project = (context as any).project as BackendProject;
+    const fallbackSwitcherProjects: ApiListResponse<BackendProject> = {
+      items: [project],
+      total: 1,
+    };
+
+    const [environmentsResult, persistedEnvironmentResult, allProjectsResult] = await Promise.allSettled([
       (
         listProjectEnvironmentsServerFn as unknown as (input: {
           data: { workspace?: string };
@@ -132,29 +185,47 @@ export const Route = createFileRoute("/projects/$projectId")({
       }),
     ]);
 
+    const environments = environmentsResult.status === "fulfilled" ? environmentsResult.value : [];
+    const persistedEnvironmentId = persistedEnvironmentResult.status === "fulfilled" ? persistedEnvironmentResult.value : null;
+
+    let projectSwitcherProjects = fallbackSwitcherProjects;
+    if (allProjectsResult.status === "fulfilled") {
+      projectSwitcherProjects = allProjectsResult.value;
+    } else {
+      console.warn("[project-route] listHomeProjects failed; falling back to current project", {
+        projectId: params.projectId,
+        workspace,
+        environmentId: searchEnvironmentId,
+      });
+    }
+
     const environmentId = resolveEnvironmentId({
       requestedEnvironmentId: searchEnvironmentId,
       preferredEnvironmentId: persistedEnvironmentId,
       environments,
     });
 
-    let projectSwitcherProjects = allProjects;
     if (environmentId && environmentId !== searchEnvironmentId) {
-      projectSwitcherProjects = await (
-        listHomeProjectsServerFn as unknown as (input: {
-          data: { workspace?: string; environmentId?: string };
-        }) => Promise<ApiListResponse<BackendProject>>
-      )({
-        data: { workspace, environmentId },
-      });
+      try {
+        projectSwitcherProjects = await (
+          listHomeProjectsServerFn as unknown as (input: {
+            data: { workspace?: string; environmentId?: string };
+          }) => Promise<ApiListResponse<BackendProject>>
+        )({
+          data: { workspace, environmentId },
+        });
+      } catch {
+        console.warn("[project-route] listHomeProjects for resolved environment failed; keeping fallback data", {
+          projectId: params.projectId,
+          workspace,
+          environmentId,
+        });
+      }
     }
 
-    const projectVisibleInActiveEnvironment = projectSwitcherProjects.items.some((item) => {
-      const candidates = [item.slug, item.id, item.name]
-        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-        .map((value) => value.trim().toLowerCase());
-      return candidates.includes(requestedProjectId);
-    });
+    const projectVisibleInActiveEnvironment = projectSwitcherProjects.items.some((item) =>
+      getProjectIdentityCandidates(item).includes(requestedProjectId),
+    );
 
     if (!projectVisibleInActiveEnvironment) {
       throw redirect({
@@ -165,8 +236,6 @@ export const Route = createFileRoute("/projects/$projectId")({
         } as any,
       });
     }
-
-    const project = (context as any).project as BackendProject;
 
     return {
       project,
