@@ -608,15 +608,47 @@ const USAGE_RESOURCES: ReadonlyArray<{
   key: keyof Omit<UsageBreakdownData, "metered_total" | "compute">;
   label: string;
   iconSrc: string;
+  // API returns `quantity` in milli-GB-months for cpu/memory/storage and milli-GB for bandwidth.
+  // factor converts raw quantity → displayed unit.
+  factor: number;
   unit: string;
+  tooltip: string;
 }> = [
-  { key: "cpu", label: "CPU", iconSrc: "/icons/cpu.svg", unit: "GB-hrs" },
-  { key: "memory", label: "Memory", iconSrc: "/icons/memory.svg", unit: "GB-hrs" },
-  { key: "storage", label: "Storage", iconSrc: "/icons/disk.svg", unit: "GB-hrs" },
-  { key: "bandwidth", label: "Bandwidth", iconSrc: "/icons/outgoing-data.svg", unit: "GB" },
+  {
+    key: "cpu",
+    label: "CPU",
+    iconSrc: "/icons/cpu.svg",
+    factor: 0.72,
+    unit: "GB-hrs",
+    tooltip: "vCPU usage beyond your plan's included amount. 1 GB-hr = 1 vCPU running for 1 hour.",
+  },
+  {
+    key: "memory",
+    label: "Memory",
+    iconSrc: "/icons/memory.svg",
+    factor: 0.72,
+    unit: "GB-hrs",
+    tooltip: "RAM usage beyond your plan's included amount. 1 GB-hr = 1 GB of memory running for 1 hour.",
+  },
+  {
+    key: "storage",
+    label: "Storage",
+    iconSrc: "/icons/disk.svg",
+    factor: 0.72,
+    unit: "GB-hrs",
+    tooltip: "Disk storage beyond your plan's included amount. 1 GB-hr = 1 GB stored for 1 hour.",
+  },
+  {
+    key: "bandwidth",
+    label: "Bandwidth",
+    iconSrc: "/icons/outgoing-data.svg",
+    factor: 0.001,
+    unit: "GB",
+    tooltip: "Outbound bandwidth beyond your plan's included amount.",
+  },
 ];
 
-const quantityFormatter = new Intl.NumberFormat("en-US");
+const quantityFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 
 function UsageBreakdown({ breakdown, planName, planAmount }: { breakdown: UsageBreakdownData; planName: string; planAmount: number }) {
   return (
@@ -627,21 +659,23 @@ function UsageBreakdown({ breakdown, planName, planAmount }: { breakdown: UsageB
       </div>
 
       <div className="flex flex-col">
-        {USAGE_RESOURCES.map(({ key, label, iconSrc, unit }) => {
+        {USAGE_RESOURCES.map(({ key, label, iconSrc, factor, unit, tooltip }) => {
           const resource = breakdown[key];
           return (
-            <div key={key} className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-2.5">
-                <img src={iconSrc} alt="" className="size-4 invert dark:invert-0" />
-                <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">{label}</span>
+            <SimpleTooltip key={key} content={tooltip}>
+              <div className="flex cursor-default items-center justify-between rounded-md px-1 py-2 -mx-1 transition-colors hover:bg-dash-bg-elevated">
+                <div className="flex items-center gap-2.5">
+                  <img src={iconSrc} alt="" className="size-4 invert dark:invert-0" />
+                  <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">{label}</span>
+                </div>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-xs tabular-nums text-dash-text-faded">
+                    {quantityFormatter.format(resource.quantity * factor)} {unit}
+                  </span>
+                  <span className="text-sm tabular-nums text-dash-text-strong">${resource.amount.toFixed(2)}</span>
+                </div>
               </div>
-              <div className="flex items-baseline gap-3">
-                <span className="text-xs tabular-nums text-dash-text-faded">
-                  {quantityFormatter.format(resource.quantity)} {unit}
-                </span>
-                <span className="text-sm tabular-nums text-dash-text-strong">${resource.amount.toFixed(2)}</span>
-              </div>
-            </div>
+            </SimpleTooltip>
           );
         })}
 
