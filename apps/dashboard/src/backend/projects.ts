@@ -90,10 +90,6 @@ export interface Project {
   }>;
   job?: {
     commonContainer?: string;
-    allocations?: Array<{
-      id?: string | number;
-      container?: string;
-    }>;
   };
 }
 
@@ -328,28 +324,8 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
 
     let job: Project["job"] | undefined;
     if (project?.job && typeof project.job === "object") {
-      const allocations = Array.isArray(project.job.allocations)
-        ? project.job.allocations
-            .filter((allocation: any) => allocation && typeof allocation === "object")
-            .map((allocation: any) => {
-              const rawId = allocation?.ID ?? allocation?.id;
-              const id = rawId && typeof rawId === "object" && rawId.$oid ? String(rawId.$oid) : rawId != null ? String(rawId) : undefined;
-
-              const container =
-                typeof allocation?.Container === "string"
-                  ? allocation.Container
-                  : typeof allocation?.container === "string"
-                    ? allocation.container
-                    : undefined;
-
-              return { id, container };
-            })
-            .filter((allocation: any) => allocation.container)
-        : [];
-
       job = {
         commonContainer: typeof project.job.commonContainer === "string" ? project.job.commonContainer : undefined,
-        allocations,
       };
     }
 

@@ -10,7 +10,6 @@ export const getProjectObservabilityMetricsServerFn = createServerFn({
         workspace?: string;
         hrsAgo?: number;
         container?: string;
-        breakdown?: "per-replica";
       }
     | undefined;
 
@@ -36,7 +35,6 @@ export const getProjectObservabilityMetricsServerFn = createServerFn({
       teamId,
       hrsAgo: payload?.hrsAgo,
       container: payload?.container,
-      breakdown: payload?.breakdown,
     });
   });
 });

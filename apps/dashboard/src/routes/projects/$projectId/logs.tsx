@@ -1451,26 +1451,8 @@ function LogsPage() {
   }, [activeTab]);
 
   const applicationLogContainers = useMemo(() => {
-    const containers: string[] = [];
-    const seenContainers = new Set<string>();
-
-    if (Array.isArray(project?.job?.allocations)) {
-      for (const allocation of project.job.allocations) {
-        const container = typeof allocation?.container === "string" ? allocation.container.trim() : "";
-        if (!container || seenContainers.has(container)) continue;
-        seenContainers.add(container);
-        containers.push(container);
-      }
-    }
-
-    const commonContainer = typeof project?.job?.commonContainer === "string" ? project.job.commonContainer.trim() : "";
-
-    if (commonContainer && !seenContainers.has(commonContainer)) {
-      seenContainers.add(commonContainer);
-      containers.push(commonContainer);
-    }
-
-    return containers;
+    const commonContainer = project?.job?.commonContainer?.trim();
+    return commonContainer ? [commonContainer] : [];
   }, [project]);
 
   return (

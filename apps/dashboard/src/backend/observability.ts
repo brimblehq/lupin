@@ -1,19 +1,5 @@
 import type { ApiClient } from "./types";
-import { asNonEmptyString, asRecord, pickNonEmptyString, pickNumber } from "./normalize";
-
-export interface ReplicaInfo {
-  id: string;
-  container: string;
-  shortName?: string;
-}
-
-export interface ReplicaMetrics {
-  memory: number;
-  cpu: number;
-  network: {
-    bytesPerSecond: number | null;
-  };
-}
+import { asNonEmptyString, asRecord } from "./normalize";
 
 export interface AggregateMetricsPoint {
   date: string;
@@ -22,12 +8,6 @@ export interface AggregateMetricsPoint {
   network: {
     bytesPerSecond: number | null;
   };
-}
-
-export interface PerReplicaMetricsPoint {
-  date: string;
-  aggregate: ReplicaMetrics;
-  replicas: Record<string, ReplicaMetrics>;
 }
 
 export interface ResponseTimeMetricsPoint {
@@ -53,9 +33,7 @@ export interface ResourceObservabilityMetrics {
       bytesPerSecond: number | null;
     };
   };
-  replicas: ReplicaInfo[];
-  replicaCount: number;
-  results: AggregateMetricsPoint[] | PerReplicaMetricsPoint[];
+  results: AggregateMetricsPoint[];
   responseTime?: {
     average: {
       p90: number | null;
@@ -72,7 +50,6 @@ export interface ObservabilityApi {
     projectId: string;
     hrsAgo?: number;
     container?: string;
-    breakdown?: "per-replica";
     teamId?: string;
   }): Promise<ResourceObservabilityMetrics>;
 }
@@ -101,7 +78,6 @@ export function createObservabilityApi(client: ApiClient): ObservabilityApi {
         query: {
           hrsAgo: input.hrsAgo,
           container: input.container,
-          breakdown: input.breakdown,
           teamId: input.teamId,
         },
       });
@@ -115,45 +91,11 @@ export function createObservabilityApi(client: ApiClient): ObservabilityApi {
       const averageCpuRecord = asRecord(averageRecord?.cpu);
       const averageNetworkRecord = asRecord(averageRecord?.network);
 
-      const rawReplicas = Array.isArray(rootRecord?.replicas) ? rootRecord.replicas : [];
       const rawResults = Array.isArray(rootRecord?.results) ? rootRecord.results : [];
       const rawResponseTimeResults = Array.isArray(responseTimeRecord?.results) ? responseTimeRecord.results : [];
 
-      const replicas: ReplicaInfo[] = rawReplicas
-        .map((item: any) => {
-          const row = asRecord(item) ?? {};
-          const container = pickNonEmptyString(row, "container") ?? "";
-          const id = String(row.id ?? row._id ?? container);
-          if (!container) {
-            return null;
-          }
-
-          return {
-            id,
-            container,
-            shortName: pickNonEmptyString(row, "shortName", "short_name"),
-          } satisfies ReplicaInfo;
-        })
-        .filter((item): item is ReplicaInfo => item !== null);
-
-      const results = rawResults.map((point: any) => {
+      const results: AggregateMetricsPoint[] = rawResults.map((point: any) => {
         const pointRecord = asRecord(point) ?? {};
-        const aggregateRecord = asRecord(pointRecord.aggregate);
-        if (aggregateRecord && pointRecord.replicas) {
-          const aggregateNetwork = asRecord(aggregateRecord.network);
-          return {
-            date: parseDateString(pointRecord.date),
-            aggregate: {
-              memory: parseNumber(aggregateRecord.memory),
-              cpu: parseNumber(aggregateRecord.cpu),
-              network: {
-                bytesPerSecond: parseNullableNumber(aggregateNetwork?.bytesPerSecond),
-              },
-            },
-            replicas: pointRecord.replicas as Record<string, ReplicaMetrics>,
-          } satisfies PerReplicaMetricsPoint;
-        }
-
         const networkRecord = asRecord(pointRecord.network);
         return {
           date: parseDateString(pointRecord.date),
@@ -162,7 +104,7 @@ export function createObservabilityApi(client: ApiClient): ObservabilityApi {
           network: {
             bytesPerSecond: parseNullableNumber(networkRecord?.bytesPerSecond),
           },
-        } satisfies AggregateMetricsPoint;
+        };
       });
 
       const responseTime = responseTimeRecord
@@ -201,8 +143,6 @@ export function createObservabilityApi(client: ApiClient): ObservabilityApi {
             bytesPerSecond: parseNullableNumber(averageNetworkRecord?.bytesPerSecond),
           },
         },
-        replicas,
-        replicaCount: pickNumber(rootRecord, "replicaCount") ?? replicas.length,
         results,
         responseTime,
       };
