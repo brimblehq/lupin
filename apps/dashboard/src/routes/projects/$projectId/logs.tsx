@@ -17,6 +17,8 @@ import { listRequestLogsServerFn, getLogTrendsServerFn } from "@/server/logs/act
 import type { RequestLogsPage as RequestLogsResponse, LogTrendsResponse } from "@/backend/logs";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useLiveApplicationLogs } from "@/hooks/use-live-application-logs";
+import { AdvancedFiltersPanel } from "@/components/logs/advanced-filters-panel";
+import { buildAppLogPipeline, emptyAppLogFilters, hasAnyAppLogFilter, type AppLogFilters } from "@/utils/log-filters";
 import {
   buildRequestLogRawData,
   defaultApplicationLogsDateRange,
@@ -462,6 +464,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
 
   const [searchQuery, setSearchQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState("all");
+  const [advancedFilters, setAdvancedFilters] = useState<AppLogFilters>(emptyAppLogFilters);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() =>
     clampRangeToBounds(defaultApplicationLogsDateRange(), minSelectableDate, maxSelectableDate),
   );
@@ -494,6 +497,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
       step?: string;
       interval?: string;
       container?: string;
+      query?: string;
     };
   }) => Promise<LogTrendsResponse>;
 
@@ -502,8 +506,10 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
     return Math.max(15, Math.min(3600, Math.floor(duration / 60)));
   }, [rangeStart, rangeEnd]);
 
+  const trendPipeline = useMemo(() => buildAppLogPipeline(advancedFilters), [advancedFilters]);
+
   const trendsQuery = useQuery({
-    queryKey: ["log-trends", projectId, rangeStart.getTime(), rangeEnd?.getTime() ?? null, stepSec] as const,
+    queryKey: ["log-trends", projectId, rangeStart.getTime(), rangeEnd?.getTime() ?? null, stepSec, trendPipeline] as const,
     enabled: Boolean(projectId),
     staleTime: 30_000,
     queryFn: () =>
@@ -514,6 +520,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
           to: (rangeEnd ?? new Date()).getTime(),
           step: `${stepSec}s`,
           interval: `${stepSec}s`,
+          query: trendPipeline || undefined,
         },
       }),
   });
@@ -550,6 +557,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
   const liveLogs = useLiveApplicationLogs({
     projectId,
     searchQuery: null,
+    filters: advancedFilters,
     start: rangeStart,
     end: rangeEnd,
     enabled: Boolean(projectId),
@@ -714,6 +722,8 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
         </button>
       </div>
 
+      <AdvancedFiltersPanel value={advancedFilters} onChange={setAdvancedFilters} />
+
       {/* Terminal */}
       <div className="flex flex-col">
         <div className="px-1 pb-1">
@@ -769,7 +779,9 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
               ) : (
                 <ApplicationLogsEmptyState
                   isConnecting={liveLogs.isConnecting}
-                  hasActiveFilters={searchQuery.trim().length > 0 || levelFilter !== "all"}
+                  hasActiveFilters={
+                    searchQuery.trim().length > 0 || levelFilter !== "all" || hasAnyAppLogFilter(advancedFilters)
+                  }
                 />
               )}
             </div>

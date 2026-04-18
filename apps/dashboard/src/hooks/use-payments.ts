@@ -23,7 +23,7 @@ export const paymentKeys = {
   all: ["payments"] as const,
   methods: () => [...paymentKeys.all, "methods"] as const,
   subscription: () => [...paymentKeys.all, "subscription"] as const,
-  spendingLimitStatus: () => [...paymentKeys.all, "spending-limit-status"] as const,
+  spendingLimitStatus: (teamId?: string) => [...paymentKeys.all, "spending-limit-status", teamId ?? "personal"] as const,
   invoices: (cursor: string | null, teamId?: string) => [...paymentKeys.all, "invoices", cursor ?? "first", teamId ?? "personal"] as const,
 };
 
@@ -64,6 +64,10 @@ const updateTeamLimit = updateTeamSpendingLimitServerFn as unknown as (args: {
   data: { team_id: string; spending_limit: number };
 }) => Promise<any>;
 
+const getSpendingLimitStatus = getSpendingLimitStatusServerFn as unknown as (args?: {
+  data?: { team_id?: string };
+}) => Promise<any>;
+
 /* ── Queries ── */
 
 export function usePaymentMethods(initialData?: any[]) {
@@ -92,10 +96,16 @@ export function useInvoices(cursor?: string | null, teamId?: string, initialData
   });
 }
 
-export function useSpendingLimitStatus() {
+export function useSpendingLimitStatus(teamId?: string) {
   return useQuery({
-    queryKey: paymentKeys.spendingLimitStatus(),
-    queryFn: () => getSpendingLimitStatusServerFn(),
+    queryKey: paymentKeys.spendingLimitStatus(teamId),
+    queryFn: () => {
+      if (!teamId) {
+        return getSpendingLimitStatus();
+      }
+
+      return getSpendingLimitStatus({ data: { team_id: teamId } });
+    },
   });
 }
 
@@ -204,7 +214,7 @@ export function useUpdateSpendingLimit(teamId?: string) {
           })
         : updateLimit({ data: { spending_limit: spendingLimit } }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: paymentKeys.spendingLimitStatus() });
+      void qc.invalidateQueries({ queryKey: paymentKeys.spendingLimitStatus(teamId) });
     },
   });
 }

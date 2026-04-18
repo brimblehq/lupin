@@ -3,6 +3,7 @@ import { io, type Socket } from "socket.io-client";
 import { subHours } from "date-fns";
 import config from "@/config";
 import { getAccessTokenServerFn } from "@/server/auth/actions";
+import { buildAppLogPipeline, type AppLogFilters } from "@/utils/log-filters";
 
 export interface LiveApplicationLogEntry {
   rawTimestampNs: string;
@@ -14,6 +15,7 @@ export interface LiveApplicationLogEntry {
 interface UseLiveApplicationLogsInput {
   projectId: string;
   searchQuery?: string | null;
+  filters?: AppLogFilters;
   start?: Date;
   end?: Date;
   enabled?: boolean;
@@ -27,11 +29,13 @@ interface LokiStreamPayload {
   }>;
 }
 
-function buildSearchPipeline(searchQuery?: string | null): string {
-  const raw = searchQuery?.trim();
-  if (!raw) return "";
-  const escaped = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[()]/g, "").replace(/\n/g, " ");
-  return `|~ "(?i)${escaped}"`;
+function mergedPipeline(searchQuery: string | null | undefined, filters: AppLogFilters | undefined): string {
+  const merged: AppLogFilters = { ...(filters ?? {}) };
+  const text = searchQuery?.trim();
+  if (text && !merged.text) {
+    merged.text = text;
+  }
+  return buildAppLogPipeline(merged);
 }
 
 function nsStringToEpochMs(raw: string): number {
@@ -121,7 +125,7 @@ function mergeUniqueLogs(current: LiveApplicationLogEntry[], incoming: LiveAppli
 
 interface TailRequestParams {
   projectId: string;
-  query: string;
+  query?: string;
   start: string;
   limit: string;
   delay_for: string;
@@ -248,7 +252,7 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
 
   const enabled = Boolean(input.enabled && input.projectId);
 
-  const lokiQuery = useMemo(() => buildSearchPipeline(input.searchQuery), [input.searchQuery]);
+  const lokiQuery = useMemo(() => mergedPipeline(input.searchQuery, input.filters), [input.searchQuery, input.filters]);
 
   const rangeStartMs = useMemo(() => {
     if (input.start instanceof Date) {
@@ -272,11 +276,14 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
   const tailParams = useMemo(() => {
     const params: TailRequestParams = {
       projectId: input.projectId,
-      query: lokiQuery,
       start: String(rangeStartMs * 1_000_000),
       limit: String(input.limit ?? 150),
       delay_for: "0",
     };
+
+    if (lokiQuery) {
+      params.query = lokiQuery;
+    }
 
     if (rangeEndMs !== null) {
       params.end = String(rangeEndMs * 1_000_000);

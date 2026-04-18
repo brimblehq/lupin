@@ -71,6 +71,7 @@ export interface GetLogTrendsInput {
   interval?: string;
   search?: string;
   container?: string;
+  query?: string;
 }
 
 export interface LogsApi {
@@ -189,6 +190,7 @@ export function createLogsApi(client: ApiClient): LogsApi {
           interval: input?.interval,
           search: input?.search?.trim() || undefined,
           container: input?.container?.trim() || undefined,
+          query: input?.query?.trim() || undefined,
         },
       });
 

@@ -54,6 +54,7 @@ export const getLogTrendsServerFn = createServerFn({
         interval?: string;
         search?: string;
         container?: string;
+        query?: string;
       }
     | undefined;
 
@@ -70,6 +71,7 @@ export const getLogTrendsServerFn = createServerFn({
       interval: payload?.interval,
       search: payload?.search,
       container: payload?.container,
+      query: payload?.query,
     });
   });
 });

@@ -184,5 +184,5 @@ export interface PaymentsApi {
   updateTeamSubscription(input: UpdateTeamSubscriptionInput): Promise<void>;
   getSubscriptionStats(teamId?: string): Promise<SubscriptionStats>;
   getSubscriptionSpecs(): Promise<any>;
-  getSpendingLimitStatus(): Promise<SpendingLimitStatus>;
+  getSpendingLimitStatus(teamId?: string): Promise<SpendingLimitStatus>;
 }

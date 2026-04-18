@@ -116,7 +116,7 @@ function BillingFormInner({
 
   const { data: paymentMethods = [], isLoading: isLoadingMethods } = usePaymentMethods(initialPaymentMethods ?? undefined);
   const { data: subscription } = useSubscription();
-  const { data: spendingLimitStatus } = useSpendingLimitStatus();
+  const { data: spendingLimitStatus } = useSpendingLimitStatus(teamId);
   const { data: invoices } = useInvoices(invoiceCursor, teamId, initialInvoices);
   const cancelMutation = useCancelSubscription();
   const payInvoiceMutation = usePayInvoice();

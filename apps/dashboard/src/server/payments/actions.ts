@@ -176,9 +176,18 @@ export const verifyTransactionServerFn = createServerFn({
 
 export const getSpendingLimitStatusServerFn = createServerFn({
   method: "GET",
-}).handler(async () => {
+}).handler(async ({ data }) => {
+  const payload = data as { team_id?: string } | undefined;
+  let teamId: string | undefined;
+  if (typeof payload?.team_id === "string") {
+    const normalizedTeamId = payload.team_id.trim();
+    if (normalizedTeamId.length > 0) {
+      teamId = normalizedTeamId;
+    }
+  }
+
   return withTokenRefresh(async (api) => {
-    return api.payments.getSpendingLimitStatus();
+    return api.payments.getSpendingLimitStatus(teamId);
   });
 });
 

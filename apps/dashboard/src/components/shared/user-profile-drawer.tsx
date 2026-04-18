@@ -1822,6 +1822,14 @@ export function UserProfileDrawer({
 
       prefetchedBillingScopesRef.current[scopeKey] = true;
 
+      const spendingLimitQueryFn = () => {
+        if (!teamId) {
+          return getSpendingLimitStatusServerFn();
+        }
+
+        return getSpendingLimitStatusServerFn({ data: { team_id: teamId } } as any);
+      };
+
       await Promise.allSettled([
         queryClient.prefetchQuery({
           queryKey: paymentKeys.methods(),
@@ -1832,8 +1840,8 @@ export function UserProfileDrawer({
           queryFn: () => getSubscriptionServerFn(),
         }),
         queryClient.prefetchQuery({
-          queryKey: paymentKeys.spendingLimitStatus(),
-          queryFn: () => getSpendingLimitStatusServerFn(),
+          queryKey: paymentKeys.spendingLimitStatus(teamId),
+          queryFn: spendingLimitQueryFn,
         }),
         queryClient.prefetchQuery({
           queryKey: paymentKeys.invoices(null, teamId),

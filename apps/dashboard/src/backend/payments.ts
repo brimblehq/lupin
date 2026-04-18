@@ -310,9 +310,10 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       return unwrapData<any>(res);
     },
 
-    async getSpendingLimitStatus(): Promise<SpendingLimitStatus> {
-      const res = await client.request<any>(`${base}/payment/spending-limit`, {
+    async getSpendingLimitStatus(teamId?: string): Promise<SpendingLimitStatus> {
+      const res = await client.request<any>(`${base}/subscription/spending-limit`, {
         method: "GET",
+        query: teamId ? { team_id: teamId } : undefined,
       });
       const data = unwrapData<any>(res);
       return {
