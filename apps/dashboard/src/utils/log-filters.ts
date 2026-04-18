@@ -55,6 +55,10 @@ function opFragment(key: string, op: FieldOp, value: string): string {
   }
 }
 
+function aliasFromDottedKey(key: string): string {
+  return key.trim().replace(/[^A-Za-z0-9_]/g, "_");
+}
+
 export function buildAppLogPipeline(f: AppLogFilters): string {
   const parts: string[] = [];
 
@@ -68,7 +72,15 @@ export function buildAppLogPipeline(f: AppLogFilters): string {
   if (fields.length > 0) parts.push("| json");
 
   for (const cond of fields) {
-    const frag = opFragment(cond.key, cond.op, cond.value);
+    const rawKey = cond.key.trim();
+    const isNested = rawKey.includes(".");
+    const labelKey = isNested ? aliasFromDottedKey(rawKey) : rawKey;
+
+    if (isNested) {
+      parts.push(`| json ${labelKey}="${escapeDouble(rawKey)}"`);
+    }
+
+    const frag = opFragment(labelKey, cond.op, cond.value);
     if (frag) parts.push(frag);
   }
 
