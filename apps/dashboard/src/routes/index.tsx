@@ -121,11 +121,13 @@ function DashboardHome() {
     workspaces,
     paymentMethods: initialPaymentMethods,
     workspaceTeamMembers,
+    userOverview,
   } = (rootRoute.useLoaderData() ?? {}) as {
     settingsSnapshot: SettingsSidebarSnapshot | null;
     workspaces: { items: Array<Workspace> };
     paymentMethods: PaymentMethod[] | null;
     workspaceTeamMembers: TeamDetails | null;
+    userOverview: import("@/backend/user-overview").UserOverview | null;
   };
   const router = useRouter();
   const navigate = useNavigate();
@@ -192,6 +194,7 @@ function DashboardHome() {
         planType={planType}
         isTeamWorkspace={isTeamWorkspace}
         initialPaymentMethods={initialPaymentMethods}
+        userOverview={userOverview}
       />
       <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
       <DeployedProjects

@@ -214,6 +214,7 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
             metadata: input.metadata,
             ...(input.team_id ? { team_id: input.team_id } : {}),
           },
+          headers: { "Idempotency-Key": generateIdempotencyKey() },
         });
         const data = unwrapData<any>(res);
         return {

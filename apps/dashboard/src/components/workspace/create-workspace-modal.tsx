@@ -4,10 +4,9 @@ import { motion, AnimatePresence } from "motion/react";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "../shared/modal";
 import { Dropdown } from "../shared/dropdown";
 import { RoleDropdown } from "../shared/role-dropdown";
+import { DashInput } from "../shared/dash-input";
 import { WorkspaceStep } from "../../types/enums";
 import { usePricing } from "@/contexts/pricing-context";
-
-const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
 
 const teamSizeOptions = Array.from({ length: 48 }, (_, i) => i + 3);
 
@@ -90,12 +89,11 @@ function StepName({
     <div className="flex flex-col gap-4 px-6 py-5">
       <div className="flex flex-col gap-1.5">
         <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Workspace name</label>
-        <input
+        <DashInput
           type="text"
           placeholder="My workspace"
           value={name}
           onChange={(e) => handleNameChange(e.target.value)}
-          className={inputClass}
           autoFocus
         />
       </div>
@@ -105,7 +103,7 @@ function StepName({
           <div className="flex items-center rounded-l-[6px] border border-r-0 border-dash-border bg-dash-bg-elevated px-3">
             <span className="whitespace-nowrap text-sm text-dash-text-faded">brimble.app/</span>
           </div>
-          <input type="text" value={slug} onChange={(e) => onSlugChange(e.target.value)} className={`${inputClass} rounded-l-none`} />
+          <DashInput type="text" value={slug} onChange={(e) => onSlugChange(e.target.value)} className="rounded-l-none" />
         </div>
       </div>
     </div>
@@ -185,12 +183,12 @@ function StepConfig({
       <div>
         <label className="mb-1.5 block text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Startup Promo Code</label>
         <div className="flex items-stretch gap-2">
-          <input
+          <DashInput
             type="text"
             placeholder="ABC-123"
             value={promoCode}
             onChange={(e) => onPromoCodeChange(e.target.value)}
-            className={`flex-1 ${inputClass}`}
+            className="flex-1"
           />
           <button
             onClick={onVerifyPromo}
@@ -242,7 +240,7 @@ function StepInvite({ rows, onRowsChange, teamSize }: { rows: InviteRow[]; onRow
       <div className="flex flex-col gap-3">
         {rows.map((row) => (
           <div key={row.id} className="flex items-center gap-2">
-            <input
+            <DashInput
               type="text"
               inputMode="email"
               autoComplete="off"
@@ -253,7 +251,7 @@ function StepInvite({ rows, onRowsChange, teamSize }: { rows: InviteRow[]; onRow
               placeholder="Enter email address"
               value={row.email}
               onChange={(e) => updateRow(row.id, "email", e.target.value)}
-              className={`flex-1 ${inputClass}`}
+              className="flex-1"
             />
             <RoleDropdown value={row.role} onChange={(v) => updateRow(row.id, "role", v)} />
             <button

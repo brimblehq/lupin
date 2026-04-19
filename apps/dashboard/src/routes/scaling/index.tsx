@@ -11,6 +11,7 @@ import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { RangeSlider } from "../../components/shared/range-slider";
 import { WarningModal } from "../../components/shared/warning-modal";
 import { FolderTrashIcon } from "../../components/shared/folder-trash-icon";
+import { dashInputClassName } from "@/components/shared/dash-input";
 import {
   deleteScalingGroupServerFn,
   listScalingGroupsServerFn,
@@ -51,7 +52,7 @@ export const Route = createFileRoute("/scaling/")({
 const ease = [0.16, 1, 0.3, 1] as const;
 
 const inputClass =
-  "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+  `${dashInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
 
 type UiScalingGroup = {
   id: string;

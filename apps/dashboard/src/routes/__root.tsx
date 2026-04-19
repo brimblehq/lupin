@@ -19,6 +19,8 @@ import type { BackendTag } from "@/backend/tags";
 import { useTagsStore } from "@/hooks/use-tags-store";
 import { getSubscriptionStatsServerFn } from "@/server/payments/actions";
 import type { SubscriptionStats } from "@/backend/payments";
+import { getUserOverviewServerFn } from "@/server/overview/actions";
+import type { UserOverview } from "@/backend/user-overview";
 
 import appCss from "../styles.css?url";
 import marfaLatinWoff2 from "../assets/fonts/ABCMarfaVariableVF-latin.woff2?url";
@@ -56,6 +58,7 @@ type RootLoaderData = {
   onboardingProjects?: ApiListResponse<Project>;
   tags?: BackendTag[];
   subscriptionStats?: SubscriptionStats;
+  userOverview?: UserOverview;
   pricing: Pricing;
 };
 
@@ -137,7 +140,7 @@ export const Route = createRootRoute({
 
       const hasGlobalCache = globalDataCache.fetchedAt > 0 && Date.now() - globalDataCache.fetchedAt < GLOBAL_CACHE_TTL;
 
-      const [settingsSnapshot, workspaces, onboardingProjects, pricingResult, tags, subscriptionStats] = await Promise.allSettled([
+      const [settingsSnapshot, workspaces, onboardingProjects, pricingResult, tags, subscriptionStats, userOverview] = await Promise.allSettled([
         (getSettingsSidebarSnapshotServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SettingsSidebarSnapshot>)({
           data: { workspace },
         }),
@@ -155,6 +158,9 @@ export const Route = createRootRoute({
         }),
         (getSubscriptionStatsServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SubscriptionStats>)({
           data: { workspace },
+        }),
+        (getUserOverviewServerFn as unknown as (input: { data?: { teamId?: string } }) => Promise<UserOverview>)({
+          data: {},
         }),
       ]);
 
@@ -176,6 +182,7 @@ export const Route = createRootRoute({
         onboardingProjects: onboardingProjects.status === "fulfilled" ? onboardingProjects.value : undefined,
         tags: tags.status === "fulfilled" ? tags.value : undefined,
         subscriptionStats: subscriptionStats.status === "fulfilled" ? subscriptionStats.value : undefined,
+        userOverview: userOverview.status === "fulfilled" ? userOverview.value : undefined,
         pricing: pricingResult.status === "fulfilled" ? pricingResult.value : DEFAULT_PRICING,
       });
     } catch (err) {
@@ -244,6 +251,7 @@ function RootComponent() {
     onboardingProjects,
     tags,
     subscriptionStats,
+    userOverview,
     pricing,
   } = Route.useLoaderData() ?? ({} as any);
 
@@ -316,6 +324,7 @@ function RootComponent() {
       initialProjectSwitcherProjects={projectSwitcherProjects}
       initialOnboardingProjects={onboardingProjects}
       initialSubscriptionStats={subscriptionStats ?? null}
+      initialUserOverview={userOverview ?? null}
       initialPricing={pricing}
     >
       <Outlet />

@@ -16,6 +16,7 @@ import {
   updateTeamSpendingLimitServerFn,
   getSpendingLimitStatusServerFn,
 } from "@/server/payments/actions";
+import type { PurchaseResult } from "@/backend/payments";
 
 /* ── Query key factory ── */
 
@@ -52,7 +53,7 @@ const purchase = purchaseServerFn as unknown as (args: {
     metadata: Record<string, unknown>;
     team_id?: string;
   };
-}) => Promise<any>;
+}) => Promise<PurchaseResult>;
 
 const payInvoice = payInvoiceServerFn as unknown as (args: {
   data: { invoice_id: string; team_id?: string };

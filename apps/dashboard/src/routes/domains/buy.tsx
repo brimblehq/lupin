@@ -10,6 +10,7 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { Dropdown } from "../../components/shared/dropdown";
 import { GlossyButton } from "../../components/shared/glossy-button";
 import { Spinner } from "../../components/shared/spinner";
+import { dashInputClassName } from "@/components/shared/dash-input";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton } from "../../components/shared/modal";
 import { NumberPagination } from "../../components/shared/pagination";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
@@ -31,7 +32,7 @@ const ease = [0.16, 1, 0.3, 1] as const;
 const PAGE_SIZE = 50;
 const PRIVACY_PRICE = 8;
 
-const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+const inputClass = dashInputClassName;
 
 /* ─── Types ─── */
 

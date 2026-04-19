@@ -538,6 +538,7 @@ export function DashboardLayout({
   initialPricing,
   initialActivityLogs,
   initialSubscriptionStats,
+  initialUserOverview,
   initialProjectEnvironments,
 }: {
   children: ReactNode;
@@ -553,6 +554,7 @@ export function DashboardLayout({
   initialPricing?: Pricing;
   initialActivityLogs?: ActivityLogsResponse | null;
   initialSubscriptionStats?: SubscriptionStats | null;
+  initialUserOverview?: import("@/backend/user-overview").UserOverview | null;
   initialProjectEnvironments?: import("@/backend/environments").ProjectEnvironment[] | null;
 }) {
   const pathname = useRouterState({
@@ -1120,6 +1122,7 @@ export function DashboardLayout({
                       initialInvoices={initialInvoices ?? null}
                       initialActivityLogs={initialActivityLogs ?? null}
                       initialSubscriptionStats={initialSubscriptionStats ?? null}
+                      initialUserOverview={initialUserOverview ?? null}
                       initialProjectEnvironments={initialProjectEnvironments ?? null}
                       projectCount={accountProjectCount}
                     />

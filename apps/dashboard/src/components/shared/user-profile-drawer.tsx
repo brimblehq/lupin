@@ -28,6 +28,7 @@ import { posthog } from "@/lib/posthog";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { InviteMembersModal } from "../settings/invite-members-modal";
 import { Dropdown } from "./dropdown";
+import { dashInputClassName } from "./dash-input";
 import { WarningModal } from "./warning-modal";
 import { GlossyButton } from "./glossy-button";
 import { OtpInput } from "../auth/auth-split-layout";
@@ -389,7 +390,7 @@ function ProfileForm({
   const isAvatarDirty = avatarUrl !== (profile.avatarUrl ?? "");
   const isDirty = isTextDirty || isAvatarDirty;
 
-  const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+  const inputClass = dashInputClassName;
   const normalizedPlanType = (profile.subscriptionPlanType ?? "").toUpperCase();
   const isFreePlan = !normalizedPlanType || normalizedPlanType === SUBSCRIPTION_PLAN_TYPE.FreePlan;
   const buildLockReason = getBuildLockReason(profile.buildDisabledBy);
@@ -827,7 +828,7 @@ function DangerZone({
             value={disconnectConfirm}
             onChange={(e) => setDisconnectConfirm(e.target.value)}
             placeholder="DISCONNECT"
-            className="w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]"
+            className={dashInputClassName}
           />
         </div>
       </WarningModal>
@@ -1169,7 +1170,7 @@ function WorkspaceProfileForm({
 
   const isDirty = name !== (team.name || "") || description !== (team.description || "") || avatarUrl !== (team.avatarUrl || "");
 
-  const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+  const inputClass = dashInputClassName;
   const buildLockReason = getBuildLockReason(team.buildDisabledBy);
 
   useEffect(() => {
@@ -1634,6 +1635,7 @@ export function UserProfileDrawer({
   initialInvoices = null,
   initialActivityLogs = null,
   initialSubscriptionStats = null,
+  initialUserOverview = null,
   initialProjectEnvironments = null,
   projectCount = 0,
   requestedTab,
@@ -1646,6 +1648,7 @@ export function UserProfileDrawer({
   initialInvoices?: any;
   initialActivityLogs?: ActivityLogsResponse | null;
   initialSubscriptionStats?: import("@/backend/payments").SubscriptionStats | null;
+  initialUserOverview?: import("@/backend/user-overview").UserOverview | null;
   initialProjectEnvironments?: ProjectEnvironment[] | null;
   projectCount?: number;
   requestedTab?: ProfileTab;
@@ -2501,6 +2504,7 @@ export function UserProfileDrawer({
                   initialInvoices={hasActiveWorkspace ? undefined : initialInvoices}
                   initialSpendingStats={snapshot?.billing.spending}
                   initialSubscriptionStats={initialSubscriptionStats}
+                  initialUserOverview={initialUserOverview}
                   hidePaymentMethods={hasActiveWorkspace}
                   hideCurrentPlan={hasActiveWorkspace}
                   teamId={hasActiveWorkspace ? workspaceTeam?.id : undefined}
@@ -3202,7 +3206,7 @@ function NotificationsForm({
     setAllEvents(false);
   }, [enabledCount, totalCount]);
 
-  const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+  const inputClass = dashInputClassName;
 
   const { webhookEnabled } = usePlanGate(profile.subscriptionPlanType ?? "");
   const webhooksFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_WEBHOOKS);

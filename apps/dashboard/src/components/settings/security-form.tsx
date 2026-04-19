@@ -24,13 +24,14 @@ import { guessDeviceName, passkeyErrorMessage, runRegistration } from "@/lib/aut
 import { GlossyButton } from "../shared/glossy-button";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "../shared/modal";
 import { OtpInput } from "../auth/auth-split-layout";
+import { dashInputClassName } from "../shared/dash-input";
 
 const stepTransition = {
   duration: 0.25,
   ease: [0.16, 1, 0.3, 1] as const,
 };
 
-const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+const inputClass = dashInputClassName;
 
 function normalizeCodeEntry(value: string) {
   return value.replace(/\s+/g, "").trim().toUpperCase();

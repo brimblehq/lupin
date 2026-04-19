@@ -12,6 +12,7 @@ import { FolderTrashIcon } from "./folder-trash-icon";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "./modal";
 import { WarningModal } from "./warning-modal";
 import { Dropdown } from "./dropdown";
+import { dashInputClassName } from "./dash-input";
 
 export interface Domain {
   id?: string;
@@ -257,8 +258,7 @@ function EditDomainModal({
   const [redirectUrlError, setRedirectUrlError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const inputClass =
-    "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded";
+  const inputClass = `${dashInputClassName} dark:placeholder:text-dash-text-extra-faded`;
 
   async function handleSave() {
     if (redirectUrl && !isValidRedirectUrl(redirectUrl)) {

@@ -13,6 +13,7 @@ import { TabHeader } from "../../../components/shared/tab-header";
 import { WarningModal } from "../../../components/shared/warning-modal";
 import { Modal, ModalHeader } from "../../../components/shared/modal";
 import { DashButton } from "../../../components/shared/dash-button";
+import { dashInputClassName } from "@/components/shared/dash-input";
 import { RootDirectoryDrawer } from "../../../components/project/root-directory-drawer";
 import { RangeSlider } from "../../../components/shared/range-slider";
 import { Dropdown } from "../../../components/shared/dropdown";
@@ -218,7 +219,7 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+const inputClass = dashInputClassName;
 
 const PERSISTENT_STORAGE_PRICE_PER_GB = 0.25;
 

@@ -36,6 +36,7 @@ import { AccessDenied, accessDeniedForbidden } from "../../components/shared/acc
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { RootDirectoryDrawer } from "../../components/project/root-directory-drawer";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
+import { dashInputClassName } from "@/components/shared/dash-input";
 import { inferProjectNameFromDockerImage, parseDockerImageRef } from "@/utils/docker-image";
 import { mapFrameworksToDropdownOptions } from "@/utils/framework-dropdown";
 import { getEnvPrefixForFramework, getLegacyServiceType, isNoBuildFramework } from "@/utils/project-deploy";
@@ -87,7 +88,7 @@ export const Route = createFileRoute("/projects/new")({
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+const inputClass = dashInputClassName;
 
 /* ─── Icons ─── */
 

@@ -8,6 +8,9 @@ import { usePlanGate } from "@/hooks/use-plan-gate";
 import type { PaymentMethod } from "@/backend/payments";
 import type { OverviewSummary } from "@/backend/overview";
 import type { BandwidthSummary } from "@/backend/bandwidth";
+import type { UserOverview } from "@/backend/user-overview";
+import { useProfileDrawer } from "@/contexts/profile-drawer-context";
+import { ProfileTab } from "@/types/enums";
 
 function formatDurationSeconds(value: number | null | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -111,14 +114,17 @@ export function StatsRow({
   planType,
   isTeamWorkspace,
   initialPaymentMethods,
+  userOverview,
 }: {
   overview?: OverviewSummary | null;
   bandwidth?: BandwidthSummary | null;
   planType?: string;
   isTeamWorkspace?: boolean;
   initialPaymentMethods?: PaymentMethod[] | null;
+  userOverview?: UserOverview | null;
 }) {
   const [changePlanOpen, setChangePlanOpen] = useState(false);
+  const profileDrawer = useProfileDrawer();
   const plan = getPlanInfo(planType, isTeamWorkspace);
   const { projectLimit: specProjectLimit } = usePlanGate();
   const canChangePlan = plan.label !== "TEAM";
@@ -178,8 +184,17 @@ export function StatsRow({
 
       {/* Deployment minutes */}
       <div className="flex w-full shrink-0 flex-col border-b-[0.5px] border-dash-border lg:w-[34%] lg:border-b-0">
-        <div className="flex h-[30px] items-center border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-2">
+        <div className="flex h-[30px] items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-2">
           <span className="text-xs tracking-[-0.02px] text-dash-text-strong">Deployment minutes</span>
+          {userOverview && (
+            <button
+              type="button"
+              onClick={() => profileDrawer.open(ProfileTab.Billing)}
+              className="text-xs tabular-nums text-[#ff9b01] hover:underline"
+            >
+              {Math.max(0, userOverview.buildMinutes.total - userOverview.buildMinutes.used).toLocaleString()} left
+            </button>
+          )}
         </div>
         <div className="flex flex-1 flex-col justify-between gap-1 px-2 py-3.5 lg:gap-0">
           {deploymentRows.map((row, i) => (

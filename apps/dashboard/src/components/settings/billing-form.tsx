@@ -1,10 +1,13 @@
 import { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import type { StripeCardElementOptions } from "@stripe/stripe-js";
 import { motion } from "motion/react";
 import { useRouter } from "@tanstack/react-router";
 import { cn } from "@brimble/ui";
+import { getUserOverviewServerFn } from "@/server/overview/actions";
+import type { UserOverview } from "@/backend/user-overview";
 import { usePricing } from "@/contexts/pricing-context";
 import { ArrowSquareOut, CreditCard, PencilSimple } from "@phosphor-icons/react";
 import { Check, Copy, Plus, Star, X } from "lucide-react";
@@ -16,6 +19,8 @@ import { CursorPagination } from "../shared/pagination";
 import { WarningModal } from "../shared/warning-modal";
 import { ChangePlanModal } from "../shared/change-plan-modal";
 import { SimpleTooltip } from "../shared/tooltip";
+import { dashInputClassName } from "../shared/dash-input";
+import { BuildMinutesCard } from "./build-minutes-card";
 import {
   usePaymentMethods,
   useSubscription,
@@ -34,7 +39,7 @@ import type { TeamDetails } from "@/backend/teams";
 import type { DrawerUserProfile } from "@/utils/dashboard";
 
 type UserProfile = DrawerUserProfile;
-const settingsInputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+const settingsInputClass = dashInputClassName;
 
 /* ── Wrapped billing form (provides Stripe Elements) ── */
 
@@ -44,6 +49,7 @@ export function BillingForm({
   initialInvoices,
   initialSpendingStats,
   initialSubscriptionStats,
+  initialUserOverview,
   hidePaymentMethods = false,
   hideCurrentPlan = false,
   teamId,
@@ -55,6 +61,7 @@ export function BillingForm({
   initialInvoices?: any;
   initialSpendingStats?: { used: number; spendingLimit: number } | null;
   initialSubscriptionStats?: SubscriptionStats | null;
+  initialUserOverview?: UserOverview | null;
   hidePaymentMethods?: boolean;
   hideCurrentPlan?: boolean;
   teamId?: string;
@@ -69,6 +76,7 @@ export function BillingForm({
         initialInvoices={initialInvoices}
         initialSpendingStats={initialSpendingStats}
         initialSubscriptionStats={initialSubscriptionStats}
+        initialUserOverview={initialUserOverview}
         hidePaymentMethods={hidePaymentMethods}
         hideCurrentPlan={hideCurrentPlan}
         teamId={teamId}
@@ -87,6 +95,7 @@ function BillingFormInner({
   initialInvoices,
   initialSpendingStats,
   initialSubscriptionStats,
+  initialUserOverview,
   hidePaymentMethods = false,
   hideCurrentPlan = false,
   teamId,
@@ -98,6 +107,7 @@ function BillingFormInner({
   initialInvoices?: any;
   initialSpendingStats?: { used: number; spendingLimit: number } | null;
   initialSubscriptionStats?: SubscriptionStats | null;
+  initialUserOverview?: UserOverview | null;
   hidePaymentMethods?: boolean;
   hideCurrentPlan?: boolean;
   teamId?: string;
@@ -115,6 +125,11 @@ function BillingFormInner({
   const [isEditingLimit, setIsEditingLimit] = useState(false);
 
   const { data: paymentMethods = [], isLoading: isLoadingMethods } = usePaymentMethods(initialPaymentMethods ?? undefined);
+  const { data: userOverview } = useQuery<UserOverview>({
+    queryKey: ["user-overview", teamId ?? "self"],
+    queryFn: () => (getUserOverviewServerFn as unknown as (args: { data: { teamId?: string } }) => Promise<UserOverview>)({ data: { teamId } }),
+    ...(initialUserOverview ? { initialData: initialUserOverview } : {}),
+  });
   const { data: subscription } = useSubscription();
   const { data: spendingLimitStatus } = useSpendingLimitStatus(teamId);
   const { data: invoices } = useInvoices(invoiceCursor, teamId, initialInvoices);
@@ -250,6 +265,16 @@ function BillingFormInner({
 
       {/* ── Usage / Bill estimate ── */}
       <UsageSection spendingLimit={savedSpendingLimit} usage={currentUsage} />
+
+      {/* ── Build minutes ── */}
+      <BuildMinutesCard
+        usedMinutes={userOverview?.buildMinutes.used ?? 0}
+        includedMinutes={userOverview?.buildMinutes.included ?? 0}
+        creditMinutes={userOverview?.buildMinutes.purchased ?? 0}
+        resetDate={userOverview?.buildMinutes.nextResetAt ?? initialSubscriptionStats?.next_payment_date ?? null}
+        teamId={teamId}
+        initialPaymentMethods={initialPaymentMethods}
+      />
 
       {/* ── Usage breakdown (per-resource) ── */}
       {initialSubscriptionStats?.usage_breakdown && (

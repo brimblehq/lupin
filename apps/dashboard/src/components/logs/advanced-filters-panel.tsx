@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ChevronDown, Plus, X, SlidersHorizontal } from "lucide-react";
 import { Dropdown } from "@/components/shared/dropdown";
+import { dashInputBaseClassName } from "@/components/shared/dash-input";
 import {
   FIELD_OP_LABELS,
   NUMERIC_OPS,
@@ -16,8 +17,7 @@ const ease = [0.16, 1, 0.3, 1] as const;
 const OP_OPTIONS: FieldOp[] = ["eq", "neq", "contains", "regex", "gte", "lte", "gt", "lt"];
 const MAX_FIELD_CONDITIONS = 7;
 
-const inputClass =
-  "input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+const inputClass = dashInputBaseClassName;
 
 interface Props {
   value: AppLogFilters;

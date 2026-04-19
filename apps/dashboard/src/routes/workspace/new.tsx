@@ -10,6 +10,7 @@ import { ImageSquare } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { GlossyButton } from "../../components/shared/glossy-button";
 import { Dropdown } from "../../components/shared/dropdown";
+import { dashInputClassName } from "@/components/shared/dash-input";
 import { Route as RootRoute } from "@/routes/__root";
 import config from "@/config";
 import { createWorkspaceServerFn, verifyWorkspacePromoCodeServerFn } from "@/server/workspaces/actions";
@@ -42,7 +43,7 @@ export const Route = createFileRoute("/workspace/new")({
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const inputClass = "w-full input-base input-focus px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af]";
+const inputClass = dashInputClassName;
 
 type Phase = 1 | 2 | 3;
 
