@@ -11,6 +11,7 @@ import type { BandwidthSummary } from "@/backend/bandwidth";
 import type { UserOverview } from "@/backend/user-overview";
 import { useProfileDrawer } from "@/contexts/profile-drawer-context";
 import { ProfileTab } from "@/types/enums";
+import { SimpleTooltip } from "../shared/tooltip";
 
 function formatDurationSeconds(value: number | null | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -187,13 +188,15 @@ export function StatsRow({
         <div className="flex h-[30px] items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-2">
           <span className="text-xs tracking-[-0.02px] text-dash-text-strong">Deployment minutes</span>
           {userOverview && (
-            <button
-              type="button"
-              onClick={() => profileDrawer.open(ProfileTab.Billing)}
-              className="text-xs tabular-nums text-[#ff9b01] hover:underline"
-            >
-              {Math.max(0, userOverview.buildMinutes.total - userOverview.buildMinutes.used).toLocaleString()} left
-            </button>
+            <SimpleTooltip content="Build minutes remaining this cycle. Click to view usage or top up.">
+              <button
+                type="button"
+                onClick={() => profileDrawer.open(ProfileTab.Billing)}
+                className="text-xs tabular-nums text-[#ff9b01] hover:underline"
+              >
+                {Math.max(0, userOverview.buildMinutes.total - userOverview.buildMinutes.used).toLocaleString()} left
+              </button>
+            </SimpleTooltip>
           )}
         </div>
         <div className="flex flex-1 flex-col justify-between gap-1 px-2 py-3.5 lg:gap-0">
