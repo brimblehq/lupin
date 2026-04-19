@@ -7,6 +7,7 @@ import { buildSeoHead } from "@/config/seo";
 import { Navbar } from "@/components/layout/navbar";
 import { Button, Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@brimble/ui";
 import { Cta } from "@/components/sections/cta";
+import { listPlansServerFn, type PlansResult } from "@/server/plans/actions";
 import trainStation from "@/assets/images/train-station.svg";
 import flower from "@/assets/images/flower.png";
 import arrowRight from "@/assets/icons/arrow-right.svg";
@@ -19,6 +20,10 @@ export const Route = createFileRoute("/pricing")({
         "Explore Brimble’s transparent pricing for app hosting, managed databases, domain purchases, and AI API access. Start free, scale as you grow.",
       path: "/pricing",
     }),
+  staleTime: 300_000,
+  loader: async (): Promise<PlansResult> => {
+    return (listPlansServerFn as unknown as () => Promise<PlansResult>)();
+  },
   component: PricingPage,
 });
 
@@ -86,16 +91,17 @@ function PricingHero() {
 function PricingPlans() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
-  const teamPlan = siteConfig.pricing.teamPlan;
+  const { personal, team } = Route.useLoaderData();
+  const teamConfig = siteConfig.pricing.teamPlan;
 
   return (
     <section className="bg-brimble-surface transition-colors duration-300 px-6 pb-20">
       <div ref={ref} className="mx-auto flex max-w-[960px] flex-col items-center gap-10">
         {/* Personal plan cards */}
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
-          {siteConfig.pricing.personalPlans.map((plan, i) => (
+          {personal.map((plan, i) => (
             <motion.div
-              key={plan.name}
+              key={plan.planType}
               className={`relative flex flex-col rounded-3xl border p-6 transition-colors duration-200 ${
                 plan.popular
                   ? "border-brimble-accent-blue bg-brimble-surface shadow-[var(--shadow-big)]"
@@ -142,7 +148,7 @@ function PricingPlans() {
                 className="mt-6 w-full gap-2 transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
               >
                 <a href="https://app.brimble.io" target="_blank" rel="noopener noreferrer">
-                  {plan.cta}
+                  {siteConfig.pricing.personalCta}
                   {plan.popular && <img src={arrowRight} alt="" className="size-3 brightness-0 invert dark:invert-0" />}
                 </a>
               </Button>
@@ -164,57 +170,59 @@ function PricingPlans() {
         </div>
 
         {/* Team plan — separate section */}
-        <motion.div
-          className="w-full rounded-3xl border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-8 dark:border-white/10"
-          initial={{ opacity: 0, y: 24 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{
-            duration: 0.6,
-            delay: 0.4,
-            ease: [0.16, 1, 0.3, 1],
-          }}
-        >
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3">
-                <h3 className="font-body text-xl font-medium leading-[30px] tracking-[-0.24px] text-brimble-black">{teamPlan.name}</h3>
-                <span className="rounded-full bg-brimble-accent-blue/10 px-2.5 py-0.5 font-body text-xs font-medium text-brimble-accent-blue">
-                  Add-on
-                </span>
+        {team && (
+          <motion.div
+            className="w-full rounded-3xl border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-8 dark:border-white/10"
+            initial={{ opacity: 0, y: 24 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{
+              duration: 0.6,
+              delay: 0.4,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+          >
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-body text-xl font-medium leading-[30px] tracking-[-0.24px] text-brimble-black">{team.name}</h3>
+                  <span className="rounded-full bg-brimble-accent-blue/10 px-2.5 py-0.5 font-body text-xs font-medium text-brimble-accent-blue">
+                    Add-on
+                  </span>
+                </div>
+                <p className="max-w-[480px] font-body text-sm leading-[18px] tracking-[-0.32px] text-brimble-black/50">
+                  {team.description}
+                </p>
+                <p className="mt-1 font-body text-sm text-brimble-black/70">
+                  <span className="font-medium text-brimble-black">${teamConfig.pricePerMember}</span>/member/mo
+                  {" + "}
+                  <span className="font-medium text-brimble-black">${teamConfig.pricePerBuild}</span>/build container/mo
+                </p>
               </div>
-              <p className="max-w-[480px] font-body text-sm leading-[18px] tracking-[-0.32px] text-brimble-black/50">
-                {teamPlan.description}
-              </p>
-              <p className="mt-1 font-body text-sm text-brimble-black/70">
-                <span className="font-medium text-brimble-black">${teamPlan.pricePerMember}</span>/member/mo
-                {" + "}
-                <span className="font-medium text-brimble-black">${teamPlan.pricePerBuild}</span>/build container/mo
-              </p>
+              <Button
+                asChild
+                variant="pill-light"
+                size="sm"
+                className="shrink-0 gap-2 transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
+              >
+                <a href="https://app.brimble.io" target="_blank" rel="noopener noreferrer">
+                  {teamConfig.cta}
+                  <ArrowRight className="size-3" />
+                </a>
+              </Button>
             </div>
-            <Button
-              asChild
-              variant="pill-light"
-              size="sm"
-              className="shrink-0 gap-2 transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
-            >
-              <a href="https://app.brimble.io" target="_blank" rel="noopener noreferrer">
-                {teamPlan.cta}
-                <ArrowRight className="size-3" />
-              </a>
-            </Button>
-          </div>
 
-          <div className="my-6 h-px bg-[rgba(152,157,164,0.2)] dark:bg-white/10" />
+            <div className="my-6 h-px bg-[rgba(152,157,164,0.2)] dark:bg-white/10" />
 
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {teamPlan.features.map((feature) => (
-              <li key={feature} className="flex items-start gap-2 font-body text-sm leading-[18px] text-brimble-black/70">
-                <Check className="mt-0.5 size-3.5 shrink-0 text-brimble-accent-blue" />
-                {feature}
-              </li>
-            ))}
-          </ul>
-        </motion.div>
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {team.features.map((feature) => (
+                <li key={feature} className="flex items-start gap-2 font-body text-sm leading-[18px] text-brimble-black/70">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-brimble-accent-blue" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
       </div>
     </section>
   );

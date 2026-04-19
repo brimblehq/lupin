@@ -8,148 +8,163 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as PricingRouteImport } from "./routes/pricing";
-import { Route as FaqRouteImport } from "./routes/faq";
-import { Route as DomainsRouteImport } from "./routes/domains";
-import { Route as SplatRouteImport } from "./routes/$";
-import { Route as IndexRouteImport } from "./routes/index";
-import { Route as LegalIndexRouteImport } from "./routes/legal/index";
-import { Route as LegalSlugRouteImport } from "./routes/legal/$slug";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as FaqRouteImport } from './routes/faq'
+import { Route as DomainsRouteImport } from './routes/domains'
+import { Route as SplatRouteImport } from './routes/$'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as LegalIndexRouteImport } from './routes/legal/index'
+import { Route as LegalSlugRouteImport } from './routes/legal/$slug'
 
 const PricingRoute = PricingRouteImport.update({
-  id: "/pricing",
-  path: "/pricing",
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const FaqRoute = FaqRouteImport.update({
-  id: "/faq",
-  path: "/faq",
+  id: '/faq',
+  path: '/faq',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const DomainsRoute = DomainsRouteImport.update({
-  id: "/domains",
-  path: "/domains",
+  id: '/domains',
+  path: '/domains',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const SplatRoute = SplatRouteImport.update({
-  id: "/$",
-  path: "/$",
+  id: '/$',
+  path: '/$',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const LegalIndexRoute = LegalIndexRouteImport.update({
-  id: "/legal/",
-  path: "/legal/",
+  id: '/legal/',
+  path: '/legal/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const LegalSlugRoute = LegalSlugRouteImport.update({
-  id: "/legal/$slug",
-  path: "/legal/$slug",
+  id: '/legal/$slug',
+  path: '/legal/$slug',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute;
-  "/$": typeof SplatRoute;
-  "/domains": typeof DomainsRoute;
-  "/faq": typeof FaqRoute;
-  "/pricing": typeof PricingRoute;
-  "/legal/$slug": typeof LegalSlugRoute;
-  "/legal/": typeof LegalIndexRoute;
+  '/': typeof IndexRoute
+  '/$': typeof SplatRoute
+  '/domains': typeof DomainsRoute
+  '/faq': typeof FaqRoute
+  '/pricing': typeof PricingRoute
+  '/legal/$slug': typeof LegalSlugRoute
+  '/legal/': typeof LegalIndexRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute;
-  "/$": typeof SplatRoute;
-  "/domains": typeof DomainsRoute;
-  "/faq": typeof FaqRoute;
-  "/pricing": typeof PricingRoute;
-  "/legal/$slug": typeof LegalSlugRoute;
-  "/legal": typeof LegalIndexRoute;
+  '/': typeof IndexRoute
+  '/$': typeof SplatRoute
+  '/domains': typeof DomainsRoute
+  '/faq': typeof FaqRoute
+  '/pricing': typeof PricingRoute
+  '/legal/$slug': typeof LegalSlugRoute
+  '/legal': typeof LegalIndexRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  "/": typeof IndexRoute;
-  "/$": typeof SplatRoute;
-  "/domains": typeof DomainsRoute;
-  "/faq": typeof FaqRoute;
-  "/pricing": typeof PricingRoute;
-  "/legal/$slug": typeof LegalSlugRoute;
-  "/legal/": typeof LegalIndexRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/$': typeof SplatRoute
+  '/domains': typeof DomainsRoute
+  '/faq': typeof FaqRoute
+  '/pricing': typeof PricingRoute
+  '/legal/$slug': typeof LegalSlugRoute
+  '/legal/': typeof LegalIndexRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/$" | "/domains" | "/faq" | "/pricing" | "/legal/$slug" | "/legal/";
-  fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/$" | "/domains" | "/faq" | "/pricing" | "/legal/$slug" | "/legal";
-  id: "__root__" | "/" | "/$" | "/domains" | "/faq" | "/pricing" | "/legal/$slug" | "/legal/";
-  fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/$'
+    | '/domains'
+    | '/faq'
+    | '/pricing'
+    | '/legal/$slug'
+    | '/legal/'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/$' | '/domains' | '/faq' | '/pricing' | '/legal/$slug' | '/legal'
+  id:
+    | '__root__'
+    | '/'
+    | '/$'
+    | '/domains'
+    | '/faq'
+    | '/pricing'
+    | '/legal/$slug'
+    | '/legal/'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  SplatRoute: typeof SplatRoute;
-  DomainsRoute: typeof DomainsRoute;
-  FaqRoute: typeof FaqRoute;
-  PricingRoute: typeof PricingRoute;
-  LegalSlugRoute: typeof LegalSlugRoute;
-  LegalIndexRoute: typeof LegalIndexRoute;
+  IndexRoute: typeof IndexRoute
+  SplatRoute: typeof SplatRoute
+  DomainsRoute: typeof DomainsRoute
+  FaqRoute: typeof FaqRoute
+  PricingRoute: typeof PricingRoute
+  LegalSlugRoute: typeof LegalSlugRoute
+  LegalIndexRoute: typeof LegalIndexRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/pricing": {
-      id: "/pricing";
-      path: "/pricing";
-      fullPath: "/pricing";
-      preLoaderRoute: typeof PricingRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/faq": {
-      id: "/faq";
-      path: "/faq";
-      fullPath: "/faq";
-      preLoaderRoute: typeof FaqRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/domains": {
-      id: "/domains";
-      path: "/domains";
-      fullPath: "/domains";
-      preLoaderRoute: typeof DomainsRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/$": {
-      id: "/$";
-      path: "/$";
-      fullPath: "/$";
-      preLoaderRoute: typeof SplatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/": {
-      id: "/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/legal/": {
-      id: "/legal/";
-      path: "/legal";
-      fullPath: "/legal/";
-      preLoaderRoute: typeof LegalIndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/legal/$slug": {
-      id: "/legal/$slug";
-      path: "/legal/$slug";
-      fullPath: "/legal/$slug";
-      preLoaderRoute: typeof LegalSlugRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/domains': {
+      id: '/domains'
+      path: '/domains'
+      fullPath: '/domains'
+      preLoaderRoute: typeof DomainsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$': {
+      id: '/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/': {
+      id: '/legal/'
+      path: '/legal'
+      fullPath: '/legal/'
+      preLoaderRoute: typeof LegalIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/$slug': {
+      id: '/legal/$slug'
+      path: '/legal/$slug'
+      fullPath: '/legal/$slug'
+      preLoaderRoute: typeof LegalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -161,14 +176,16 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   LegalSlugRoute: LegalSlugRoute,
   LegalIndexRoute: LegalIndexRoute,
-};
-export const routeTree = rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>();
+}
+export const routeTree = rootRouteImport
+  ._addFileChildren(rootRouteChildren)
+  ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx";
-import type { createStart } from "@tanstack/react-start";
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true;
-    router: Awaited<ReturnType<typeof getRouter>>;
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
   }
 }

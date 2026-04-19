@@ -13,6 +13,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ScalingRouteImport } from './routes/scaling'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as PasskeyRecoveryRouteImport } from './routes/passkey-recovery'
+import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DomainsRouteImport } from './routes/domains'
 import { Route as AddonsRouteImport } from './routes/addons'
@@ -61,6 +62,11 @@ const ProjectsRoute = ProjectsRouteImport.update({
 const PasskeyRecoveryRoute = PasskeyRecoveryRouteImport.update({
   id: '/passkey-recovery',
   path: '/passkey-recovery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OverviewRoute = OverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -225,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/addons': typeof AddonsRouteWithChildren
   '/domains': typeof DomainsRouteWithChildren
   '/login': typeof LoginRoute
+  '/overview': typeof OverviewRoute
   '/passkey-recovery': typeof PasskeyRecoveryRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/scaling': typeof ScalingRouteWithChildren
@@ -258,6 +265,7 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/2fa': typeof R2faRoute
   '/login': typeof LoginRoute
+  '/overview': typeof OverviewRoute
   '/passkey-recovery': typeof PasskeyRecoveryRoute
   '/signup': typeof SignupRoute
   '/addons/$addonId': typeof AddonsAddonIdRoute
@@ -290,6 +298,7 @@ export interface FileRoutesById {
   '/addons': typeof AddonsRouteWithChildren
   '/domains': typeof DomainsRouteWithChildren
   '/login': typeof LoginRoute
+  '/overview': typeof OverviewRoute
   '/passkey-recovery': typeof PasskeyRecoveryRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/scaling': typeof ScalingRouteWithChildren
@@ -327,6 +336,7 @@ export interface FileRouteTypes {
     | '/addons'
     | '/domains'
     | '/login'
+    | '/overview'
     | '/passkey-recovery'
     | '/projects'
     | '/scaling'
@@ -360,6 +370,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/2fa'
     | '/login'
+    | '/overview'
     | '/passkey-recovery'
     | '/signup'
     | '/addons/$addonId'
@@ -391,6 +402,7 @@ export interface FileRouteTypes {
     | '/addons'
     | '/domains'
     | '/login'
+    | '/overview'
     | '/passkey-recovery'
     | '/projects'
     | '/scaling'
@@ -427,6 +439,7 @@ export interface RootRouteChildren {
   AddonsRoute: typeof AddonsRouteWithChildren
   DomainsRoute: typeof DomainsRouteWithChildren
   LoginRoute: typeof LoginRoute
+  OverviewRoute: typeof OverviewRoute
   PasskeyRecoveryRoute: typeof PasskeyRecoveryRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
   ScalingRoute: typeof ScalingRouteWithChildren
@@ -465,6 +478,13 @@ declare module '@tanstack/react-router' {
       path: '/passkey-recovery'
       fullPath: '/passkey-recovery'
       preLoaderRoute: typeof PasskeyRecoveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/overview': {
+      id: '/overview'
+      path: '/overview'
+      fullPath: '/overview'
+      preLoaderRoute: typeof OverviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -778,6 +798,7 @@ const rootRouteChildren: RootRouteChildren = {
   AddonsRoute: AddonsRouteWithChildren,
   DomainsRoute: DomainsRouteWithChildren,
   LoginRoute: LoginRoute,
+  OverviewRoute: OverviewRoute,
   PasskeyRecoveryRoute: PasskeyRecoveryRoute,
   ProjectsRoute: ProjectsRouteWithChildren,
   ScalingRoute: ScalingRouteWithChildren,
