@@ -10,6 +10,7 @@ import { createFrameworksApi, type FrameworksApi } from "./frameworks";
 import { createLogsApi, type LogsApi } from "./logs";
 import { createMessagesApi, type MessagesApi } from "./messages";
 import { createMcpApi, type McpApi } from "./mcp";
+import { createNotificationsApi, type NotificationsApi } from "./notifications";
 import { createObservabilityApi, type ObservabilityApi } from "./observability";
 import { createOverviewApi, type OverviewApi } from "./overview";
 import { createPaymentsApi, type PaymentsApi } from "./payments";
@@ -36,6 +37,7 @@ export * from "./frameworks";
 export * from "./logs";
 export * from "./messages";
 export * from "./mcp";
+export * from "./notifications";
 export * from "./observability";
 export * from "./overview";
 export * from "./payments";
@@ -65,6 +67,7 @@ export interface BackendApi {
   logs: LogsApi;
   messages: MessagesApi;
   mcp: McpApi;
+  notifications: NotificationsApi;
   overview: OverviewApi;
   payments: PaymentsApi;
   userOverview: UserOverviewApi;
@@ -95,6 +98,7 @@ export function createBackendApi(config: BackendClientConfig): BackendApi {
     logs: createLogsApi(client),
     messages: createMessagesApi(client),
     mcp: createMcpApi(client),
+    notifications: createNotificationsApi(client),
     overview: createOverviewApi(client),
     payments: createPaymentsApi(client),
     userOverview: createUserOverviewApi(client),

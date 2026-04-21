@@ -37,7 +37,7 @@ function isRefreshTokenReuseError(error: any): boolean {
 
 const activeRefreshPromises = new Map<string, Promise<AuthSession>>();
 const recentRefreshSessions = new Map<string, { session: AuthSession; expiresAt: number }>();
-const RECENT_REFRESH_TTL_MS = 30_000;
+const RECENT_REFRESH_TTL_MS = 2 * 60 * 1000;
 
 function getRecentRefreshSession(refreshToken: string): AuthSession | null {
   const entry = recentRefreshSessions.get(refreshToken);
@@ -144,6 +144,7 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
   const recentSession = getRecentRefreshSession(refreshToken);
 
   if (recentSession) {
+    setServerAuthCookies(recentSession);
     authLogger.info("refreshServerSession using recent refreshed session", {
       refreshTokenFp,
       currentRefreshTokenFp,
@@ -180,6 +181,7 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
     const isRefreshReuse = isRefreshTokenReuseError(error);
     const fallbackSession = getRecentRefreshSession(refreshToken);
     if (fallbackSession) {
+      setServerAuthCookies(fallbackSession);
       authLogger.warn("refreshServerSession recovered from stale refresh token", {
         refreshTokenFp,
         latestRefreshTokenFp,
@@ -285,6 +287,7 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
   if (refreshToken) {
     const recentSession = getRecentRefreshSession(refreshToken);
     if (recentSession?.accessToken) {
+      setServerAuthCookies(recentSession);
       authLogger.info("withTokenRefresh using recent session before request", {
         refreshTokenFp: tokenFingerprint(refreshToken),
         nextAccessTokenFp: tokenFingerprint(recentSession.accessToken),

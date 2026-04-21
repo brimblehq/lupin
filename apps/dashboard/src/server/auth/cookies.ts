@@ -7,7 +7,7 @@ import { authLogger } from "@/server/shared/logger";
 const isProduction = process.env.NODE_ENV === "production";
 
 const cookieOptions = {
-  httpOnly: false,
+  httpOnly: true,
   sameSite: "strict" as const,
   secure: isProduction,
   path: "/",

@@ -312,7 +312,7 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
     },
 
     async getSpendingLimitStatus(teamId?: string): Promise<SpendingLimitStatus> {
-      const res = await client.request<any>(`${base}/subscription/spending-limit`, {
+      const res = await client.request<any>(`${base}/payment/spending-limit`, {
         method: "GET",
         query: teamId ? { team_id: teamId } : undefined,
       });

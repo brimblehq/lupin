@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Search,
@@ -31,8 +31,9 @@ import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import type { Workspace } from "@/backend/workspaces";
 import type { Project } from "@/backend/projects";
 import type { TeamDetails } from "@/backend/teams";
-import type { AppTooltipMessage } from "@/backend/messages";
-import { listTooltipMessagesServerFn } from "@/server/messages/actions";
+import type { NotificationItem, NotificationLevel } from "@/backend/notifications";
+import { useNotifications, useMarkNotificationSeen, useMarkAllNotificationsSeen } from "@/hooks/use-notifications";
+import { formatRelativeTime } from "@/utils/dashboard";
 import {
   listProjectEnvironmentsServerFn,
   createProjectEnvironmentServerFn,
@@ -801,121 +802,25 @@ function EnvironmentDropdown({
 
 /* ─── Notifications ─── */
 
-interface Notification {
-  id: string;
-  message: string;
-  time?: string;
-  read: boolean;
-  route?: string;
-}
-
-function getNotificationId(message: AppTooltipMessage, index: number) {
-  return [message.type || "notification", message.level, message.route || "", message.message, index].join("|");
-}
-
-function getNotificationTime(meta?: Record<string, unknown>) {
-  if (!meta) return undefined;
-
-  const direct = meta.time;
-  if (typeof direct === "string" && direct.trim()) {
-    return direct.trim();
-  }
-
-  const relative = meta.relativeTime;
-  if (typeof relative === "string" && relative.trim()) {
-    return relative.trim();
-  }
-
-  return undefined;
-}
-
-function mapNotifications(messages: AppTooltipMessage[] | null): Notification[] {
-  if (!messages || messages.length === 0) {
-    return [];
-  }
-
-  return messages.map((message, index) => ({
-    id: getNotificationId(message, index),
-    message: message.message,
-    time: getNotificationTime(message.meta),
-    read: false,
-    route: message.route,
-  }));
+function levelIcon(level: NotificationLevel): { src: string; className?: string } {
+  if (level === "error") return { src: "/icons/error.svg", className: "invert dark:invert-0" };
+  if (level === "warning") return { src: "/icons/icons8-warning-shield.svg" };
+  return { src: "/icons/info.svg", className: "invert dark:invert-0" };
 }
 
 function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHaptics> }) {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspaceSearch = getWorkspaceSearch(searchStr);
-  const listTooltipMessages = useServerFn(listTooltipMessagesServerFn as any) as (args: {
-    data: {
-      workspace?: string;
-      type: "notifications";
-      limit?: number;
-      page?: number;
-    };
-  }) => Promise<AppTooltipMessage[] | null>;
-  const listTooltipMessagesRef = useRef(listTooltipMessages);
+  const workspace = workspaceSearch?.workspace;
 
-  const notificationFetchKey = workspaceSearch?.workspace ?? "__personal__";
-
-  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
-
-  useEffect(() => {
-    listTooltipMessagesRef.current = listTooltipMessages;
-  }, [listTooltipMessages]);
-
-  useEffect(() => {
-    setNotifications([]);
-    setHasLoaded(false);
-    setIsLoading(false);
-  }, [notificationFetchKey]);
-
-  useEffect(() => {
-    if (!open || hasLoaded || isLoading) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      setIsLoading(true);
-      try {
-        const messages = await listTooltipMessagesRef.current({
-          data: {
-            ...(workspaceSearch?.workspace ? { workspace: workspaceSearch.workspace } : {}),
-            type: "notifications",
-            limit: 8,
-            page: 1,
-          },
-        });
-
-        if (cancelled) {
-          return;
-        }
-
-        setNotifications(mapNotifications(messages));
-      } catch {
-        if (!cancelled) {
-          setNotifications([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setHasLoaded(true);
-          setIsLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, hasLoaded, workspaceSearch?.workspace]);
+  const { data, isLoading, refetch } = useNotifications({ workspace, limit: 8 });
+  const items = data?.items ?? [];
+  const unreadCount = data?.unseenCount ?? 0;
+  const markSeen = useMarkNotificationSeen(workspace);
+  const markAllSeen = useMarkAllNotificationsSeen(workspace);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -929,16 +834,19 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
     }
   }, [open]);
 
-  function markAllRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  useEffect(() => {
+    if (open) void refetch();
+  }, [open, refetch]);
+
+  function handleMarkAllRead() {
+    if (unreadCount === 0) return;
+    markAllSeen.mutate();
   }
 
-  function markAsRead(id: string) {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  }
-
-  function handleNotificationClick(notification: Notification) {
-    markAsRead(notification.id);
+  function handleNotificationClick(notification: NotificationItem) {
+    if (!notification.seen) {
+      markSeen.mutate(notification.id);
+    }
     setOpen(false);
 
     if (!notification.route) {
@@ -989,7 +897,11 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
             <div className="flex items-center justify-between border-b-[0.5px] border-dash-border px-4 py-3">
               <span className="text-sm font-medium text-dash-text-strong">Notifications</span>
               {unreadCount > 0 && (
-                <button onClick={markAllRead} className="text-xs text-[#4879f8] transition-colors hover:text-[#3a6ae6]">
+                <button
+                  onClick={handleMarkAllRead}
+                  disabled={markAllSeen.isPending}
+                  className="text-xs text-[#4879f8] transition-colors hover:text-[#3a6ae6] disabled:opacity-50"
+                >
                   Mark all as read
                 </button>
               )}
@@ -997,26 +909,41 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
 
             {/* List */}
             <div className="max-h-[320px] overflow-y-auto">
-              {isLoading ? (
+              {isLoading && items.length === 0 ? (
                 <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-dash-text-faded">
                   <LoaderCircle className="size-4 animate-spin" />
                   <span>Loading notifications...</span>
                 </div>
-              ) : notifications.length === 0 ? (
+              ) : items.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-dash-text-faded">No notifications</div>
               ) : (
-                notifications.map((n) => (
+                items.map((n) => (
                   <button
                     key={n.id}
                     onClick={() => handleNotificationClick(n)}
-                    className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated"
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated ${
+                      n.seen ? "" : "bg-[#4879f8]/[0.04] dark:bg-[#4879f8]/[0.06]"
+                    }`}
                   >
-                    <span className={`mt-1.5 size-[6px] shrink-0 rounded-full ${n.read ? "bg-transparent" : "bg-[#ef2f1f]"}`} />
+                    {(() => {
+                      const icon = levelIcon(n.level);
+                      return (
+                        <img
+                          src={icon.src}
+                          alt=""
+                          className={`mt-0.5 size-4 shrink-0 ${icon.className ?? ""} ${n.seen ? "opacity-60" : ""}`}
+                        />
+                      );
+                    })()}
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className={`text-sm leading-[1.4] ${n.read ? "font-light text-dash-text-faded" : "text-dash-text-strong"}`}>
+                      <span
+                        className={`text-sm leading-[1.4] ${
+                          n.seen ? "font-light text-dash-text-faded" : "font-medium text-dash-text-strong"
+                        }`}
+                      >
                         {n.message}
                       </span>
-                      {n.time ? <span className="text-xs text-dash-text-extra-faded">{n.time}</span> : null}
+                      <span className="text-xs text-dash-text-extra-faded">{formatRelativeTime(n.createdAt)}</span>
                     </div>
                   </button>
                 ))
