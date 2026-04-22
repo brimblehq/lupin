@@ -466,6 +466,27 @@ function BillingFormInner({
         payingInvoiceId={payingInvoiceId}
       />
 
+      {canChangePlan && (
+        <>
+          <hr className="-ml-8 border-dash-border-soft" />
+
+          {/* ── Change plan ── */}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-[2px] py-2">
+              <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">Plan</p>
+              <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
+                You're currently on the {currentPlan} plan.
+              </p>
+            </div>
+            <div>
+              <GlossyButton variant="blue" onClick={() => setChangePlanOpen(true)}>
+                {currentPlan === "Free" ? "Upgrade plan" : "Change plan"}
+              </GlossyButton>
+            </div>
+          </div>
+        </>
+      )}
+
       {hasActivePaidSubscription && (
         <>
           <hr className="-ml-8 border-dash-border-soft" />

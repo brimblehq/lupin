@@ -1821,8 +1821,8 @@ function Phase3Configure({
   const [outputDir, setOutputDir] = useState(fw.output ?? "");
   const [installCmd, setInstallCmd] = useState(fw.install ?? "");
   const [preStartCmd, setPreStartCmd] = useState("");
-  const [envVars, setEnvVars] = useState<EnvVar[]>([]);
-  const [envExpanded, setEnvExpanded] = useState(false);
+  const [envVars, setEnvVars] = useState<EnvVar[]>(() => [{ id: envNextId++, key: "PORT", value: "3000" }]);
+  const [envExpanded, setEnvExpanded] = useState(true);
   const [diskEnabled, setDiskEnabled] = useState(false);
   const [diskSize, setDiskSize] = useState("10");
   const [mountPath, setMountPath] = useState("/mnt/data");
@@ -2180,6 +2180,9 @@ function Phase3Configure({
                     placeholder="npm run start"
                     className={`${inputClass} font-family-mono text-[13px]`}
                   />
+                  <p className="mt-2 text-xs text-dash-text-extra-faded">
+                    Make sure your app listens on the port Brimble provides via the <code className="rounded bg-dash-bg-elevated px-1 py-0.5 font-family-mono text-[11px] text-dash-text-body">PORT</code> env var so health checks pass on startup.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2237,9 +2240,12 @@ function Phase3Configure({
       {/* Secrets — hidden for no-build frameworks (HTML, Static) */}
       {!isNoBuildFramework(framework) && (
         <div>
-          <button onClick={() => setEnvExpanded(!envExpanded)} className="flex w-full items-center justify-between text-sm">
-            <span className="font-medium text-dash-text-strong">Secrets</span>
-            <span className="flex items-center gap-2 text-xs text-dash-text-faded">
+          <button onClick={() => setEnvExpanded(!envExpanded)} className="flex w-full items-start justify-between gap-4 text-sm">
+            <div className="flex flex-col gap-[2px] text-left">
+              <span className="font-medium text-dash-text-strong">Secrets</span>
+              <span className="text-xs text-dash-text-faded">Stored securely on Brimble and injected at runtime.</span>
+            </div>
+            <span className="flex shrink-0 items-center gap-2 pt-0.5 text-xs text-dash-text-faded">
               {envVars.length} secret{envVars.length !== 1 ? "s" : ""}
               <motion.span animate={{ rotate: envExpanded ? 180 : 0 }} transition={{ duration: 0.2, ease }}>
                 <ChevronDown className="size-3.5" />
@@ -2256,7 +2262,7 @@ function Phase3Configure({
                 transition={{ duration: 0.2, ease }}
                 className="overflow-hidden"
               >
-                <div className="mt-3 flex flex-col gap-2 px-px pb-px">
+                <div className="scrollbar-subtle mt-3 flex max-h-[340px] flex-col gap-2 overflow-y-auto px-px pb-px pr-1">
                   {envVars.map((v) => (
                     <div key={v.id} className="flex items-center gap-2">
                       <input
