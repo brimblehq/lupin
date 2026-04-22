@@ -117,8 +117,8 @@ function OpenRoles() {
           transition={{ duration: 0.6, delay: 0.15 * careerRoles.length, ease: [0.16, 1, 0.3, 1] }}
         >
           Don't see the right fit? If you're excited about what we're building, send a note to{" "}
-          <a href="mailto:careers@brimble.app" className="text-[#006fff] hover:underline">
-            careers@brimble.app
+          <a href="mailto:hello@brimble.app" className="text-[#006fff] hover:underline">
+            hello@brimble.app
           </a>
           .
         </motion.p>
