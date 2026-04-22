@@ -15,7 +15,9 @@ import { Route as DomainsRouteImport } from './routes/domains'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LegalIndexRouteImport } from './routes/legal/index'
+import { Route as CareersIndexRouteImport } from './routes/careers/index'
 import { Route as LegalSlugRouteImport } from './routes/legal/$slug'
+import { Route as CareersSlugRouteImport } from './routes/careers/$slug'
 
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
@@ -47,9 +49,19 @@ const LegalIndexRoute = LegalIndexRouteImport.update({
   path: '/legal/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CareersIndexRoute = CareersIndexRouteImport.update({
+  id: '/careers/',
+  path: '/careers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalSlugRoute = LegalSlugRouteImport.update({
   id: '/legal/$slug',
   path: '/legal/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CareersSlugRoute = CareersSlugRouteImport.update({
+  id: '/careers/$slug',
+  path: '/careers/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -59,7 +71,9 @@ export interface FileRoutesByFullPath {
   '/domains': typeof DomainsRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
+  '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
+  '/careers/': typeof CareersIndexRoute
   '/legal/': typeof LegalIndexRoute
 }
 export interface FileRoutesByTo {
@@ -68,7 +82,9 @@ export interface FileRoutesByTo {
   '/domains': typeof DomainsRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
+  '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
+  '/careers': typeof CareersIndexRoute
   '/legal': typeof LegalIndexRoute
 }
 export interface FileRoutesById {
@@ -78,7 +94,9 @@ export interface FileRoutesById {
   '/domains': typeof DomainsRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
+  '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
+  '/careers/': typeof CareersIndexRoute
   '/legal/': typeof LegalIndexRoute
 }
 export interface FileRouteTypes {
@@ -89,10 +107,21 @@ export interface FileRouteTypes {
     | '/domains'
     | '/faq'
     | '/pricing'
+    | '/careers/$slug'
     | '/legal/$slug'
+    | '/careers/'
     | '/legal/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$' | '/domains' | '/faq' | '/pricing' | '/legal/$slug' | '/legal'
+  to:
+    | '/'
+    | '/$'
+    | '/domains'
+    | '/faq'
+    | '/pricing'
+    | '/careers/$slug'
+    | '/legal/$slug'
+    | '/careers'
+    | '/legal'
   id:
     | '__root__'
     | '/'
@@ -100,7 +129,9 @@ export interface FileRouteTypes {
     | '/domains'
     | '/faq'
     | '/pricing'
+    | '/careers/$slug'
     | '/legal/$slug'
+    | '/careers/'
     | '/legal/'
   fileRoutesById: FileRoutesById
 }
@@ -110,7 +141,9 @@ export interface RootRouteChildren {
   DomainsRoute: typeof DomainsRoute
   FaqRoute: typeof FaqRoute
   PricingRoute: typeof PricingRoute
+  CareersSlugRoute: typeof CareersSlugRoute
   LegalSlugRoute: typeof LegalSlugRoute
+  CareersIndexRoute: typeof CareersIndexRoute
   LegalIndexRoute: typeof LegalIndexRoute
 }
 
@@ -158,11 +191,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LegalIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/careers/': {
+      id: '/careers/'
+      path: '/careers'
+      fullPath: '/careers/'
+      preLoaderRoute: typeof CareersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legal/$slug': {
       id: '/legal/$slug'
       path: '/legal/$slug'
       fullPath: '/legal/$slug'
       preLoaderRoute: typeof LegalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/careers/$slug': {
+      id: '/careers/$slug'
+      path: '/careers/$slug'
+      fullPath: '/careers/$slug'
+      preLoaderRoute: typeof CareersSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -174,7 +221,9 @@ const rootRouteChildren: RootRouteChildren = {
   DomainsRoute: DomainsRoute,
   FaqRoute: FaqRoute,
   PricingRoute: PricingRoute,
+  CareersSlugRoute: CareersSlugRoute,
   LegalSlugRoute: LegalSlugRoute,
+  CareersIndexRoute: CareersIndexRoute,
   LegalIndexRoute: LegalIndexRoute,
 }
 export const routeTree = rootRouteImport

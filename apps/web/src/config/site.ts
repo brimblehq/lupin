@@ -4,6 +4,7 @@ export const siteConfig = {
   navLinks: [
     { label: "Pricing", href: "/pricing" },
     { label: "Domains", href: "/domains" },
+    { label: "Careers", href: "/careers" },
     { label: "FAQ", href: "/faq" },
     { label: "Docs", href: "https://docs.brimble.io" },
     { label: "Status", href: "https://status.brimble.io", status: true },
