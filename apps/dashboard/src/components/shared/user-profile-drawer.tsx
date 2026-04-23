@@ -182,6 +182,31 @@ function formatWorkspaceCreatedAt(value?: string): string {
   }).format(new Date(timestamp));
 }
 
+function ActivitySessionSkeleton() {
+  const rows = [0, 1, 2, 3];
+
+  return (
+    <div className="py-2" aria-hidden="true">
+      <div className="mb-3 h-3 w-12 animate-pulse rounded bg-dash-bg-elevated" />
+      <div className="flex flex-col">
+        {rows.map((row, index) => (
+          <div
+            key={row}
+            className={cn("grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3", index !== 0 && "border-t border-dash-border-soft")}
+          >
+            <div className="size-5 shrink-0 animate-pulse rounded-full bg-dash-bg-elevated" style={{ animationDelay: `${index * 80}ms` }} />
+            <div className="min-w-0">
+              <div className="h-4 w-[68%] animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 40}ms` }} />
+              <div className="mt-2 h-3 w-[88%] animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 80}ms` }} />
+            </div>
+            <div className="h-3 w-14 animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 120}ms` }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ActivitySessionForm({
   workspace,
   initialData,
@@ -248,7 +273,12 @@ function ActivitySessionForm({
         <p className="text-xs text-dash-text-faded">Recent account actions across authentication, projects, and domains.</p>
       </div>
 
-      {isLoading && <div className="py-6 text-sm text-dash-text-faded">Loading activity...</div>}
+      {isLoading && (
+        <div>
+          <span className="sr-only">Loading activity...</span>
+          <ActivitySessionSkeleton />
+        </div>
+      )}
 
       {error && <div className="py-6 text-sm text-red-500">{error}</div>}
 

@@ -530,9 +530,9 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
             </a>
           )}
           <div className="flex items-center gap-4">
-            <button className="text-dash-text-faded hover:text-dash-text-strong transition-colors">
+            {/*<button className="text-dash-text-faded hover:text-dash-text-strong transition-colors">
               <Star className="size-4" />
-            </button>
+            </button>*/}
             <button
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href);

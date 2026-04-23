@@ -139,7 +139,8 @@ function BillingFormInner({
 
   const { data: userOverview } = useQuery<UserOverview>({
     queryKey: ["user-overview", teamId ?? "self"],
-    queryFn: () => (getUserOverviewServerFn as unknown as (args: { data: { teamId?: string } }) => Promise<UserOverview>)({ data: { teamId } }),
+    queryFn: () =>
+      (getUserOverviewServerFn as unknown as (args: { data: { teamId?: string } }) => Promise<UserOverview>)({ data: { teamId } }),
     ...(canUseInitialUserOverview && initialUserOverview ? { initialData: initialUserOverview } : {}),
   });
   const { data: subscription } = useSubscription();
@@ -276,9 +277,7 @@ function BillingFormInner({
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-[2px] py-2">
               <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">Plan</p>
-              <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
-                You're currently on the {currentPlan} plan.
-              </p>
+              <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">You're currently on the {currentPlan} plan.</p>
             </div>
             <div>
               <GlossyButton variant="blue" onClick={() => setChangePlanOpen(true)}>
@@ -304,7 +303,7 @@ function BillingFormInner({
         usedMinutes={userOverview?.buildMinutes.used ?? 0}
         includedMinutes={userOverview?.buildMinutes.included ?? 0}
         creditMinutes={userOverview?.buildMinutes.purchased ?? 0}
-        resetDate={userOverview?.buildMinutes.nextResetAt ?? (teamId ? null : initialSubscriptionStats?.next_payment_date ?? null)}
+        resetDate={userOverview?.buildMinutes.nextResetAt ?? (teamId ? null : (initialSubscriptionStats?.next_payment_date ?? null))}
         teamId={teamId}
         initialPaymentMethods={initialPaymentMethods}
       />
@@ -580,7 +579,7 @@ function BillForecast({ stats, hasOpenInvoice }: { stats?: SubscriptionStats | n
         </div>
         {nextPaymentDate && (
           <div className="flex flex-col items-end gap-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-dash-text-faded">Next payment</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-dash-text-faded">Due at</p>
             <p className="text-sm font-medium text-dash-text-body">{nextPaymentDate}</p>
           </div>
         )}

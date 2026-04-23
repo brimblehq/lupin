@@ -4,7 +4,6 @@ import { asRecord, pickNonEmptyString, pickNumber } from "./normalize";
 export interface BandwidthPoint {
   date: string;
   transmit: number;
-  receive: number;
   total: number;
 }
 
@@ -25,14 +24,13 @@ function mapPoint(value: unknown): BandwidthPoint | null {
 
   const date = pickNonEmptyString(row, "date");
   const transmit = pickNumber(row, "transmit");
-  const receive = pickNumber(row, "receive");
   const total = pickNumber(row, "total");
 
-  if (!date || transmit === undefined || receive === undefined || total === undefined) {
+  if (!date || transmit === undefined || total === undefined) {
     return null;
   }
 
-  return { date, transmit, receive, total };
+  return { date, transmit, total };
 }
 
 export function createBandwidthApi(client: ApiClient): BandwidthApi {
