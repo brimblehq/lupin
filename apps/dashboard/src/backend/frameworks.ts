@@ -1,5 +1,5 @@
 import type { ApiClient } from "./types";
-import { asRecord, pickString } from "./normalize";
+import { asRecord, pickNumber, pickString } from "./normalize";
 
 export interface FrameworkOption {
   slug: string;
@@ -9,6 +9,7 @@ export interface FrameworkOption {
   buildCommand?: string;
   startCommand?: string;
   outputDirectory?: string;
+  port?: number;
 }
 
 export interface FrameworksApi {
@@ -47,6 +48,7 @@ export function createFrameworksApi(client: ApiClient): FrameworksApi {
             buildCommand: pickString(row, "buildCommand"),
             startCommand: pickString(row, "startCommand"),
             outputDirectory: pickString(row, "outputDirectory"),
+            port: pickNumber(row, "port"),
           } satisfies FrameworkOption;
         })
         .filter((item): item is FrameworkOption => item !== null);

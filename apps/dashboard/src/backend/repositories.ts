@@ -1,5 +1,5 @@
 import type { ApiClient } from "./types";
-import { asRecord, asString, asStringOrNumber, pickString } from "./normalize";
+import { asRecord, asString, asStringOrNumber, pickNumber, pickString } from "./normalize";
 import { BackendApiError } from "./errors";
 
 export const CONNECT_EXPIRED_PREFIX = "CONNECT_EXPIRED:";
@@ -83,6 +83,7 @@ export interface RepositoryFrameworkDefaults {
   startCommand?: string;
   outputDirectory?: string;
   logo?: string;
+  port?: number;
 }
 
 export interface RepositoryDirectoryEntry {
@@ -148,6 +149,7 @@ function mapRepositoryFrameworkDefaults(value: unknown): RepositoryFrameworkDefa
     startCommand: pickString(row, "startCommand"),
     outputDirectory: pickString(row, "outputDirectory"),
     logo: pickString(row, "logo"),
+    port: pickNumber(row, "port"),
   };
 }
 

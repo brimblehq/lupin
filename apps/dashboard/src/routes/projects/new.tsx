@@ -1725,6 +1725,7 @@ function Phase3Configure({
     start?: string;
     output?: string;
     install?: string;
+    port?: number;
   }>;
   regionOptions: RegionOption[];
   branchOptions?: string[];
@@ -1821,7 +1822,8 @@ function Phase3Configure({
   const [outputDir, setOutputDir] = useState(fw.output ?? "");
   const [installCmd, setInstallCmd] = useState(fw.install ?? "");
   const [preStartCmd, setPreStartCmd] = useState("");
-  const [envVars, setEnvVars] = useState<EnvVar[]>(() => [{ id: envNextId++, key: "PORT", value: "3000" }]);
+  const defaultPort = detectedFramework?.port ?? frameworkOptions.find((f) => f.id === defaultFrameworkId)?.port ?? 3000;
+  const [envVars, setEnvVars] = useState<EnvVar[]>(() => [{ id: envNextId++, key: "PORT", value: String(defaultPort) }]);
   const [envExpanded, setEnvExpanded] = useState(true);
   const [diskEnabled, setDiskEnabled] = useState(false);
   const [diskSize, setDiskSize] = useState("10");
@@ -1933,6 +1935,7 @@ function Phase3Configure({
     setStartCmd(newFw?.start ?? "");
     setOutputDir(newFw?.output ?? "");
     setInstallCmd(newFw?.install ?? "");
+    setEnvVars((prev) => prev.map((row) => (row.key === "PORT" ? { ...row, value: String(newFw?.port ?? 3000) } : row)));
   }
 
   const canBrowseRootDir = isGit && Boolean(repoBrowser?.repoName) && Boolean(branch?.trim());
@@ -2586,6 +2589,7 @@ function NewProjectPage() {
       start?: string;
       output?: string;
       install?: string;
+      port?: number;
     }>
   >(() =>
     frameworks.map((f) => ({
@@ -2708,6 +2712,7 @@ function NewProjectPage() {
             start: item.startCommand || "",
             output: item.outputDirectory || "",
             install: item.installCommand || "",
+            port: item.port,
           })),
         );
       })

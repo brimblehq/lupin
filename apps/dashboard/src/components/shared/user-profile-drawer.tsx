@@ -1852,6 +1852,7 @@ export function UserProfileDrawer({
             getPaymentInvoicesServerFn({
               data: {
                 cursor: null,
+                per_page: 7,
                 ...(teamId ? { team_id: teamId } : {}),
               },
             } as any),

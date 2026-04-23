@@ -160,7 +160,7 @@ export function StatsRow({
       {/* Bandwidth */}
       <div className="flex w-full shrink-0 flex-col border-b-[0.5px] border-dash-border lg:w-[36%] lg:border-b-0 lg:border-r-[0.5px]">
         <div className="flex h-[30px] items-center border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-2">
-          <span className="text-xs tracking-[-0.02px] text-dash-text-strong">Bandwidth</span>
+          <span className="text-xs tracking-[-0.02px] text-dash-text-strong">External Data Transfer (Egress)</span>
         </div>
         <p className="px-2 pt-2 pb-3 text-xs uppercase tracking-[-0.02px] text-[#ff9b01]">{bandwidthSummaryText}</p>
         <div className="mt-auto h-[65px] min-w-0">

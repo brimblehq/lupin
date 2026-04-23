@@ -669,3 +669,97 @@ code {
 .woot-widget-holder iframe {
   z-index: 2147483647 !important;
 }
+
+/* Product tour — driver.js theming */
+.brimble-tour-popover.driver-popover {
+  background: var(--dash-bg);
+  color: var(--dash-text-strong);
+  border: 0.5px solid var(--dash-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  font-family: inherit;
+  padding: 14px 16px;
+  max-width: 320px;
+}
+.brimble-tour-popover.driver-popover * {
+  font-family: inherit;
+}
+.brimble-tour-popover .driver-popover-title {
+  color: var(--dash-text-strong);
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  letter-spacing: -0.09px;
+}
+.brimble-tour-popover .driver-popover-description {
+  color: var(--dash-text-body);
+  font-size: 13px;
+  line-height: 1.45;
+  letter-spacing: -0.09px;
+}
+.brimble-tour-popover .driver-popover-progress-text {
+  color: var(--dash-text-faded);
+  font-size: 11px;
+  letter-spacing: -0.02px;
+}
+.brimble-tour-popover .driver-popover-footer {
+  margin-top: 12px;
+}
+.brimble-tour-popover .driver-popover-navigation-btns {
+  gap: 6px;
+}
+.brimble-tour-popover .driver-popover-next-btn,
+.brimble-tour-popover .driver-popover-prev-btn,
+.brimble-tour-popover .driver-popover-close-btn.driver-popover-btn-disabled {
+  text-shadow: none;
+}
+.brimble-tour-popover .driver-popover-next-btn {
+  background-color: var(--dash-text-strong) !important;
+  color: var(--dash-bg) !important;
+  border: none !important;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.brimble-tour-popover .driver-popover-next-btn:hover,
+.brimble-tour-popover .driver-popover-next-btn:focus {
+  background-color: var(--dash-text-strong) !important;
+  opacity: 0.9;
+}
+.brimble-tour-popover .driver-popover-prev-btn {
+  background-color: var(--dash-bg-elevated) !important;
+  color: var(--dash-text-strong) !important;
+  border: 0.5px solid var(--dash-border) !important;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.brimble-tour-popover .driver-popover-prev-btn:hover,
+.brimble-tour-popover .driver-popover-prev-btn:focus {
+  background-color: var(--dash-bg-elevated) !important;
+}
+.brimble-tour-popover .driver-popover-close-btn {
+  color: var(--dash-text-faded);
+  top: 10px;
+  right: 10px;
+}
+.brimble-tour-popover .driver-popover-close-btn:hover {
+  color: var(--dash-text-strong);
+}
+.brimble-tour-popover .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: var(--dash-bg);
+}
+.brimble-tour-popover .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: var(--dash-bg);
+}
+.brimble-tour-popover .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: var(--dash-bg);
+}
+.brimble-tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: var(--dash-bg);
+}
+.driver-overlay {
+  fill: rgba(0, 0, 0, 0.45) !important;
+}

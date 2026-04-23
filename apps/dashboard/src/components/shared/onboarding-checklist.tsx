@@ -16,6 +16,7 @@ import type { Project } from "@/backend/projects";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import type { TeamDetails } from "@/backend/teams";
 import { usePaymentMethods } from "@/hooks/use-payments";
+import { hasCompletedTour, startProductTour } from "./product-tour";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -33,6 +34,7 @@ function buildTasks({
   isFreePlan,
   hasFollowed,
   hasPaymentCard,
+  hasTakenTour,
   onAddPaymentCard,
   onConnectGit,
   isTeamWorkspace,
@@ -44,6 +46,7 @@ function buildTasks({
   isFreePlan: boolean;
   hasFollowed: boolean;
   hasPaymentCard: boolean;
+  hasTakenTour: boolean;
   onAddPaymentCard?: () => void;
   onConnectGit?: () => void;
   isTeamWorkspace: boolean;
@@ -51,6 +54,11 @@ function buildTasks({
   showInviteTeamMemberTask: boolean;
 }): OnboardingTask[] {
   const tasks: OnboardingTask[] = [
+    {
+      label: "Take a quick tour",
+      done: hasTakenTour,
+      onClick: () => startProductTour(),
+    },
     {
       label: "Connect Git",
       done: hasGit,
@@ -99,6 +107,17 @@ export function OnboardingChecklist({
   const haptics = useHaptics();
   const [expanded, setExpanded] = useState(false);
   const [hasFollowed, setHasFollowed] = useState(Boolean(settingsSnapshot?.profile?.followedX));
+  const [hasTakenTour, setHasTakenTour] = useState(() => hasCompletedTour());
+
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.key === "brimble:product-tour-completed") {
+        setHasTakenTour(hasCompletedTour());
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   const navigate = useNavigate();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
@@ -246,6 +265,7 @@ export function OnboardingChecklist({
         isFreePlan,
         hasFollowed,
         hasPaymentCard,
+        hasTakenTour,
         onAddPaymentCard: () => profileDrawer.open(ProfileTab.Billing),
         onConnectGit: () => {
           void (async () => {
@@ -277,6 +297,7 @@ export function OnboardingChecklist({
       isFreePlan,
       hasFollowed,
       hasPaymentCard,
+      hasTakenTour,
       getGithubInstallUrl,
       isTeamWorkspace,
       hasTeamMembers,

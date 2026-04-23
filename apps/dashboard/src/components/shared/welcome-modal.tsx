@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { X } from "@phosphor-icons/react";
 import { Modal } from "./modal";
+import { hasCompletedTour, startProductTour } from "./product-tour";
 
 const STORAGE_KEY = "brimble:welcome-modal-dismissed";
 
@@ -40,6 +41,9 @@ export function WelcomeModal() {
       localStorage.setItem(STORAGE_KEY, "true");
     } catch {
       // ignore
+    }
+    if (!hasCompletedTour()) {
+      window.setTimeout(() => startProductTour(), 300);
     }
   }, []);
 

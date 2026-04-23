@@ -91,7 +91,7 @@ export function useInvoices(cursor?: string | null, teamId?: string, initialData
   const hasInitialData = isFirstPage && initialData?.items?.length > 0;
   return useQuery({
     queryKey: paymentKeys.invoices(cursor ?? null, teamId),
-    queryFn: () => getInvoices({ data: { cursor: cursor ?? null, ...(teamId ? { team_id: teamId } : {}) } }),
+    queryFn: () => getInvoices({ data: { cursor: cursor ?? null, per_page: 7, ...(teamId ? { team_id: teamId } : {}) } }),
     placeholderData: (prev: any) => prev,
     ...(hasInitialData ? { initialData } : {}),
   });

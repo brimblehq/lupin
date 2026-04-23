@@ -4,7 +4,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { Command } from "cmdk";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check, SignOut } from "@phosphor-icons/react";
+import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check, SignOut, Compass } from "@phosphor-icons/react";
+import { startProductTour } from "../shared/product-tour";
 import { PaletteView, Theme } from "../../types/enums";
 import { useScoutBar } from "../../contexts/scoutbar-context";
 import { useTheme } from "../../hooks/use-theme";
@@ -581,6 +582,13 @@ export function CommandPalette() {
                           </Command.Group>
 
                           <Command.Group heading="HELP &amp; ACCOUNT">
+                            <Command.Item
+                              value="start onboarding tour walkthrough intro guide"
+                              onSelect={() => runAction(() => window.setTimeout(() => startProductTour(), 200))}
+                            >
+                              <Compass className="size-4" />
+                              <span>Start onboarding tour</span>
+                            </Command.Item>
                             <Command.Item
                               value="cli docs documentation"
                               onSelect={() => runAction(() => window.open("https://docs.brimble.io", "_blank"))}

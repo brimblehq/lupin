@@ -11,19 +11,21 @@ import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/featur
 import { isPostHogEnabled } from "@/lib/posthog";
 
 export const mainNav = [
-  { label: "Home", icon: "/icons/home.svg", href: "/" },
-  { label: "Projects", icon: "/icons/project.svg", href: "/projects" },
+  { label: "Home", icon: "/icons/home.svg", href: "/", tourId: "home" },
+  { label: "Projects", icon: "/icons/project.svg", href: "/projects", tourId: "projects" },
   {
     label: "Domains",
     icon: "/icons/domains.svg",
     href: "/domains",
     flag: FeatureFlags.ENABLE_DOMAINS,
+    tourId: "domains",
   },
   {
     label: "Scaling",
     icon: "/icons/scaling.svg",
     href: "/scaling",
     flag: FeatureFlags.ENABLE_AUTO_SCALING,
+    tourId: "scaling",
   },
   {
     label: "Buckets",
@@ -47,8 +49,9 @@ export const moreNav = [
     icon: "/icons/documentation.svg",
     href: "https://docs.brimble.io",
     external: true,
+    tourId: "docs",
   },
-  { label: "Discover", icon: "/icons/discover.svg", href: "/addons" },
+  { label: "Discover", icon: "/icons/discover.svg", href: "/addons", tourId: "discover" },
 ];
 
 const navItemBase =
@@ -128,6 +131,7 @@ export function Sidebar({ profileOpen, onProfileOpenChange }: { profileOpen: boo
               return (
                 <button
                   key={item.label}
+                  data-tour-item={item.tourId}
                   onClick={() => {
                     haptics.selection();
                     void navigate({
@@ -164,6 +168,7 @@ export function Sidebar({ profileOpen, onProfileOpenChange }: { profileOpen: boo
                   return (
                     <a
                       key={item.label}
+                      data-tour-item={item.tourId}
                       href={item.href}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -183,6 +188,7 @@ export function Sidebar({ profileOpen, onProfileOpenChange }: { profileOpen: boo
                 return (
                   <button
                     key={item.label}
+                    data-tour-item={item.tourId}
                     onClick={() => {
                       haptics.selection();
                       void navigate({
