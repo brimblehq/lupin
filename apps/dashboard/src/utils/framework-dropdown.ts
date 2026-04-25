@@ -5,6 +5,8 @@ export type FrameworkDropdownOption = {
   label: string;
   icon?: string;
   iconClassName?: string;
+  tooltipMessage?: string;
+  type?: string;
 };
 
 export function mapFrameworksToDropdownOptions(frameworks: FrameworkOption[] | undefined | null): FrameworkDropdownOption[] {
@@ -18,6 +20,8 @@ export function mapFrameworksToDropdownOptions(frameworks: FrameworkOption[] | u
       label: item.name,
       icon: item.logo || undefined,
       iconClassName: isOtherFramework ? "dark:invert" : undefined,
+      tooltipMessage: item.tooltipMessage,
+      type: item.type,
     };
   });
 }

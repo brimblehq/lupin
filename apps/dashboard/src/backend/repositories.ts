@@ -85,6 +85,7 @@ export interface RepositoryFrameworkDefaults {
   logo?: string;
   port?: number;
   type?: string;
+  tooltipMessage?: string;
 }
 
 export interface RepositoryDirectoryEntry {
@@ -152,6 +153,7 @@ function mapRepositoryFrameworkDefaults(value: unknown): RepositoryFrameworkDefa
     logo: pickString(row, "logo"),
     port: pickNumber(row, "port"),
     type: pickString(row, "type"),
+    tooltipMessage: pickString(row, "tooltipMessage"),
   };
 }
 

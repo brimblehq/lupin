@@ -21,6 +21,7 @@ import {
   HardDrive,
   ArrowUpRight,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 import { GithubLogo, Cube, Database, CircleNotch } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
@@ -37,12 +38,13 @@ import { RootDirectoryTrigger } from "../../components/shared/root-directory-tri
 import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { RootDirectoryDrawer } from "../../components/project/root-directory-drawer";
+import { ConfirmServerRuntimeModal } from "../../components/project/confirm-server-runtime-modal";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { dashInputClassName } from "@/components/shared/dash-input";
 import { inferProjectNameFromDockerImage, parseDockerImageRef } from "@/utils/docker-image";
 import { mapFrameworksToDropdownOptions } from "@/utils/framework-dropdown";
 import { getEnvPrefixForFramework, getLegacyServiceType, isNoBuildFramework } from "@/utils/project-deploy";
-import { ServiceType } from "@brimble/models/dist/enum";
+import { ServiceType, FrameworkApplicationType } from "@brimble/models/dist/enum";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import { listRegionsServerFn } from "@/server/regions/actions";
 import {
@@ -1701,6 +1703,11 @@ type Phase3DeployInput = {
   mountPath?: string;
 };
 
+const SERVER_RUNTIME_FRAMEWORK_TYPES: string[] = [
+  FrameworkApplicationType.Ssr,
+  FrameworkApplicationType.Backend,
+];
+
 function Phase3Configure({
   sourceType,
   sourceName,
@@ -1728,6 +1735,8 @@ function Phase3Configure({
     output?: string;
     install?: string;
     port?: number;
+    tooltipMessage?: string;
+    type?: string;
   }>;
   regionOptions: RegionOption[];
   branchOptions?: string[];
@@ -1757,7 +1766,7 @@ function Phase3Configure({
   const pricing = usePricing();
   const isFreePlan = planKey === "free";
   const limitReached = projectLimit !== null && projectCount > projectLimit;
-  const backendOnFreePlan = isFreePlan && detectedFramework?.type === "backend";
+  const backendOnFreePlan = isFreePlan && detectedFramework?.type === FrameworkApplicationType.Backend;
 
   const deployValidationSchema = useMemo(
     () =>
@@ -1866,6 +1875,10 @@ function Phase3Configure({
   );
   const hideStorageSettings = isNoBuildFramework(framework) || serviceType === ServiceType.Static;
   const showMcpAuthToggle = serviceType === ServiceType.Mcp;
+  const effectiveFrameworkType = fw.type ?? detectedFramework?.type;
+  const requiresServerRuntime =
+    SERVER_RUNTIME_FRAMEWORK_TYPES.includes(effectiveFrameworkType ?? "") && serviceType === ServiceType.Static;
+  const [confirmServerRuntimeOpen, setConfirmServerRuntimeOpen] = useState(false);
 
   useEffect(() => {
     setRootDir("./");
@@ -2204,7 +2217,7 @@ function Phase3Configure({
                 </div>
 
                 {serviceType !== ServiceType.Static && (
-                  <div>
+                  <div className="pb-2">
                     <label className="mb-1.5 block text-sm text-dash-text-body">Start command</label>
                     <input
                       type="text"
@@ -2449,6 +2462,10 @@ function Phase3Configure({
                 setShowUpgradeModal(true);
                 return;
               }
+              if (requiresServerRuntime) {
+                setConfirmServerRuntimeOpen(true);
+                return;
+              }
               const deployInput = buildDeployInput();
               if (!deployInput) {
                 return;
@@ -2466,6 +2483,23 @@ function Phase3Configure({
           onOpenChange={setShowUpgradeModal}
           currentPlan={planKey}
           defaultSelectedPlan={nextPlanName}
+        />
+
+        <ConfirmServerRuntimeModal
+          open={confirmServerRuntimeOpen}
+          onOpenChange={setConfirmServerRuntimeOpen}
+          frameworkName={fw.name}
+          tooltipMessage={fw.tooltipMessage ?? detectedFramework?.tooltipMessage}
+          isFreePlan={isFreePlan}
+          loading={deploying}
+          onConfirm={() => {
+            setConfirmServerRuntimeOpen(false);
+            const deployInput = buildDeployInput();
+            if (!deployInput) {
+              return;
+            }
+            void onDeploy(deployInput);
+          }}
         />
       </div>
 
@@ -2637,6 +2671,8 @@ function NewProjectPage() {
       output?: string;
       install?: string;
       port?: number;
+      tooltipMessage?: string;
+      type?: string;
     }>
   >(() =>
     frameworks.map((f) => ({
@@ -2760,6 +2796,8 @@ function NewProjectPage() {
             output: item.outputDirectory || "",
             install: item.installCommand || "",
             port: item.port,
+            tooltipMessage: item.tooltipMessage,
+            type: item.type,
           })),
         );
       })

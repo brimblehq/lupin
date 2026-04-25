@@ -3,7 +3,7 @@ import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { GearSix, Hammer, Cpu, Warning, DatabaseIcon, MagnifyingGlass, GithubLogo, X } from "@phosphor-icons/react";
+import { GearSix, Hammer, Cpu, Warning, DatabaseIcon, MagnifyingGlass, GithubLogo, X, Info } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
@@ -775,7 +775,7 @@ function GeneralSection({
   branchOptions: { id: string; label: string }[];
   rootDir: string;
   onOpenDrawer: () => void;
-  frameworkOptions: { id: string; label: string; icon?: string }[];
+  frameworkOptions: { id: string; label: string; icon?: string; iconClassName?: string; tooltipMessage?: string }[];
   regionOptions: { id: string; label: string }[];
   showSourceFields: boolean;
   dockerSourceImage?: string;

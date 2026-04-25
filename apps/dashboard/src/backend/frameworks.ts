@@ -10,6 +10,8 @@ export interface FrameworkOption {
   startCommand?: string;
   outputDirectory?: string;
   port?: number;
+  tooltipMessage?: string;
+  type?: string;
 }
 
 export interface FrameworksApi {
@@ -49,6 +51,8 @@ export function createFrameworksApi(client: ApiClient): FrameworksApi {
             startCommand: pickString(row, "startCommand"),
             outputDirectory: pickString(row, "outputDirectory"),
             port: pickNumber(row, "port"),
+            tooltipMessage: pickString(row, "tooltipMessage"),
+            type: pickString(row, "type"),
           } satisfies FrameworkOption;
         })
         .filter((item): item is FrameworkOption => item !== null);
