@@ -54,6 +54,12 @@ function normalizeMemberRole(member: TeamMember): string {
 }
 
 const PAGE_LIMIT = 10;
+const PAGE_CACHE_TTL_MS = 15_000;
+
+type DeploymentsCacheEntry = {
+  data: PaginatedDeploymentsResponse;
+  fetchedAt: number;
+};
 
 function createEmptyDeployments(): PaginatedDeploymentsResponse {
   return {
@@ -660,6 +666,7 @@ function DeploymentHistoryPage() {
   const prevStatusMapRef = useRef<Record<string, string>>({});
   const latestRequestRef = useRef(0);
   const previousProjectScopeRef = useRef<string | null>(null);
+  const deploymentsCacheRef = useRef<Map<string, DeploymentsCacheEntry>>(new Map());
 
   const projectId = project?.id || project?.name;
   const projectName = project?.name || projectId;
@@ -673,12 +680,58 @@ function DeploymentHistoryPage() {
     Cancelled: "CANCELLED",
   };
 
-  const fetchDeployments = useCallback(
-    async (page: number, options?: { silent?: boolean }) => {
-      const silent = options?.silent === true;
-      const requestId = ++latestRequestRef.current;
+  const statusesParam = status !== "All" ? statusFilterMap[status] : undefined;
+  const environmentParam = environment !== "All" ? environment.toUpperCase() : undefined;
+  const startParam = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+  const endParam = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
+  const searchParam = search.trim() || undefined;
 
-      if (!silent) {
+  const buildCacheKey = useCallback(
+    (page: number) =>
+      [
+        projectScope,
+        page,
+        statusesParam ?? "",
+        environmentParam ?? "",
+        startParam ?? "",
+        endParam ?? "",
+        searchParam ?? "",
+      ].join("|"),
+    [projectScope, statusesParam, environmentParam, startParam, endParam, searchParam],
+  );
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    deploymentsCacheRef.current.set(buildCacheKey(initialData?.currentPage ?? 1), {
+      data: initialData,
+      fetchedAt: Date.now(),
+    });
+  }, [projectId, initialData, buildCacheKey]);
+
+  const fetchDeployments = useCallback(
+    async (page: number, options?: { silent?: boolean; useCache?: boolean; force?: boolean }) => {
+      const silent = options?.silent === true;
+      const useCache = options?.useCache === true;
+      const force = options?.force === true;
+      const requestId = ++latestRequestRef.current;
+      const cacheKey = buildCacheKey(page);
+      const cacheEntry = deploymentsCacheRef.current.get(cacheKey);
+      const hasCachedData = Boolean(cacheEntry);
+      const isCacheFresh = hasCachedData && Date.now() - (cacheEntry?.fetchedAt ?? 0) <= PAGE_CACHE_TTL_MS;
+      const backgroundRefreshFromStaleCache = !silent && useCache && !force && hasCachedData && !isCacheFresh;
+
+      if (!silent && useCache && !force && hasCachedData) {
+        setDeployments(cacheEntry!.data);
+        setCurrentPage(cacheEntry!.data.currentPage);
+        if (isCacheFresh) {
+          return;
+        }
+      }
+
+      if (!silent && !backgroundRefreshFromStaleCache) {
         setFetching(true);
       }
 
@@ -703,11 +756,11 @@ function DeploymentHistoryPage() {
             workspace,
             page,
             limit: PAGE_LIMIT,
-            statuses: status !== "All" ? statusFilterMap[status] : undefined,
-            environment: environment !== "All" ? environment.toUpperCase() : undefined,
-            start: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
-            end: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
-            search: search.trim() || undefined,
+            statuses: statusesParam,
+            environment: environmentParam,
+            start: startParam,
+            end: endParam,
+            search: searchParam,
           },
         });
 
@@ -755,15 +808,19 @@ function DeploymentHistoryPage() {
 
         setDeployments(result);
         setCurrentPage(result.currentPage);
+        deploymentsCacheRef.current.set(cacheKey, {
+          data: result,
+          fetchedAt: Date.now(),
+        });
       } catch {
         // keep existing data
       } finally {
-        if (!silent && requestId === latestRequestRef.current) {
+        if (!silent && !backgroundRefreshFromStaleCache && requestId === latestRequestRef.current) {
           setFetching(false);
         }
       }
     },
-    [projectId, workspace, environment, status, dateRange, search, projectName, sendNotification],
+    [projectId, workspace, statusesParam, environmentParam, startParam, endParam, searchParam, projectName, sendNotification, buildCacheKey],
   );
 
   useEffect(() => {
@@ -782,11 +839,12 @@ function DeploymentHistoryPage() {
 
     previousProjectScopeRef.current = projectScope;
     latestRequestRef.current += 1;
+    deploymentsCacheRef.current.clear();
     prevStatusMapRef.current = {};
     setCurrentPage(1);
     setDeployments(createEmptyDeployments());
     setFetching(true);
-    void fetchDeployments(1);
+    void fetchDeployments(1, { force: true });
   }, [projectId, projectScope, fetchDeployments]);
 
   useEffect(() => {
@@ -798,17 +856,17 @@ function DeploymentHistoryPage() {
       return;
     }
 
-    void fetchDeployments(1);
+    void fetchDeployments(1, { force: true });
   }, [fetchDeployments, projectId, workspace]);
 
   // Re-fetch when filters change
   useEffect(() => {
-    void fetchDeployments(1);
-  }, [environment, status, dateRange, search]);
+    void fetchDeployments(1, { useCache: true });
+  }, [environment, status, dateRange, search, fetchDeployments]);
 
   useEffect(() => {
     function handleDeploymentUpdated() {
-      void fetchDeployments(currentPage, { silent: true });
+      void fetchDeployments(currentPage, { silent: true, force: true });
     }
     window.addEventListener("brimble:deployment-updated", handleDeploymentUpdated);
     return () => window.removeEventListener("brimble:deployment-updated", handleDeploymentUpdated);
@@ -833,14 +891,14 @@ function DeploymentHistoryPage() {
     }
 
     const intervalId = window.setInterval(() => {
-      void fetchDeployments(currentPage, { silent: true });
+      void fetchDeployments(currentPage, { silent: true, force: true });
     }, 5000);
 
     return () => window.clearInterval(intervalId);
   }, [currentPage, fetchDeployments, isPageVisible]);
 
   function handlePageChange(page: number) {
-    void fetchDeployments(page);
+    void fetchDeployments(page, { useCache: true });
   }
 
   const filtered = deployments?.items ?? [];
