@@ -35,6 +35,7 @@ export async function enforceRouteAuth(pathname: string, search?: string) {
 
   let session: unknown = null;
   let authCheckFailed = false;
+  let refreshStatus: "ok" | "missing" | "expired" | "error" | null = null;
 
   try {
     session = await getCurrentSessionServerFn();
@@ -44,19 +45,31 @@ export async function enforceRouteAuth(pathname: string, search?: string) {
   }
 
   if (!session) {
-    session = await refreshSessionServerFn();
+    const refreshResult = await refreshSessionServerFn();
+    refreshStatus = refreshResult?.status ?? null;
+    if (refreshResult?.status === "ok") {
+      session = {
+        user: refreshResult.user,
+      };
+    }
   }
 
   if (session) {
     markSessionVerified();
   }
 
-  if (!session && !isPublicRoute && !authCheckFailed) {
+  const shouldRedirectToLogin =
+    !session &&
+    !isPublicRoute &&
+    (refreshStatus === "expired" || refreshStatus === "missing" || (!authCheckFailed && refreshStatus !== "error"));
+
+  if (shouldRedirectToLogin) {
     clearSessionCache();
     throw redirect({
       to: "/login",
       search: {
         next: buildNextPath(pathname, search),
+        ...(refreshStatus === "expired" ? { reason: "session-expired" } : {}),
       },
     });
   }

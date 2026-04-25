@@ -406,6 +406,25 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [oauthLoadingProvider, setOauthLoadingProvider] = useState<OauthProvider | null>(null);
   const [lastAuthMethod] = useState<AuthMethod | null>(() => getLastAuthMethod());
+  const sessionExpiredToastShownRef = useRef(false);
+
+  useEffect(() => {
+    if (sessionExpiredToastShownRef.current) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason !== "session-expired") {
+      return;
+    }
+
+    sessionExpiredToastShownRef.current = true;
+    toast.error("Session Expired");
+  }, []);
 
   async function handleOauth(provider: OauthProvider) {
     if (oauthLoadingProvider) {

@@ -228,11 +228,28 @@ export const getCurrentSessionServerFn = createServerFn({ method: "GET" }).handl
   }
 });
 
+type RefreshSessionServerResult =
+  | {
+      status: "ok";
+      user: AuthSession["user"];
+    }
+  | {
+      status: "missing";
+    }
+  | {
+      status: "expired";
+    }
+  | {
+      status: "error";
+    };
+
 export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler(async () => {
   const refreshToken = getServerRefreshToken();
   if (!refreshToken) {
     authLogger.warn("refreshSession skipped: missing refresh token");
-    return null;
+    return {
+      status: "missing",
+    } satisfies RefreshSessionServerResult;
   }
 
   try {
@@ -243,7 +260,9 @@ export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler
 
     const session = await refreshServerSession(refreshToken);
     if (!session) {
-      return null;
+      return {
+        status: "missing",
+      } satisfies RefreshSessionServerResult;
     }
 
     authLogger.info("refreshSession success", {
@@ -252,10 +271,23 @@ export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler
       hasNewRefreshToken: Boolean(session.refreshToken),
     });
 
-    return { user: session.user };
+    return {
+      status: "ok",
+      user: session.user,
+    } satisfies RefreshSessionServerResult;
   } catch (error: any) {
+    const status = error?.status;
     authLogger.warn("refreshSession failed", getErrorMeta(error));
-    return null;
+
+    if (status === 401 || status === 403) {
+      return {
+        status: "expired",
+      } satisfies RefreshSessionServerResult;
+    }
+
+    return {
+      status: "error",
+    } satisfies RefreshSessionServerResult;
   }
 });
 
