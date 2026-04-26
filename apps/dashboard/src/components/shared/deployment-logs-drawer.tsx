@@ -8,6 +8,7 @@ import { useHaptics } from "@/hooks/use-haptics";
 import type { DeploymentDrawerLogEntry } from "@/utils/deployment-logs";
 import { downloadDeploymentLogsServerFn } from "@/server/deployments/actions";
 import { LogAiDebugPanel } from "@/components/shared/log-ai-debug-panel";
+import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 
 interface DeploymentLogsDrawerProps {
   open: boolean;
@@ -127,6 +128,7 @@ export function DeploymentLogsDrawer({
   }) => Promise<{ content: string; filename: string }>;
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
   const [aiDebugMessage, setAiDebugMessage] = useState<string | null>(null);
+  const aiDebugEnabled = useFeatureFlag(FeatureFlags.ENABLE_AI_DEBUG);
   const [copiedRowIndex, setCopiedRowIndex] = useState<number | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -383,6 +385,7 @@ export function DeploymentLogsDrawer({
                       const detailTone = getLogLineTone(log.message);
                       const detailClasses = getDetailToneClasses(detailTone);
                       const canDebug =
+                        aiDebugEnabled &&
                         !isSection &&
                         (detailTone === "error" || detailTone === "warning") &&
                         Boolean(projectId && deploymentId);
@@ -499,7 +502,7 @@ export function DeploymentLogsDrawer({
       </Drawer.Portal>
 
       <LogAiDebugPanel
-        open={aiDebugMessage !== null}
+        open={aiDebugEnabled && aiDebugMessage !== null}
         onOpenChange={(next) => {
           if (!next) {
             setAiDebugMessage(null);

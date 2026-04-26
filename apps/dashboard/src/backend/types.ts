@@ -6,6 +6,8 @@ export interface ApiRequestOptions<TBody = unknown> {
   body?: TBody;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /** Per-request timeout in milliseconds. Overrides the client's default 25s. */
+  timeout?: number;
 }
 
 export interface ApiClient {

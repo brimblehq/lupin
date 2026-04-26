@@ -379,6 +379,46 @@ export const debugSuggestionsServerFn = createServerFn({
   return withTokenRefresh((api) => api.projects.debugSuggestions(projectId, { logId, message }));
 });
 
+export const debugSuggestionsPrServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        projectId: string;
+        logId: string;
+        message: string;
+        debug?: {
+          framework: unknown | null;
+          envNames: string[];
+          rootDir: unknown[];
+          suggestions: unknown;
+        } | null;
+      }
+    | undefined;
+
+  const projectId = payload?.projectId?.trim();
+  const logId = payload?.logId?.trim();
+  const message = payload?.message;
+
+  if (!projectId) {
+    throw new Error("Project ID is required");
+  }
+  if (!logId) {
+    throw new Error("Log ID is required");
+  }
+  if (!message?.trim()) {
+    throw new Error("Message is required");
+  }
+
+  return withTokenRefresh((api) =>
+    api.projects.debugSuggestionsPr(projectId, {
+      logId,
+      message,
+      debug: (payload?.debug as never) ?? null,
+    }),
+  );
+});
+
 export const transferProjectServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {

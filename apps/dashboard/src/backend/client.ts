@@ -210,6 +210,7 @@ export function createBackendClient(config: BackendClientConfig): BackendClient 
           headers,
           signal: options?.signal,
           data: method === "GET" ? undefined : options?.body,
+          ...(options?.timeout !== undefined ? { timeout: options.timeout } : {}),
         });
 
         return response.data;

@@ -1,19 +1,22 @@
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Copy, Sparkles } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { debugSuggestionsServerFn } from "@/server/projects/actions";
+import { debugSuggestionsPrServerFn, debugSuggestionsServerFn } from "@/server/projects/actions";
 import type {
   DebugAction,
   DebugConfidence,
   DebugLikelyCause,
   DebugPriority,
+  DebugSuggestionsPrResponse,
   DebugSuggestionsResponse,
+  ProvidedDebugContext,
 } from "@/backend/projects";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { Spinner } from "@/components/shared/spinner";
 import { Modal } from "@/components/shared/modal";
+import { GlossyButton } from "@/components/shared/glossy-button";
 
 interface LogAiDebugPanelProps {
   open: boolean;
@@ -70,6 +73,9 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
   const debugFn = useServerFn(debugSuggestionsServerFn as any) as (args: {
     data: { projectId: string; logId: string; message: string };
   }) => Promise<DebugSuggestionsResponse>;
+  const prFn = useServerFn(debugSuggestionsPrServerFn as any) as (args: {
+    data: { projectId: string; logId: string; message: string; debug?: ProvidedDebugContext | null };
+  }) => Promise<DebugSuggestionsPrResponse>;
   const queryClient = useQueryClient();
 
   const trimmedMessage = message.trim();
@@ -83,6 +89,61 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
     staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
     retry: false,
+  });
+
+  const prMutation = useMutation<DebugSuggestionsPrResponse, Error, void>({
+    mutationFn: () => {
+      const debug: ProvidedDebugContext | null = query.data
+        ? {
+            framework: query.data.framework ?? null,
+            envNames: query.data.envNames,
+            rootDir: query.data.rootDir,
+            suggestions: query.data.suggestions,
+          }
+        : null;
+      return prFn({ data: { projectId, logId, message: trimmedMessage, debug } });
+    },
+    onSuccess: (data) => {
+      if (data.status === "created") {
+        const url = data.pullRequest?.url?.trim();
+        if (url) {
+          window.open(url, "_blank", "noopener,noreferrer");
+          toast.success("Pull request opened.");
+        } else if (data.pullRequest?.headBranch) {
+          toast.success(`Branch ${data.pullRequest.headBranch} created.`);
+        } else {
+          toast.success("Pull request opened.");
+        }
+        onOpenChange(false);
+        return;
+      }
+
+      switch (data.reason) {
+        case "plan_disabled":
+          toast.error(data.message || "AI debug isn't included on your current plan.");
+          break;
+        case "quota_exceeded":
+          toast.error("Daily AI debug limit reached.");
+          break;
+        case "unsupported_provider":
+          toast.error("This repository's git provider isn't supported for auto-fix PRs.");
+          break;
+        case "no_safe_changes":
+          toast(data.message || "No safe automated fix found. Try the manual steps.");
+          break;
+        case "generation_failed":
+        default:
+          toast.error(data.message || "Couldn't generate the auto-fix pull request.");
+      }
+    },
+    onError: (error) => {
+      const errMessage = error instanceof Error ? error.message : "";
+      if (errMessage.toLowerCase().includes("already in progress")) {
+        toast("We're still working on the previous request — please wait.");
+        return;
+      }
+      toast.error(errMessage || "Couldn't generate the auto-fix pull request.");
+    },
   });
 
   useEffect(() => {
@@ -177,6 +238,20 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
           </p>
         )}
       </div>
+
+      {canCopy && (
+        <div className="flex shrink-0 items-center justify-end border-t-[0.5px] border-dash-border px-6 py-4">
+          <GlossyButton
+            variant="blue"
+            loading={prMutation.isPending}
+            loadingLabel="Opening pull request..."
+            disabled={prMutation.isPending}
+            onClick={() => prMutation.mutate()}
+          >
+            Open pull request
+          </GlossyButton>
+        </div>
+      )}
     </Modal>
   );
 }
