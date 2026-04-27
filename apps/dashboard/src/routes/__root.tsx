@@ -50,46 +50,6 @@ const chatwootBootstrapScript = `(function(d,t){
   } catch (e) {}
 })(document,"script");`;
 
-const vitePreloadErrorRecoveryScript = `(function () {
-  if (typeof window === "undefined") return;
-
-  var ATTEMPTS_KEY = "brimble:vite-preload-error-reload-attempts";
-  var RECOVERY_PARAM = "__vite_preload_recovery";
-  var MAX_ATTEMPTS = 1;
-
-  try {
-    var current = new URL(window.location.href);
-    if (current.searchParams.has(RECOVERY_PARAM)) {
-      current.searchParams.delete(RECOVERY_PARAM);
-      window.history.replaceState({}, "", current.toString());
-    }
-  } catch (_) {}
-
-  window.addEventListener("vite:preloadError", function (event) {
-    try {
-      event.preventDefault();
-
-      var attempts = Number(sessionStorage.getItem(ATTEMPTS_KEY) || "0");
-      if (!Number.isFinite(attempts)) {
-        attempts = 0;
-      }
-
-      if (attempts >= MAX_ATTEMPTS) {
-        return;
-      }
-
-      var nextAttempts = attempts + 1;
-      sessionStorage.setItem(ATTEMPTS_KEY, String(nextAttempts));
-
-      var nextUrl = new URL(window.location.href);
-      nextUrl.searchParams.set(RECOVERY_PARAM, String(nextAttempts));
-      window.location.replace(nextUrl.toString());
-    } catch (_) {
-      window.location.reload();
-    }
-  });
-})();`;
-
 type RootLoaderData = {
   workspace?: string;
   settingsSnapshot?: SettingsSidebarSnapshot;
@@ -257,11 +217,6 @@ gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var d=document.documentElement;var t=localStorage.getItem('theme');var legacy=localStorage.getItem('brimble-theme');if(t!=='light'&&t!=='dark'&&t!=='system'){t=(legacy==='light'||legacy==='dark')?legacy:null}var sys=(t==='system'||(!t));var dark=t==='dark'||(sys&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()`,
-          }}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: vitePreloadErrorRecoveryScript,
           }}
         />
       </head>
