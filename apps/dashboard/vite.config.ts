@@ -4,6 +4,11 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { sentryTanstackStart } from "@sentry/tanstackstart-react/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 function staleAssetGuard(): Plugin {
   return {
@@ -47,6 +52,11 @@ const config = defineConfig({
       : []),
     viteReact(),
   ],
+  resolve: {
+    alias: {
+      "@": resolve(__dirname, "src"),
+    },
+  },
   server: {
     allowedHosts: true,
   },
