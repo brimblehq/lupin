@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -29,6 +31,8 @@ function staleAssetGuard(): Plugin {
   };
 }
 
+const projectRoot = fileURLToPath(new URL(".", import.meta.url));
+
 const config = defineConfig({
   envPrefix: ["VITE_"],
   plugins: [
@@ -49,6 +53,11 @@ const config = defineConfig({
   ],
   server: {
     allowedHosts: true,
+  },
+  resolve: {
+    alias: {
+      "@": resolve(projectRoot, "src"),
+    },
   },
   build: {
     sourcemap: false,
