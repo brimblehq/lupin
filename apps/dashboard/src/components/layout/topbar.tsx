@@ -802,9 +802,28 @@ function EnvironmentDropdown({
 
 /* ─── Notifications ─── */
 
-function levelIcon(level: NotificationLevel): { src: string; className?: string } {
-  if (level === "error") return { src: "/icons/error.svg", className: "invert dark:invert-0" };
-  if (level === "warning") return { src: "/icons/icons8-warning-shield.svg" };
+function levelIcon(level: NotificationLevel): { src: string; className?: string; style?: React.CSSProperties } {
+  if (level === "error")
+    return {
+      src: "/icons/error.svg",
+      style: {
+        filter:
+          "brightness(0) saturate(100%) invert(33%) sepia(98%) saturate(2700%) hue-rotate(347deg) brightness(95%) contrast(95%)",
+      },
+    };
+  if (level === "warning")
+    return {
+      src: "/icons/icons8-warning-shield.svg",
+      style: { filter: "hue-rotate(-28deg) saturate(1.4)" },
+    };
+  if (level === "success")
+    return {
+      src: "/icons/success.svg",
+      style: {
+        filter:
+          "brightness(0) saturate(100%) invert(57%) sepia(94%) saturate(420%) hue-rotate(101deg) brightness(95%) contrast(89%)",
+      },
+    };
   return { src: "/icons/info.svg", className: "invert dark:invert-0" };
 }
 
@@ -908,7 +927,7 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
             </div>
 
             {/* List */}
-            <div className="max-h-[320px] overflow-y-auto">
+            <div className="scrollbar-subtle max-h-[320px] overflow-y-auto">
               {isLoading && items.length === 0 ? (
                 <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-dash-text-faded">
                   <LoaderCircle className="size-4 animate-spin" />
@@ -931,6 +950,7 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
                         <img
                           src={icon.src}
                           alt=""
+                          style={icon.style}
                           className={`mt-0.5 size-4 shrink-0 ${icon.className ?? ""} ${n.seen ? "opacity-60" : ""}`}
                         />
                       );

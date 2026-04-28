@@ -629,9 +629,11 @@ function DeploymentRow({
         <span className="truncate text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
           {deployment.message || "-"}
         </span>
-        <div className="flex items-center gap-1">
-          <GitBranch className="size-3.5 text-dash-text-faded" />
-          <span className="text-sm font-light leading-[1.3] text-dash-text-faded">{deployment.branch || "main"}</span>
+        <div className="flex min-w-0 items-center gap-1">
+          <GitBranch className="size-3.5 shrink-0 text-dash-text-faded" />
+          <span className="truncate text-sm font-light leading-[1.3] text-dash-text-faded" title={deployment.branch || "main"}>
+            {deployment.branch || "main"}
+          </span>
         </div>
       </div>
 
