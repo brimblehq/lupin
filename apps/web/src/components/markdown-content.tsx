@@ -105,7 +105,7 @@ function Linkify({ text }: { text: string }) {
       );
     } else if (match[2]) {
       parts.push(
-        <strong key={key++} className="font-semibold text-brimble-black">
+        <strong key={key++} className="font-medium text-brimble-black/85">
           {match[2]}
         </strong>,
       );
