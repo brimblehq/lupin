@@ -5,10 +5,11 @@ export const siteConfig = {
     { label: "Pricing", href: "/pricing" },
     { label: "Domains", href: "/domains" },
     { label: "Careers", href: "/careers" },
+    { label: "Changelog", href: "/changelog" },
     { label: "FAQ", href: "/faq" },
     { label: "Docs", href: "https://docs.brimble.io" },
     { label: "Status", href: "https://status.brimble.io", status: true },
-    { label: "Talk to Founder", href: "https://cal.com/brimble/15min" },
+    // { label: "Talk to Founder", href: "https://cal.com/brimble/15min" },
   ],
   socials: {
     heading: "Follow Brimble",
@@ -312,6 +313,17 @@ export const siteConfig = {
       primary: "Get started",
       secondary: "Terms & conditions",
       tertiary: "Contact us",
+    },
+  },
+  changelog: {
+    eyebrow: "Changelog",
+    heading: "What's new",
+    description: "Recent updates from the Brimble team.",
+    viewAllCta: "View all updates",
+    page: {
+      heading: "Changelog",
+      description: "What we've been shipping. Updated regularly.",
+      empty: "No updates yet — check back soon.",
     },
   },
 } as const;
