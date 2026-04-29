@@ -50,8 +50,9 @@ export function MarkdownContent({ content }: { content: string }) {
       continue;
     }
 
-    if (line.startsWith("- ")) {
-      listItems.push(line.slice(2));
+    const listItem = parseListItem(line);
+    if (listItem) {
+      listItems.push(listItem);
       continue;
     }
 
@@ -73,8 +74,16 @@ export function MarkdownContent({ content }: { content: string }) {
   return <>{elements}</>;
 }
 
+function parseListItem(line: string): string | null {
+  const match = line.match(/^\s*([-*•])\s+(.*)$/);
+  if (!match) return null;
+  const item = match[2]?.trim();
+  if (!item) return null;
+  return item;
+}
+
 function Linkify({ text }: { text: string }) {
-  const pattern = /\[([^\]]+)\]\(([^)]+)\)|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|`([^`]+)`/g;
+  const pattern = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let key = 0;
@@ -85,32 +94,38 @@ function Linkify({ text }: { text: string }) {
       parts.push(text.slice(lastIndex, match.index));
     }
 
-    if (match[1] && match[2]) {
-      parts.push(
-        <a
-          key={key++}
-          href={match[2]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#006fff] hover:underline"
-        >
-          {match[1]}
-        </a>,
-      );
-    } else if (match[3]) {
-      parts.push(
-        <a key={key++} href={`mailto:${match[3]}`} className="text-[#006fff] hover:underline">
-          {match[3]}
-        </a>,
-      );
-    } else if (match[4]) {
+    if (match[1]) {
       parts.push(
         <code
           key={key++}
           className="rounded bg-brimble-black/5 px-1 py-0.5 font-mono text-[0.85em] text-brimble-black dark:bg-white/10"
         >
-          {match[4]}
+          {match[1]}
         </code>,
+      );
+    } else if (match[2]) {
+      parts.push(
+        <strong key={key++} className="font-semibold text-brimble-black">
+          {match[2]}
+        </strong>,
+      );
+    } else if (match[3] && match[4]) {
+      parts.push(
+        <a
+          key={key++}
+          href={match[4]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#006fff] hover:underline"
+        >
+          {match[3]}
+        </a>,
+      );
+    } else if (match[5]) {
+      parts.push(
+        <a key={key++} href={`mailto:${match[5]}`} className="text-[#006fff] hover:underline">
+          {match[5]}
+        </a>,
       );
     }
 
