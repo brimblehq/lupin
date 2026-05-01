@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Drawer } from "vaul";
-import { Clock, ChevronRight, ChevronsDownUp, ChevronsDown, X, CheckCircle2, XCircle, CircleDashed, Sparkles } from "lucide-react";
+import { Clock, ChevronRight, ChevronsDownUp, ChevronsDown, X, CheckCircle2, XCircle, CircleDashed, Sparkles, Copy, Check } from "lucide-react";
 import { DownloadSimple } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import { useServerFn } from "@tanstack/react-start";
 import { useHaptics } from "@/hooks/use-haptics";
 import type { DeploymentDrawerLogEntry } from "@/utils/deployment-logs";
+import { BUILD_PHASE_LABEL, summarizePhases } from "@/utils/deployment-logs";
 import { downloadDeploymentLogsServerFn } from "@/server/deployments/actions";
 import { LogAiDebugPanel } from "@/components/shared/log-ai-debug-panel";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
@@ -121,6 +122,19 @@ function isBuildInProgress(status?: string): boolean {
   return value === "inprogress" || value === "pending";
 }
 
+function formatPhaseDuration(ms: number): string {
+  if (ms < 1000) {
+    return "<1s";
+  }
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+}
+
 export function DeploymentLogsDrawer({
   open,
   onOpenChange,
@@ -142,6 +156,7 @@ export function DeploymentLogsDrawer({
   const [aiDebugSelection, setAiDebugSelection] = useState<AiDebugSelection | null>(null);
   const aiDebugEnabled = useFeatureFlag(FeatureFlags.ENABLE_AI_DEBUG);
   const [copiedRowIndex, setCopiedRowIndex] = useState<number | null>(null);
+  const [copiedAll, setCopiedAll] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollTopRef = useRef(0);
@@ -155,6 +170,7 @@ export function DeploymentLogsDrawer({
     setCollapsedSections(new Set());
     setAiDebugSelection(null);
     setAutoScroll(true);
+    setCopiedAll(false);
     lastScrollTopRef.current = 0;
   }, [open]);
 
@@ -163,8 +179,29 @@ export function DeploymentLogsDrawer({
       return;
     }
 
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    const scrollToBottom = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+
+    const rafId = window.requestAnimationFrame(scrollToBottom);
+
+    const observer = new ResizeObserver(scrollToBottom);
+    observer.observe(el);
+    const inner = el.firstElementChild;
+    if (inner instanceof Element) {
+      observer.observe(inner);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   }, [autoScroll, open, logs, collapsedSections]);
+
+  const phaseSummaries = summarizePhases(logs);
+  const activePhase = phaseSummaries.length > 0 ? phaseSummaries[phaseSummaries.length - 1].phase : null;
+  const showPhaseRail = phaseSummaries.length > 0;
 
   const successCount = logs.filter((l) => l.type === "section" && l.status === "success").length;
   const errorCount = logs.filter((l) => {
@@ -219,12 +256,15 @@ export function DeploymentLogsDrawer({
       return;
     }
 
-    if (distanceToBottom < 8 && !autoScroll) {
+    if (distanceToBottom < 32 && !autoScroll) {
       setAutoScroll(true);
     }
   }
 
   function copyLogLine(log: DeploymentDrawerLogEntry, index: number) {
+    if (window.getSelection()?.toString()) {
+      return;
+    }
     const text = `[${log.timestamp}] ${log.message}`;
     navigator.clipboard.writeText(text);
     haptics.light();
@@ -232,6 +272,17 @@ export function DeploymentLogsDrawer({
     window.setTimeout(() => {
       setCopiedRowIndex((prev) => (prev === index ? null : prev));
     }, 1200);
+  }
+
+  function copyAllLogs() {
+    if (logs.length === 0) {
+      return;
+    }
+    const text = logs.map((l) => `[${l.timestamp}] ${l.message}`).join("\n");
+    navigator.clipboard.writeText(text);
+    haptics.light();
+    setCopiedAll(true);
+    window.setTimeout(() => setCopiedAll(false), 1500);
   }
 
   const visibleRows: { log: DeploymentDrawerLogEntry; index: number }[] = [];
@@ -320,6 +371,14 @@ export function DeploymentLogsDrawer({
                     <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px] sm:inline">Bottom</span>
                   </button>
                   <button
+                    onClick={copyAllLogs}
+                    disabled={logs.length === 0}
+                    className="flex items-center gap-1.5 rounded px-1 py-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent sm:gap-2 sm:px-0.5"
+                  >
+                    {copiedAll ? <Check className="size-4 text-[#13d282]" /> : <Copy className="size-4" />}
+                    <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">{copiedAll ? "Copied" : "Copy all"}</span>
+                  </button>
+                  <button
                     onClick={async () => {
                       if (projectId && deploymentId) {
                         try {
@@ -359,6 +418,37 @@ export function DeploymentLogsDrawer({
                 </div>
               </div>
             </div>
+
+            {/* ─── Phase rail ─── */}
+            {showPhaseRail && (
+              <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b-[0.5px] border-[#e5e5e5] px-3.5 py-2 sm:px-5 dark:border-dash-border">
+                {phaseSummaries.map((summary, i) => {
+                  const isActive = summary.phase === activePhase && buildInProgress;
+                  return (
+                    <div key={summary.phase} className="flex items-center gap-1.5">
+                      <span
+                        className={`size-1.5 rounded-full ${
+                          isActive ? "bg-[#ffb020]" : "bg-[#13d282]"
+                        }`}
+                      />
+                      <span
+                        className={`font-logs text-[11px] leading-[1.4] tracking-[-0.01px] ${
+                          isActive ? "text-dash-text-strong" : "text-dash-text-faded"
+                        }`}
+                      >
+                        {BUILD_PHASE_LABEL[summary.phase]}
+                      </span>
+                      <span className="font-logs text-[11px] leading-[1.4] tracking-[-0.01px] text-dash-text-extra-faded">
+                        {formatPhaseDuration(summary.durationMs)}
+                      </span>
+                      {i < phaseSummaries.length - 1 && (
+                        <span className="ml-1 font-logs text-[11px] text-dash-text-extra-faded">→</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* ─── Log body ─── */}
             <div
