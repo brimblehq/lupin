@@ -56,11 +56,9 @@ function openErrorReportMail(message?: string) {
     return;
   }
 
-  const params = new URLSearchParams({
-    subject: REPORT_ERROR_SUBJECT,
-    body: buildReportErrorBody(message),
-  });
-  window.location.href = `mailto:${REPORT_ERROR_EMAIL}?${params.toString()}`;
+  const subject = encodeURIComponent(REPORT_ERROR_SUBJECT);
+  const body = encodeURIComponent(buildReportErrorBody(message));
+  window.location.href = `mailto:${REPORT_ERROR_EMAIL}?subject=${subject}&body=${body}`;
 }
 
 export const hapticToast = Object.assign((...args: Parameters<typeof sonnerToast>) => sonnerToast(...args), {

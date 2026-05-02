@@ -19,6 +19,8 @@ import { getPaymentMethodsServerFn } from "@/server/payments/actions";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import type { PaymentMethod } from "@/backend/payments";
 import { getWorkspaceFromSearch, withWorkspaceQuery } from "@/utils/topbar-navigation";
+import { PaymentProvider } from "@/providers/payment-provider";
+import { AddCardForm } from "@/components/settings/billing-form";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -40,6 +42,7 @@ interface DomainResult {
   domainName: string;
   available: boolean;
   price: number | null;
+  previousPrice?: number | null;
 }
 
 /* ─── Helpers ─── */
@@ -105,7 +108,7 @@ function BuyDomainPage() {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const searchDomains = useServerFn(searchDomainSaleServerFn as any) as (args: {
     data: { name: string };
-  }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number }>>;
+  }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number; previousPrice?: number }>>;
   const purchaseDomain = useServerFn(purchaseDomainServerFn as any) as (args: {
     data: {
       workspace?: string;
@@ -224,41 +227,51 @@ function BuyDomainPage() {
     setAutoRenewal(false);
   }
 
-  async function handlePurchase() {
-    if (!purchaseTarget || purchasing) return;
-
-    setPurchasing(true);
-
+  async function executePurchase(target: DomainResult) {
     try {
       const latestMethods = await getPaymentMethodsServerFn();
       const methods = Array.isArray(latestMethods) ? latestMethods : [];
       const latestDefaultMethod = methods.find((method: any) => method.is_default) ?? methods[0];
       if (!latestDefaultMethod?.id) {
         toast.error("Add a payment method before purchasing a domain.");
+        setPurchasing(false);
         return;
       }
 
       await purchaseDomain({
         data: {
           ...(workspace ? { workspace } : {}),
-          name: purchaseTarget.domainName,
+          name: target.domainName,
           duration: years,
           privacyEnabled: effectivePrivacy,
           autoRenewal,
         },
       });
 
-      toast.success(`${purchaseTarget.domainName} purchased successfully!`);
+      toast.success(`${target.domainName} purchased successfully!`);
       setPurchaseTarget(null);
       await router.invalidate();
-      const detailPath = `/domains/${encodeURIComponent(purchaseTarget.domainName)}`;
+      const detailPath = `/domains/${encodeURIComponent(target.domainName)}`;
       router.navigate({
         to: withWorkspaceQuery({ pathname: detailPath, searchStr }) as any,
       });
     } catch (error) {
+      console.error("[domain-purchase] error", error);
       toast.error(error instanceof Error ? error.message : "Purchase failed");
       setPurchasing(false);
     }
+  }
+
+  async function handlePurchase() {
+    if (!purchaseTarget || purchasing) return;
+    setPurchasing(true);
+    await executePurchase(purchaseTarget);
+  }
+
+  async function handleCardAddedDuringPurchase() {
+    if (!purchaseTarget) return;
+    setPurchasing(true);
+    await executePurchase(purchaseTarget);
   }
 
   function getDurationOptions() {
@@ -413,7 +426,8 @@ function BuyDomainPage() {
       )}
 
       {/* Purchase modal */}
-      <Modal
+      <PaymentProvider>
+        <Modal
         open={!!purchaseTarget}
         onOpenChange={(open) => {
           if (!open && !purchasing) {
@@ -447,11 +461,14 @@ function BuyDomainPage() {
                   <p className="text-xs text-dash-text-extra-faded">Domain purchases use your available saved card automatically.</p>
                 </>
               ) : (
-                <div className="rounded-[4px] border-[0.5px] border-dash-border px-4 py-3 text-center">
-                  <p className="text-sm text-dash-text-faded">
-                    No payment methods found. Add a card in <span className="font-medium text-dash-text-strong">Settings</span>.
-                  </p>
-                </div>
+                <AddCardForm
+                  onClose={() => {}}
+                  showHeader={false}
+                  showCancel={false}
+                  animated={false}
+                  submitLabel="Add card & continue"
+                  onSuccess={handleCardAddedDuringPurchase}
+                />
               )}
             </div>
 
@@ -508,11 +525,18 @@ function BuyDomainPage() {
 
         <ModalFooter>
           <ModalCancelButton />
-          <GlossyButton variant="blue" onClick={handlePurchase} disabled={purchasing} loading={purchasing} loadingLabel="Purchasing...">
+          <GlossyButton
+            variant="blue"
+            onClick={handlePurchase}
+            disabled={purchasing || !defaultCard}
+            loading={purchasing}
+            loadingLabel="Purchasing..."
+          >
             Purchase domain
           </GlossyButton>
         </ModalFooter>
-      </Modal>
+        </Modal>
+      </PaymentProvider>
     </div>
   );
 }

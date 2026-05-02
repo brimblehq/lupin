@@ -345,7 +345,7 @@ function BillingFormInner({
                     key={method.id}
                     method={method}
                     isDefault={method.id === defaultMethod?.id}
-                    canRemove={!hasActivePaidSubscription}
+                    requiresRemoveConfirmation={paymentMethods.length === 1 && hasActivePaidSubscription}
                     onChangeCard={
                       method.id === defaultMethod?.id
                         ? () => {
@@ -779,16 +779,29 @@ function formatCardType(cardType?: string): string {
 function PaymentMethodRow({
   method,
   isDefault,
-  canRemove,
+  requiresRemoveConfirmation = false,
   onChangeCard,
 }: {
   method: Record<string, any>;
   isDefault: boolean;
-  canRemove: boolean;
+  requiresRemoveConfirmation?: boolean;
   onChangeCard?: () => void;
 }) {
+  const router = useRouter();
   const removeMutation = useRemovePaymentMethod();
   const setDefaultMutation = useSetDefaultPaymentMethod();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  function fireRemove() {
+    removeMutation.mutate(method.id, {
+      onSuccess: () => {
+        toast.success("Payment method removed");
+        router.invalidate();
+        setConfirmOpen(false);
+      },
+      onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to remove payment method"),
+    });
+  }
 
   // Card data may be nested under `.card` or flat on the method object
   const card = method.card ?? method;
@@ -843,32 +856,55 @@ function PaymentMethodRow({
         <button
           type="button"
           disabled={removeMutation.isPending}
-          onClick={() =>
-            canRemove
-              ? removeMutation.mutate(method.id, {
-                  onSuccess: () => {
-                    toast.success("Payment method removed");
-                    router.invalidate();
-                  },
-                  onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to remove payment method"),
-                })
-              : toast.error("You can't remove your payment method while subscribed to a paid plan")
-          }
-          className={`rounded-[4px] p-1.5 text-dash-text-faded transition-colors ${
-            canRemove ? "hover:bg-[#ef2f1f]/10 hover:text-[#ef2f1f]" : "opacity-40"
-          } disabled:pointer-events-none disabled:opacity-40`}
-          title={canRemove ? "Remove" : "Active subscriptions require a payment method on file"}
+          onClick={() => {
+            if (requiresRemoveConfirmation) {
+              setConfirmOpen(true);
+            } else {
+              fireRemove();
+            }
+          }}
+          className="rounded-lg p-1.5 text-dash-text-faded transition-colors hover:bg-[#ef2f1f]/10 hover:text-[#ef2f1f] disabled:pointer-events-none disabled:opacity-40"
+          title="Remove"
         >
           {removeMutation.isPending ? <Spinner className="size-3.5" /> : <FolderTrashIcon className="size-3.5" />}
         </button>
       </div>
+      <WarningModal
+        open={confirmOpen}
+        onOpenChange={(next) => {
+          if (!removeMutation.isPending) setConfirmOpen(next);
+        }}
+        title="Remove your only card?"
+        description="This is the card we use to renew your paid plan. If you remove it, we won't be able to charge you on your next renewal date — your projects may go offline until you add a new card."
+        confirmLabel="Remove anyway"
+        confirmLoadingLabel="Removing..."
+        confirmDisabled={removeMutation.isPending}
+        closeOnConfirm={false}
+        onConfirm={fireRemove}
+      />
     </div>
   );
 }
 
 /* ── Add card form (inline Stripe CardElement) ── */
 
-function AddCardForm({ onClose, replacePaymentMethodId }: { onClose: () => void; replacePaymentMethodId?: string | null }) {
+export function AddCardForm({
+  onClose,
+  replacePaymentMethodId,
+  onSuccess,
+  submitLabel,
+  showCancel = true,
+  showHeader = true,
+  animated = true,
+}: {
+  onClose: () => void;
+  replacePaymentMethodId?: string | null;
+  onSuccess?: (paymentMethodId: string) => void;
+  submitLabel?: string;
+  showCancel?: boolean;
+  showHeader?: boolean;
+  animated?: boolean;
+}) {
   const router = useRouter();
   const stripe = useStripe();
   const elements = useElements();
@@ -957,7 +993,11 @@ function AddCardForm({ onClose, replacePaymentMethodId }: { onClose: () => void;
       }
 
       toast.success(replacePaymentMethodId ? "Payment method updated successfully" : "Payment method added successfully");
-      router.invalidate();
+      if (onSuccess) {
+        onSuccess(paymentMethodId);
+      } else {
+        router.invalidate();
+      }
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add payment method");
@@ -966,21 +1006,16 @@ function AddCardForm({ onClose, replacePaymentMethodId }: { onClose: () => void;
     }
   }
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: "auto" }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="overflow-hidden"
-    >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-px pb-px">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-dash-text-strong">{replacePaymentMethodId ? "Change card" : "Add a new card"}</p>
-          <button type="button" onClick={onClose} className="rounded-[4px] p-1 text-dash-text-faded hover:text-dash-text-body">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+  const formContent = (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-px pb-px">
+        {showHeader && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-dash-text-strong">{replacePaymentMethodId ? "Change card" : "Add a new card"}</p>
+            <button type="button" onClick={onClose} className="rounded-[4px] p-1 text-dash-text-faded hover:text-dash-text-body">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <div
           className={`input-base flex h-[50px] items-center overflow-hidden px-3 [&_.StripeElement]:w-full ${cardError ? "!shadow-[0_0_0_1px_#ef2f1f,0_0_0_3px_rgba(239,47,31,0.15)]" : "input-focus-within"}`}
         >
@@ -998,18 +1033,35 @@ function AddCardForm({ onClose, replacePaymentMethodId }: { onClose: () => void;
                 Adding...
               </span>
             ) : (
-              "Add card"
+              (submitLabel ?? "Add card")
             )}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
-          >
-            Cancel
-          </button>
+          {showCancel && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </form>
+  );
+
+  if (!animated) {
+    return formContent;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      className="overflow-hidden"
+    >
+      {formContent}
     </motion.div>
   );
 }
