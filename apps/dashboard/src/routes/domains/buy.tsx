@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, getRouteApi, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { Search, Globe, AlertCircle } from "lucide-react";
+import { Search, Globe, AlertCircle, Tag, X } from "lucide-react";
 import { DomainSearchResultCard } from "@brimble/ui";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
@@ -139,12 +139,20 @@ function BuyDomainPage() {
   const [autoRenewal, setAutoRenewal] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [page, setPage] = useState(0);
+  const [discountBannerDismissed, setDiscountBannerDismissed] = useState(false);
   const autoSearchedQueryRef = useRef("");
 
   const totalPages = Math.ceil(results.length / PAGE_SIZE);
   const paginatedResults = results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const exactDomainAvailable = results.some((result) => result.domainName === searchedDomain && result.available);
   const showUnavailableBanner = hasSearched && !searching && Boolean(searchedDomain) && !exactDomainAvailable;
+  const maxDiscountPercent = results.reduce((max, result) => {
+    const prev = result.previousPrice ?? 0;
+    const curr = result.price ?? 0;
+    if (prev <= curr) return max;
+    return Math.max(max, Math.round(((prev - curr) / prev) * 100));
+  }, 0);
+  const showDiscountBanner = hasSearched && !searching && maxDiscountPercent > 0 && !discountBannerDismissed;
 
   const isAi = purchaseTarget ? isAiDomain(purchaseTarget.domainName) : false;
   const isApp = purchaseTarget ? isAppDomain(purchaseTarget.domainName) : false;
@@ -170,6 +178,7 @@ function BuyDomainPage() {
         domainName: item.domainName,
         available: item.purchasable,
         price: item.purchasePrice ?? null,
+        previousPrice: item.previousPrice ?? null,
       }));
       setResults(mappedResults);
 
@@ -310,6 +319,22 @@ function BuyDomainPage() {
           Search
         </GlossyButton>
       </div>
+      {showDiscountBanner && (
+        <div className="mb-4 flex items-center gap-3 rounded-[4px] bg-[#34d399]/10 px-4 py-2.5 dark:bg-[#34d399]/15">
+          <Tag className="size-4 shrink-0 text-[#229464] dark:text-[#34d399]" />
+          <p className="flex-1 text-sm text-dash-text-body dark:text-dash-text-strong">
+            Domain sale is on — save up to <span className="font-medium text-[#229464] dark:text-[#34d399]">{maxDiscountPercent}%</span> on first-year registration.
+          </p>
+          <button
+            type="button"
+            onClick={() => setDiscountBannerDismissed(true)}
+            aria-label="Dismiss"
+            className="shrink-0 rounded p-0.5 text-dash-text-faded transition-colors hover:bg-[#34d399]/15 hover:text-dash-text-strong dark:hover:bg-[#34d399]/25"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
       {showUnavailableBanner && (
         <div className="mb-4 flex items-center gap-3 rounded-[4px] bg-[#ef2f1f]/5 px-4 py-2.5 dark:bg-[#ef2f1f]/15">
           <AlertCircle className="size-4 shrink-0 text-[#ef2f1f]" />

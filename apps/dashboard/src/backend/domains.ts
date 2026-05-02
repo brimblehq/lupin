@@ -83,6 +83,7 @@ export interface SearchDomainResult {
   domainName: string;
   purchasable: boolean;
   purchasePrice?: number;
+  previousPrice?: number;
   renewalPrice?: number;
 }
 
@@ -549,6 +550,7 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
             domainName: name,
             purchasable: Boolean(row?.purchasable),
             purchasePrice: pickNumber(row, "purchasePrice"),
+            previousPrice: pickNumber(row, "previousPrice"),
             renewalPrice: pickNumber(row, "renewalPrice"),
           } satisfies SearchDomainResult;
         })
