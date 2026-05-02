@@ -570,6 +570,9 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
       await client.request<any>(endpoint, {
         method: "POST",
         body,
+        headers: {
+          "X-Payment-Key": btoa(crypto.randomUUID()),
+        },
       });
     },
 
