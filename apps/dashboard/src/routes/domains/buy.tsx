@@ -43,6 +43,7 @@ interface DomainResult {
   available: boolean;
   price: number | null;
   previousPrice?: number | null;
+  renewalPrice?: number | null;
 }
 
 /* ─── Helpers ─── */
@@ -108,7 +109,7 @@ function BuyDomainPage() {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const searchDomains = useServerFn(searchDomainSaleServerFn as any) as (args: {
     data: { name: string };
-  }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number; previousPrice?: number }>>;
+  }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number; previousPrice?: number; renewalPrice?: number }>>;
   const purchaseDomain = useServerFn(purchaseDomainServerFn as any) as (args: {
     data: {
       workspace?: string;
@@ -182,6 +183,7 @@ function BuyDomainPage() {
         available: item.purchasable,
         price: item.purchasePrice ?? null,
         previousPrice: item.previousPrice ?? null,
+        renewalPrice: item.renewalPrice ?? null,
       }));
       setResults(mappedResults);
 
@@ -441,9 +443,14 @@ function BuyDomainPage() {
         {purchaseTarget && (
           <div className="flex flex-col gap-4 px-6 py-5">
             {/* Domain + price */}
-            <div className="flex items-center justify-between rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3">
-              <span className="text-sm font-medium text-dash-text-strong">{purchaseTarget.domainName}</span>
-              <span className="text-sm font-medium text-[#34d399]">{formatUsd(purchaseTarget.price ?? 0)}/yr</span>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3">
+                <span className="text-sm font-medium text-dash-text-strong">{purchaseTarget.domainName}</span>
+                <span className="text-sm font-medium text-[#34d399]">{formatUsd(purchaseTarget.price ?? 0)}/yr</span>
+              </div>
+              {purchaseTarget.renewalPrice != null && purchaseTarget.renewalPrice !== purchaseTarget.price && (
+                <p className="px-1 text-xs text-dash-text-extra-faded">Renews at {formatUsd(purchaseTarget.renewalPrice)}/yr after the first year.</p>
+              )}
             </div>
 
             {/* Payment method */}

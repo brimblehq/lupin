@@ -16,7 +16,7 @@ import {
   Check,
 } from "lucide-react";
 import { House, ShoppingBag, Desktop } from "@phosphor-icons/react";
-import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../../hooks/use-theme";
@@ -293,11 +293,23 @@ function WorkspaceSwitcher({
     return team.name.toLowerCase().includes(text);
   });
 
+  const homeSearch = activeTeam?.slug ? { workspace: activeTeam.slug } : {};
+
   return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 text-sm font-medium text-dash-text-strong">
+    <div className="relative flex items-center gap-1" ref={ref}>
+      <Link
+        to="/"
+        search={homeSearch as any}
+        className="flex items-center gap-2 rounded-[4px] py-0.5 text-sm font-medium text-dash-text-strong transition-colors hover:text-dash-text-body"
+      >
         <Avatar src={activeAvatarSrc} fallbackSeed={activeAvatarSeed} alt="" className="size-6 rounded-full object-cover" />
         <span className="truncate max-w-[90px] sm:max-w-[180px]">{activeWorkspaceLabel}</span>
+      </Link>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-label="Switch workspace"
+        className="flex items-center rounded-[4px] p-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+      >
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}>
           <ChevronDown className="size-4 text-dash-text-strong" />
         </motion.span>

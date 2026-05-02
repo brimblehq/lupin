@@ -289,6 +289,16 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
       toast.success("Redeploy started", {
         id: toastId,
         description: `${projectName} is being redeployed to production.`,
+        action: {
+          label: "View deployment",
+          onClick: () => {
+            navigate({
+              to: "/projects/$projectId/deployment-history",
+              params: { projectId: actualProjectId },
+              search: workspace ? ({ workspace } as any) : ({} as any),
+            });
+          },
+        },
       });
 
       markDeploymentHistoryForRefresh({
