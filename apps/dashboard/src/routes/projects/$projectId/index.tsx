@@ -23,6 +23,7 @@ import { redeployProjectServerFn } from "@/server/projects/actions";
 import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { WarningModal } from "@/components/shared/warning-modal";
+import { ProjectOverviewPending } from "@/components/shared/route-pending";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -92,6 +93,7 @@ export const Route = createFileRoute("/projects/$projectId/")({
     return { screenshotUrl, frameworks, recentDeployments };
   },
   component: ProjectDetailPage,
+  pendingComponent: ProjectOverviewPending,
 });
 
 function ProjectDetailPage() {
@@ -343,7 +345,7 @@ function ProjectDetailPage() {
         <div
           className={
             isDatabaseProject
-              ? "flex flex-col gap-4 lg:grid lg:grid-cols-[300px_1fr] lg:items-start lg:gap-4"
+              ? "flex flex-col gap-4 lg:grid lg:grid-cols-[300px_1fr] lg:items-stretch lg:gap-4"
               : "flex flex-col gap-4 md:flex-row"
           }
         >

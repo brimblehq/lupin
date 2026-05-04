@@ -2,6 +2,7 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import * as Sentry from "@sentry/tanstackstart-react";
 import { routeTree } from "./routeTree.gen";
 import { DefaultErrorComponent } from "./components/shared/default-error";
+import { RoutePending } from "./components/shared/route-pending";
 import { installServerFnPerfLogger } from "./lib/perf-logger";
 
 let sentryInitialized = false;
@@ -14,7 +15,9 @@ export function getRouter() {
     defaultStaleTime: 300_000,
     defaultPreloadStaleTime: 300_000,
     defaultGcTime: 30 * 60_000,
-    defaultPendingMs: 100,
+    defaultPendingMs: 80,
+    defaultPendingMinMs: 350,
+    defaultPendingComponent: RoutePending,
     defaultErrorComponent: DefaultErrorComponent,
   });
 

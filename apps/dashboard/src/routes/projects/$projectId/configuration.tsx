@@ -70,6 +70,7 @@ import { generalConfigSchema, databaseConfigSchema, resourcesConfigSchema } from
 import type { GeneralConfigValues, DatabaseConfigValues, ResourcesConfigValues } from "@/utils/configuration-schemas";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
 import { collectWatchPathEntries, deriveWatchPathSuggestions, type RootDirFetcher } from "@/utils/watch-path-suggestions";
+import { ProjectConfigurationPending } from "@/components/shared/route-pending";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -213,6 +214,7 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
     return data;
   },
   component: ConfigurationPage,
+  pendingComponent: ProjectConfigurationPending,
 });
 
 /* ─── Constants ─── */

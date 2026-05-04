@@ -4,6 +4,7 @@ import { createFileRoute, getRouteApi, useRouter, useRouterState } from "@tansta
 import { useServerFn } from "@tanstack/react-start";
 import { ChartLineUp } from "@phosphor-icons/react";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { WebAnalyticsPending } from "@/components/shared/route-pending";
 import { shouldShowProjectWebAnalyticsTab } from "@/utils/project-capabilities";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { AppAnalytics } from "./observability";
@@ -54,6 +55,7 @@ function SkeletonShell() {
 
 export const Route = createFileRoute("/projects/$projectId/web-analytics")({
   component: WebAnalyticsPage,
+  pendingComponent: WebAnalyticsPending,
 });
 
 function EnableAnalyticsEmptyState({ projectId, onEnabled }: { projectId: string; onEnabled?: () => void }) {

@@ -22,6 +22,7 @@ import { createPortal } from "react-dom";
 import { type DateRange } from "react-day-picker";
 import { format, differenceInSeconds } from "date-fns";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { DeploymentHistoryPending } from "@/components/shared/route-pending";
 import { Tooltip } from "../../../components/shared/tooltip";
 import { DateRangePicker } from "../../../components/shared/date-range-picker";
 import {
@@ -126,6 +127,7 @@ export const Route = createFileRoute("/projects/$projectId/deployment-history")(
     return { deployments: result, workspace };
   },
   component: DeploymentHistoryPage,
+  pendingComponent: DeploymentHistoryPending,
 });
 
 /* ─── Filter dropdown (reusable) ─── */

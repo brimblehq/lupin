@@ -9,6 +9,7 @@ import { Pause, Play, Clock, MagnifyingGlass, CircleNotch, ArrowUp, ArrowDown } 
 import type { DateRange } from "react-day-picker";
 import { endOfDay, format, startOfDay, subDays, subHours } from "date-fns";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { ProjectLogsPending } from "@/components/shared/route-pending";
 import { FilterDropdown, type FilterOption } from "../../../components/shared/filter-dropdown";
 import { SearchFilterBar } from "../../../components/shared/search-filter-bar";
 import { DateRangePicker } from "../../../components/shared/date-range-picker";
@@ -40,6 +41,7 @@ export const Route = createFileRoute("/projects/$projectId/logs")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
   component: LogsPage,
+  pendingComponent: ProjectLogsPending,
 });
 
 const parentRoute = getRouteApi("/projects/$projectId");

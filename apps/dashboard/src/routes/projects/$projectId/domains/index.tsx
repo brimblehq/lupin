@@ -8,6 +8,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { DomainList, type Domain } from "../../../../components/shared/domain-list";
 import { TabHeader } from "../../../../components/shared/tab-header";
+import { ProjectDomainsPending } from "@/components/shared/route-pending";
 import { NumberPagination } from "../../../../components/shared/pagination";
 import { AddDomainModal, type DomainValidationError } from "../../../../components/shared/add-domain-modal";
 import { Route as RootRoute } from "@/routes/__root";
@@ -94,6 +95,7 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
     return data;
   },
   component: ProjectDomainsPage,
+  pendingComponent: ProjectDomainsPending,
 });
 
 function validateDomain(url: string): DomainValidationError | null {

@@ -210,12 +210,12 @@ function ConnectionField({
   mono?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1 py-2">
-      <span className="text-[10px] font-medium uppercase tracking-[0.5px] text-dash-text-faded">{label}</span>
+    <div className="flex flex-col gap-1.5 py-2.5">
+      <span className="text-[11px] font-medium uppercase tracking-[0.5px] text-dash-text-faded">{label}</span>
       <div className="flex items-start gap-2">
         <span
           title={value}
-          className={`min-w-0 flex-1 break-all text-[11px] leading-[1.4] text-dash-text-strong ${mono ? "font-mono" : ""}`}
+          className={`min-w-0 flex-1 break-all text-sm leading-[1.4] text-dash-text-strong ${mono ? "font-mono" : ""}`}
         >
           {value}
         </span>
@@ -225,7 +225,7 @@ function ConnectionField({
           className="mt-0.5 shrink-0 text-dash-text-extra-faded transition-colors hover:text-dash-text-strong"
           aria-label={`Copy ${label}`}
         >
-          {copied ? <Check className="size-3 text-[#22c55e]" /> : <Copy className="size-3" />}
+          {copied ? <Check className="size-3.5 text-[#22c55e]" /> : <Copy className="size-3.5" />}
         </button>
       </div>
     </div>
@@ -268,9 +268,9 @@ function ConnectionFieldsSkeleton() {
   return (
     <div className="flex flex-col divide-y divide-dash-border-soft">
       {fieldWidths.map((w, i) => (
-        <div key={i} className="flex flex-col gap-1.5 py-2">
-          <div className="h-2 w-10 animate-pulse rounded bg-dash-border-soft" />
-          <div className={`h-3 ${w} animate-pulse rounded bg-dash-border-soft`} />
+        <div key={i} className="flex flex-col gap-1.5 py-2.5">
+          <div className="h-2.5 w-10 animate-pulse rounded bg-dash-border-soft" />
+          <div className={`h-3.5 ${w} animate-pulse rounded bg-dash-border-soft`} />
         </div>
       ))}
     </div>

@@ -9,6 +9,7 @@ import { useHaptics } from "@/hooks/use-haptics";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@brimble/ui";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { EnvironmentPending } from "@/components/shared/route-pending";
 import { GlossyButton } from "../../../components/shared/glossy-button";
 import { Tooltip, SimpleTooltip } from "@/components/shared/tooltip";
 import { Spinner } from "@/components/shared/spinner";
@@ -146,6 +147,7 @@ export const Route = createFileRoute("/projects/$projectId/environment")({
     return data;
   },
   component: EnvironmentPage,
+  pendingComponent: EnvironmentPending,
 });
 
 function createDraftId() {

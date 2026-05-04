@@ -7,6 +7,7 @@ import { SimpleTooltip } from "@/components/shared/tooltip";
 import { ArrowBendUpLeft, GlobeHemisphereWest, UsersThree } from "@phosphor-icons/react";
 import { motion, useInView } from "motion/react";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { ObservabilityPending } from "@/components/shared/route-pending";
 import { TimeSeriesChart } from "@/components/observability/time-series-chart";
 import { SemiGauge } from "@/components/observability/semi-gauge";
 import { SegmentedToggle } from "@/components/observability/segmented-toggle";
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/projects/$projectId/observability")({
     return { metrics };
   },
   component: ObservabilityPage,
+  pendingComponent: ObservabilityPending,
 });
 
 import { MetricChart } from "../../../types/enums";
