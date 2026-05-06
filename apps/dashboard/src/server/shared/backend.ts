@@ -136,7 +136,7 @@ function doRefresh(refreshToken: string): Promise<AuthSession> {
   return refreshPromise;
 }
 
-function getClientHeaders(): Record<string, string> {
+function getClientHeaders(opts?: { stepUpToken?: string }): Record<string, string> {
   const headers: Record<string, string> = {};
   const ua = getServerUserAgent();
   if (ua) {
@@ -145,6 +145,10 @@ function getClientHeaders(): Record<string, string> {
   const ip = getServerClientIp();
   if (ip) {
     headers["X-Forwarded-For"] = ip;
+  }
+  const stepUpToken = opts?.stepUpToken?.trim();
+  if (stepUpToken) {
+    headers["X-2FA-Token"] = stepUpToken;
   }
   return headers;
 }
@@ -276,12 +280,30 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
 const SERIALIZED_HTTP_STATUS_PREFIX = /^\[HTTP (\d{3})\]\s*/;
 
 /**
- * TanStack Start serializes errors across the SSR/client boundary using
- * seroval's ShallowErrorPlugin, which only preserves `message` and `stack`.
- * Custom fields like `status` and `code` on BackendApiError get stripped.
+ * Pull the step-up challenge fields out of a backend 403 response.
+ * Backend shape: `{ message, data: { requires_2fa: true, action, resource_id } }`.
+ */
+function extractStepUpRequirement(payload: unknown): { action: string; resourceId: string } | null {
+  const data = (payload as any)?.data;
+  if (!data?.requires_2fa) return null;
+
+  const action = String(data.action ?? "").trim();
+  const resourceId = String(data.resource_id ?? "").trim();
+  if (!action || !resourceId) return null;
+
+  return { action, resourceId };
+}
+
+/**
+ * TanStack Start serializes errors via seroval's ShallowErrorPlugin. Of the
+ * preserved fields (`name`, `message`, `stack`, `cause`), `message` is the
+ * one we control end-to-end — engines don't regenerate it on rehydration.
  *
- * Preserve HTTP status in `stack` for downstream checks while keeping
- * `message` clean for user-facing toasts and UI copy.
+ * Encoding strategy:
+ *   - HTTP status: still prefixed into `stack` for legacy parsers.
+ *   - Step-up 2FA challenge: prepended to `message` as
+ *       `[STEP_UP|<action>|<resource_id>] <original message>`
+ *     The client strips this prefix before display.
  */
 function makeSerializableError(error: any): any {
   if (!error || typeof error !== "object") {
@@ -291,10 +313,7 @@ function makeSerializableError(error: any): any {
   const rawMessage = typeof error.message === "string" ? error.message : "";
   const statusFromMessage = (() => {
     const match = rawMessage.match(SERIALIZED_HTTP_STATUS_PREFIX);
-    if (!match) {
-      return undefined;
-    }
-    return Number(match[1]);
+    return match ? Number(match[1]) : undefined;
   })();
   const status = typeof error.status === "number" ? error.status : statusFromMessage;
 
@@ -302,9 +321,17 @@ function makeSerializableError(error: any): any {
     return error;
   }
 
-  const cleanMessage = rawMessage.replace(SERIALIZED_HTTP_STATUS_PREFIX, "");
-  if (cleanMessage) {
-    error.message = cleanMessage;
+  let nextMessage = rawMessage.replace(SERIALIZED_HTTP_STATUS_PREFIX, "");
+
+  if (status === 403) {
+    const stepUp = extractStepUpRequirement(error.details);
+    if (stepUp) {
+      nextMessage = `[STEP_UP|${stepUp.action}|${stepUp.resourceId}] ${nextMessage}`;
+    }
+  }
+
+  if (nextMessage) {
+    error.message = nextMessage;
   }
 
   const stackPrefix = `[HTTP ${status}]`;
@@ -319,15 +346,21 @@ function makeSerializableError(error: any): any {
   return error;
 }
 
-export async function withTokenRefresh<T>(fn: (api: BackendApi) => Promise<T>): Promise<T> {
+export interface WithTokenRefreshOptions {
+  /** Optional step-up 2FA token. When set, attached as `X-2FA-Token` header. */
+  stepUpToken?: string;
+}
+
+export async function withTokenRefresh<T>(fn: (api: BackendApi) => Promise<T>, options?: WithTokenRefreshOptions): Promise<T> {
   try {
-    return await withTokenRefreshImpl(fn);
+    return await withTokenRefreshImpl(fn, options);
   } catch (error: any) {
     throw makeSerializableError(error);
   }
 }
 
-async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Promise<T> {
+async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>, options?: WithTokenRefreshOptions): Promise<T> {
+  const stepUpToken = options?.stepUpToken;
   const accessToken = getServerAccessToken();
   const refreshToken = getServerRefreshToken();
 
@@ -344,7 +377,7 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
       const recentApi = createBackendApi({
         baseUrl: serverConfig.apiUrl,
         getAccessToken: () => recentSession.accessToken ?? null,
-        defaultHeaders: getClientHeaders(),
+        defaultHeaders: getClientHeaders({ stepUpToken }),
         signatureSecret: serverConfig.hmacSecretKey,
         apiKey: serverConfig.apiKey,
       });
@@ -385,7 +418,7 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
       const freshApi = createBackendApi({
         baseUrl: serverConfig.apiUrl,
         getAccessToken: () => session.accessToken ?? null,
-        defaultHeaders: getClientHeaders(),
+        defaultHeaders: getClientHeaders({ stepUpToken }),
         signatureSecret: serverConfig.hmacSecretKey,
         apiKey: serverConfig.apiKey,
       });
@@ -400,7 +433,15 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
     }
   }
 
-  const api = getServerBackendApi();
+  const api = stepUpToken
+    ? createBackendApi({
+        baseUrl: serverConfig.apiUrl,
+        getAccessToken: getServerAccessToken,
+        defaultHeaders: getClientHeaders({ stepUpToken }),
+        signatureSecret: serverConfig.hmacSecretKey,
+        apiKey: serverConfig.apiKey,
+      })
+    : getServerBackendApi();
   try {
     return await fn(api);
   } catch (error: any) {
@@ -442,7 +483,7 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
       const freshApi = createBackendApi({
         baseUrl: serverConfig.apiUrl,
         getAccessToken: () => session.accessToken ?? null,
-        defaultHeaders: getClientHeaders(),
+        defaultHeaders: getClientHeaders({ stepUpToken }),
         signatureSecret: serverConfig.hmacSecretKey,
         apiKey: serverConfig.apiKey,
       });

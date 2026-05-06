@@ -101,6 +101,8 @@ import { normalizeMemberRole as normalizeRole } from "@/utils/workspace-role";
 import { mapSettingsSnapshotToDrawerProfile, maskSecretWithAsterisks, type DrawerUserProfile } from "@/utils/dashboard";
 import { formatUsdMonthly } from "@/utils/billing";
 import { usePricing } from "@/contexts/pricing-context";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
 import { ProfileTab, Theme } from "../../types/enums";
 type UserProfile = DrawerUserProfile;
 
@@ -3810,8 +3812,9 @@ function MembersForm({
     data: { workspace: string; memberId: string; role: string };
   }) => Promise<{ ok: true }>;
   const transferOwnership = useServerFn(transferOwnershipServerFn as any) as (args: {
-    data: { workspace: string; memberId: string };
+    data: { workspace: string; memberId: string; twoFactorToken?: string };
   }) => Promise<TeamOwnershipTransfer>;
+  const { requestStepUp } = useStepUpTwoFactor();
 
   const [team, setTeam] = useState<TeamDetails | null>(initialTeam);
   const [isLoadingMembers, setIsLoadingMembers] = useState(!initialTeam);
@@ -4216,9 +4219,13 @@ function MembersForm({
               if (!transferTarget) return;
               setTransferring(true);
               try {
-                await transferOwnership({
-                  data: { workspace, memberId: transferTarget.id },
-                });
+                await withStepUp(
+                  (twoFactorToken) =>
+                    transferOwnership({
+                      data: { workspace, memberId: transferTarget.id, twoFactorToken },
+                    }),
+                  requestStepUp,
+                );
                 toast.success("Transfer request sent. Expires in 7 days.");
                 setTransferOpen(false);
                 setTransferTarget(null);

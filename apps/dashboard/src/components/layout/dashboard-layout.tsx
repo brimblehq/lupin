@@ -31,6 +31,7 @@ import { PlanTypeProvider } from "@/contexts/plan-type-context";
 import { WorkspaceRoleProvider } from "@/contexts/workspace-role-context";
 import { canWorkspaceRoleWrite, resolveCurrentWorkspaceRole } from "@/utils/workspace-role";
 import { ProfileDrawerProvider } from "@/contexts/profile-drawer-context";
+import { StepUpTwoFactorProvider } from "@/contexts/step-up-two-factor-context";
 import { DEFAULT_PRICING } from "@/utils/default-pricing";
 import { ProfileTab, Theme } from "../../types/enums";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
@@ -220,6 +221,30 @@ function ProjectsTabSkeleton() {
   );
 }
 
+function NewProjectTabSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-[680px] animate-pulse">
+      <div className="mb-8">
+        <div className="mb-4 h-4 w-28 rounded bg-dash-border-soft/60" />
+        <div className="mb-2 h-7 w-40 rounded bg-dash-border-soft/70" />
+        <div className="h-3.5 w-full max-w-[420px] rounded bg-dash-border-soft/50" />
+      </div>
+
+      <div className="mb-4 h-4 w-56 rounded bg-dash-border-soft/60" />
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="min-h-[132px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30 p-5">
+            <div className="mb-3 h-5 w-5 rounded bg-dash-border-soft/50" />
+            <div className="h-3.5 w-36 rounded bg-dash-border-soft/60" />
+            <div className="mt-1.5 h-3 w-full max-w-[230px] rounded bg-dash-border-soft/45" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DomainsTabSkeleton() {
   return (
     <div className="max-w-[1000px] animate-pulse">
@@ -371,6 +396,10 @@ function ProjectDetailTabSkeleton() {
 }
 
 function RouteTransitionSkeleton({ pathname, fullWidth }: { pathname: string; fullWidth?: boolean }) {
+  if (/^\/projects\/new(?:\/|$)/.test(pathname)) {
+    return <NewProjectTabSkeleton />;
+  }
+
   if (/^\/projects\/[^/]+(?:\/|$)/.test(pathname) && !/^\/projects\/new(?:\/|$)/.test(pathname)) {
     return <ProjectDetailTabSkeleton />;
   }
@@ -1020,6 +1049,7 @@ export function DashboardLayout({
             <ScoutBarProvider>
               <TooltipProvider>
                 <ProfileDrawerProvider onOpen={openProfileDrawer}>
+                  <StepUpTwoFactorProvider>
                   <RouterProgressBar />
                   <DashToaster />
                   <CommandPaletteSlot />
@@ -1189,6 +1219,7 @@ export function DashboardLayout({
                       </Suspense>
                     )}
                   </div>
+                  </StepUpTwoFactorProvider>
                 </ProfileDrawerProvider>
               </TooltipProvider>
             </ScoutBarProvider>

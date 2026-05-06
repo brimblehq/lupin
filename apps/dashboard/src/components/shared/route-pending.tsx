@@ -507,4 +507,87 @@ export function WebAnalyticsPending() {
   );
 }
 
+/* ─────────────────────────────────────────────
+   /projects/new
+   Header + source selection cards
+   ───────────────────────────────────────────── */
+
+export function NewProjectPending() {
+  return (
+    <div className="mx-auto w-full max-w-[680px] py-8" aria-hidden="true">
+      <div className="mb-8">
+        <div className={`mb-4 h-4 w-28 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+        <div className={`mb-2 h-7 w-40 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+        <div className={`h-3.5 w-full max-w-[420px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+      </div>
+
+      <div className={`mb-4 h-4 w-56 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex min-h-[132px] flex-col gap-3 rounded-[4px] border-[0.5px] border-dash-border p-5">
+            <div className={`h-5 w-5 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            <div className="flex flex-col gap-1.5">
+              <div className={`h-3.5 w-36 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+              <div className={`h-3 w-full max-w-[230px] rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   /scaling
+   Header + search row + scaling cards
+   ───────────────────────────────────────────── */
+
+export function ScalingPending() {
+  return (
+    <div className="mx-auto w-full max-w-[1000px] py-8" aria-hidden="true">
+      <div className="mb-8">
+        <div className="mb-2 h-4 w-24 rounded bg-dash-border-soft/70 animate-pulse" />
+        <div className="flex flex-col gap-1.5">
+          <div className="h-3 w-[400px] max-w-full rounded bg-dash-border-soft/50 animate-pulse" />
+          <div className="h-3 w-[300px] max-w-full rounded bg-dash-border-soft/50 animate-pulse" />
+        </div>
+      </div>
+
+      <hr className="-ml-4 mb-6 border-dash-border-soft md:-ml-10" />
+
+      <div className="mb-5 flex items-center gap-3">
+        <div className="h-10 min-w-0 flex-1 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30 animate-pulse" />
+        <div className={`h-10 w-[180px] rounded-[6px] ${PULSE_BG_MEDIUM} animate-pulse`} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex h-[164px] flex-col rounded-[4px] border-[0.5px] border-dash-border">
+            <div className="flex items-center justify-between px-3.5 pb-1 pt-3">
+              <div className={`h-4 w-28 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+              <div className={`h-4 w-20 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            </div>
+            <div className="px-3.5 pb-3">
+              <div className={`h-3 w-32 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            </div>
+            <div className="grid flex-1 grid-cols-2 gap-3 px-3.5 pb-3">
+              <div className="space-y-2">
+                <div className={`h-3 w-16 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+                <div className={`h-4 w-20 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+                <div className={`h-3 w-16 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+              </div>
+              <div className="space-y-2">
+                <div className={`h-3 w-16 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+                <div className={`h-3 w-20 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+                <div className={`h-3 w-20 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+              </div>
+            </div>
+            <div className="mt-auto h-10 border-t-[0.5px] border-dash-border" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export { Bar, Block };

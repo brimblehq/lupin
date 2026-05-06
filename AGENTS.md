@@ -181,6 +181,33 @@ URLs, ports, credentials, feature flags, and tunable limits belong in config or 
 - Defaults for local dev are fine in a `.env.example` or config file, but the real values are injected.
 - If a value differs between staging and prod, it's config.
 
+## 16. Validate inputs with a schema, not by hand
+
+When a server fn / route handler / API boundary receives a payload, validate it with **yup** (or zod where already used). Don't write `if (!x.trim()) throw ...` ladders or hand-rolled regex checks beside the handler.
+
+```ts
+// Bad — manual labour, easy to drift, no shared error shape
+const code = String(payload?.code ?? "").trim();
+if (!/^\d{6}$/.test(code)) throw new Error("Enter a valid 6-digit code");
+if (!payload?.action) throw new Error("Action required");
+
+// Good — declarative, reusable, errors are uniform
+const schema = Yup.object({
+  code: Yup.string().required().matches(/^(\d{6}|[A-Za-z0-9]{8})$/, "Enter a 6-digit code or 8-character recovery code"),
+  action: Yup.string().trim().required(),
+  resourceId: Yup.string().trim().required(),
+});
+const { code, action, resourceId } = schema.validateSync(payload, { stripUnknown: true });
+```
+
+Why:
+- One place to read the contract instead of decoding scattered if-statements.
+- Error messages are co-located with the rule that produced them.
+- Same schema can be reused on the client form, eliminating drift.
+- `stripUnknown` prevents accidental field passthrough.
+
+Reach for hand-rolled checks only for trivial single-field guards (`if (!id) throw` is fine).
+
 ---
 
 ## Summary

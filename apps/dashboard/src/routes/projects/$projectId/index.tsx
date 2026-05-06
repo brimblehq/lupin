@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
-import { ExternalLink, Copy, Check, ArrowUpRight, Terminal, Download, Database, Clock, HardDrive } from "lucide-react";
+import { ExternalLink, Copy, Check, ArrowUpRight, Terminal } from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
 import { getProjectScreenshotServerFn } from "@/server/projects/actions";
@@ -203,6 +203,14 @@ function ProjectDetailPage() {
   const isBitbucket = repoSource.toLowerCase() === "bitbucket";
   const repositoryHref = project?.gitLink || "";
   const lastUpdatedText = project?.updatedAt ? formatRelativeTime(project.updatedAt) : "unknown";
+  let createdOnText = "Unknown";
+  if (project?.createdAt) {
+    const created = new Date(project.createdAt);
+    if (!Number.isNaN(created.getTime())) {
+      createdOnText = created.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
+  }
+  const publicAccessText = project?.isPublicAccess ? "Yes" : "No";
   const mcpServerUrl = project?.domains?.[0]?.name ? `https://${project.domains[0].name}/mcp` : "";
 
   const deploymentRows: Array<{ url: string; date: string }> = (recentDeployments ?? []).map((dep) => ({
@@ -357,35 +365,51 @@ function ProjectDetailPage() {
               <span className="text-dash-text-strong">Project meta</span>
             </div>
             <div className="flex flex-col">
-              <div className="border-b-[0.5px] border-dash-border p-3.5">
+              <div className="flex items-center gap-2 border-b-[0.5px] border-dash-border p-3.5">
+                <img src="/icons/renew.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                 <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Last updated {lastUpdatedText}</span>
               </div>
               <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
-                <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Project status</span>
+                <div className="flex items-center gap-2">
+                  <img src="/icons/schedule.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Created on</span>
+                </div>
+                <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{createdOnText}</span>
+              </div>
+              <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
+                <div className="flex items-center gap-2">
+                  <img src="/icons/status.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Project status</span>
+                </div>
                 <StatusChip status={projectStatus} />
               </div>
+              {!isDatabaseProject ? (
+                <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
+                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Status code</span>
+                  {typeof statusCode === "number" ? (
+                    <span className="rounded-[4px] bg-[#13d282]/15 px-2 py-0.5 text-xs font-medium text-[#13d282]">{statusCode}</span>
+                  ) : (
+                    <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">N/A</span>
+                  )}
+                </div>
+              ) : null}
               <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
-                <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Status code</span>
-                {typeof statusCode === "number" ? (
-                  <span className="rounded-[4px] bg-[#13d282]/15 px-2 py-0.5 text-xs font-medium text-[#13d282]">{statusCode}</span>
-                ) : (
-                  <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">N/A</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
-                <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Region</span>
-                <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">{regionText}</span>
+                <div className="flex items-center gap-2">
+                  <img src="/icons/region.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Region</span>
+                </div>
+                <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{regionText}</span>
               </div>
               {showSitePasswordRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Site password enabled</span>
-                  <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">{passwordEnabledText}</span>
+                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{passwordEnabledText}</span>
                 </div>
               ) : null}
               {showMcpAuthRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Authentication enabled</span>
-                  <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
+                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">
                     {project?.authEnabled ? "Yes" : "No"}
                   </span>
                 </div>
@@ -393,24 +417,44 @@ function ProjectDetailPage() {
               {showBuildCacheRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Build cache enabled</span>
-                  <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
+                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">
                     {project?.buildCacheEnabled ? "Yes" : "No"}
                   </span>
                 </div>
               ) : null}
               {showComputeSizeRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
-                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Compute size</span>
-                  <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">{computeSizeText}</span>
+                  <div className="flex items-center gap-2">
+                    <img src="/icons/cpu.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+                    <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Compute size</span>
+                  </div>
+                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{computeSizeText}</span>
+                </div>
+              ) : null}
+              {isDatabaseProject ? (
+                <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
+                  <div className="flex items-center gap-2">
+                    <img src="/icons/info.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+                    <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Public access</span>
+                  </div>
+                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{publicAccessText}</span>
                 </div>
               ) : null}
               {showFrameworkRow ? (
                 <div
                   className={`flex items-center justify-between p-3.5 ${!isDatabaseProject ? "border-b-[0.5px] border-dash-border" : ""}`}
                 >
-                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Framework</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">{frameworkLabel}</span>
+                    <img
+                      src={isDatabaseProject ? "/icons/container.svg" : "/icons/box.svg"}
+                      alt=""
+                      aria-hidden="true"
+                      className="size-4 invert dark:invert-0"
+                    />
+                    <span className="text-sm font-light leading-[1.3] text-dash-text-faded">{isDatabaseProject ? "Image" : "Framework"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{frameworkLabel}</span>
                     {frameworkLogo ? (
                       frameworkLogo.trim().startsWith("<svg") || frameworkLogo.includes("<svg") ? (
                         <div
@@ -426,11 +470,14 @@ function ProjectDetailPage() {
               ) : null}
               {!isDatabaseProject ? (
                 <div className="flex items-center justify-between p-3.5">
-                  <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-faded">Repository</span>
+                  <div className="flex items-center gap-2">
+                    <img src="/icons/git-circle.svg" alt="" aria-hidden="true" className="size-4" />
+                    <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-faded">Repository</span>
+                  </div>
                   <div className="flex items-center gap-2">
                     {repositoryHref ? (
                       <a href={repositoryHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-                        <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
+                        <span className="font-mono text-sm leading-5 text-dash-text-strong">
                           From <span className="underline">{repoName}</span>
                         </span>
                         {isGitlab ? (
@@ -451,7 +498,7 @@ function ProjectDetailPage() {
                       </a>
                     ) : (
                       <>
-                        <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong">
+                        <span className="font-mono text-sm leading-5 text-dash-text-strong">
                           From <span className="underline">{repoName}</span>
                         </span>
                         {isGitlab ? (
@@ -496,23 +543,23 @@ function ProjectDetailPage() {
               <div className="flex flex-col divide-y divide-dash-border">
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
-                    <HardDrive className="size-4 text-dash-text-extra-faded" />
+                    <img src="/icons/storage.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light text-dash-text-faded">Backup size</span>
                   </div>
-                  <span className="font-mono text-sm text-dash-text-body">
+                  <span className="font-mono text-sm text-dash-text-strong">
                     {project?.backupSize != null ? formatBytes(project.backupSize) : "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
-                    <Clock className="size-4 text-dash-text-extra-faded" />
+                    <img src="/icons/schedule.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light text-dash-text-faded">Backup frequency</span>
                   </div>
-                  <span className="font-mono text-sm text-dash-text-body">Daily</span>
+                  <span className="font-mono text-sm text-dash-text-strong">Daily</span>
                 </div>
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
-                    <Download className="size-4 text-dash-text-extra-faded" />
+                    <img src="/icons/download.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light text-dash-text-faded">Download backup</span>
                   </div>
                   {project?.backupUrl ? (
@@ -532,10 +579,10 @@ function ProjectDetailPage() {
                 </div>
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
-                    <Database className="size-4 text-dash-text-extra-faded" />
+                    <img src="/icons/clock.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light text-dash-text-faded">Last backup</span>
                   </div>
-                  <span className="font-mono text-sm text-dash-text-body">
+                  <span className="font-mono text-sm text-dash-text-strong">
                     {project?.lastBackup ? formatRelativeTime(project.lastBackup) : "N/A"}
                   </span>
                 </div>
@@ -585,7 +632,7 @@ function ProjectDetailPage() {
                           {i < deploymentRows.length - 1 && <div className="absolute -bottom-3.5 left-[7.5px] h-3.5 w-px bg-dash-border" />}
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">{dep.url}</span>
+                          <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{dep.url}</span>
                           <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-faded">{dep.date}</span>
                         </div>
                       </div>
@@ -627,7 +674,7 @@ function ProjectDetailPage() {
                           href={`https://${domain.url}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="group/link inline-flex items-center gap-1 text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-strong transition-colors hover:text-dash-text-body"
+                          className="group/link inline-flex items-center gap-1 font-mono text-sm leading-5 text-dash-text-strong transition-colors hover:text-dash-text-body"
                         >
                           <span className="group-hover/link:underline">{domain.url}</span>
                           <ArrowUpRight className="size-3 -translate-x-1 translate-y-0.5 opacity-0 transition-all duration-200 ease-out group-hover/link:translate-x-0 group-hover/link:translate-y-0 group-hover/link:opacity-100" />

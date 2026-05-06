@@ -245,6 +245,7 @@ export const deleteDomainServerFn = createServerFn({
         workspace?: string;
         domainId: string;
         projectId?: string;
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -253,21 +254,21 @@ export const deleteDomainServerFn = createServerFn({
     throw new Error("Domain id is required");
   }
 
-  let projectId: string | undefined;
-  if (typeof payload?.projectId === "string" && payload.projectId.trim()) {
-    projectId = payload.projectId.trim();
-  }
+  const projectId = payload?.projectId?.trim() || undefined;
 
-  return withTokenRefresh(async (api) => {
-    const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
-    await api.domains.remove({
-      domainId,
-      projectId,
-      teamId,
-    });
+  return withTokenRefresh(
+    async (api) => {
+      const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
+      await api.domains.remove({
+        domainId,
+        projectId,
+        teamId,
+      });
 
-    return { success: true };
-  });
+      return { success: true };
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const searchDomainSaleServerFn = createServerFn({
@@ -517,6 +518,7 @@ export const transferOutServerFn = createServerFn({
     | {
         workspace?: string;
         domainName: string;
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -525,10 +527,13 @@ export const transferOutServerFn = createServerFn({
     throw new Error("Domain name is required");
   }
 
-  return withTokenRefresh(async (api) => {
-    const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
-    return api.domains.transferOut(domainName, teamId);
-  });
+  return withTokenRefresh(
+    async (api) => {
+      const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
+      return api.domains.transferOut(domainName, teamId);
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const setDomainNameserversServerFn = createServerFn({

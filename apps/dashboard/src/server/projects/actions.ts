@@ -622,6 +622,7 @@ export const updateDatabaseProjectConfigServerFn = createServerFn({
         password?: string;
         configurations?: Record<string, unknown> | null;
         whitelistedIps?: string[];
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -639,17 +640,20 @@ export const updateDatabaseProjectConfigServerFn = createServerFn({
 
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
-  return withTokenRefresh(async (api) => {
-    const teamId = await resolveTeamId(api, workspaceSlug);
+  return withTokenRefresh(
+    async (api) => {
+      const teamId = await resolveTeamId(api, workspaceSlug);
 
-    return api.projects.updateDatabaseConfig(projectId, {
-      teamId,
-      name,
-      password,
-      configurations: payload?.configurations ?? null,
-      whitelistedIps: Array.isArray(payload?.whitelistedIps) ? payload.whitelistedIps : [],
-    });
-  });
+      return api.projects.updateDatabaseConfig(projectId, {
+        teamId,
+        name,
+        password,
+        configurations: payload?.configurations ?? null,
+        whitelistedIps: Array.isArray(payload?.whitelistedIps) ? payload.whitelistedIps : [],
+      });
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const decryptDatabaseConnectionUriServerFn = createServerFn({
@@ -720,6 +724,7 @@ export const deleteProjectServerFn = createServerFn({
     | {
         projectId: string;
         workspace?: string;
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -730,12 +735,14 @@ export const deleteProjectServerFn = createServerFn({
 
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
-  return withTokenRefresh(async (api) => {
-    const teamId = await resolveTeamId(api, workspaceSlug);
-
-    await api.projects.remove(projectId, { teamId });
-    return { success: true };
-  });
+  return withTokenRefresh(
+    async (api) => {
+      const teamId = await resolveTeamId(api, workspaceSlug);
+      await api.projects.remove(projectId, { teamId });
+      return { success: true };
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const linkRepoServerFn = createServerFn({

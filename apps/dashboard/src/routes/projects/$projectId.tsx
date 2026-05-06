@@ -87,6 +87,12 @@ export function clearProjectCache() {
   projectCache.clear();
 }
 
+export function markProjectCacheStale() {
+  for (const [key, entry] of projectCache.entries()) {
+    projectCache.set(key, { ...entry, fetchedAt: 0 });
+  }
+}
+
 export const Route = createFileRoute("/projects/$projectId")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
@@ -116,9 +122,7 @@ export const Route = createFileRoute("/projects/$projectId")({
 
     try {
       const project = await (
-        getProjectDetailsServerFn as unknown as (input: {
-          data: { projectId: string; workspace?: string };
-        }) => Promise<BackendProject>
+        getProjectDetailsServerFn as unknown as (input: { data: { projectId: string; workspace?: string } }) => Promise<BackendProject>
       )({
         data: {
           projectId: params.projectId,
@@ -487,6 +491,7 @@ function ProjectLayout() {
 
       channel.subscribe((message) => {
         const eventName = message.name ?? "";
+
         if (DEPLOYMENT_EVENT_NAMES.includes(eventName)) {
           window.dispatchEvent(
             new CustomEvent("brimble:deployment-updated", {
@@ -496,6 +501,7 @@ function ProjectLayout() {
         }
 
         if (DATABASE_EVENT_NAMES.includes(eventName)) {
+          markProjectCacheStale();
           void router.invalidate();
         }
       });

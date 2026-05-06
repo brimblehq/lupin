@@ -151,6 +151,7 @@ export interface AuthApi {
   verifyTwoFactorSetup(input: TwoFactorCodeInput): Promise<void>;
   disableTwoFactor(input: TwoFactorCodeInput): Promise<void>;
   regenerateTwoFactorRecoveryCodes(input: TwoFactorCodeInput): Promise<string[]>;
+  stepUpTwoFactor(input: { code: string; action: string; resourceId: string }): Promise<{ token: string; expiresIn: number }>;
   resendCode(email: string): Promise<void>;
   requestDeleteAccountCode(turnstileToken?: string): Promise<void>;
   confirmDeleteAccount(input: ConfirmDeleteAccountInput): Promise<void>;

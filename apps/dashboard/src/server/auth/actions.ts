@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import * as Yup from "yup";
 import { createBackendApi } from "@/backend";
 import type {
   AuthSession,
@@ -159,6 +160,21 @@ export const regenerateTwoFactorRecoveryCodesServerFn = createServerFn({
     });
     return { recoveryCodes } as const;
   });
+});
+
+// 6-digit TOTP or 8-character recovery code, per the auth-service /2fa/step-up contract.
+const stepUpTwoFactorSchema = Yup.object({
+  code: Yup.string()
+    .trim()
+    .required("Enter a 6-digit code or 8-character recovery code")
+    .matches(/^(\d{6}|[A-Za-z0-9]{8})$/, "Enter a 6-digit code or 8-character recovery code"),
+  action: Yup.string().trim().required("Step-up action is required"),
+  resourceId: Yup.string().trim().required("Step-up resource is required"),
+});
+
+export const stepUpTwoFactorServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
+  const { code, action, resourceId } = stepUpTwoFactorSchema.validateSync(data, { stripUnknown: true });
+  return withTokenRefresh((api) => api.auth.stepUpTwoFactor({ code, action, resourceId }));
 });
 
 export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {

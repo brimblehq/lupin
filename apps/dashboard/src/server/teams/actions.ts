@@ -204,6 +204,7 @@ export const transferOwnershipServerFn = createServerFn({
     | {
         workspace?: string;
         memberId?: string;
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -214,10 +215,13 @@ export const transferOwnershipServerFn = createServerFn({
 
   teamsLogger.info("transferOwnershipServerFn payload", { payload });
 
-  return withTokenRefresh(async (api) => {
-    const { teamId } = await resolveWorkspaceTeam(api, payload?.workspace);
-    return api.teams.transferOwnership(teamId, memberId);
-  });
+  return withTokenRefresh(
+    async (api) => {
+      const { teamId } = await resolveWorkspaceTeam(api, payload?.workspace);
+      return api.teams.transferOwnership(teamId, memberId);
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const acceptOwnershipTransferServerFn = createServerFn({

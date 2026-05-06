@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Copy, Plus, AlertCircle, ChevronDown, Pencil, RefreshCw, ArrowUpRight, Eye, EyeOff, X } from "lucide-react";
 import { CheckCircle, FolderOpen, ShieldCheck, Warning } from "@phosphor-icons/react";
@@ -24,6 +24,8 @@ import {
   updateDomainDnsRecordServerFn,
 } from "@/server/domains/actions";
 import { getPaymentMethodsServerFn } from "@/server/payments/actions";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
 
 const dnsRecordTypes = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"];
 
@@ -299,10 +301,18 @@ function EditNameserversModal({
     idRef.current = seed.length;
   }, [open, initialNameservers]);
 
-  const trimmed = entries.map((e) => e.value.trim());
+  const trimmed = entries.map((e) => e.value.trim().toLowerCase());
   const hasInvalid = trimmed.some((value) => value.length > 0 && !isValidHostname(value));
+  const seenCounts = trimmed.reduce<Record<string, number>>((acc, value) => {
+    if (!value) return acc;
+    acc[value] = (acc[value] ?? 0) + 1;
+    return acc;
+  }, {});
+  const duplicateValues = new Set(Object.entries(seenCounts).filter(([, count]) => count > 1).map(([value]) => value));
+  const hasDuplicate = duplicateValues.size > 0;
   const filled = trimmed.filter(Boolean);
-  const canSubmit = filled.length >= 2 && !hasInvalid && !submitting;
+  const uniqueFilled = Array.from(new Set(filled));
+  const canSubmit = uniqueFilled.length >= 2 && !hasInvalid && !hasDuplicate && !submitting;
 
   function updateEntry(id: number, value: string) {
     setEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, value } : entry)));
@@ -317,7 +327,7 @@ function EditNameserversModal({
 
   async function handleSubmit() {
     if (!canSubmit) return;
-    await onSubmit(filled);
+    await onSubmit(uniqueFilled);
   }
 
   return (
@@ -329,8 +339,10 @@ function EditNameserversModal({
 
       <div className="flex flex-col gap-3 px-6 pb-5 pt-4">
         {entries.map((entry, index) => {
-          const value = entry.value.trim();
+          const value = entry.value.trim().toLowerCase();
           const invalid = value.length > 0 && !isValidHostname(value);
+          const duplicate = !invalid && value.length > 0 && duplicateValues.has(value);
+          const showError = invalid || duplicate;
           return (
             <div key={entry.id} className="flex flex-col gap-1.5">
               <label className="text-sm leading-5 tracking-[-0.022px] text-dash-text-strong">Nameserver {index + 1}</label>
@@ -340,8 +352,8 @@ function EditNameserversModal({
                   placeholder={`ns${index + 1}.example.com`}
                   value={entry.value}
                   onChange={(e) => updateEntry(entry.id, e.target.value)}
-                  className={`input-base input-focus min-h-[46px] flex-1 px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded ${
-                    invalid ? "border-[#e34935]" : ""
+                  className={`input-base min-h-[46px] flex-1 px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded ${
+                    showError ? "input-error" : "input-focus"
                   }`}
                 />
                 {entries.length > 2 && (
@@ -356,6 +368,7 @@ function EditNameserversModal({
                 )}
               </div>
               {invalid && <span className="text-xs text-[#e34935]">Enter a valid hostname (e.g. ns1.example.com).</span>}
+              {duplicate && <span className="text-xs text-[#e34935]">This nameserver is already listed above.</span>}
             </div>
           );
         })}
@@ -413,6 +426,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
   const [linkProjectSelected, setLinkProjectSelected] = useState<string | null>(null);
   const [linkProjectSubmitting, setLinkProjectSubmitting] = useState(false);
   const haptics = useHaptics();
+  const router = useRouter();
 
   const expiringSoon = (() => {
     if (domain.isExpired || !domain.expiresAt) return false;
@@ -446,8 +460,9 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
     data: { workspace?: string; domainId: string; duration?: number; autoRenew?: boolean };
   }) => Promise<{ success: boolean }>;
   const transferOut = useServerFn(transferOutServerFn as any) as (args: {
-    data: { workspace?: string; domainName: string };
+    data: { workspace?: string; domainName: string; twoFactorToken?: string };
   }) => Promise<{ domainName: string; authCode: string; unlocked: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
   const transferToProject = useServerFn(transferDomainServerFn as any) as (args: {
     data: { workspace?: string; domainId: string; projectId: string };
   }) => Promise<{ success: boolean }>;
@@ -509,6 +524,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
       setNameservers(updated);
       setEditNameserversOpen(false);
       toast.success("Nameservers updated. Changes can take up to 24 hours to propagate.");
+      void router.invalidate();
     } catch (err: any) {
       toast.error(err?.message || "Failed to update nameservers");
     } finally {
@@ -693,7 +709,10 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
   }
 
   async function requestTransferAuthCode() {
-    const result = await transferOut({ data: { workspace, domainName: domain.domainName } });
+    const result = await withStepUp(
+      (twoFactorToken) => transferOut({ data: { workspace, domainName: domain.domainName, twoFactorToken } }),
+      requestStepUp,
+    );
     return result.authCode;
   }
 
@@ -1056,38 +1075,45 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
         </div>
 
         {/* Nameservers section */}
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-base font-medium leading-5 tracking-[-0.026px] text-dash-text-body dark:text-white">Nameservers</h2>
-            <p className="max-w-[720px] text-sm font-light leading-[1.3] text-dash-text-faded">
-              {domain.purchased ? (
-                <>
-                  <a
-                    href={`https://${domain.domainName}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-normal text-dash-text-body underline-offset-2 transition-colors hover:text-dash-text-strong hover:underline"
-                  >
-                    {domain.domainName}
-                  </a>{" "}
-                  uses Brimble's nameservers by default so DNS just works. Prefer to manage DNS elsewhere (Cloudflare, Route 53, etc.)? Hit
-                  the edit icon to point it at your own nameservers.
-                </>
-              ) : (
-                <>
-                  To use Brimble's nameservers, point{" "}
-                  <a
-                    href={`https://${domain.domainName}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-normal text-dash-text-body underline-offset-2 transition-colors hover:text-dash-text-strong hover:underline"
-                  >
-                    {domain.domainName}
-                  </a>{" "}
-                  at the values below from your registrar. You can disable this any time from the Domains page.
-                </>
-              )}
-            </p>
+        <div className="mt-6 flex flex-col gap-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-base font-medium leading-5 tracking-[-0.026px] text-dash-text-body dark:text-white">Nameservers</h2>
+              <p className="max-w-[720px] text-sm font-light leading-[1.3] text-dash-text-faded">
+                {domain.purchased ? (
+                  <>
+                    <a
+                      href={`https://${domain.domainName}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-normal text-dash-text-body underline-offset-2 transition-colors hover:text-dash-text-strong hover:underline"
+                    >
+                      {domain.domainName}
+                    </a>{" "}
+                    uses Brimble's nameservers by default so DNS just works. Prefer to manage DNS elsewhere (Cloudflare, Route 53, etc.)?
+                    Click Change to point it at your own nameservers.
+                  </>
+                ) : (
+                  <>
+                    To use Brimble's nameservers, point{" "}
+                    <a
+                      href={`https://${domain.domainName}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-normal text-dash-text-body underline-offset-2 transition-colors hover:text-dash-text-strong hover:underline"
+                    >
+                      {domain.domainName}
+                    </a>{" "}
+                    at the values below from your registrar. You can disable this any time from the Domains page.
+                  </>
+                )}
+              </p>
+            </div>
+            {domain.purchased && (
+              <GlossyButton variant="black" type="button" onClick={() => setEditNameserversOpen(true)} className="shrink-0">
+                Change
+              </GlossyButton>
+            )}
           </div>
 
           <hr className="border-dash-border" />
@@ -1111,18 +1137,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
               }`}
             >
               <span className="font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">{ns}</span>
-              <div className="flex items-center gap-3">
-                {domain.purchased && (
-                  <button
-                    onClick={() => setEditNameserversOpen(true)}
-                    className="text-dash-text-body transition-colors hover:text-dash-text-strong"
-                    title="Edit nameservers"
-                  >
-                    <Pencil className="size-4" />
-                  </button>
-                )}
-                <CopyButton text={ns} />
-              </div>
+              <CopyButton text={ns} />
             </div>
           ))}
         </div>

@@ -9,6 +9,8 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { DomainList, type Domain } from "../../../../components/shared/domain-list";
 import { TabHeader } from "../../../../components/shared/tab-header";
 import { ProjectDomainsPending } from "@/components/shared/route-pending";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
 import { NumberPagination } from "../../../../components/shared/pagination";
 import { AddDomainModal, type DomainValidationError } from "../../../../components/shared/add-domain-modal";
 import { Route as RootRoute } from "@/routes/__root";
@@ -211,8 +213,9 @@ function ProjectDomainsPage() {
     data: { workspace?: string; domainId: string; projectId: string };
   }) => Promise<{ success: boolean }>;
   const deleteDomain = useServerFn(deleteDomainServerFn as any) as (args: {
-    data: { workspace?: string; domainId: string; projectId?: string };
+    data: { workspace?: string; domainId: string; projectId?: string; twoFactorToken?: string };
   }) => Promise<{ success: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
 
   useEffect(() => {
     setRows(domainsResult.items.map((item) => mapDomainToRow(item, project.name)));
@@ -428,13 +431,18 @@ function ProjectDomainsPage() {
       throw new Error("Domain id is missing");
     }
 
-    await deleteDomain({
-      data: {
-        workspace,
-        domainId: domain.id,
-        projectId: domain.projectId || project.id,
-      },
-    });
+    await withStepUp(
+      (twoFactorToken) =>
+        deleteDomain({
+          data: {
+            workspace,
+            domainId: domain.id!,
+            projectId: domain.projectId || project.id,
+            twoFactorToken,
+          },
+        }),
+      requestStepUp,
+    );
 
     setRows((prev) => prev.filter((row) => row.id !== domain.id));
     toast.success("Domain deleted successfully");

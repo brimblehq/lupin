@@ -25,10 +25,12 @@ import { usePlanGate } from "@/hooks/use-plan-gate";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { PlanUpgradePrompt } from "../../components/shared/plan-upgrade-prompt";
+import { ScalingPending } from "@/components/shared/route-pending";
 
 export const Route = createFileRoute("/scaling/")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
+  pendingComponent: ScalingPending,
   validateSearch: (search: Record<string, unknown>) => workspaceLoaderDeps(search),
   loaderDeps: ({ search }) => workspaceLoaderDeps(search),
   loader: async ({ deps }) => {

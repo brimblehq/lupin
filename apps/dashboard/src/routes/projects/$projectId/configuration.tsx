@@ -72,6 +72,8 @@ import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refr
 import { collectWatchPathEntries, deriveWatchPathSuggestions, type RootDirFetcher } from "@/utils/watch-path-suggestions";
 import { generateStrongPassword } from "@/utils/password";
 import { ProjectConfigurationPending } from "@/components/shared/route-pending";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -1627,8 +1629,9 @@ function DangerSection({
   const navigate = useNavigate();
   const router = useRouter();
   const deleteProject = useServerFn(deleteProjectServerFn as any) as (args: {
-    data: { projectId: string; workspace?: string };
+    data: { projectId: string; workspace?: string; twoFactorToken?: string };
   }) => Promise<{ success: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
 
   return (
     <>
@@ -1684,9 +1687,10 @@ function DangerSection({
           setDeleting(true);
           let deleted = false;
           try {
-            await deleteProject({
-              data: { projectId, workspace },
-            });
+            await withStepUp(
+              (twoFactorToken) => deleteProject({ data: { projectId, workspace, twoFactorToken } }),
+              requestStepUp,
+            );
             toast.success("Project deleted successfully");
             deleted = true;
           } catch (error) {
@@ -1731,6 +1735,7 @@ function ConfigurationPage() {
   const params = Route.useParams();
   const navigate = useNavigate();
   const router = useRouter();
+  const { requestStepUp } = useStepUpTwoFactor();
   const saveGeneralConfig = useServerFn(saveProjectGeneralConfigServerFn as any) as (args: {
     data: {
       projectId: string;
@@ -1755,6 +1760,7 @@ function ConfigurationPage() {
       password: string;
       configurations?: Record<string, unknown> | null;
       whitelistedIps?: string[];
+      twoFactorToken?: string;
     };
   }) => Promise<{ message?: string }>;
   const saveBuildConfig = useServerFn(saveProjectBuildConfigServerFn as any) as (args: {
@@ -2090,16 +2096,21 @@ function ConfigurationPage() {
   async function handleSubmitDatabase(values: DatabaseConfigValues) {
     const password = values.password.trim();
 
-    await saveDatabaseConfig({
-      data: {
-        projectId: project?.id || params.projectId,
-        workspace,
-        name: values.name.trim(),
-        password,
-        configurations: project?.specs ? ({ ...project.specs } as Record<string, unknown>) : null,
-        whitelistedIps: (values.whitelistIps ?? []).map((ip) => ip.value).filter(Boolean),
-      },
-    });
+    await withStepUp(
+      (twoFactorToken) =>
+        saveDatabaseConfig({
+          data: {
+            projectId: project?.id || params.projectId,
+            workspace,
+            name: values.name.trim(),
+            password,
+            configurations: project?.specs ? ({ ...project.specs } as Record<string, unknown>) : null,
+            whitelistedIps: (values.whitelistIps ?? []).map((ip) => ip.value).filter(Boolean),
+            twoFactorToken,
+          },
+        }),
+      requestStepUp,
+    );
 
     const nextProjectId = values.name.trim();
     if (nextProjectId && nextProjectId !== params.projectId) {

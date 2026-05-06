@@ -48,6 +48,8 @@ import { useHasActiveDeployment } from "@/hooks/use-has-active-deployment";
 import { DatabaseConnectionModal } from "./database-connection-modal";
 import { TransferProjectModal } from "./transfer-project-modal";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
 
 const baseTabs = [
   { label: "Projects details", slug: "", Icon: GlobeSimple },
@@ -100,8 +102,10 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
     data: {
       projectId: string;
       workspace?: string;
+      twoFactorToken?: string;
     };
   }) => Promise<{ success: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
   const backupDatabase = useServerFn(backupDatabaseProjectServerFn as any) as (args: {
     data: {
       projectId: string;
@@ -671,12 +675,17 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
             setDeleting(true);
             toast.loading("Deleting project...", { id: toastId });
 
-            await deleteProject({
-              data: {
-                projectId: actualProjectId,
-                workspace,
-              },
-            });
+            await withStepUp(
+              (twoFactorToken) =>
+                deleteProject({
+                  data: {
+                    projectId: actualProjectId,
+                    workspace,
+                    twoFactorToken,
+                  },
+                }),
+              requestStepUp,
+            );
 
             toast.success(`${projectName} deleted successfully`, {
               id: toastId,

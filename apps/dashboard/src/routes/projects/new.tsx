@@ -82,8 +82,10 @@ import { usePlanGate } from "@/hooks/use-plan-gate";
 import { usePricing } from "@/contexts/pricing-context";
 import { estimateComputeCost } from "@/utils/compute-pricing";
 import { formatUsdMonthly } from "@/utils/billing";
+import { NewProjectPending } from "@/components/shared/route-pending";
 
 export const Route = createFileRoute("/projects/new")({
+  pendingComponent: NewProjectPending,
   component: NewProjectPage,
 });
 
@@ -131,7 +133,7 @@ const gitProviders: GitProvider[] = [
     id: "github",
     name: "GitHub",
     Icon: GithubLogo,
-    cardIcon: "/images/icons8-git.svg",
+    cardIcon: "/images/git.svg",
     description: "Connect a repository from your GitHub account",
     permissions: [
       {
@@ -531,13 +533,13 @@ function Phase1SourceType({ onSelect }: { onSelect: (type: SourceType) => void }
     })),
     {
       type: SourceType.Docker,
-      icon: "/images/icons8-container.svg",
+      icon: "/images/container.svg",
       title: "Deploy Docker image",
       desc: "Deploy from a public or private registry",
     },
     {
       type: SourceType.Database,
-      icon: "/images/icons8-database.svg",
+      icon: "/images/database.svg",
       title: "Provision a Database",
       desc: "Deploy a managed database instance",
     },

@@ -59,6 +59,7 @@ export function createAuthApi(client: ApiClient): AuthApi {
     twoFactorDisable: "/auth/2fa/disable",
     twoFactorVerify: "/auth/2fa/verify",
     twoFactorRegenerateRecoveryCodes: "/auth/2fa/recovery-codes/regenerate",
+    twoFactorStepUp: "/auth/2fa/step-up",
     passkeyRegisterOptions: "/auth/passkey/register/options",
     passkeyRegisterVerify: "/auth/passkey/register/verify",
     passkeyAuthOptions: "/auth/passkey/auth/options",
@@ -265,6 +266,21 @@ export function createAuthApi(client: ApiClient): AuthApi {
         },
       });
       return mapRecoveryCodes(response);
+    },
+    async stepUpTwoFactor(input) {
+      const response = await client.request(endpoints.twoFactorStepUp, {
+        method: "POST",
+        body: {
+          code: input.code.trim(),
+          action: input.action,
+          resource_id: input.resourceId,
+        },
+      });
+      const data = (response as any)?.data?.data ?? (response as any)?.data ?? response;
+      return {
+        token: String(data.token),
+        expiresIn: Number(data.expires_in),
+      };
     },
     async resendCode(email) {
       await client.request(endpoints.login, {

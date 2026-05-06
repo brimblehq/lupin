@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Check, Eye, EyeOff, Download, RotateCcw } from "lucide-react";
+import { Copy, Check, Eye, EyeOff } from "lucide-react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { decryptDatabaseConnectionUriServerFn } from "@/server/projects/actions";
@@ -178,14 +178,14 @@ export function DbQuickActionsCard({ onDownloadBackup, onRestart, hasBackup, can
       </div>
       <div className="flex flex-col">
         <ActionButton
-          icon={<Download className="size-4" />}
+          icon={<img src="/icons/download.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />}
           label="Download backup"
           disabled={!hasBackup}
           disabledHint={hasBackup ? undefined : "No backup available yet"}
           onClick={onDownloadBackup}
         />
         <ActionButton
-          icon={<RotateCcw className="size-4" />}
+          icon={<img src="/icons/restart.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />}
           label={restarting ? "Restarting..." : "Restart database"}
           disabled={!canRestart || restarting}
           danger
