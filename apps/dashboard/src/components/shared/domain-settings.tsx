@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Plus, AlertCircle, ChevronDown, Pencil, RefreshCw, ArrowUpRight } from "lucide-react";
+import { Copy, Plus, AlertCircle, ChevronDown, Pencil, RefreshCw, ArrowUpRight, Eye, EyeOff, X } from "lucide-react";
 import { CheckCircle, FolderOpen, ShieldCheck, Warning } from "@phosphor-icons/react";
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
@@ -18,6 +18,7 @@ import {
   listDomainProjectsServerFn,
   refreshDomainStatusServerFn,
   renewDomainSaleServerFn,
+  setDomainNameserversServerFn,
   transferDomainServerFn,
   transferOutServerFn,
   updateDomainDnsRecordServerFn,
@@ -264,6 +265,123 @@ function FormField({
   );
 }
 
+const HOSTNAME_PATTERN = /^(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
+function isValidHostname(value: string) {
+  return HOSTNAME_PATTERN.test(value.trim());
+}
+
+function EditNameserversModal({
+  open,
+  onOpenChange,
+  initialNameservers,
+  onSubmit,
+  submitting,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialNameservers: string[];
+  onSubmit: (nameservers: string[]) => Promise<void>;
+  submitting: boolean;
+}) {
+  const [entries, setEntries] = useState<{ id: number; value: string }[]>(() =>
+    (initialNameservers.length >= 2 ? initialNameservers : [...initialNameservers, ""]).map((value, index) => ({
+      id: index,
+      value,
+    })),
+  );
+  const idRef = useRef(entries.length);
+
+  useEffect(() => {
+    if (!open) return;
+    const seed = initialNameservers.length >= 2 ? initialNameservers : [...initialNameservers, ...Array(2 - initialNameservers.length).fill("")];
+    setEntries(seed.map((value, index) => ({ id: index, value })));
+    idRef.current = seed.length;
+  }, [open, initialNameservers]);
+
+  const trimmed = entries.map((e) => e.value.trim());
+  const hasInvalid = trimmed.some((value) => value.length > 0 && !isValidHostname(value));
+  const filled = trimmed.filter(Boolean);
+  const canSubmit = filled.length >= 2 && !hasInvalid && !submitting;
+
+  function updateEntry(id: number, value: string) {
+    setEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, value } : entry)));
+  }
+  function addEntry() {
+    idRef.current += 1;
+    setEntries((prev) => [...prev, { id: idRef.current, value: "" }]);
+  }
+  function removeEntry(id: number) {
+    setEntries((prev) => (prev.length <= 2 ? prev : prev.filter((entry) => entry.id !== id)));
+  }
+
+  async function handleSubmit() {
+    if (!canSubmit) return;
+    await onSubmit(filled);
+  }
+
+  return (
+    <Modal open={open} onOpenChange={onOpenChange}>
+      <ModalHeader
+        title="Edit nameservers"
+        description="Point your domain to a different DNS provider. Changes can take up to 24 hours to propagate."
+      />
+
+      <div className="flex flex-col gap-3 px-6 pb-5 pt-4">
+        {entries.map((entry, index) => {
+          const value = entry.value.trim();
+          const invalid = value.length > 0 && !isValidHostname(value);
+          return (
+            <div key={entry.id} className="flex flex-col gap-1.5">
+              <label className="text-sm leading-5 tracking-[-0.022px] text-dash-text-strong">Nameserver {index + 1}</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder={`ns${index + 1}.example.com`}
+                  value={entry.value}
+                  onChange={(e) => updateEntry(entry.id, e.target.value)}
+                  className={`input-base input-focus min-h-[46px] flex-1 px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded ${
+                    invalid ? "border-[#e34935]" : ""
+                  }`}
+                />
+                {entries.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => removeEntry(entry.id)}
+                    className="rounded-[4px] p-2 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                    title="Remove nameserver"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+              {invalid && <span className="text-xs text-[#e34935]">Enter a valid hostname (e.g. ns1.example.com).</span>}
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={addEntry}
+          className="flex items-center gap-1.5 self-start text-sm font-medium text-[#3667ea] transition-opacity hover:opacity-80"
+        >
+          <Plus className="size-4" />
+          Add nameserver
+        </button>
+
+        <p className="text-xs text-dash-text-faded">A minimum of 2 nameservers is required.</p>
+      </div>
+
+      <ModalFooter>
+        <ModalCancelButton />
+        <ModalContinueButton onClick={() => void handleSubmit()} disabled={!canSubmit} loading={submitting} loadingLabel="Saving...">
+          Save changes
+        </ModalContinueButton>
+      </ModalFooter>
+    </Modal>
+  );
+}
+
 export function DomainSettings({ domain, backPath, workspace }: { domain: DomainInfo; backPath: string; workspace?: string }) {
   const [records, setRecords] = useState(domain.dnsRecords);
   const [addRecordOpen, setAddRecordOpen] = useState(false);
@@ -282,9 +400,13 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
   });
   const [transferStep, setTransferStep] = useState<"setup" | "auth-code">("setup");
   const [transferAuthCode, setTransferAuthCode] = useState<string>("");
+  const [transferAuthCodeRevealed, setTransferAuthCodeRevealed] = useState(false);
   const [transferAuthLoading, setTransferAuthLoading] = useState(false);
   const [domainActive, setDomainActive] = useState(Boolean(domain.active));
   const [refreshingStatus, setRefreshingStatus] = useState(false);
+  const [nameservers, setNameservers] = useState<string[]>(domain.nameservers);
+  const [editNameserversOpen, setEditNameserversOpen] = useState(false);
+  const [savingNameservers, setSavingNameservers] = useState(false);
   const [linkProjectOpen, setLinkProjectOpen] = useState(false);
   const [linkProjectList, setLinkProjectList] = useState<{ id: string; name: string }[]>([]);
   const [linkProjectLoading, setLinkProjectLoading] = useState(false);
@@ -329,6 +451,9 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
   const transferToProject = useServerFn(transferDomainServerFn as any) as (args: {
     data: { workspace?: string; domainId: string; projectId: string };
   }) => Promise<{ success: boolean }>;
+  const setDomainNameservers = useServerFn(setDomainNameserversServerFn as any) as (args: {
+    data: { workspace?: string; domainId: string; nameservers: string[] };
+  }) => Promise<{ nameservers?: string[] } | null>;
 
   async function handleOpenLinkProject() {
     setLinkProjectOpen(true);
@@ -366,8 +491,30 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
   }, [domain.dnsRecords]);
 
   useEffect(() => {
+    setNameservers(domain.nameservers);
+  }, [domain.nameservers]);
+
+  useEffect(() => {
     setDomainActive(Boolean(domain.active));
   }, [domain.active]);
+
+  async function handleSaveNameservers(next: string[]) {
+    if (savingNameservers) return;
+    setSavingNameservers(true);
+    try {
+      const result = await setDomainNameservers({
+        data: { workspace, domainId: domain.domainId, nameservers: next },
+      });
+      const updated = Array.isArray(result?.nameservers) && result.nameservers.length > 0 ? result.nameservers : next;
+      setNameservers(updated);
+      setEditNameserversOpen(false);
+      toast.success("Nameservers updated. Changes can take up to 24 hours to propagate.");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update nameservers");
+    } finally {
+      setSavingNameservers(false);
+    }
+  }
 
   useEffect(() => {
     setRenewDuration(domain.renewalDuration || 1);
@@ -555,6 +702,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
       setTransferAuthLoading(true);
       const authCode = await requestTransferAuthCode();
       setTransferAuthCode(authCode);
+      setTransferAuthCodeRevealed(false);
       setTransferStep("auth-code");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load EPP/Auth code");
@@ -566,6 +714,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
   function resetTransferModalState() {
     setTransferStep("setup");
     setTransferAuthCode("");
+    setTransferAuthCodeRevealed(false);
     setTransferAuthLoading(false);
     setTransferChecklist({
       unlocked: false,
@@ -911,17 +1060,33 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
           <div className="flex flex-col gap-2">
             <h2 className="text-base font-medium leading-5 tracking-[-0.026px] text-dash-text-body dark:text-white">Nameservers</h2>
             <p className="max-w-[720px] text-sm font-light leading-[1.3] text-dash-text-faded">
-              To use Brimble Name Servers, Kindly enable DNS for this domain. It can always be disabled too from the Domains Page. Point
-              your domain nameservers of "
-              <a
-                href={`https://${domain.domainName}`}
-                target="_blank"
-                rel="noreferrer"
-                className="font-normal text-dash-text-body underline-offset-2 transition-colors hover:text-dash-text-strong hover:underline"
-              >
-                {domain.domainName}
-              </a>
-              " to Brimble name servers listed below.
+              {domain.purchased ? (
+                <>
+                  <a
+                    href={`https://${domain.domainName}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-normal text-dash-text-body underline-offset-2 transition-colors hover:text-dash-text-strong hover:underline"
+                  >
+                    {domain.domainName}
+                  </a>{" "}
+                  uses Brimble's nameservers by default so DNS just works. Prefer to manage DNS elsewhere (Cloudflare, Route 53, etc.)? Hit
+                  the edit icon to point it at your own nameservers.
+                </>
+              ) : (
+                <>
+                  To use Brimble's nameservers, point{" "}
+                  <a
+                    href={`https://${domain.domainName}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-normal text-dash-text-body underline-offset-2 transition-colors hover:text-dash-text-strong hover:underline"
+                  >
+                    {domain.domainName}
+                  </a>{" "}
+                  at the values below from your registrar. You can disable this any time from the Domains page.
+                </>
+              )}
             </p>
           </div>
 
@@ -938,15 +1103,26 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
 
         {/* Nameservers table */}
         <div className="overflow-clip rounded-[2px] border-[0.5px] border-dash-border">
-          {domain.nameservers.map((ns, i) => (
+          {nameservers.map((ns, i) => (
             <div
               key={ns}
               className={`flex items-center justify-between bg-dash-bg-elevated px-3.5 py-2.5 ${
-                i < domain.nameservers.length - 1 ? "border-b-[0.5px] border-dash-border" : ""
+                i < nameservers.length - 1 ? "border-b-[0.5px] border-dash-border" : ""
               }`}
             >
               <span className="font-mono text-sm font-light leading-5 tracking-[-0.022px] text-dash-text-body">{ns}</span>
-              <CopyButton text={ns} />
+              <div className="flex items-center gap-3">
+                {domain.purchased && (
+                  <button
+                    onClick={() => setEditNameserversOpen(true)}
+                    className="text-dash-text-body transition-colors hover:text-dash-text-strong"
+                    title="Edit nameservers"
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                )}
+                <CopyButton text={ns} />
+              </div>
             </div>
           ))}
         </div>
@@ -980,6 +1156,15 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
           </div>
         )}
       </div>
+
+      {/* Edit Nameservers Modal */}
+      <EditNameserversModal
+        open={editNameserversOpen}
+        onOpenChange={setEditNameserversOpen}
+        initialNameservers={nameservers}
+        onSubmit={handleSaveNameservers}
+        submitting={savingNameservers}
+      />
 
       {/* Add DNS Record Modal */}
       <AddDnsRecordModal
@@ -1195,14 +1380,31 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                       Keep private
                     </span>
                   </div>
-                  {transferAuthCode ? <CopyButton text={transferAuthCode} /> : null}
+                  {transferAuthCode ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setTransferAuthCodeRevealed((v) => !v)}
+                        className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-strong"
+                        aria-label={transferAuthCodeRevealed ? "Hide EPP/Auth code" : "Show EPP/Auth code"}
+                        aria-pressed={transferAuthCodeRevealed}
+                      >
+                        {transferAuthCodeRevealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                      </button>
+                      <CopyButton text={transferAuthCode} />
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="rounded-[6px] border-[0.5px] border-dash-border bg-gradient-to-b from-dash-bg to-dash-bg-elevated px-3 py-2.5 shadow-[inset_0px_1px_0px_rgba(255,255,255,0.03)]">
                   <div className="flex items-center gap-2">
                     <span className="size-1.5 rounded-full bg-[#4879f8]" />
                     <code className="block min-w-0 break-all font-mono text-[13px] font-medium tracking-[0.01em] text-dash-text-strong">
-                      {transferAuthCode || "Unavailable"}
+                      {transferAuthCode
+                        ? transferAuthCodeRevealed
+                          ? transferAuthCode
+                          : "•".repeat(Math.min(24, Math.max(8, transferAuthCode.length)))
+                        : "Unavailable"}
                     </code>
                   </div>
                 </div>

@@ -22,8 +22,8 @@ import config from "@/config";
 const SUCCESS_LOG_PATTERN = /site (is )?(live|running)\b/i;
 const FAILURE_LOG_PATTERN = /deployment failed|build failed|failed to deploy/i;
 
-const DEPLOYMENT_EVENT_NAMES = ["deployment:started", "deployment:completed", "deployment:failed"] as const;
-type DeploymentEventName = (typeof DEPLOYMENT_EVENT_NAMES)[number];
+const DEPLOYMENT_EVENT_NAMES: readonly string[] = ["deployment:started", "deployment:completed", "deployment:failed"];
+const DATABASE_EVENT_NAMES: readonly string[] = ["database:provisioned", "database:updated"];
 
 function getDrawerEntryKey(entry: DeploymentDrawerLogEntry): string {
   const rawId = entry.rawId?.trim();
@@ -487,7 +487,7 @@ function ProjectLayout() {
 
       channel.subscribe((message) => {
         const eventName = message.name ?? "";
-        if (DEPLOYMENT_EVENT_NAMES.includes(eventName as DeploymentEventName)) {
+        if (DEPLOYMENT_EVENT_NAMES.includes(eventName)) {
           window.dispatchEvent(
             new CustomEvent("brimble:deployment-updated", {
               detail: { projectId: backendProjectId, ...(message.data ?? {}) },
@@ -495,7 +495,7 @@ function ProjectLayout() {
           );
         }
 
-        if (eventName === "database:provisioned") {
+        if (DATABASE_EVENT_NAMES.includes(eventName)) {
           void router.invalidate();
         }
       });

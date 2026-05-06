@@ -81,7 +81,10 @@ const config = defineConfig({
           if (id.includes("/ably/")) return "ably";
           if (id.includes("/motion/") || id.includes("/framer-motion/")) return "motion";
           if (id.includes("/lucide-react/")) return "lucide";
+          if (id.includes("@phosphor-icons/")) return "phosphor";
           if (id.includes("@sentry/")) return "sentry";
+          if (id.includes("/formik/") || id.includes("/yup/")) return "forms";
+          if (id.includes("/recharts/") || id.includes("/d3-")) return "recharts";
         },
       },
     },

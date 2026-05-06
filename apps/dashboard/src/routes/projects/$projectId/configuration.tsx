@@ -3,7 +3,7 @@ import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { GearSix, Hammer, Cpu, Warning, DatabaseIcon, MagnifyingGlass, GithubLogo, X, Info } from "@phosphor-icons/react";
+import { GearSix, Hammer, Cpu, Warning, DatabaseIcon, MagnifyingGlass, GithubLogo, X, Info, ArrowsClockwise, Eye, EyeSlash } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
@@ -70,6 +70,7 @@ import { generalConfigSchema, databaseConfigSchema, resourcesConfigSchema } from
 import type { GeneralConfigValues, DatabaseConfigValues, ResourcesConfigValues } from "@/utils/configuration-schemas";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
 import { collectWatchPathEntries, deriveWatchPathSuggestions, type RootDirFetcher } from "@/utils/watch-path-suggestions";
+import { generateStrongPassword } from "@/utils/password";
 import { ProjectConfigurationPending } from "@/components/shared/route-pending";
 
 const parentRoute = getRouteApi("/projects/$projectId");
@@ -1413,6 +1414,8 @@ function DatabaseConfigurationPanel({
   dbImageName?: string;
   canWrite?: boolean;
 }) {
+  const haptics = useHaptics();
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <Formik
       initialValues={initialValues}
@@ -1519,32 +1522,75 @@ function DatabaseConfigurationPanel({
             <div className="grid grid-cols-1 gap-4 px-4 py-4 md:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-dash-text-strong">Database password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={values.password}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Enter new password"
-                  readOnly={!canWrite}
-                  className={inputClass}
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={values.password}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="Enter new password"
+                    readOnly={!canWrite}
+                    className={`${inputClass} ${canWrite ? "pr-[72px]" : "pr-10"}`}
+                    autoComplete="new-password"
+                  />
+                  <div className="absolute inset-y-0 right-1.5 my-auto flex h-7 items-center gap-0.5">
+                    {canWrite && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const generated = generateStrongPassword();
+                          setFieldValue("password", generated);
+                          setFieldValue("confirmPassword", generated);
+                          setShowPassword(true);
+                          haptics.light();
+                        }}
+                        title="Generate a strong password"
+                        aria-label="Generate a strong password"
+                        className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                      >
+                        <ArrowsClockwise className="size-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      title={showPassword ? "Hide password" : "Show password"}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                      className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                    >
+                      {showPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
+                    </button>
+                  </div>
+                </div>
                 <p className="text-xs text-dash-text-faded">Set a new password for database connections.</p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-dash-text-strong">Confirm password</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={values.confirmPassword}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Re-enter password"
-                  readOnly={!canWrite}
-                  className={inputClass}
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={values.confirmPassword}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="Re-enter password"
+                    readOnly={!canWrite}
+                    className={`${inputClass} pr-10`}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    title={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute inset-y-0 right-2 my-auto flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                  >
+                    {showPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
+                </div>
                 {passwordError && <p className="text-xs text-[#ef2f1f]">{errors.confirmPassword}</p>}
               </div>
             </div>

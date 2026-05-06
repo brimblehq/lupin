@@ -153,6 +153,7 @@ export interface DomainsApi {
     teamId?: string;
   }): Promise<DomainDetailDnsRecord>;
   deleteDnsRecord(input: { domain: string; recordId: string; teamId?: string }): Promise<void>;
+  setNameservers(input: { domainId: string; nameservers: string[]; teamId?: string }): Promise<DomainDetailsRecord | null>;
 }
 
 function mapDomainRecord(domain: any): DomainRecord | null {
@@ -686,6 +687,23 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
           },
         },
       );
+    },
+
+    async setNameservers(input) {
+      const response = await client.request<any>(`${listEndpoint}/${encodeURIComponent(input.domainId)}/nameservers`, {
+        method: "POST",
+        body: {
+          nameservers: input.nameservers,
+          teamId: input.teamId,
+        },
+      });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? null;
+      if (!root) {
+        return null;
+      }
+
+      return mapDomainDetailsRecord(root);
     },
   };
 }

@@ -1188,8 +1188,8 @@ function Phase2DbEngine({
       <p className="mb-4 text-sm text-dash-text-faded">
         Select a database engine, then configure compute, storage, and access in one step.
       </p>
-      <div className="rounded-[4px] border-[0.5px] border-dash-border p-4">
-        <label className="mb-2 block text-xs font-medium uppercase tracking-[0.08em] text-dash-text-faded">Database engine</label>
+      <div>
+        <label className="mb-1.5 block text-sm text-dash-text-body">Database engine</label>
         <Dropdown
           value={selectedEngineId}
           options={engineOptions}
@@ -1198,15 +1198,6 @@ function Phase2DbEngine({
           searchable
           searchPlaceholder="Search database engines..."
         />
-        {selectedEngine && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-dash-text-faded">
-            {renderEngineIcon(selectedEngine)}
-            <span>
-              {selectedEngine.protocol ? `${selectedEngine.protocol.toUpperCase()} database` : "Managed database service"}
-              {selectedEngine.version ? ` • v${selectedEngine.version}` : ""}
-            </span>
-          </div>
-        )}
       </div>
 
       {selectedEngine ? (
@@ -1343,6 +1334,7 @@ function Phase3DatabaseConfigure({
   });
   const [publicAccess, setPublicAccess] = useState(false);
   const [whitelistIps, setWhitelistIps] = useState<{ id: number; value: string }[]>([]);
+  const [whitelistIpErrors, setWhitelistIpErrors] = useState<Record<number, string | undefined>>({});
   const [envDrafts, setEnvDrafts] = useState<DatabaseEnvDraft[]>([]);
 
   const recommendation = engine.recommendations?.[0]?.compute;
@@ -1418,10 +1410,38 @@ function Phase3DatabaseConfigure({
 
   function removeWhitelistIp(id: number) {
     setWhitelistIps((prev) => prev.filter((ip) => ip.id !== id));
+    setWhitelistIpErrors((prev) => {
+      if (prev[id] === undefined) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }
 
   function updateWhitelistIp(id: number, value: string) {
     setWhitelistIps((prev) => prev.map((ip) => (ip.id === id ? { ...ip, value } : ip)));
+    // Clear the error for this row as soon as the user edits it; we revalidate
+    // on submit so we don't badger them while they're typing.
+    setWhitelistIpErrors((prev) => {
+      if (prev[id] === undefined) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
+  function validateWhitelistIps(): boolean {
+    const errors: Record<number, string> = {};
+    for (const ip of whitelistIps) {
+      const trimmed = ip.value.trim();
+      if (!trimmed) {
+        errors[ip.id] = "Enter an IP or CIDR (e.g. 192.168.1.1/32) or remove this row.";
+      } else if (!isValidCidr(trimmed)) {
+        errors[ip.id] = "Use CIDR notation, e.g. 192.168.1.1/32 or 10.0.0.0/24.";
+      }
+    }
+    setWhitelistIpErrors(errors);
+    return Object.keys(errors).length === 0;
   }
 
   return (
@@ -1574,6 +1594,7 @@ function Phase3DatabaseConfigure({
                   onAdd={addWhitelistIp}
                   onRemove={(id) => removeWhitelistIp(id as number)}
                   onUpdate={(id, value) => updateWhitelistIp(id as number, value)}
+                  errors={whitelistIpErrors}
                   inputClassName={`${inputClass} flex-1 font-family-mono text-[13px]`}
                 />
               </div>
@@ -1633,9 +1654,7 @@ function Phase3DatabaseConfigure({
               setShowUpgradeModal(true);
               return;
             }
-            const hasInvalidIp = !publicAccess ? whitelistIps.some((ip) => ip.value.trim() && !isValidCidr(ip.value)) : false;
-            if (hasInvalidIp) {
-              toast.error("Please fix invalid IP addresses before provisioning.");
+            if (!publicAccess && !validateWhitelistIps()) {
               return;
             }
 

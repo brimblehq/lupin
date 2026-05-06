@@ -531,6 +531,33 @@ export const transferOutServerFn = createServerFn({
   });
 });
 
+export const setDomainNameserversServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        domainId: string;
+        nameservers: string[];
+      }
+    | undefined;
+
+  const domainId = payload?.domainId?.trim();
+  if (!domainId) {
+    throw new Error("Domain ID is required");
+  }
+
+  const nameservers = (payload?.nameservers ?? []).map((ns) => ns.trim()).filter(Boolean);
+  if (nameservers.length < 2) {
+    throw new Error("Provide at least 2 nameservers");
+  }
+
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
+    return api.domains.setNameservers({ domainId, nameservers, teamId });
+  });
+});
+
 export const transferInServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
