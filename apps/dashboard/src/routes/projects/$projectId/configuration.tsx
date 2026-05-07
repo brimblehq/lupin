@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { usePlanGate } from "@/hooks/use-plan-gate";
+import { ChangePlanModal } from "@/components/shared/change-plan-modal";
 import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -1227,6 +1229,8 @@ function ResourcesSection({
   storageAlwaysOn = false,
   canSave = true,
   canWrite = true,
+  freePlanLocked = false,
+  onUpgradeClick,
 }: {
   initialValues: ResourcesConfigValues;
   onSubmit?: (values: ResourcesConfigValues) => Promise<void>;
@@ -1236,7 +1240,20 @@ function ResourcesSection({
   storageAlwaysOn?: boolean;
   canSave?: boolean;
   canWrite?: boolean;
+  freePlanLocked?: boolean;
+  onUpgradeClick?: () => void;
 }) {
+  const gatedDiskSizes = useMemo(
+    () =>
+      freePlanLocked
+        ? diskSizes.map((option) => ({
+            ...option,
+            disabled: option.id !== "10",
+            asideText: option.id === "10" ? undefined : "Upgrade to access",
+          }))
+        : diskSizes,
+    [freePlanLocked],
+  );
   return (
     <Formik
       initialValues={initialValues}
@@ -1262,7 +1279,7 @@ function ResourcesSection({
               max={8}
               step={0.5}
               unit=" vCPU"
-              disabled={!canWrite}
+              disabled={!canWrite || freePlanLocked}
             />
           </div>
 
@@ -1281,11 +1298,19 @@ function ResourcesSection({
                   max={12}
                   step={0.5}
                   hideValue
-                  disabled={!canWrite}
+                  disabled={!canWrite || freePlanLocked}
                 />
               </div>
               <span className="min-w-[52px] text-right text-sm font-medium text-dash-text-strong">{formatMemory(values.memoryValue)}</span>
             </div>
+            {freePlanLocked && (
+              <p className="text-xs text-dash-text-faded">
+                Compute and storage are fixed on the free plan.{" "}
+                <button type="button" onClick={onUpgradeClick} className="font-medium text-[#4879f8] hover:text-[#3060d0]">
+                  Upgrade for more
+                </button>
+              </p>
+            )}
           </div>
 
           <hr className="border-dash-border" />
@@ -1349,8 +1374,14 @@ function ResourcesSection({
                           <label className="mb-1.5 block text-xs text-dash-text-faded">Disk size</label>
                           <Dropdown
                             value={values.diskSize}
-                            options={diskSizes}
-                            onChange={(v) => setFieldValue("diskSize", v)}
+                            options={gatedDiskSizes}
+                            onChange={(v) => {
+                              if (freePlanLocked && v !== "10") {
+                                onUpgradeClick?.();
+                                return;
+                              }
+                              setFieldValue("diskSize", v);
+                            }}
                             disabled={!canWrite}
                           />
                         </div>
@@ -1985,6 +2016,9 @@ function ConfigurationPage() {
   })();
 
   const databaseProject = isDatabaseProject(project);
+  const { planKey } = usePlanGate();
+  const dbResourcesFreeLocked = databaseProject && planKey === "free";
+  const [showDbUpgradeModal, setShowDbUpgradeModal] = useState(false);
   const sourceFieldsVisible = shouldShowBranchRootFrameworkFields(project);
   const noBuildFramework = isNoBuildFramework(project?.framework ?? "");
   const dockerSourceFieldsVisible = shouldShowDockerSourceFields(project);
@@ -2289,6 +2323,8 @@ function ConfigurationPage() {
                   storageAlwaysOn={databaseProject}
                   canSave
                   canWrite={canWrite}
+                  freePlanLocked={dbResourcesFreeLocked}
+                  onUpgradeClick={() => setShowDbUpgradeModal(true)}
                 />
               )}
               {canWrite && activeSection === ConfigSection.Danger && (
@@ -2333,6 +2369,8 @@ function ConfigurationPage() {
           }}
         />
       )}
+
+      <ChangePlanModal open={showDbUpgradeModal} onOpenChange={setShowDbUpgradeModal} currentPlan={planKey} />
     </div>
   );
 }
