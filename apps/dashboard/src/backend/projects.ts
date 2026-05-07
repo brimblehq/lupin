@@ -130,6 +130,7 @@ export interface DatabaseEngineOption {
   envs: Array<{ type?: string; value: string }>;
   isAvailable: boolean;
   isDefault: boolean;
+  free: boolean;
   hasPort?: boolean;
   port?: number;
   volumePath?: string;
@@ -977,6 +978,7 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
             envs,
             isAvailable: pickBoolean(row, "is_available", "isAvailable") ?? true,
             isDefault: pickBoolean(row, "is_default", "isDefault") ?? false,
+            free: pickBoolean(row, "free") ?? false,
             hasPort: pickBoolean(row, "hasPort", "has_port"),
             port: pickNumber(row, "port"),
             volumePath: pickString(row, "volumePath", "volume_path"),

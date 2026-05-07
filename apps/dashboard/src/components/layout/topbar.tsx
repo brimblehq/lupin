@@ -14,6 +14,7 @@ import {
   ArrowRightLeft,
   Copy,
   Check,
+  Newspaper,
 } from "lucide-react";
 import { House, ShoppingBag, Desktop } from "@phosphor-icons/react";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
@@ -819,8 +820,7 @@ function levelIcon(level: NotificationLevel): { src: string; className?: string;
     return {
       src: "/icons/error.svg",
       style: {
-        filter:
-          "brightness(0) saturate(100%) invert(33%) sepia(98%) saturate(2700%) hue-rotate(347deg) brightness(95%) contrast(95%)",
+        filter: "brightness(0) saturate(100%) invert(33%) sepia(98%) saturate(2700%) hue-rotate(347deg) brightness(95%) contrast(95%)",
       },
     };
   if (level === "warning")
@@ -832,8 +832,7 @@ function levelIcon(level: NotificationLevel): { src: string; className?: string;
     return {
       src: "/icons/success.svg",
       style: {
-        filter:
-          "brightness(0) saturate(100%) invert(57%) sepia(94%) saturate(420%) hue-rotate(101deg) brightness(95%) contrast(89%)",
+        filter: "brightness(0) saturate(100%) invert(57%) sepia(94%) saturate(420%) hue-rotate(101deg) brightness(95%) contrast(89%)",
       },
     };
   return { src: "/icons/info.svg", className: "invert dark:invert-0" };
@@ -1208,6 +1207,15 @@ export function Topbar({
           </div>
           <div className="flex items-center gap-2 text-dash-text-faded md:gap-4">
             <NotificationsDropdown haptics={haptics} />
+            <a
+              href="https://www.brimble.io/changelog"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm transition-colors hover:text-dash-text-strong"
+            >
+              <Newspaper className="size-4" />
+              <span className="hidden md:inline">What's new ?</span>
+            </a>
             <a href="mailto:hello@brimble.app" className="flex items-center gap-1.5 text-sm hover:text-dash-text-strong transition-colors">
               <HelpCircle className="size-4" />
               <span className="hidden md:inline">Help</span>

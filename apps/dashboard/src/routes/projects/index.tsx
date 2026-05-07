@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createFileRoute, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
@@ -39,6 +39,7 @@ import {
 } from "@/utils/workspace-route-search";
 import { useTagsStore } from "@/hooks/use-tags-store";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import config from "@/config";
 
 const environmentFormSchema = Yup.object({
   name: Yup.string()
@@ -550,8 +551,9 @@ function ProjectCardSkeleton() {
 
 function ProjectsPage() {
   const navigate = useNavigate({ from: "/projects/" });
+  const router = useRouter();
   const search = Route.useSearch();
-  const loaderData = Route.useLoaderData();
+  const loaderData = Route.useLoaderData()!;
   const { canWrite } = useWorkspaceRole();
   const [projects, setProjects] = useState(loaderData.projects);
   const [pagination, setPagination] = useState(loaderData.pagination);
@@ -607,6 +609,59 @@ function ProjectsPage() {
     setIsFilterChanging(false);
     setIsStatusFilterChanging(false);
   }, [loaderData]);
+
+  const visibleProjectIds = useMemo(() => projects.map((p) => p.id).filter((id): id is string => Boolean(id)), [projects]);
+  const visibleProjectIdsKey = visibleProjectIds.join(",");
+  useEffect(() => {
+    if (visibleProjectIds.length === 0) return;
+
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
+    let invalidateTimer: number | null = null;
+
+    const scheduleInvalidate = () => {
+      if (invalidateTimer !== null) return;
+      invalidateTimer = window.setTimeout(() => {
+        invalidateTimer = null;
+        void router.invalidate();
+      }, 750);
+    };
+
+    void (async () => {
+      const { Realtime } = await import("ably");
+      if (cancelled) return;
+
+      const clientId = visibleProjectIds[0];
+      const ably = new Realtime({
+        authUrl: `${config.apiUrl}/v1/ably/token?clientId=${clientId}`,
+        clientId,
+      });
+
+      const channels = visibleProjectIds.map((id) => {
+        const channel = ably.channels.get(id);
+        channel.subscribe((message) => {
+          if ((message.name ?? "").startsWith("deployment:")) {
+            scheduleInvalidate();
+          }
+        });
+        return channel;
+      });
+
+      cleanup = () => {
+        channels.forEach((channel) => channel.unsubscribe());
+        ably.close();
+      };
+    })();
+
+    return () => {
+      cancelled = true;
+      if (invalidateTimer !== null) {
+        window.clearTimeout(invalidateTimer);
+      }
+      cleanup?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleProjectIdsKey, router]);
 
   useEffect(() => {
     if (!isWorkspaceSwitching) {

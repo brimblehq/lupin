@@ -42,6 +42,7 @@ export const config = {
   defaultOverageBandwidthPerGb: Number(readEnv("VITE_DEFAULT_OVERAGE_BANDWIDTH_PER_GB") ?? "0.25"),
   defaultOverageBuildMinutesPerMin: Number(readEnv("VITE_DEFAULT_OVERAGE_BUILD_MINUTES_PER_MIN") ?? "0.002"),
   buildMinutesTopUpPerDollar: Number(readEnv("VITE_BUILD_MINUTES_TOPUP_PER_DOLLAR") ?? "288"),
+  databaseFreeTrialDays: Number(readEnv("VITE_DB_FREE_TRIAL_DAYS") ?? "15"),
 
   accessTokenTtl: Number(readEnv("VITE_ACCESS_TOKEN_TTL") ?? String(60 * 30)),
   refreshTokenTtl: Number(readEnv("VITE_REFRESH_TOKEN_TTL") ?? String(60 * 60 * 24 * 14)),

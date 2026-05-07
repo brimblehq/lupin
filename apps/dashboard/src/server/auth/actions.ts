@@ -179,18 +179,17 @@ export const stepUpTwoFactorServerFn = createServerFn({ method: "POST" }).handle
 
 export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {
   const refreshToken = getServerRefreshToken();
-  authLogger.info("logout start", {
-    hasAccessToken: Boolean(getServerAccessToken()),
-    hasRefreshToken: Boolean(refreshToken),
-  });
+  clearServerAuthCookies();
 
-  await getServerBackendApi()
+  void getServerBackendApi()
     .auth.logout(refreshToken ?? undefined)
     .catch((error: any) => {
       authLogger.warn("logout endpoint failed", getErrorMeta(error));
     });
 
-  clearServerAuthCookies();
+  authLogger.info("logout cookies cleared", {
+    hadRefreshToken: Boolean(refreshToken),
+  });
   authLogger.info("logout complete");
   return { ok: true } as const;
 });

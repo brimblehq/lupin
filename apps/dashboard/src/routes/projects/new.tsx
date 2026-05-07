@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import { createFileRoute, getRouteApi, Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -32,6 +32,7 @@ import { DashButton } from "../../components/shared/dash-button";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { RangeSlider } from "../../components/shared/range-slider";
 import { Dropdown } from "../../components/shared/dropdown";
+import { SimpleTooltip } from "../../components/shared/tooltip";
 import { DiskSizeSelect, diskSizes } from "../../components/shared/disk-size-select";
 import { RootDirectoryTrigger } from "../../components/shared/root-directory-trigger";
 import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
@@ -80,9 +81,16 @@ import type {
 import type { Project } from "@/backend/projects";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 import { usePricing } from "@/contexts/pricing-context";
+import { usePaymentMethods } from "@/hooks/use-payments";
+import { PaymentProvider } from "@/providers/payment-provider";
+
+const AddCardForm = lazy(() =>
+  import("@/components/settings/billing-form").then((m) => ({ default: m.AddCardForm })),
+);
 import { estimateComputeCost } from "@/utils/compute-pricing";
 import { formatUsdMonthly } from "@/utils/billing";
 import { NewProjectPending } from "@/components/shared/route-pending";
+import config from "@/config";
 
 export const Route = createFileRoute("/projects/new")({
   pendingComponent: NewProjectPending,
@@ -401,12 +409,16 @@ function ComputeSliderField({
   steps,
   formatValue,
   onCommit,
+  disabled = false,
+  disabledReason,
 }: {
   label: string;
   value: number;
   steps: number[];
   formatValue: (value: number) => string;
   onCommit: (value: number) => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
   const maxIndex = Math.max(steps.length - 1, 1);
   const indexToTrack = (index: number) => (index / maxIndex) * 100;
@@ -419,23 +431,44 @@ function ComputeSliderField({
 
   const previewIndex = trackToIndex(trackValue);
 
-  return (
-    <div>
+  const content = (
+    <div className={disabled ? "opacity-50" : ""}>
       <div className="mb-2 flex items-center justify-between">
         <label className="text-sm text-dash-text-body">{label}</label>
         <span className="text-sm font-medium text-dash-text-strong">{formatValue(steps[previewIndex] ?? steps[0] ?? 0)}</span>
       </div>
-      <RangeSlider
-        value={trackValue}
-        onChange={setTrackValue}
-        onCommit={(nextTrackValue) => onCommit(trackToIndex(nextTrackValue))}
-        min={0}
-        max={100}
-        step={1}
-        hideValue
-      />
+      {disabled && disabledReason ? (
+        <SimpleTooltip content={disabledReason} side="top" sideOffset={2} delayDuration={120}>
+          <div>
+            <div className="pointer-events-none">
+              <RangeSlider
+                value={trackValue}
+                onChange={disabled ? () => {} : setTrackValue}
+                onCommit={disabled ? () => {} : (nextTrackValue) => onCommit(trackToIndex(nextTrackValue))}
+                min={0}
+                max={100}
+                step={1}
+                hideValue
+              />
+            </div>
+          </div>
+        </SimpleTooltip>
+      ) : (
+        <div className={disabled ? "pointer-events-none" : ""}>
+          <RangeSlider
+            value={trackValue}
+            onChange={disabled ? () => {} : setTrackValue}
+            onCommit={disabled ? () => {} : (nextTrackValue) => onCommit(trackToIndex(nextTrackValue))}
+            min={0}
+            max={100}
+            step={1}
+            hideValue
+          />
+        </div>
+      )}
     </div>
   );
+  return content;
 }
 
 function generateMockCredential(length: number): string {
@@ -1135,7 +1168,28 @@ function Phase2DbEngine({
     return <img src={imageUrl} alt="" className="size-5 object-contain" loading="lazy" />;
   }
 
-  if (loading) {
+  const { data: paymentMethods, isLoading: paymentMethodsLoading } = usePaymentMethods();
+  const hasPaymentCard = (paymentMethods?.length ?? 0) > 0;
+  const [showAddCardForm, setShowAddCardForm] = useState(false);
+  const { planKey } = usePlanGate();
+  const isFreePlan = planKey === "free";
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const orderedEngines = useMemo(() => {
+    return [...engines].sort((a, b) => {
+      const aGated = isFreePlan && !a.free;
+      const bGated = isFreePlan && !b.free;
+
+      if (aGated !== bGated) {
+        return aGated ? 1 : -1;
+      }
+
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [engines, isFreePlan]);
+
+  if (loading || paymentMethodsLoading) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -1158,7 +1212,69 @@ function Phase2DbEngine({
     );
   }
 
-  const selectedEngine = engines.find((engine) => engine.id === selectedEngineId) ?? null;
+  if (!hasPaymentCard) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ duration: 0.25, ease }}
+      >
+        <h3 className="mb-1 text-sm font-medium text-dash-text-strong">Add a payment card to provision a database</h3>
+        <p className="mb-4 text-sm text-dash-text-faded">
+          Databases use persistent storage which is billed monthly. Add a card before provisioning so we can keep your data online.
+        </p>
+        <div className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-[6px] bg-dash-bg-elevated">
+                <img src="/icons/card-payment.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-dash-text-strong">No payment method on file</span>
+                <span className="text-xs text-dash-text-faded">
+                  You won't be charged until your database is active and storage is in use.
+                </span>
+              </div>
+            </div>
+            {!showAddCardForm && (
+              <DashButton onClick={() => setShowAddCardForm(true)} className="shrink-0">
+                Add a card
+              </DashButton>
+            )}
+          </div>
+
+          <AnimatePresence initial={false}>
+            {showAddCardForm && (
+              <motion.div
+                key="add-card-form"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{
+                  height: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+                  opacity: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                }}
+                style={{ overflow: "hidden" }}
+              >
+                {/* px-1 / py-1 keeps the Stripe input's box-shadow ring out of the
+                    motion wrapper's clip path during the height animation. */}
+                <div className="mt-5 border-t border-dash-border px-1 py-1 pt-5">
+                  <PaymentProvider>
+                    <Suspense fallback={<div className="h-10 w-full animate-pulse rounded bg-dash-bg-elevated" />}>
+                      <AddCardForm onClose={() => setShowAddCardForm(false)} showHeader={false} animated={false} />
+                    </Suspense>
+                  </PaymentProvider>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    );
+  }
+
+  const selectedEngine = orderedEngines.find((engine) => engine.id === selectedEngineId) ?? null;
   const getDropdownIconSrc = (value?: string) => {
     const raw = value?.trim();
     if (!raw) return undefined;
@@ -1173,11 +1289,17 @@ function Phase2DbEngine({
     }
     return undefined;
   };
-  const engineOptions = engines.map((engine) => ({
-    id: engine.id,
-    label: engine.name,
-    icon: getDropdownIconSrc(engine.imageUrl) || getDropdownIconSrc(engine.image),
-  }));
+  const engineOptions = orderedEngines.map((engine) => {
+    const gated = isFreePlan && !engine.free;
+    return {
+      id: engine.id,
+      label: engine.name,
+      icon: getDropdownIconSrc(engine.imageUrl) || getDropdownIconSrc(engine.image),
+      disabled: gated,
+      asideText: gated ? "Upgrade to access" : undefined,
+    };
+  });
+  const hasGatedEngine = engineOptions.some((option) => option.disabled);
 
   return (
     <motion.div
@@ -1191,11 +1313,29 @@ function Phase2DbEngine({
         Select a database engine, then configure compute, storage, and access in one step.
       </p>
       <div>
-        <label className="mb-1.5 block text-sm text-dash-text-body">Database engine</label>
+        <div className="mb-1.5 flex items-center justify-between gap-3">
+          <label className="text-sm text-dash-text-body">Database engine</label>
+          {hasGatedEngine && (
+            <button
+              type="button"
+              onClick={() => setShowUpgradeModal(true)}
+              className="text-sm font-medium text-[#4879f8] transition-colors hover:text-[#3060d0]"
+            >
+              Upgrade for access
+            </button>
+          )}
+        </div>
         <Dropdown
           value={selectedEngineId}
           options={engineOptions}
-          onChange={onSelect}
+          onChange={(nextId) => {
+            const nextOption = engineOptions.find((option) => option.id === nextId);
+            if (nextOption?.disabled) {
+              setShowUpgradeModal(true);
+              return;
+            }
+            onSelect(nextId);
+          }}
           placeholder="Select a database engine"
           searchable
           searchPlaceholder="Search database engines..."
@@ -1223,6 +1363,8 @@ function Phase2DbEngine({
           Choose an engine to continue with database configuration.
         </div>
       )}
+
+      <ChangePlanModal open={showUpgradeModal} onOpenChange={setShowUpgradeModal} currentPlan={planKey} />
     </motion.div>
   );
 }
@@ -1312,16 +1454,10 @@ function Phase3DatabaseConfigure({
 }) {
   const [dbName, setDbName] = useState(`${engine.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-db-${generateMockCredential(4)}`);
   const [region, setRegion] = useState(regionOptions[0]?.id ?? "");
-  const [cpuIdx, setCpuIdx] = useState(() => {
-    const recommendedCpu = engine.recommendations?.[0]?.compute?.cpu;
-    const exactIndex = typeof recommendedCpu === "number" ? cpuSteps.indexOf(recommendedCpu) : -1;
-    return exactIndex >= 0 ? exactIndex : 0;
-  });
-  const [memIdx, setMemIdx] = useState(() => {
-    const recommendedMemory = engine.recommendations?.[0]?.compute?.memory;
-    const exactIndex = typeof recommendedMemory === "number" ? memorySteps.indexOf(recommendedMemory) : -1;
-    return exactIndex >= 0 ? exactIndex : 0;
-  });
+  // Compute defaults to the lowest tier — users opt in to more via the
+  // sliders or the "Apply recommended" button below the engine summary.
+  const [cpuIdx, setCpuIdx] = useState(0);
+  const [memIdx, setMemIdx] = useState(0);
   const [dbDiskSize, setDbDiskSize] = useState(() => {
     const recommendedStorage = engine.recommendations?.[0]?.compute?.storage;
     if (typeof recommendedStorage === "number") {
@@ -1342,9 +1478,28 @@ function Phase3DatabaseConfigure({
   const recommendation = engine.recommendations?.[0]?.compute;
 
   const { planKey, projectLimit } = usePlanGate();
+  const isFreePlan = planKey === "free";
   const pricing = usePricing();
   const limitReached = projectLimit !== null && projectCount > projectLimit;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const storageOptions = useMemo(
+    () =>
+      isFreePlan
+        ? diskSizes.map((option) => ({
+            ...option,
+            disabled: option.id !== "10",
+            asideText: option.id === "10" ? undefined : "Upgrade to access",
+          }))
+        : diskSizes,
+    [isFreePlan],
+  );
+
+  useEffect(() => {
+    if (!isFreePlan) return;
+    if (cpuIdx !== 0) setCpuIdx(0);
+    if (memIdx !== 0) setMemIdx(0);
+    if (dbDiskSize !== "10") setDbDiskSize("10");
+  }, [isFreePlan, cpuIdx, memIdx, dbDiskSize]);
   const nextPlanName = useMemo(() => {
     const currentIdx = pricing.plans.findIndex((p) => p.id === planKey || p.name.toLowerCase() === planKey);
     return currentIdx >= 0 && currentIdx < pricing.plans.length - 1 ? pricing.plans[currentIdx + 1].name : undefined;
@@ -1484,7 +1639,7 @@ function Phase3DatabaseConfigure({
         </div>
       </div>
 
-      {recommendation ? (
+      {recommendation && !isFreePlan ? (
         <div className="mt-4 rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
           <p className="text-xs leading-relaxed text-dash-text-body">
             Recommended for {engine.name}: {recommendation.cpu ?? "?"} vCPU, {recommendation.memory ?? "?"} GB RAM,{" "}
@@ -1517,11 +1672,49 @@ function Phase3DatabaseConfigure({
 
       {/* Compute resources */}
       <div>
-        <h4 className="mb-4 text-sm font-medium text-dash-text-strong">Compute</h4>
+        <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Compute</h4>
+        <p className="mb-5 text-sm text-dash-text-faded">
+          Choose CPU, memory, and storage for your database instance. You can update these later.
+        </p>
         <div className="flex flex-col gap-5">
-          <ComputeSliderField label="CPU" value={cpuIdx} steps={cpuSteps} formatValue={formatCpu} onCommit={setCpuIdx} />
-          <ComputeSliderField label="Memory" value={memIdx} steps={memorySteps} formatValue={formatMemory} onCommit={setMemIdx} />
-          <DiskSizeSelect label="Storage" value={dbDiskSize} onChange={setDbDiskSize} />
+          <ComputeSliderField
+            label="CPU"
+            value={cpuIdx}
+            steps={cpuSteps}
+            formatValue={formatCpu}
+            onCommit={setCpuIdx}
+            disabled={isFreePlan}
+            disabledReason="Compute controls are locked on the Free plan. Upgrade your plan to customize CPU."
+          />
+          <ComputeSliderField
+            label="Memory"
+            value={memIdx}
+            steps={memorySteps}
+            formatValue={formatMemory}
+            onCommit={setMemIdx}
+            disabled={isFreePlan}
+            disabledReason="Compute controls are locked on the Free plan. Upgrade your plan to customize memory."
+          />
+          <DiskSizeSelect
+            label="Storage"
+            value={dbDiskSize}
+            onChange={(nextId) => {
+              if (isFreePlan && nextId !== "10") {
+                setShowUpgradeModal(true);
+                return;
+              }
+              setDbDiskSize(nextId);
+            }}
+            options={storageOptions}
+          />
+          {isFreePlan && (
+            <p className="text-xs text-dash-text-faded">
+              Compute and storage are fixed on the free plan.{" "}
+              <button type="button" onClick={() => setShowUpgradeModal(true)} className="font-medium text-[#4879f8] hover:text-[#3060d0]">
+                Upgrade for more
+              </button>
+            </p>
+          )}
         </div>
       </div>
 
@@ -1529,7 +1722,10 @@ function Phase3DatabaseConfigure({
 
       {/* Credentials */}
       <div>
-        <h4 className="mb-3 text-sm font-medium text-dash-text-strong">Database credentials</h4>
+        <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Database credentials</h4>
+        <p className="mb-4 text-sm text-dash-text-faded">
+          These values are used to connect to your database after provisioning.
+        </p>
         <div className="rounded-[4px] border-[0.5px] border-dash-border p-4">
           <div className="flex flex-col gap-2.5">
             {envDrafts.length > 0 ? (
@@ -1610,7 +1806,11 @@ function Phase3DatabaseConfigure({
       {/* Estimated Billing */}
       <div>
         <h4 className="text-sm font-medium text-dash-text-strong">Estimated Billing</h4>
-        <p className="mt-0.5 text-xs text-dash-text-faded">Monthly cost based on your current plan</p>
+        <p className="mt-0.5 text-xs text-dash-text-faded">
+          {isFreePlan
+            ? `Free for the first ${config.databaseFreeTrialDays} days. Upgrade your plan before the trial ends or this database will be paused.`
+            : "Monthly cost based on your current plan"}
+        </p>
 
         <div className="mt-3 flex flex-col">
           {costBreakdown.cpu.excess > 0 && (
@@ -1638,7 +1838,14 @@ function Phase3DatabaseConfigure({
           <hr className="my-1.5 border-dash-border-soft" />
           <div className="flex items-center justify-between py-1.5 text-sm font-medium text-dash-text-strong">
             <span>Estimated total</span>
-            <span>{formatUsdMonthly(costBreakdown.total)}/mo</span>
+            {isFreePlan ? (
+              <span className="flex items-baseline gap-2">
+                <span className="text-xs font-normal text-dash-text-faded line-through">{formatUsdMonthly(costBreakdown.total)}/mo</span>
+                <span>$0.00 during {config.databaseFreeTrialDays}-day trial</span>
+              </span>
+            ) : (
+              <span>{formatUsdMonthly(costBreakdown.total)}/mo</span>
+            )}
           </div>
         </div>
       </div>
