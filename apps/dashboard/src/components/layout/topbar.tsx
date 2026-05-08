@@ -133,7 +133,7 @@ function ProjectSwitcher({
         onClick={handleCopyProjectName}
         aria-label={copied ? "Project name copied" : "Copy project name"}
         title={copied ? "Copied" : "Copy project name"}
-        className="flex size-6 shrink-0 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+        className="flex size-6 shrink-0 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
       >
         {copied ? <Check className="size-3.5 text-[#4879f8]" /> : <Copy className="size-3.5" />}
       </button>
@@ -145,7 +145,7 @@ function ProjectSwitcher({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-0 top-full z-50 mt-2 w-[200px] origin-top-left overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06)]"
+            className="absolute left-0 top-full z-50 mt-2 w-[200px] origin-top-left overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06)]"
           >
             {/* Search filter */}
             <div className="border-b-[0.5px] border-dash-border px-3 py-2">
@@ -301,7 +301,7 @@ function WorkspaceSwitcher({
       <Link
         to="/"
         search={homeSearch as any}
-        className="flex items-center gap-2 rounded-[4px] py-0.5 text-sm font-medium text-dash-text-strong transition-colors hover:text-dash-text-body"
+        className="flex items-center gap-2 rounded-lg py-0.5 text-sm font-medium text-dash-text-strong transition-colors hover:text-dash-text-body"
       >
         <Avatar src={activeAvatarSrc} fallbackSeed={activeAvatarSeed} alt="" className="size-6 rounded-full object-cover" />
         <span className="truncate max-w-[90px] sm:max-w-[180px]">{activeWorkspaceLabel}</span>
@@ -309,7 +309,7 @@ function WorkspaceSwitcher({
       <button
         onClick={() => setOpen(!open)}
         aria-label="Switch workspace"
-        className="flex items-center rounded-[4px] p-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+        className="flex items-center rounded-lg p-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
       >
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}>
           <ChevronDown className="size-4 text-dash-text-strong" />
@@ -323,7 +323,7 @@ function WorkspaceSwitcher({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-0 top-full z-50 mt-2 w-[243px] origin-top-left overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
+            className="absolute left-0 top-full z-50 mt-2 w-[243px] origin-top-left overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
           >
             {/* Search */}
             <div className="flex items-center gap-2 border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-2 py-2">
@@ -349,7 +349,7 @@ function WorkspaceSwitcher({
                     setOpen(false);
                     navigateWithWorkspace();
                   }}
-                  className={`flex w-full cursor-pointer items-center gap-2.5 rounded-[4px] px-2 py-2 transition-colors hover:bg-dash-bg-elevated ${
+                  className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-dash-bg-elevated ${
                     !activeTeam ? "bg-dash-bg-elevated" : ""
                   }`}
                 >
@@ -381,7 +381,7 @@ function WorkspaceSwitcher({
                             navigateWithWorkspace(team.slug);
                           }
                         }}
-                        className={`flex w-full cursor-pointer items-center gap-2.5 rounded-[4px] px-2 py-2 transition-colors hover:bg-dash-bg-elevated ${
+                        className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-dash-bg-elevated ${
                           activeTeam?.slug === team.slug ? "bg-dash-bg-elevated" : ""
                         }`}
                       >
@@ -685,7 +685,7 @@ function EnvironmentDropdown({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-full z-50 mt-2 w-[180px] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
+            className="absolute right-0 top-full z-50 mt-2 w-[180px] origin-top-right overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
           >
             <div className="py-1">
               {environments.map((env) => {
@@ -921,7 +921,7 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-full z-50 mt-2 w-[340px] max-w-[calc(100vw-32px)] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_8px_rgba(0,0,0,0.08)]"
+            className="absolute right-0 top-full z-50 mt-2 w-[340px] max-w-[calc(100vw-32px)] origin-top-right overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_8px_rgba(0,0,0,0.08)]"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b-[0.5px] border-dash-border px-4 py-3">
@@ -1120,7 +1120,7 @@ function CreateDropdown() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-full z-50 mt-2 w-[200px] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
+            className="absolute right-0 top-full z-50 mt-2 w-[200px] origin-top-right overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
           >
             {menuItems.map((item) => {
               const Icon = item.icon;

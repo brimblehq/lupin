@@ -41,7 +41,7 @@ export function StatusChip({ status, className }: StatusChipProps) {
     <div
       style={{ background: v.bg }}
       className={cn(
-        "flex h-5 items-center gap-2 rounded-[4px] border px-2 shadow-[0px_1px_2px_rgba(16,24,40,0.1),inset_0px_1px_0px_rgba(255,255,255,0.25)]",
+        "flex h-5 items-center gap-2 rounded-lg border px-2 shadow-[0px_1px_2px_rgba(16,24,40,0.1),inset_0px_1px_0px_rgba(255,255,255,0.25)]",
         v.border,
         className,
       )}

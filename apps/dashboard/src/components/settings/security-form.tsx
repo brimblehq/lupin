@@ -633,7 +633,7 @@ export function SecurityForm({
                                     setRenamingId(pk.id);
                                     setRenameValue(pk.deviceName || "");
                                   }}
-                                  className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-2.5 py-1 text-xs font-medium text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+                                  className="rounded-lg border-[0.5px] border-dash-border bg-dash-bg px-2.5 py-1 text-xs font-medium text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
                                 >
                                   Rename
                                 </button>
@@ -642,7 +642,7 @@ export function SecurityForm({
                                   disabled={deleteBlocked || deletingId === pk.id}
                                   onClick={() => void handleDeletePasskey(pk.id)}
                                   title={deleteBlocked ? "Enable 2FA or keep at least one passkey to remove this one." : undefined}
-                                  className="rounded-[4px] border-[0.5px] border-dash-border px-2.5 py-1 text-xs font-medium text-[#ef2f1f] transition-colors hover:bg-[#ef2f1f]/5 disabled:cursor-not-allowed disabled:opacity-40"
+                                  className="rounded-lg border-[0.5px] border-dash-border px-2.5 py-1 text-xs font-medium text-[#ef2f1f] transition-colors hover:bg-[#ef2f1f]/5 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                   {deletingId === pk.id ? "Removing..." : "Delete"}
                                 </button>
@@ -923,9 +923,7 @@ export function SecurityForm({
           title="Remove passkey"
           description={(() => {
             const name = passkeys.find((p) => p.id === stepUpPasskeyId)?.deviceName;
-            return name
-              ? `Enter your authenticator code to remove "${name}"`
-              : "Enter your authenticator code to remove this passkey";
+            return name ? `Enter your authenticator code to remove "${name}"` : "Enter your authenticator code to remove this passkey";
           })()}
         />
         <div className="flex flex-col items-center gap-4 px-6 py-6">

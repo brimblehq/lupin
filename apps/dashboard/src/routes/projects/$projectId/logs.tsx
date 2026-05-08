@@ -239,7 +239,7 @@ function LogsActionsMenu({ actions }: { actions: LogsActionItem[] }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-full z-50 mt-1 w-[170px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
+            className="absolute right-0 top-full z-50 mt-1 w-[170px] overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
           >
             {actions.map((action) => (
               <button
@@ -673,7 +673,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
           }
         />
 
-        <div className="flex items-stretch rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
+        <div className="flex items-stretch rounded-lg border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
           <DateRangePicker value={dateRange} onChange={setDateRange} minDate={minSelectableDate} maxDate={maxSelectableDate}>
             <button type="button" className="flex items-center gap-2 px-3 py-3 transition-colors hover:bg-dash-bg-elevated">
               <Calendar className="size-3.5 text-dash-text-faded" />
@@ -714,7 +714,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
           }}
           aria-label={liveLogs.isPaused ? "Resume log stream" : "Pause log stream"}
           title={liveLogs.isPaused ? "Resume" : "Pause"}
-          className="flex size-[42px] shrink-0 items-center justify-center rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
+          className="flex size-[42px] shrink-0 items-center justify-center rounded-lg border-[0.5px] border-dash-border bg-dash-bg text-dash-text-body transition-colors hover:bg-dash-bg-elevated"
         >
           {liveLogs.isPaused ? (
             <Play weight="fill" className="size-4 text-dash-text-faded" />
@@ -734,7 +734,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-[4px] border border-dash-border dark:border-[#1f2123] bg-dash-bg-elevated dark:bg-[#0d0e10]">
+        <div className="overflow-hidden rounded-lg border border-dash-border dark:border-[#1f2123] bg-dash-bg-elevated dark:bg-[#0d0e10]">
           <VolumeGraph buckets={trendBuckets} totals={trendTotals} isLoading={trendsQuery.isLoading} />
         </div>
 
@@ -746,7 +746,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-[4px] border border-dash-border dark:border-[#1f2123] bg-dash-bg-elevated dark:bg-[#0d0e10]">
+        <div className="overflow-hidden rounded-lg border border-dash-border dark:border-[#1f2123] bg-dash-bg-elevated dark:bg-[#0d0e10]">
           <div className="relative">
             <div
               ref={scrollRef}
@@ -781,9 +781,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
               ) : (
                 <ApplicationLogsEmptyState
                   isConnecting={liveLogs.isConnecting}
-                  hasActiveFilters={
-                    searchQuery.trim().length > 0 || levelFilter !== "all" || hasAnyAppLogFilter(advancedFilters)
-                  }
+                  hasActiveFilters={searchQuery.trim().length > 0 || levelFilter !== "all" || hasAnyAppLogFilter(advancedFilters)}
                 />
               )}
             </div>
@@ -794,7 +792,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
                   type="button"
                   onClick={scrollToTop}
                   aria-label="Scroll to top"
-                  className="flex size-7 items-center justify-center rounded-[4px] bg-dash-bg/80 text-dash-text-faded dark:bg-white/8 dark:text-white/50 backdrop-blur transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong dark:hover:bg-white/12 dark:hover:text-white/80"
+                  className="flex size-7 items-center justify-center rounded-lg bg-dash-bg/80 text-dash-text-faded dark:bg-white/8 dark:text-white/50 backdrop-blur transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong dark:hover:bg-white/12 dark:hover:text-white/80"
                 >
                   <ArrowUp className="size-3.5" weight="bold" />
                 </button>
@@ -802,7 +800,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
                   type="button"
                   onClick={scrollToBottom}
                   aria-label="Scroll to bottom"
-                  className="flex size-7 items-center justify-center rounded-[4px] bg-dash-bg/80 text-dash-text-faded dark:bg-white/8 dark:text-white/50 backdrop-blur transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong dark:hover:bg-white/12 dark:hover:text-white/80"
+                  className="flex size-7 items-center justify-center rounded-lg bg-dash-bg/80 text-dash-text-faded dark:bg-white/8 dark:text-white/50 backdrop-blur transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong dark:hover:bg-white/12 dark:hover:text-white/80"
                 >
                   <ArrowDown className="size-3.5" weight="bold" />
                 </button>
@@ -1029,7 +1027,7 @@ function RequestDetailDrawer({
                   {/* Request + Response side by side */}
                   <div className="grid grid-cols-2 gap-4">
                     {groups.slice(0, 2).map((group) => (
-                      <div key={group.title} className="min-w-0 rounded-[4px] border-[0.5px] border-dash-border">
+                      <div key={group.title} className="min-w-0 rounded-lg border-[0.5px] border-dash-border">
                         <div className="border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3.5 py-2">
                           <span className="font-logs text-[10px] uppercase tracking-widest text-dash-text-faded">{group.title}</span>
                         </div>
@@ -1055,7 +1053,7 @@ function RequestDetailDrawer({
 
                   {/* Query parameters (full width, only if present) */}
                   {hasQuery && (
-                    <div className="rounded-[4px] border-[0.5px] border-dash-border">
+                    <div className="rounded-lg border-[0.5px] border-dash-border">
                       <div className="border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3.5 py-2">
                         <span className="font-logs text-[10px] uppercase tracking-widest text-dash-text-faded">Query Parameters</span>
                       </div>
@@ -1092,7 +1090,7 @@ function RequestDetailDrawer({
                   )}
 
                   {/* Client full width */}
-                  <div className="rounded-[4px] border-[0.5px] border-dash-border">
+                  <div className="rounded-lg border-[0.5px] border-dash-border">
                     <div className="border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3.5 py-2">
                       <span className="font-logs text-[10px] uppercase tracking-widest text-dash-text-faded">{groups[2].title}</span>
                     </div>
@@ -1314,7 +1312,7 @@ function RequestLogs({ projectId, logRetentionDays }: { projectId: string; logRe
           }
         />
 
-        <div className="flex items-stretch rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
+        <div className="flex items-stretch rounded-lg border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
           <DateRangePicker value={dateRange} onChange={setDateRange} minDate={minSelectableDate} maxDate={maxSelectableDate}>
             <button type="button" className="flex items-center gap-2 px-3 py-3 transition-colors hover:bg-dash-bg-elevated">
               <Calendar className="size-3.5 text-dash-text-faded" />
@@ -1345,7 +1343,7 @@ function RequestLogs({ projectId, logRetentionDays }: { projectId: string; logRe
       </div>
 
       {/* Table */}
-      <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+      <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border">
         {/* Table header */}
         <div className="grid grid-cols-[64px_1fr_60px_160px] items-center gap-2 border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-2.5">
           <span className="font-logs text-[11px] font-medium text-dash-text-faded">Method</span>

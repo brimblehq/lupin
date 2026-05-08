@@ -30,8 +30,7 @@ export function AdvancedFiltersPanel({ value, onChange }: Props) {
   const fields = value.fields ?? [];
   const canAddField = fields.length < MAX_FIELD_CONDITIONS;
 
-  const activeCount =
-    (value.text?.trim() ? 1 : 0) + fields.filter((c) => c.key.trim() && c.value.trim()).length;
+  const activeCount = (value.text?.trim() ? 1 : 0) + fields.filter((c) => c.key.trim() && c.value.trim()).length;
 
   function addField() {
     if (!canAddField) {
@@ -57,11 +56,8 @@ export function AdvancedFiltersPanel({ value, onChange }: Props) {
   }
 
   return (
-    <div className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center justify-between px-3 py-2 text-left"
-      >
+    <div className="rounded-lg border-[0.5px] border-dash-border bg-dash-bg">
+      <button onClick={() => setExpanded((v) => !v)} className="flex w-full items-center justify-between px-3 py-2 text-left">
         <span className="flex items-center gap-2 text-sm text-dash-text-body">
           <SlidersHorizontal className="size-3.5 text-dash-text-faded" />
           Advanced filters
@@ -165,10 +161,7 @@ export function AdvancedFiltersPanel({ value, onChange }: Props) {
 
               {activeCount > 0 && (
                 <div className="flex justify-end">
-                  <button
-                    onClick={clearAll}
-                    className="text-xs text-dash-text-faded transition-colors hover:text-dash-text-strong"
-                  >
+                  <button onClick={clearAll} className="text-xs text-dash-text-faded transition-colors hover:text-dash-text-strong">
                     Clear all
                   </button>
                 </div>

@@ -112,7 +112,7 @@ export function DateRangePicker({ value, onChange, minDate, maxDate, children }:
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="absolute left-0 right-0 top-full z-50 mt-1.5 origin-top sm:left-auto sm:right-0 sm:origin-top-right"
           >
-            <div className="brimble-date-picker flex w-full flex-col overflow-clip rounded-[4px] border-[0.5px] border-[#d9dadd] bg-dash-bg shadow-[0px_4px_20px_-8px_rgba(18,18,23,0.25),0px_1px_2px_rgba(18,18,23,0.07)] sm:w-auto dark:border-dash-border">
+            <div className="brimble-date-picker flex w-full flex-col overflow-clip rounded-lg border-[0.5px] border-[#d9dadd] bg-dash-bg shadow-[0px_4px_20px_-8px_rgba(18,18,23,0.25),0px_1px_2px_rgba(18,18,23,0.07)] sm:w-auto dark:border-dash-border">
               {/* Calendar area */}
               <DayPicker
                 mode="range"
@@ -164,13 +164,13 @@ export function DateRangePicker({ value, onChange, minDate, maxDate, children }:
                 <div className="flex items-center gap-2 self-stretch sm:self-auto">
                   <button
                     onClick={handleCancel}
-                    className="flex h-[34px] flex-1 items-center justify-center rounded-[4px] border border-dash-border-soft bg-dash-bg px-3.5 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated sm:flex-none"
+                    className="flex h-[34px] flex-1 items-center justify-center rounded-lg border border-dash-border-soft bg-dash-bg px-3.5 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated sm:flex-none"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleApply}
-                    className="flex h-[34px] flex-1 items-center justify-center rounded-[4px] bg-[#010f1a] px-4 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-[#0a1f2e] sm:flex-none dark:bg-white dark:text-[#010f1a] dark:hover:bg-white/90"
+                    className="flex h-[34px] flex-1 items-center justify-center rounded-lg bg-[#010f1a] px-4 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-[#0a1f2e] sm:flex-none dark:bg-white dark:text-[#010f1a] dark:hover:bg-white/90"
                   >
                     Apply
                   </button>

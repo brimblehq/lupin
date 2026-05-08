@@ -88,7 +88,7 @@ export function FilterDropdown({
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             style={{ width: dropdownWidth }}
-            className={`absolute top-full z-50 mt-1 origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)] ${
+            className={`absolute top-full z-50 mt-1 origin-top-right overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)] ${
               align === "right" ? "right-0" : "left-0"
             }`}
           >

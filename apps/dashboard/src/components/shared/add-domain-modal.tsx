@@ -50,7 +50,7 @@ function formatCardType(cardType?: string): string {
 
 function CardChip() {
   return (
-    <div className="relative h-8 w-[45px] shrink-0 overflow-hidden rounded-[4px] bg-[radial-gradient(circle_at_84%_10%,#5a5454_0%,#383636_55%,#1f1f1f_100%)] shadow-[0px_1px_1px_rgba(0,0,0,0.16),0px_1px_0px_rgba(0,0,0,0.11)]">
+    <div className="relative h-8 w-[45px] shrink-0 overflow-hidden rounded-lg bg-[radial-gradient(circle_at_84%_10%,#5a5454_0%,#383636_55%,#1f1f1f_100%)] shadow-[0px_1px_1px_rgba(0,0,0,0.16),0px_1px_0px_rgba(0,0,0,0.11)]">
       <div className="absolute left-[5px] top-[12px] h-[7px] w-[10px] rounded-[1.5px] bg-white/10" />
       <div className="absolute bottom-[5px] right-[5px] flex items-center gap-0.5">
         <span className="size-[3px] rounded-full bg-[#ea4335]" />
@@ -634,7 +634,7 @@ export function AddDomainModal({
                     placeholder="you@example.com"
                     value={transferRegistrantEmail}
                     onChange={(e) => setTransferRegistrantEmail(e.target.value)}
-                    className="input-base input-focus rounded-[4px] px-2 py-1.5 text-[13px] font-light leading-5 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded"
+                    className="input-base input-focus rounded-lg px-2 py-1.5 text-[13px] font-light leading-5 text-dash-text-strong placeholder:text-[#9ca3af] dark:placeholder:text-dash-text-extra-faded"
                   />
                   <p className="text-xs text-dash-text-faded">You can change it if the registrant email is different.</p>
                 </div>
@@ -643,7 +643,7 @@ export function AddDomainModal({
                   <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">Payment method</label>
                   {availablePaymentCards.length > 0 ? (
                     availablePaymentCards.length === 1 ? (
-                      <div className="flex items-center gap-3 rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-2.5">
+                      <div className="flex items-center gap-3 rounded-lg border-[0.5px] border-dash-border px-3.5 py-2.5">
                         <CardChip />
                         <div className="flex flex-col">
                           <span className="text-sm font-medium text-dash-text-strong">
@@ -664,7 +664,7 @@ export function AddDomainModal({
                       />
                     )
                   ) : (
-                    <div className="rounded-[4px] border-[0.5px] border-dash-border px-4 py-3">
+                    <div className="rounded-lg border-[0.5px] border-dash-border px-4 py-3">
                       <p className="text-sm text-dash-text-faded">
                         No payment card found. Add one in <span className="font-medium text-dash-text-strong">Settings</span>.
                       </p>
@@ -743,7 +743,7 @@ export function AddDomainModal({
             <button
               type="button"
               onClick={() => setStep(DomainStep.SelectProject)}
-              className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
+              className="flex h-[34px] items-center rounded-lg border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
             >
               Back
             </button>

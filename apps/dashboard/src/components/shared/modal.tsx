@@ -104,7 +104,7 @@ export function ModalCancelButton({ onClick }: { onClick?: () => void }) {
           haptics.selection();
           onClick?.();
         }}
-        className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
+        className="flex h-[34px] items-center rounded-lg border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
       >
         Cancel
       </button>
@@ -133,7 +133,7 @@ export function ModalContinueButton({
         onClick?.();
       }}
       disabled={disabled || loading}
-      className="flex items-center rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
+      className="flex items-center rounded-lg border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
     >
       <LoadingButtonContent loading={loading} loadingLabel={loadingLabel}>
         {children}

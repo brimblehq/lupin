@@ -433,7 +433,7 @@ Web app additionally defines:
 
 **Common hardcoded radii in dashboard components:**
 
-- `rounded-[4px]` — DashButton, ModalCancelButton, ModalContinueButton, StatusChip
+- `rounded-lg` — DashButton, ModalCancelButton, ModalContinueButton, StatusChip
 - `rounded-[6px]` — input-base, date picker pills
 - `rounded-[8px]` — GlossyButton, command palette dialog
 - `rounded-lg` — Modal container
@@ -743,8 +743,8 @@ interface DashButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 **Variants:**
 | Variant | Classes |
 |---------|---------|
-| `outline` | `rounded-[4px] border border-dash-btn-outline-border bg-dash-btn-outline-bg text-dash-btn-outline-text hover:bg-dash-bg-elevated` |
-| `primary` | `rounded-[4px] border border-[#3964d5] bg-[#4879f8] text-white hover:bg-[#3a6ae6]` |
+| `outline` | `rounded-lg border border-dash-btn-outline-border bg-dash-btn-outline-bg text-dash-btn-outline-text hover:bg-dash-bg-elevated` |
+| `primary` | `rounded-lg border border-[#3964d5] bg-[#4879f8] text-white hover:bg-[#3a6ae6]` |
 
 **Sizes:**
 | Size | Classes |
@@ -825,7 +825,7 @@ Description: `text-sm font-light leading-[1.3] text-dash-text-faded`
 **ModalContinueButton:**
 
 ```
-flex items-center rounded-[4px] border border-[#232931]
+flex items-center rounded-lg border border-[#232931]
 bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32]
 px-4 py-[5px] text-sm font-medium text-white
 shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity
@@ -848,7 +848,7 @@ interface StatusChipProps {
 **Container:**
 
 ```
-flex h-5 items-center gap-2 rounded-[4px] border px-2
+flex h-5 items-center gap-2 rounded-lg border px-2
 shadow-[0px_1px_2px_rgba(16,24,40,0.1),inset_0px_1px_0px_rgba(255,255,255,0.25)]
 ```
 

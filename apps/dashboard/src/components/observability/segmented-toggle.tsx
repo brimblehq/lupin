@@ -3,7 +3,7 @@ import { useHaptics } from "@/hooks/use-haptics";
 export function SegmentedToggle({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   const haptics = useHaptics();
   return (
-    <div className="flex max-w-full items-center overflow-x-auto rounded-[4px] border-[0.5px] border-dash-border p-0.5">
+    <div className="flex max-w-full items-center overflow-x-auto rounded-lg border-[0.5px] border-dash-border p-0.5">
       {options.map((opt) => (
         <button
           key={opt}

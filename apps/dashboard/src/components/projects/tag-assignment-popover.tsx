@@ -219,7 +219,7 @@ export function TagAssignmentPopover({
             width: 220,
             zIndex: 9999,
           }}
-          className="max-h-[260px] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          className="max-h-[260px] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();

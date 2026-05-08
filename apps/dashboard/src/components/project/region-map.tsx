@@ -72,7 +72,7 @@ export function RegionMap({ regionText }: { regionText: string }) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-clip rounded-[4px]">
+    <div className="flex flex-1 flex-col overflow-clip rounded-lg">
       <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
         <span className="text-dash-text-strong">Serving region</span>
         <span className="font-mono text-xs text-dash-text-faded">{regionText}</span>
@@ -157,7 +157,7 @@ export function RegionMap({ regionText }: { regionText: string }) {
             </ZoomableGroup>
           </ComposableMap>
         </div>
-        <div className="absolute right-4 top-4 flex flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_6px_-2px_rgba(0,0,0,0.18)]">
+        <div className="absolute right-4 top-4 flex flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_6px_-2px_rgba(0,0,0,0.18)]">
           <button
             type="button"
             onClick={handleZoomIn}
@@ -181,7 +181,7 @@ export function RegionMap({ regionText }: { regionText: string }) {
         <button
           type="button"
           onClick={handleReset}
-          className="absolute bottom-4 right-4 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-2 py-1 text-[10px] font-medium text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+          className="absolute bottom-4 right-4 rounded-lg border-[0.5px] border-dash-border bg-dash-bg px-2 py-1 text-[10px] font-medium text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
         >
           Reset
         </button>

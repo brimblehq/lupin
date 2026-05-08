@@ -516,7 +516,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.98 }}
                     transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute right-0 top-full z-50 mt-1 w-[220px] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]"
+                    className="absolute right-0 top-full z-50 mt-1 w-[220px] origin-top-right overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]"
                   >
                     <button
                       onClick={() => void handleRedeploy()}
@@ -598,7 +598,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
                   top: overflowMenuPos.top,
                   left: overflowMenuPos.left,
                 }}
-                className="z-[120] min-w-[220px] origin-top-left overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]"
+                className="z-[120] min-w-[220px] origin-top-left overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]"
               >
                 {overflowTabs.map((tab) => {
                   if (tab.locked) {

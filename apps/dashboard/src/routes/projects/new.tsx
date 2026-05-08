@@ -595,7 +595,7 @@ function Phase1SourceType({ onSelect }: { onSelect: (type: SourceType) => void }
               haptics.selection();
               onSelect(card.type);
             }}
-            className="group flex flex-col gap-3 rounded-[4px] border-[0.5px] border-dash-border p-5 text-left transition-all hover:border-dash-text-faded hover:bg-dash-bg-elevated"
+            className="group flex flex-col gap-3 rounded-lg border-[0.5px] border-dash-border p-5 text-left transition-all hover:border-dash-text-faded hover:bg-dash-bg-elevated"
           >
             <img src={card.icon} alt="" className={card.iconClass ?? "size-5 brightness-0 dark:brightness-200"} />
             <div>
@@ -649,7 +649,7 @@ function Phase2GitConnect({
         To import a repository, you need to connect your {provider.name} account to Brimble first.
       </p>
 
-      <div className="rounded-[4px] border-[0.5px] border-dash-border p-5">
+      <div className="rounded-lg border-[0.5px] border-dash-border p-5">
         <div className="flex flex-col items-center py-4">
           <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-dash-bg-elevated">
             <Icon className="size-6 text-dash-text-body" />
@@ -783,7 +783,7 @@ function Phase2GitRepoSelect({
       <h3 className="mb-4 text-sm font-medium text-dash-text-strong">Import from {provider.name}</h3>
 
       {!accounts.length ? (
-        <div className="rounded-[4px] border-[0.5px] border-dash-border p-5">
+        <div className="rounded-lg border-[0.5px] border-dash-border p-5">
           <p className="text-sm text-dash-text-faded">
             {accountsLoading
               ? `Loading connected ${provider.name} accounts…`
@@ -827,7 +827,7 @@ function Phase2GitRepoSelect({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.98 }}
                     transition={{ duration: 0.2, ease }}
-                    className="absolute left-0 top-full z-50 mt-1 w-full overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
+                    className="absolute left-0 top-full z-50 mt-1 w-full overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
                   >
                     {accounts.map((account) => {
                       const isOrg = String(account.type ?? "").toLowerCase() === "organization";
@@ -896,7 +896,7 @@ function Phase2GitRepoSelect({
           </div>
 
           {/* Repo list */}
-          <div className="mt-3 overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="mt-3 overflow-clip rounded-lg border-[0.5px] border-dash-border">
             {reposLoading ? (
               <div className="px-4 py-8 text-center text-sm text-dash-text-faded">Loading repositories…</div>
             ) : repos.length === 0 ? (
@@ -1202,7 +1202,7 @@ function Phase2DbEngine({
         <p className="mb-4 text-sm text-dash-text-faded">Loading available engines...</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-[4px] border-[0.5px] border-dash-border p-5">
+            <div key={i} className="rounded-lg border-[0.5px] border-dash-border p-5">
               <div className="h-5 w-5 rounded bg-dash-bg-elevated" />
               <div className="mt-3 h-4 w-28 rounded bg-dash-bg-elevated" />
               <div className="mt-2 h-3 w-40 rounded bg-dash-bg-elevated" />
@@ -1225,7 +1225,7 @@ function Phase2DbEngine({
         <p className="mb-4 text-sm text-dash-text-faded">
           Databases use persistent storage which is billed monthly. Add a card before provisioning so we can keep your data online.
         </p>
-        <div className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30 p-5">
+        <div className="rounded-lg border-[0.5px] border-dash-border bg-dash-bg-elevated/30 p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-[6px] bg-dash-bg-elevated">
@@ -1362,7 +1362,7 @@ function Phase2DbEngine({
           />
         </div>
       ) : (
-        <div className="mt-6 rounded-[4px] border-[0.5px] border-dash-border p-4 text-sm text-dash-text-faded">
+        <div className="mt-6 rounded-lg border-[0.5px] border-dash-border p-4 text-sm text-dash-text-faded">
           Choose an engine to continue with database configuration.
         </div>
       )}
@@ -1423,7 +1423,7 @@ function CredentialRow({
             onClick={onRegenerate}
             title="Generate a strong password"
             aria-label="Generate a strong password"
-            className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+            className="flex size-7 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
           >
             <RefreshCw className="size-3.5" />
           </button>
@@ -1432,7 +1432,7 @@ function CredentialRow({
           <button
             type="button"
             onClick={() => setRevealed(!revealed)}
-            className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+            className="flex size-7 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
           >
             {revealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
           </button>
@@ -1440,7 +1440,7 @@ function CredentialRow({
         <button
           type="button"
           onClick={handleCopy}
-          className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+          className="flex size-7 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
         >
           {copied ? <Check className="size-3.5 text-[#34d399]" /> : <Copy className="size-3.5" />}
         </button>
@@ -1667,7 +1667,7 @@ function Phase3DatabaseConfigure({
       </div>
 
       {recommendation && !isFreePlan ? (
-        <div className="mt-4 rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
+        <div className="mt-4 rounded-lg bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
           <p className="text-xs leading-relaxed text-dash-text-body">
             Recommended for {engine.name}: {recommendation.cpu ?? "?"} vCPU, {recommendation.memory ?? "?"} GB RAM,{" "}
             {recommendation.storage ?? "?"} GB storage.
@@ -1751,7 +1751,7 @@ function Phase3DatabaseConfigure({
       <div>
         <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Service credentials</h4>
         <p className="mb-4 text-sm text-dash-text-faded">These values are used to connect to your service after provisioning.</p>
-        <div className="rounded-[4px] border-[0.5px] border-dash-border p-4">
+        <div className="rounded-lg border-[0.5px] border-dash-border p-4">
           <div className="flex flex-col gap-2.5">
             {envDrafts.length > 0 ? (
               envDrafts.map((row) => (
@@ -1795,7 +1795,7 @@ function Phase3DatabaseConfigure({
               transition={{ duration: 0.2, ease }}
               className="overflow-hidden"
             >
-              <div className="mt-3 flex items-start gap-2 rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5">
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-[#f59e0b]/[0.06] px-3 py-2.5">
                 <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-[#f59e0b]" />
                 <p className="text-xs leading-relaxed text-dash-text-body">
                   Public access exposes your database to the internet. Use strong credentials and consider IP whitelisting in production.
@@ -2404,7 +2404,7 @@ function Phase3Configure({
 
         {showMcpAuthToggle && (
           <div>
-            <div className="flex items-center justify-between rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2.5">
+            <div className="flex items-center justify-between rounded-lg border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2.5">
               <div className="pr-4">
                 <p className="text-sm font-medium text-dash-text-strong">Enable MCP authentication</p>
                 <p className="mt-1 text-xs text-dash-text-faded">
@@ -2641,7 +2641,7 @@ function Phase3Configure({
                       </div>
                     </div>
 
-                    <div className="rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
+                    <div className="rounded-lg bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
                       <p className="text-xs leading-relaxed text-dash-text-body">
                         <span className="font-medium text-dash-text-strong">$0.25/GB per month.</span> Data persists across container
                         restarts and deployments. The volume mounts at{" "}
@@ -3573,7 +3573,7 @@ function NewProjectPage() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.25, ease }}
-                        className="rounded-[4px] border-[0.5px] border-dash-border p-4 text-sm text-dash-text-faded"
+                        className="rounded-lg border-[0.5px] border-dash-border p-4 text-sm text-dash-text-faded"
                       >
                         Unable to load the selected database engine. Please go back and choose an engine again.
                       </motion.div>

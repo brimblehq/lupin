@@ -28,7 +28,7 @@ export function TrafficHeatmap({ grid }: { grid: number[][] }) {
   const max = grid.reduce((m, row) => Math.max(m, ...row), 0);
 
   return (
-    <div className="flex flex-col rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="flex flex-col rounded-lg border-[0.5px] border-dash-border">
       <div className="border-b-[0.5px] border-dash-border px-4 py-3">
         <h3 className="text-sm font-medium text-dash-text-strong">Traffic by hour</h3>
         <p className="text-xs font-light text-dash-text-faded">Pageviews by day of week and hour of day</p>

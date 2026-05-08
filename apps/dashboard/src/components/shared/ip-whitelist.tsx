@@ -39,7 +39,7 @@ export function IpWhitelist({
             {ips.map((ip) => (
               <span
                 key={ip.id}
-                className="rounded-[4px] border border-dash-border bg-dash-bg px-2 py-1 font-family-mono text-xs text-dash-text-body"
+                className="rounded-lg border border-dash-border bg-dash-bg px-2 py-1 font-family-mono text-xs text-dash-text-body"
               >
                 {ip.value}
               </span>
@@ -82,7 +82,7 @@ export function IpWhitelist({
                   />
                   <button
                     onClick={() => onRemove?.(ip.id)}
-                    className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:text-dash-text-strong"
+                    className="flex size-7 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:text-dash-text-strong"
                   >
                     <X className="size-3.5" />
                   </button>

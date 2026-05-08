@@ -104,7 +104,7 @@ export function DbConnectionCard({ connectionUri, isActive }: DbConnectionCardPr
   }
 
   return (
-    <div className="flex flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="flex flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border">
       <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
         <span className="text-dash-text-strong">Connection</span>
         <div className="flex items-center gap-2">
@@ -172,7 +172,7 @@ export function DbConnectionCard({ connectionUri, isActive }: DbConnectionCardPr
 
 export function DbQuickActionsCard({ onDownloadBackup, onRestart, hasBackup, canRestart, restarting = false }: DbQuickActionsCardProps) {
   return (
-    <div className="flex flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="flex flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border">
       <div className="flex h-10 items-center border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
         <span className="text-dash-text-strong">Quick actions</span>
       </div>
@@ -213,10 +213,7 @@ function ConnectionField({
     <div className="flex flex-col gap-1.5 py-2.5">
       <span className="text-[11px] font-medium uppercase tracking-[0.5px] text-dash-text-faded">{label}</span>
       <div className="flex items-start gap-2">
-        <span
-          title={value}
-          className={`min-w-0 flex-1 break-all text-sm leading-[1.4] text-dash-text-strong ${mono ? "font-mono" : ""}`}
-        >
+        <span title={value} className={`min-w-0 flex-1 break-all text-sm leading-[1.4] text-dash-text-strong ${mono ? "font-mono" : ""}`}>
           {value}
         </span>
         <button

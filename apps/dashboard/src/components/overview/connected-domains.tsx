@@ -9,7 +9,7 @@ export function ConnectedDomains({ activeDomains = 0 }: { activeDomains?: number
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const { canWrite } = useWorkspaceRole();
   return (
-    <div className="mb-8 flex rounded-[4px] border-[0.5px] border-dash-border py-2">
+    <div className="mb-8 flex rounded-lg border-[0.5px] border-dash-border py-2">
       {/* Left content */}
       <div className="flex flex-1 flex-col gap-3.5 px-3.5 py-3.5">
         <div className="flex flex-col gap-2">

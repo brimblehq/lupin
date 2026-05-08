@@ -19,7 +19,7 @@ export function SearchFilterBar({
   className,
 }: SearchFilterBarProps) {
   return (
-    <div className={`flex items-center rounded-[4px] border-[0.5px] border-dash-border ${className ?? ""}`}>
+    <div className={`flex items-center rounded-lg border-[0.5px] border-dash-border ${className ?? ""}`}>
       <div className="flex flex-1 items-center gap-2 px-4 py-3">
         {loading ? (
           <LoaderCircle className="size-5 shrink-0 animate-spin text-dash-text-extra-faded" />

@@ -18,9 +18,7 @@ export interface ProjectVarOption {
   name: string;
 }
 
-export type AutocompleteSelection =
-  | { kind: "shared"; name: string }
-  | { kind: "project"; slug: string; name: string };
+export type AutocompleteSelection = { kind: "shared"; name: string } | { kind: "project"; slug: string; name: string };
 
 type Row = {
   kind: "shared-var" | "project" | "project-var";
@@ -238,7 +236,7 @@ export function EnvReferenceAutocomplete({
             zIndex: 9999,
             pointerEvents: "auto",
           }}
-          className="max-h-[200px] overflow-x-hidden overflow-y-auto overscroll-contain rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)] [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.15)_transparent]"
+          className="max-h-[200px] overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)] [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.15)_transparent]"
           onWheelCapture={(event) => event.stopPropagation()}
           onTouchMoveCapture={(event) => event.stopPropagation()}
         >
@@ -272,11 +270,7 @@ export function EnvReferenceAutocomplete({
 }
 
 function GroupHeader({ label }: { label: string }) {
-  return (
-    <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-dash-text-extra-faded">
-      {label}
-    </div>
-  );
+  return <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-dash-text-extra-faded">{label}</div>;
 }
 
 const COLLAPSED_LIMIT = 9;
@@ -370,9 +364,7 @@ function ProjectDrillDown({
           <Spinner className="size-3.5" />
         </div>
       ) : rows.length === 0 ? (
-        <div className="px-3 py-2 text-sm text-dash-text-faded">
-          {hasAnyVars ? "No matches" : "No variables in this project"}
-        </div>
+        <div className="px-3 py-2 text-sm text-dash-text-faded">{hasAnyVars ? "No matches" : "No variables in this project"}</div>
       ) : (
         <>
           {visibleRows.map((row, index) => (

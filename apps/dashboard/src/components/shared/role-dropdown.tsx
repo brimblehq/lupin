@@ -30,7 +30,7 @@ export function RoleDropdown({ value, onChange }: { value: string; onChange: (v:
         <ChevronDown className={`size-3.5 text-dash-text-faded transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[220px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-[220px] rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
           {TEAM_ROLES.map((role) => (
             <button
               type="button"

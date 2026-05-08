@@ -154,7 +154,7 @@ export function InstallTrackingModal({
       <div className="flex flex-col gap-4 px-6 py-5">
         <div className="flex flex-col gap-1.5">
           <span className="text-[10px] font-medium uppercase tracking-[1px] text-dash-text-faded">Site ID</span>
-          <div className="flex items-center gap-2 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2">
             <code className="flex-1 truncate font-mono text-xs text-dash-text-body">{siteId}</code>
             <button
               type="button"
@@ -167,7 +167,7 @@ export function InstallTrackingModal({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1 rounded-[4px] border-[0.5px] border-dash-border p-0.5">
+        <div className="flex flex-wrap items-center gap-1 rounded-lg border-[0.5px] border-dash-border p-0.5">
           {FRAMEWORK_ORDER.map((k) => {
             const opt = resolvedSnippets[k];
             const isActive = k === activeKey;
@@ -189,7 +189,7 @@ export function InstallTrackingModal({
           })}
         </div>
 
-        <div className="flex items-start gap-2 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2.5">
+        <div className="flex items-start gap-2 rounded-lg border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2.5">
           <div className="flex flex-1 flex-col gap-1">
             <code className="font-mono text-[11px] text-dash-text-strong">{active.file}</code>
             <p className="text-[11px] font-light leading-[1.5] text-dash-text-faded">{active.instructions}</p>
@@ -197,7 +197,7 @@ export function InstallTrackingModal({
         </div>
 
         <div className="relative">
-          <pre className="max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated p-4 pr-14 font-mono text-[11px] leading-[1.7] text-dash-text-body">
+          <pre className="max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border-[0.5px] border-dash-border bg-dash-bg-elevated p-4 pr-14 font-mono text-[11px] leading-[1.7] text-dash-text-body">
             <code>
               {highlight(code).map((tok, i) => (
                 <Fragment key={i}>{tok.cls ? <span className={tok.cls}>{tok.text}</span> : tok.text}</Fragment>
@@ -228,7 +228,7 @@ export function InstallTrackingModal({
             type="button"
             disabled={enabling}
             onClick={() => void onEnable()}
-            className="flex h-10 items-center justify-center rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="flex h-10 items-center justify-center rounded-lg border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             {enabling ? "Enabling..." : "Enable analytics for this project"}
           </button>

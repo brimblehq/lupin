@@ -99,8 +99,7 @@ export function StepUpTwoFactorModal({ open, requirement, onResolve, onCancel }:
     }
   }
 
-  const submitDisabled =
-    submitting || countdownSeconds <= 0 || (mode === "totp" ? code.length !== 6 : recoveryCode.trim().length !== 8);
+  const submitDisabled = submitting || countdownSeconds <= 0 || (mode === "totp" ? code.length !== 6 : recoveryCode.trim().length !== 8);
 
   return (
     <Modal open={open} onOpenChange={(next) => !next && onCancel()} width={460}>
@@ -126,7 +125,14 @@ export function StepUpTwoFactorModal({ open, requirement, onResolve, onCancel }:
               inputMode="text"
               autoComplete="one-time-code"
               value={recoveryCode}
-              onChange={(e) => setRecoveryCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
+              onChange={(e) =>
+                setRecoveryCode(
+                  e.target.value
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, "")
+                    .slice(0, 8),
+                )
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -136,9 +142,7 @@ export function StepUpTwoFactorModal({ open, requirement, onResolve, onCancel }:
               placeholder="8-character code"
               className={`input-base ${error ? "input-error" : "input-focus"} px-3 py-2.5 text-sm font-mono tracking-[0.2em] text-dash-text-strong placeholder:text-dash-text-extra-faded`}
             />
-            <p className="text-xs text-dash-text-faded">
-              Each recovery code can only be used once.
-            </p>
+            <p className="text-xs text-dash-text-faded">Each recovery code can only be used once.</p>
           </div>
         )}
 
@@ -167,7 +171,7 @@ export function StepUpTwoFactorModal({ open, requirement, onResolve, onCancel }:
             loading={submitting}
             loadingLabel="Verifying..."
             onClick={handleManualSubmit}
-            className="h-[34px] rounded-[4px] px-3.5 text-sm"
+            className="h-[34px] rounded-lg px-3.5 text-sm"
           >
             Verify
           </GlossyButton>

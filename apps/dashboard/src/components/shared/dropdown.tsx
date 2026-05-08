@@ -208,7 +208,7 @@ export function Dropdown({
                   zIndex: 9999,
                   pointerEvents: "auto",
                 }}
-                className="max-h-[200px] overflow-x-hidden overflow-y-auto overscroll-contain rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)] [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.15)_transparent]"
+                className="max-h-[200px] overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)] [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.15)_transparent]"
                 onWheelCapture={(event) => {
                   event.stopPropagation();
                 }}

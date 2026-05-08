@@ -348,7 +348,7 @@ function Globe({ countries }: { countries: CountryVisitor[] }) {
         />
       </div>
       {topCountries.length > 0 && (
-        <div className="absolute left-4 top-4 hidden flex-col gap-1.5 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg/80 px-3 py-2.5 backdrop-blur-sm sm:flex">
+        <div className="absolute left-4 top-4 hidden flex-col gap-1.5 rounded-lg border-[0.5px] border-dash-border bg-dash-bg/80 px-3 py-2.5 backdrop-blur-sm sm:flex">
           <span className="text-[9px] font-medium uppercase tracking-[1px] text-dash-text-faded">Top countries</span>
           {topCountries.slice(0, 6).map((c) => {
             const name = ISO2_TO_NAME[c.code.toUpperCase()] ?? c.code;
@@ -411,7 +411,7 @@ export function VisitorsMap({ countries = [] }: { countries?: CountryVisitor[] }
   const [mode, setMode] = useState<"Map" | "Globe">("Map");
 
   return (
-    <div className="flex flex-col rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="flex flex-col rounded-lg border-[0.5px] border-dash-border">
       <div className="flex flex-col gap-2 border-b-[0.5px] border-dash-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-medium text-dash-text-strong">Where your visitors are</h3>

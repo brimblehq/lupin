@@ -40,7 +40,7 @@ Conventions for building **Modals**, **Input fields**, **Toggles**, and **Sideba
 
 ### Radii & borders
 
-- Inputs & pills: `rounded-[4px]` or `rounded-[6px]`
+- Inputs & pills: `rounded-lg` or `rounded-[6px]`
 - Modals & cards: `rounded-lg`
 - Borders are almost always `border-[0.5px] border-dash-border` (or `border-dash-border-soft` for dividers).
 
@@ -325,7 +325,7 @@ For toggles that reveal a sub-section when on, wrap the sub-section in `AnimateP
 | Soft border | `border-[0.5px] border-dash-border` |
 | Divider | `border-dash-border-soft` |
 | Modal surface radius | `rounded-lg` |
-| Input / pill radius | `rounded-[4px]` |
+| Input / pill radius | `rounded-lg` |
 | Easing | `[0.16, 1, 0.3, 1]` |
 | Toggle | `ToggleSwitch` from `components/shared/toggle-switch.tsx` |
 | Modal primitives | `components/shared/modal.tsx` |

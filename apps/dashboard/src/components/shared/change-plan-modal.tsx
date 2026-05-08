@@ -186,12 +186,12 @@ export function ChangePlanModal({
                 : `Your plan will change to ${selectedObj.name} (${selectedObj.price === 0 ? "Free" : `$${selectedObj.price}/mo`}) at the end of your billing period.`}
             </p>
             {needsPaymentMethod && (
-              <div className="rounded-[4px] bg-[#4879f8]/[0.06] px-3 py-2.5 dark:bg-[#4879f8]/[0.08]">
+              <div className="rounded-lg bg-[#4879f8]/[0.06] px-3 py-2.5 dark:bg-[#4879f8]/[0.08]">
                 <p className="text-sm leading-[1.4] text-[#4879f8]">You need to add a payment method before upgrading to a paid plan.</p>
               </div>
             )}
             {isDowngrade && (
-              <div className="rounded-[4px] bg-[#f5a623]/[0.06] px-3 py-2.5 dark:bg-[#f5a623]/[0.08]">
+              <div className="rounded-lg bg-[#f5a623]/[0.06] px-3 py-2.5 dark:bg-[#f5a623]/[0.08]">
                 <p className="text-sm leading-[1.4] text-[#b37a10] dark:text-[#f5a623]">
                   If you have more projects than the new plan allows, your existing projects won't be deleted, but you won't be able to
                   create new ones until you're within the limit.

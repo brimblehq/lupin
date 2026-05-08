@@ -53,8 +53,7 @@ export const Route = createFileRoute("/scaling/")({
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const inputClass =
-  `${dashInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
+const inputClass = `${dashInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
 
 type UiScalingGroup = {
   id: string;
@@ -180,7 +179,7 @@ function ScalingGroupCard({
       whileHover={{ y: -3, scale: 1.01 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      className={`flex flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border ${!group.active ? "opacity-70" : ""}`}
+      className={`flex flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border ${!group.active ? "opacity-70" : ""}`}
     >
       <div className="flex items-center justify-between px-3.5 pb-1 pt-3">
         <span className="text-sm font-medium leading-5 text-dash-text-strong">{group.name}</span>
@@ -189,7 +188,7 @@ function ScalingGroupCard({
             <button
               type="button"
               onClick={() => onEdit(group)}
-              className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-body"
+              className="rounded-lg p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-body"
               title="Edit scaling group"
               disabled={Boolean(deleting)}
             >
@@ -200,7 +199,7 @@ function ScalingGroupCard({
             <button
               type="button"
               onClick={() => onDelete(group)}
-              className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-[#ef2f1f]"
+              className="rounded-lg p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-[#ef2f1f]"
               title="Delete scaling group"
               disabled={Boolean(deleting)}
             >
@@ -248,7 +247,7 @@ function ScalingGroupCard({
 
 function ScalingCardSkeleton() {
   return (
-    <div className="flex h-[164px] animate-pulse flex-col rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="flex h-[164px] animate-pulse flex-col rounded-lg border-[0.5px] border-dash-border">
       <div className="flex items-center justify-between px-3.5 pb-1 pt-3">
         <div className="h-4 w-28 rounded bg-dash-bg-elevated" />
         <div className="h-4 w-20 rounded bg-dash-bg-elevated" />
@@ -338,7 +337,7 @@ function CreationForm({
       transition={{ duration: 0.25, ease }}
       className="overflow-hidden"
     >
-      <div className="mb-6 rounded-[4px] border-[0.5px] border-dash-border p-5">
+      <div className="mb-6 rounded-lg border-[0.5px] border-dash-border p-5">
         <div className="mb-4">
           <label className="mb-1.5 block text-sm text-dash-text-body">Group name</label>
           <input

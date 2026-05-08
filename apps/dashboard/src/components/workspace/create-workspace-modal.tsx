@@ -55,7 +55,7 @@ function Stepper({
 
 function InfoBanner({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-2 flex items-start gap-2.5 rounded-[4px] bg-[#f5a623]/[0.06] px-3 py-2.5 dark:bg-[#f5a623]/[0.08]">
+    <div className="mt-2 flex items-start gap-2.5 rounded-lg bg-[#f5a623]/[0.06] px-3 py-2.5 dark:bg-[#f5a623]/[0.08]">
       <Info className="mt-0.5 size-3.5 shrink-0 text-[#f5a623]" />
       <div className="text-sm font-light leading-[1.4] text-[#b37a10] dark:text-[#f5a623]">{children}</div>
     </div>
@@ -89,13 +89,7 @@ function StepName({
     <div className="flex flex-col gap-4 px-6 py-5">
       <div className="flex flex-col gap-1.5">
         <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Workspace name</label>
-        <DashInput
-          type="text"
-          placeholder="My workspace"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          autoFocus
-        />
+        <DashInput type="text" placeholder="My workspace" value={name} onChange={(e) => handleNameChange(e.target.value)} autoFocus />
       </div>
       <div className="flex flex-col gap-1.5">
         <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Workspace URL</label>
@@ -270,7 +264,7 @@ function StepInvite({ rows, onRowsChange, teamSize }: { rows: InviteRow[]; onRow
       </button>
 
       {filled > 0 && (
-        <div className="rounded-[4px] bg-dash-bg-elevated px-4 py-3">
+        <div className="rounded-lg bg-dash-bg-elevated px-4 py-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-dash-text-faded">
               {filled} of {teamSize} seats used
@@ -435,7 +429,7 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
           ) : (
             <button
               onClick={back}
-              className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
+              className="flex h-[34px] items-center rounded-lg border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
             >
               Back
             </button>
@@ -458,7 +452,7 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
         <div className="flex justify-center px-6 pb-6">
           <button
             onClick={() => handleClose(false)}
-            className="flex h-[34px] items-center rounded-[4px] border border-[#3964d5] bg-[#4879f8] px-5 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-[#3a6ae6]"
+            className="flex h-[34px] items-center rounded-lg border border-[#3964d5] bg-[#4879f8] px-5 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-[#3a6ae6]"
           >
             Go to workspace
           </button>

@@ -115,7 +115,7 @@ function EnableAnalyticsEmptyState({ projectId, onEnabled }: { projectId: string
             <button
               type="button"
               onClick={() => setUpgradeOpen(true)}
-              className="rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[7px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+              className="rounded-lg border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[7px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
             >
               Upgrade plan
             </button>
@@ -124,7 +124,7 @@ function EnableAnalyticsEmptyState({ projectId, onEnabled }: { projectId: string
               type="button"
               disabled={enabling}
               onClick={() => void handleEnable()}
-              className="rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[7px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:opacity-40"
+              className="rounded-lg border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[7px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
               {enabling ? "Enabling..." : "Enable analytics"}
             </button>
@@ -133,7 +133,7 @@ function EnableAnalyticsEmptyState({ projectId, onEnabled }: { projectId: string
             <button
               type="button"
               onClick={() => setOpen(true)}
-              className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-3 py-[7px] text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+              className="rounded-lg border-[0.5px] border-dash-border bg-dash-bg px-3 py-[7px] text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
             >
               Preview snippet
             </button>
@@ -164,13 +164,13 @@ function PlanLockedCard({ message }: { message: string }) {
   return (
     <div className="mx-auto flex max-w-[1000px] flex-col gap-6 px-4 py-8 sm:px-0">
       <TabHeader title="Web analytics">Track visitor activity, top pages, and traffic sources.</TabHeader>
-      <div className="flex flex-col items-center gap-4 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-6 py-12 text-center">
+      <div className="flex flex-col items-center gap-4 rounded-lg border-[0.5px] border-dash-border bg-dash-bg-elevated px-6 py-12 text-center">
         <h3 className="text-base font-medium text-dash-text-strong">Upgrade to enable analytics</h3>
         <p className="max-w-[420px] text-sm font-light text-dash-text-faded">{message}</p>
         <button
           type="button"
           onClick={() => setUpgradeOpen(true)}
-          className="rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[7px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+          className="rounded-lg border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[7px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
         >
           Upgrade plan
         </button>
@@ -185,12 +185,12 @@ function ErrorCard({ message }: { message: string }) {
   return (
     <div className="mx-auto flex max-w-[1000px] flex-col gap-6 px-4 py-8 sm:px-0">
       <TabHeader title="Web analytics">Track visitor activity, top pages, and traffic sources.</TabHeader>
-      <div className="flex flex-col items-center gap-4 rounded-[4px] border-[0.5px] border-dash-border px-6 py-12 text-center">
+      <div className="flex flex-col items-center gap-4 rounded-lg border-[0.5px] border-dash-border px-6 py-12 text-center">
         <p className="text-sm text-dash-text-body">{message}</p>
         <button
           type="button"
           onClick={() => void router.invalidate()}
-          className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-3 py-[7px] text-xs font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+          className="rounded-lg border-[0.5px] border-dash-border bg-dash-bg px-3 py-[7px] text-xs font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
         >
           Retry
         </button>

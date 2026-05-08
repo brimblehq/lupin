@@ -514,11 +514,11 @@ function EnvironmentManagerModal({
 
 function ProjectCardSkeleton() {
   return (
-    <div className="flex min-h-[168px] flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="flex min-h-[168px] flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border">
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-3.5 pt-3 pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="h-4 w-32 animate-pulse rounded bg-dash-border-soft" />
-          <div className="h-5 w-16 animate-pulse rounded-[4px] bg-dash-border-soft" />
+          <div className="h-5 w-16 animate-pulse rounded-lg bg-dash-border-soft" />
         </div>
         <div className="h-4 w-48 animate-pulse rounded bg-dash-border-soft" />
       </div>

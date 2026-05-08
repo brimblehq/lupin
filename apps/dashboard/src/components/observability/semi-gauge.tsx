@@ -98,7 +98,7 @@ export function SemiGauge({
   }, [value]);
 
   return (
-    <div className="flex flex-1 flex-col rounded-[4px] border-[0.5px] border-dash-border-soft bg-dash-bg">
+    <div className="flex flex-1 flex-col rounded-lg border-[0.5px] border-dash-border-soft bg-dash-bg">
       <div className="flex min-h-[72px] items-center border-b-[0.5px] border-dash-border-soft px-4 py-3 sm:px-5 sm:py-0">
         <div>
           <h3 className="text-sm text-dash-text-strong">{title}</h3>

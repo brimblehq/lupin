@@ -10,7 +10,7 @@ import { useHaptics } from "@/hooks/use-haptics";
    ───────────────────────────────────────────── */
 
 const btnBase = cn(
-  "inline-flex items-center justify-center rounded-[4px] text-sm font-medium transition-colors",
+  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors",
   "shadow-[0px_1px_2px_rgba(18,18,23,0.05)]",
   "select-none",
 );
@@ -120,7 +120,7 @@ export function NumberPagination({
         }}
         disabled={isFirst || isLoading}
         aria-label="Previous page"
-        className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
+        className="flex size-8 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
       >
         {prevLoading ? <Spinner size="size-4" className="text-dash-text-faded" /> : <ChevronLeft className="size-4" />}
       </button>
@@ -141,7 +141,7 @@ export function NumberPagination({
             disabled={isLoading}
             aria-current={page === currentPage ? "page" : undefined}
             aria-label={`Page ${page}`}
-            className={`flex size-8 items-center justify-center rounded-[4px] text-sm transition-colors ${
+            className={`flex size-8 items-center justify-center rounded-lg text-sm transition-colors ${
               page === currentPage
                 ? "bg-dash-bg-elevated font-medium text-dash-text-strong"
                 : "text-dash-text-faded hover:bg-dash-bg-elevated"
@@ -160,7 +160,7 @@ export function NumberPagination({
         }}
         disabled={isLast || isLoading}
         aria-label="Next page"
-        className="flex size-8 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
+        className="flex size-8 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-30"
       >
         {nextLoading ? <Spinner size="size-4" className="text-dash-text-faded" /> : <ChevronRight className="size-4" />}
       </button>

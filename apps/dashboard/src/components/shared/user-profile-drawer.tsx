@@ -134,7 +134,7 @@ const aboutNav = [
 ];
 
 const navItemBase =
-  "flex items-center gap-2 whitespace-nowrap rounded-[4px] px-3.5 py-1.5 text-sm tracking-[-0.0224px] transition-colors w-full cursor-pointer";
+  "flex items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm tracking-[-0.0224px] transition-colors w-full cursor-pointer";
 
 function formatActivityTime(value: string): string {
   const timestamp = new Date(value).getTime();
@@ -194,12 +194,18 @@ function ActivitySessionSkeleton() {
         {rows.map((row, index) => (
           <div
             key={row}
-            className={cn("grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3", index !== 0 && "border-t border-dash-border-soft")}
+            className={cn(
+              "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3",
+              index !== 0 && "border-t border-dash-border-soft",
+            )}
           >
             <div className="size-5 shrink-0 animate-pulse rounded-full bg-dash-bg-elevated" style={{ animationDelay: `${index * 80}ms` }} />
             <div className="min-w-0">
               <div className="h-4 w-[68%] animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 40}ms` }} />
-              <div className="mt-2 h-3 w-[88%] animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 80}ms` }} />
+              <div
+                className="mt-2 h-3 w-[88%] animate-pulse rounded bg-dash-bg-elevated"
+                style={{ animationDelay: `${index * 80 + 80}ms` }}
+              />
             </div>
             <div className="h-3 w-14 animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 120}ms` }} />
           </div>
@@ -560,7 +566,7 @@ function ProfileForm({
           <button
             onClick={handleAvatarButtonClick}
             disabled={isUploadingAvatar || Boolean(isSaving)}
-            className="flex h-[34px] w-fit items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-50"
+            className="flex h-[34px] w-fit items-center rounded-lg border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-50"
           >
             {isUploadingAvatar ? "Uploading..." : hasCustomAvatar && isAltPressed ? "Remove photo" : "Upload photo"}
           </button>
@@ -1132,7 +1138,7 @@ function ApiKeySection({
                       }
                     }}
                     disabled={isDecrypting}
-                    className="shrink-0 rounded-[4px] p-1 text-dash-text-faded transition-colors hover:text-dash-text-strong"
+                    className="shrink-0 rounded-lg p-1 text-dash-text-faded transition-colors hover:text-dash-text-strong"
                     title={revealed ? "Hide" : "Reveal"}
                   >
                     {revealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -1140,7 +1146,7 @@ function ApiKeySection({
                   {decryptedApiKey ? (
                     <CopyButton text={decryptedApiKey} />
                   ) : (
-                    <button disabled className="shrink-0 rounded-[4px] p-1 text-dash-text-extra-faded" title="Reveal key to copy">
+                    <button disabled className="shrink-0 rounded-lg p-1 text-dash-text-extra-faded" title="Reveal key to copy">
                       <Copy className="size-4" />
                     </button>
                   )}
@@ -1291,7 +1297,7 @@ function WorkspaceProfileForm({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={!canEdit || isUploadingAvatar || Boolean(isSaving)}
-            className="flex h-[34px] w-fit items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-50"
+            className="flex h-[34px] w-fit items-center rounded-lg border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-50"
           >
             {isUploadingAvatar ? "Uploading..." : "Upload photo"}
           </button>
@@ -3647,7 +3653,7 @@ function MemberActionMenu({
 
       {/* Main menu */}
       {open && !subMenu && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[190px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-[190px] rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
           {canChangeRole && (
             <button
               onClick={() => setSubMenu("role")}
@@ -3688,7 +3694,7 @@ function MemberActionMenu({
 
       {/* Role picker */}
       {open && subMenu === "role" && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[220px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-[220px] rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
           <div className="flex items-center gap-2 px-3 py-1.5">
             <button onClick={() => setSubMenu(null)} className="text-dash-text-faded transition-colors hover:text-dash-text-strong">
               <ArrowLeft className="size-3.5" />
@@ -3736,7 +3742,7 @@ function MemberActionMenu({
 
       {/* Environment picker */}
       {open && subMenu === "env" && environments && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[220px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-[220px] rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
           <div className="flex items-center gap-2 px-3 py-1.5">
             <button onClick={() => setSubMenu(null)} className="text-dash-text-faded transition-colors hover:text-dash-text-strong">
               <ArrowLeft className="size-3.5" />
@@ -4189,7 +4195,7 @@ function MembersForm({
               </div>
               <button
                 onClick={() => setTransferOpen(true)}
-                className="shrink-0 rounded-[4px] border border-red-500/30 bg-gradient-to-b from-red-500 via-red-600 to-red-700 px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+                className="shrink-0 rounded-lg border border-red-500/30 bg-gradient-to-b from-red-500 via-red-600 to-red-700 px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
               >
                 Transfer ownership
               </button>

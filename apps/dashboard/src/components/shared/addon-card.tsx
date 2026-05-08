@@ -23,7 +23,7 @@ export function AddonCard({ addon, onManage }: { addon: Addon; onManage?: () => 
   const logoBgColor = logoColors?.logoBg ?? addon.logoBg;
 
   return (
-    <div className="flex h-full flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft transition-shadow hover:shadow-[0px_2px_8px_rgba(0,0,0,0.06)]">
+    <div className="flex h-full flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border-soft transition-shadow hover:shadow-[0px_2px_8px_rgba(0,0,0,0.06)]">
       {/* Gradient header with browser mockup + logo */}
       <div
         className={`relative h-[101px] overflow-clip border-b-[0.5px] border-dash-border ${logoColors ? "" : `bg-gradient-to-b ${addon.gradient}`}`}
@@ -31,7 +31,7 @@ export function AddonCard({ addon, onManage }: { addon: Addon; onManage?: () => 
       >
         {/* Browser window mockup */}
         <div
-          className="absolute top-4 h-[157px] w-[282px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft bg-dash-bg"
+          className="absolute top-4 h-[157px] w-[282px] overflow-clip rounded-lg border-[0.5px] border-dash-border-soft bg-dash-bg"
           style={{
             left: "calc(50% + 40px)",
             transform: "translateX(-50%)",

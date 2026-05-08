@@ -165,7 +165,7 @@ function FilterSelect({
     <div className="relative w-full sm:w-auto" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between overflow-clip rounded-[4px] border border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated sm:w-auto sm:justify-start"
+        className="flex w-full items-center justify-between overflow-clip rounded-lg border border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated sm:w-auto sm:justify-start"
       >
         <span className="flex items-center gap-2 px-3 py-1.5">
           {activeDot ? <span className="size-[6px] shrink-0 rounded-full" style={{ backgroundColor: activeDot }} /> : icon}
@@ -183,7 +183,7 @@ function FilterSelect({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-0 top-full z-50 mt-1 min-w-[160px] origin-top-left overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
+            className="absolute left-0 top-full z-50 mt-1 min-w-[160px] origin-top-left overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
           >
             {options.map((option) => (
               <button
@@ -402,7 +402,7 @@ function DeploymentMenu({
           if (!open) updatePos();
           setOpen((prev) => !prev);
         }}
-        className="ml-4 shrink-0 rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+        className="ml-4 shrink-0 rounded-lg p-1 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
       >
         {loading ? <RotateCw className="size-4 animate-spin" /> : <MoreVertical className="size-4" />}
       </button>
@@ -425,7 +425,7 @@ function DeploymentMenu({
                   zIndex: 9999,
                   pointerEvents: "auto",
                 }}
-                className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]"
+                className="overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]"
               >
                 {visibleActions.map((action) => (
                   <button
@@ -1208,7 +1208,7 @@ function DeploymentHistoryPage() {
       {/* Filter bar */}
       <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         {/* Search */}
-        <div className="flex w-full flex-1 items-center gap-2 rounded-[4px] border border-dash-border bg-dash-bg px-3 py-1.5 shadow-[0px_1px_2px_rgba(18,18,23,0.05)] sm:min-w-[280px]">
+        <div className="flex w-full flex-1 items-center gap-2 rounded-lg border border-dash-border bg-dash-bg px-3 py-1.5 shadow-[0px_1px_2px_rgba(18,18,23,0.05)] sm:min-w-[280px]">
           <Search className="size-4 shrink-0 text-dash-text-extra-faded" />
           <input
             type="text"
@@ -1222,7 +1222,7 @@ function DeploymentHistoryPage() {
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3">
           <div className="col-span-2 sm:col-span-1">
             <DateRangePicker value={dateRange} onChange={setDateRange}>
-              <button className="flex w-full items-center justify-between overflow-clip rounded-[4px] border border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated sm:w-auto sm:justify-start">
+              <button className="flex w-full items-center justify-between overflow-clip rounded-lg border border-dash-border bg-dash-bg text-sm text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated sm:w-auto sm:justify-start">
                 <span className="flex min-w-0 items-center gap-2 px-3 py-1.5">
                   <Calendar className="size-3.5 shrink-0 text-dash-text-faded" />
                   <span className="truncate">
@@ -1262,7 +1262,7 @@ function DeploymentHistoryPage() {
       </div>
 
       {/* Deployment list */}
-      <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+      <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border">
         {fetching ? (
           Array.from({ length: 6 }).map((_, i) => <DeploymentSkeleton key={i} />)
         ) : filtered.length > 0 ? (

@@ -1100,7 +1100,7 @@ export function DatabaseConnectionModal({ open, onOpenChange, connectionUri, isA
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 rounded-[4px] border-[0.5px] border-dash-border p-0.5">
+                <div className="flex items-center gap-1 rounded-lg border-[0.5px] border-dash-border p-0.5">
                   <button
                     type="button"
                     onClick={() => setGuideTab("code")}
@@ -1183,7 +1183,7 @@ function ConnectionGuideSkeleton() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="h-3 w-32 animate-pulse rounded bg-dash-border-soft" />
-        <div className="h-9 w-[240px] animate-pulse rounded-[4px] bg-dash-border-soft" />
+        <div className="h-9 w-[240px] animate-pulse rounded-lg bg-dash-border-soft" />
       </div>
 
       <div className="flex items-center justify-between">
@@ -1192,7 +1192,7 @@ function ConnectionGuideSkeleton() {
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 rounded-[4px] border-[0.5px] border-dash-border p-0.5">
+        <div className="flex items-center gap-1 rounded-lg border-[0.5px] border-dash-border p-0.5">
           <div className="h-6 w-20 animate-pulse rounded-[3px] bg-dash-border-soft" />
           <div className="h-6 w-12 animate-pulse rounded-[3px] bg-dash-border-soft" />
         </div>

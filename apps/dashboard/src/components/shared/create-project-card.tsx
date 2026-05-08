@@ -18,7 +18,7 @@ export function CreateProjectCard({ className }: CreateProjectCardProps) {
 
   return (
     <div
-      className={`flex h-full min-h-[120px] items-center justify-center overflow-clip rounded-[4px] border-[0.5px] border-dash-border ${className ?? ""}`}
+      className={`flex h-full min-h-[120px] items-center justify-center overflow-clip rounded-lg border-[0.5px] border-dash-border ${className ?? ""}`}
       style={{
         backgroundImage:
           "repeating-linear-gradient(135deg, transparent, transparent 10px, rgba(217,218,221,0.35) 10px, rgba(217,218,221,0.35) 11px)",

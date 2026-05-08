@@ -259,11 +259,11 @@ function ProjectDetailPage() {
       {/* Project preview banner */}
       <div className="flex flex-col gap-4">
         {showPreviewBanner ? (
-          <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border">
             {/* Gradient banner */}
             <div className="relative h-[232px] overflow-clip bg-gradient-to-b from-[#ea51bd] to-[#f1558a]">
               {/* Browser window mockup */}
-              <div className="absolute inset-x-[3.38%] top-[27px] h-[236px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-white">
+              <div className="absolute inset-x-[3.38%] top-[27px] h-[236px] overflow-clip rounded-lg border-[0.5px] border-dash-border bg-white">
                 <div className="flex h-[13px] items-center border-b-[0.5px] border-dash-border px-2 py-[6px]">
                   <div className="flex gap-1">
                     <span className="size-[4px] rounded-full bg-[#FF5F57]" />
@@ -308,7 +308,7 @@ function ProjectDetailPage() {
         ) : null}
 
         {isMcpProject ? (
-          <div className="rounded-[4px] bg-dash-bg-elevated p-3.5">
+          <div className="rounded-lg bg-dash-bg-elevated p-3.5">
             <p className="text-sm font-medium text-dash-text-strong">MCP Server</p>
             <p className="mt-1 text-sm font-light leading-[1.35] text-dash-text-faded">
               {mcpServerUrl ? (
@@ -330,7 +330,7 @@ function ProjectDetailPage() {
                     setCopiedIdx(-1);
                     setTimeout(() => setCopiedIdx(null), 2000);
                   }}
-                  className="inline-flex items-center gap-2 rounded-[4px] px-2.5 py-1.5 text-xs text-dash-text-body transition-colors hover:bg-dash-bg"
+                  className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-dash-text-body transition-colors hover:bg-dash-bg"
                 >
                   {copiedIdx === -1 ? <Check className="size-3.5 text-[#13d282]" /> : <Copy className="size-3.5" />}
                   {copiedIdx === -1 ? "Copied" : "Copy MCP URL"}
@@ -360,7 +360,7 @@ function ProjectDetailPage() {
           {isDatabaseProject ? <DbConnectionCard connectionUri={project?.connectionUri} isActive={projectStatus === "ACTIVE"} /> : null}
 
           {/* Project meta card */}
-          <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="flex flex-1 flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border">
             <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
               <span className="text-dash-text-strong">Project meta</span>
             </div>
@@ -387,7 +387,7 @@ function ProjectDetailPage() {
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Status code</span>
                   {typeof statusCode === "number" ? (
-                    <span className="rounded-[4px] bg-[#13d282]/15 px-2 py-0.5 text-xs font-medium text-[#13d282]">{statusCode}</span>
+                    <span className="rounded-lg bg-[#13d282]/15 px-2 py-0.5 text-xs font-medium text-[#13d282]">{statusCode}</span>
                   ) : (
                     <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">N/A</span>
                   )}
@@ -409,17 +409,13 @@ function ProjectDetailPage() {
               {showMcpAuthRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Authentication enabled</span>
-                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">
-                    {project?.authEnabled ? "Yes" : "No"}
-                  </span>
+                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{project?.authEnabled ? "Yes" : "No"}</span>
                 </div>
               ) : null}
               {showBuildCacheRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Build cache enabled</span>
-                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">
-                    {project?.buildCacheEnabled ? "Yes" : "No"}
-                  </span>
+                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{project?.buildCacheEnabled ? "Yes" : "No"}</span>
                 </div>
               ) : null}
               {showComputeSizeRow ? (
@@ -451,7 +447,9 @@ function ProjectDetailPage() {
                       aria-hidden="true"
                       className="size-4 invert dark:invert-0"
                     />
-                    <span className="text-sm font-light leading-[1.3] text-dash-text-faded">{isDatabaseProject ? "Image" : "Framework"}</span>
+                    <span className="text-sm font-light leading-[1.3] text-dash-text-faded">
+                      {isDatabaseProject ? "Image" : "Framework"}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{frameworkLabel}</span>
@@ -536,7 +534,7 @@ function ProjectDetailPage() {
 
           {/* Backups card (database projects) */}
           {isDatabaseProject ? (
-            <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+            <div className="flex flex-1 flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border">
               <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
                 <span className="text-dash-text-strong">Manage Backups</span>
               </div>
@@ -595,7 +593,7 @@ function ProjectDetailPage() {
 
           {/* Deployments card */}
           {!isDatabaseProject ? (
-            <div className="flex flex-1 flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+            <div className="flex flex-1 flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border">
               <div className="flex h-10 items-center justify-between border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-3 text-sm tracking-[-0.02px]">
                 <span className="text-dash-text-strong">Deployments</span>
                 <button
@@ -663,7 +661,7 @@ function ProjectDetailPage() {
           </div>
 
           {/* Domain rows */}
-          <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border">
             <table className="w-full border-collapse">
               <tbody>
                 {domainRows.length > 0 ? (
@@ -711,7 +709,7 @@ function ProjectDetailPage() {
                               setCopiedIdx(i);
                               setTimeout(() => setCopiedIdx(null), 2000);
                             }}
-                            className="inline-flex size-[34px] items-center justify-center rounded-[4px] border border-dash-border transition-colors hover:bg-dash-bg-elevated"
+                            className="inline-flex size-[34px] items-center justify-center rounded-lg border border-dash-border transition-colors hover:bg-dash-bg-elevated"
                           >
                             {copiedIdx === i ? (
                               <Check className="size-4 text-[#13d282]" />

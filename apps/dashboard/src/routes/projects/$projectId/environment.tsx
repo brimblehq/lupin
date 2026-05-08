@@ -46,11 +46,7 @@ import {
 } from "@/utils/project-environment";
 import { isDatabaseProject as getIsDatabaseProject } from "@/utils/project-capabilities";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
-import {
-  hasReferenceTrigger,
-  highlightReferences,
-  type ReferenceValidationContext,
-} from "@/utils/env-references";
+import { hasReferenceTrigger, highlightReferences, type ReferenceValidationContext } from "@/utils/env-references";
 import type { ProjectOption, ProjectVarOption, SharedVarOption } from "@/components/project/env-reference-autocomplete";
 import { ReferenceHighlightInput } from "@/components/project/reference-highlight-input";
 import { ReferenceCountBadge, ReferenceWarnings } from "@/components/project/env-reference-widgets";
@@ -140,9 +136,7 @@ export const Route = createFileRoute("/projects/$projectId/environment")({
       targets: sortEnvironmentTargets(targets),
       initialEnvLevelVars: envLevelResult.vars,
       initialEnvLevelVarsKey:
-        sharedLayerEnabled && projectEnvironmentId && envLevelResult.loaded
-          ? `${projectEnvironmentId}:${workspace ?? ""}`
-          : null,
+        sharedLayerEnabled && projectEnvironmentId && envLevelResult.loaded ? `${projectEnvironmentId}:${workspace ?? ""}` : null,
     } satisfies LoaderData;
     return data;
   },
@@ -193,7 +187,7 @@ function HighlightedEditor({
   }
 
   return (
-    <div className="relative h-[420px] w-full rounded-[4px] border-[0.5px] border-[#d0d5dd] bg-dash-bg">
+    <div className="relative h-[420px] w-full rounded-lg border-[0.5px] border-[#d0d5dd] bg-dash-bg">
       <pre
         ref={preRef}
         aria-hidden
@@ -216,7 +210,7 @@ function HighlightedEditor({
 
 function InfoBanner({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-[4px] bg-[#f59e0b]/8 px-3.5 py-3">
+    <div className="flex items-start gap-2.5 rounded-lg bg-[#f59e0b]/8 px-3.5 py-3">
       <Info className="mt-0.5 size-4 shrink-0 text-[#f59e0b]" weight="fill" />
       <div className="flex flex-col gap-0.5">
         <span className="text-xs font-medium uppercase tracking-wide text-[#b37a10] dark:text-[#f59e0b]">Quick Tip</span>
@@ -1482,7 +1476,7 @@ function EnvironmentPage() {
       <hr className="border-dash-border" />
 
       {!envTabSupported && (
-        <div className="rounded-[4px] border-[0.5px] border-dash-border px-4 py-5 text-sm text-dash-text-faded">
+        <div className="rounded-lg border-[0.5px] border-dash-border px-4 py-5 text-sm text-dash-text-faded">
           Secrets are not available for HTML projects.
         </div>
       )}
@@ -1491,7 +1485,7 @@ function EnvironmentPage() {
         <>
           {databaseProject && <InfoBanner>Connect to your database service using a private connection in the same region.</InfoBanner>}
 
-          <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border">
             <div
               className={`flex flex-wrap items-center gap-3 border-b-[0.5px] border-dash-border px-3.5 py-3.5 ${databaseProject ? "justify-end" : ""}`}
             >
@@ -1518,7 +1512,7 @@ function EnvironmentPage() {
                   }
                 }}
                 disabled={rawLoading}
-                className="flex h-[34px] items-center gap-2 rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3.5 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="flex h-[34px] items-center gap-2 rounded-lg border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3.5 text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {rawLoading ? <Spinner size="size-3.5" /> : <Code2 className="size-4" />}
                 Raw Editor
@@ -1527,7 +1521,7 @@ function EnvironmentPage() {
 
             {rawMode ? (
               <div className="px-3.5 pb-6 pt-5">
-                <div className="mb-3 flex w-fit items-center gap-1 rounded-[4px] border-[0.5px] border-dash-border p-0.5">
+                <div className="mb-3 flex w-fit items-center gap-1 rounded-lg border-[0.5px] border-dash-border p-0.5">
                   <button
                     type="button"
                     onClick={() => handleRawFormatChange("env")}
@@ -1559,7 +1553,7 @@ function EnvironmentPage() {
                   <button
                     type="button"
                     onClick={closeRawEditor}
-                    className="rounded-[4px] border border-dash-border px-3 py-1.5 text-sm text-dash-text-body hover:bg-dash-bg-elevated"
+                    className="rounded-lg border border-dash-border px-3 py-1.5 text-sm text-dash-text-body hover:bg-dash-bg-elevated"
                   >
                     Cancel
                   </button>
@@ -1615,7 +1609,7 @@ function EnvironmentPage() {
                                   <button
                                     type="button"
                                     onClick={() => toggleDraftShared(row.id)}
-                                    className="group flex h-[36px] shrink-0 items-center gap-1.5 rounded-[4px] px-2 text-dash-text-faded hover:text-dash-text-body"
+                                    className="group flex h-[36px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-dash-text-faded hover:text-dash-text-body"
                                   >
                                     <span
                                       className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
@@ -1644,7 +1638,7 @@ function EnvironmentPage() {
                                     return next;
                                   })
                                 }
-                                className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[4px] text-dash-text-faded hover:text-dash-text-body"
+                                className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg text-dash-text-faded hover:text-dash-text-body"
                                 title={hiddenDraftIds.has(row.id) ? "Show value" : "Hide value"}
                               >
                                 {hiddenDraftIds.has(row.id) ? <Eye className="size-4" /> : <EyeSlash className="size-4" />}
@@ -1653,7 +1647,7 @@ function EnvironmentPage() {
                                 type="button"
                                 onClick={() => removeDraftRow(row.id)}
                                 disabled={draftRows.length === 1}
-                                className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[4px] text-dash-text-faded hover:text-red-400 disabled:opacity-30"
+                                className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg text-dash-text-faded hover:text-red-400 disabled:opacity-30"
                               >
                                 <X className="size-4" />
                               </button>

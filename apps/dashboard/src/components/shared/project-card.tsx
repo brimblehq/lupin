@@ -186,7 +186,7 @@ export function ProjectCard({ project, onTagsChange }: { project: Project; onTag
         whileHover={{ y: -3, scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        className="flex min-h-[168px] cursor-pointer flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border"
+        className="flex min-h-[168px] cursor-pointer flex-col overflow-clip rounded-lg border-[0.5px] border-dash-border"
       >
         {/* Project name + commit message */}
         <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-3.5 pt-3 pb-2 text-sm tracking-[-0.02px]">

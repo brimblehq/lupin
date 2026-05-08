@@ -56,7 +56,7 @@ export function BuildMinutesCard({
           <button
             type="button"
             onClick={() => setTopUpOpen(true)}
-            className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-[4px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
+            className="flex h-[30px] shrink-0 items-center gap-1.5 rounded-lg border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
           >
             <Clock className="h-3.5 w-3.5" />
             Top up
@@ -145,7 +145,10 @@ function TopUpBuildMinutesModal({
     const firstDot = cleaned.indexOf(".");
     if (firstDot !== -1) {
       const head = cleaned.slice(0, firstDot + 1);
-      const tail = cleaned.slice(firstDot + 1).replace(/\./g, "").slice(0, 2);
+      const tail = cleaned
+        .slice(firstDot + 1)
+        .replace(/\./g, "")
+        .slice(0, 2);
       cleaned = head + tail;
     }
     return cleaned;
@@ -236,12 +239,7 @@ function TopUpBuildMinutesModal({
       <div className="flex flex-col gap-5 px-6 py-5">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm text-dash-text-body">Quick select</label>
-          <Dropdown
-            value={selectedPresetId}
-            options={presetOptions}
-            onChange={handlePresetSelect}
-            placeholder="Choose a preset amount"
-          />
+          <Dropdown value={selectedPresetId} options={presetOptions} onChange={handlePresetSelect} placeholder="Choose a preset amount" />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -280,7 +278,7 @@ function TopUpBuildMinutesModal({
         </div>
 
         {hasPaymentMethod ? (
-          <div className="flex items-center justify-between rounded-[4px] bg-dash-bg-elevated px-3 py-2.5">
+          <div className="flex items-center justify-between rounded-lg bg-dash-bg-elevated px-3 py-2.5">
             <span className="text-sm text-dash-text-faded">Pay with</span>
             <span className="text-sm text-dash-text-strong">
               {cardBrand}
@@ -288,7 +286,7 @@ function TopUpBuildMinutesModal({
             </span>
           </div>
         ) : (
-          <div className="rounded-[4px] bg-[#f5a623]/[0.06] px-3 py-2.5 dark:bg-[#f5a623]/[0.08]">
+          <div className="rounded-lg bg-[#f5a623]/[0.06] px-3 py-2.5 dark:bg-[#f5a623]/[0.08]">
             <p className="text-sm leading-[1.4] text-[#b37a10] dark:text-[#f5a623]">Add a payment method before topping up.</p>
           </div>
         )}

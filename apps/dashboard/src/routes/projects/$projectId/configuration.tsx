@@ -5,7 +5,20 @@ import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { GearSix, Hammer, Cpu, Warning, DatabaseIcon, MagnifyingGlass, GithubLogo, X, Info, ArrowsClockwise, Eye, EyeSlash } from "@phosphor-icons/react";
+import {
+  GearSix,
+  Hammer,
+  Cpu,
+  Warning,
+  DatabaseIcon,
+  MagnifyingGlass,
+  GithubLogo,
+  X,
+  Info,
+  ArrowsClockwise,
+  Eye,
+  EyeSlash,
+} from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
@@ -357,7 +370,7 @@ function EnvironmentSection({
   const options = environments.map((e) => ({ id: e._id, label: e.name }));
 
   return (
-    <div className="mb-6 rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="mb-6 rounded-lg border-[0.5px] border-dash-border">
       <div className="flex items-center justify-between gap-4 px-4 py-4">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <label className="text-sm font-medium text-dash-text-strong">Environment</label>
@@ -641,7 +654,7 @@ function RepoSection({
 
   return (
     <>
-      <div className="mb-4 rounded-[4px] border-[0.5px] border-dash-border">
+      <div className="mb-4 rounded-lg border-[0.5px] border-dash-border">
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-dash-text-strong">Connected repository</label>
@@ -723,7 +736,7 @@ function RepoSection({
 
           {/* Repo list */}
           <div
-            className="max-h-[320px] overflow-y-auto overflow-clip rounded-[4px] border-[0.5px] border-dash-border"
+            className="max-h-[320px] overflow-y-auto overflow-clip rounded-lg border-[0.5px] border-dash-border"
             style={{
               scrollbarWidth: "thin",
               scrollbarColor: "rgba(255,255,255,0.1) transparent",
@@ -802,7 +815,7 @@ function GeneralSection({
       enableReinitialize
     >
       {({ values, errors, touched, dirty, isSubmitting, handleSubmit, handleChange, handleBlur, setFieldValue }) => (
-        <form className="rounded-[4px] border-[0.5px] border-dash-border" onSubmit={handleSubmit}>
+        <form className="rounded-lg border-[0.5px] border-dash-border" onSubmit={handleSubmit}>
           {/* Row 1: Project name */}
           <div className="flex flex-col gap-1.5 px-4 py-4">
             <label className="text-sm font-medium text-dash-text-strong">Project name</label>
@@ -1002,8 +1015,7 @@ function BuildSection({
   ]);
 
   const watchPathsChanged =
-    values.watchPaths.length !== initialValues.watchPaths.length ||
-    values.watchPaths.some((p, i) => p !== initialValues.watchPaths[i]);
+    values.watchPaths.length !== initialValues.watchPaths.length || values.watchPaths.some((p, i) => p !== initialValues.watchPaths[i]);
 
   const dirty =
     values.installCommand !== initialValues.installCommand ||
@@ -1015,9 +1027,7 @@ function BuildSection({
     values.outputDirectory !== initialValues.outputDirectory ||
     watchPathsChanged;
 
-  const availableWatchPathOptions = watchPathSuggestions
-    .filter((p) => !values.watchPaths.includes(p))
-    .map((p) => ({ id: p, label: p }));
+  const availableWatchPathOptions = watchPathSuggestions.filter((p) => !values.watchPaths.includes(p)).map((p) => ({ id: p, label: p }));
 
   function addWatchPath(path: string) {
     const trimmed = path.trim();
@@ -1040,7 +1050,7 @@ function BuildSection({
   }
 
   return (
-    <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border">
       {showDockerSourceFields && (
         <>
           <div className="flex flex-col gap-1.5 px-4 py-4">
@@ -1162,7 +1172,8 @@ function BuildSection({
           <div className="flex flex-col gap-1.5 px-4 py-4">
             <label className="text-sm font-medium text-dash-text-strong">Watch paths</label>
             <p className="text-xs text-dash-text-faded">
-              Only redeploy when changes land in one of these paths. Supports glob patterns like <code className="font-mono text-[11px]">/src/**</code>.
+              Only redeploy when changes land in one of these paths. Supports glob patterns like{" "}
+              <code className="font-mono text-[11px]">/src/**</code>.
             </p>
             {values.watchPaths.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-2">
@@ -1267,7 +1278,7 @@ function ResourcesSection({
       enableReinitialize
     >
       {({ values, dirty, isSubmitting, handleSubmit, setFieldValue }) => (
-        <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+        <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border">
           {/* Row 1: CPU */}
           <div className="flex flex-col gap-2 px-4 py-4">
             <label className="text-sm font-medium text-dash-text-strong">CPU</label>
@@ -1398,7 +1409,7 @@ function ResourcesSection({
                         </div>
                       </div>
 
-                      <div className="rounded-[4px] bg-[#4879f8]/[0.04] px-3 py-2.5 dark:bg-[#4879f8]/[0.08]">
+                      <div className="rounded-lg bg-[#4879f8]/[0.04] px-3 py-2.5 dark:bg-[#4879f8]/[0.08]">
                         <p className="text-xs leading-relaxed text-dash-text-body">
                           <span className="font-medium text-[#4879f8]">${PERSISTENT_STORAGE_PRICE_PER_GB}/GB per month.</span> Data persists
                           across container restarts and deployments. The volume mounts at{" "}
@@ -1471,7 +1482,7 @@ function DatabaseConfigurationPanel({
         const isPublicAccess = (values.whitelistIps ?? []).some((ip) => ip.value === "0.0.0.0/0");
 
         return (
-          <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border">
             <div className="flex flex-col gap-1.5 px-4 py-4">
               <label className="text-sm font-medium text-dash-text-strong">Project name</label>
               <input
@@ -1580,7 +1591,7 @@ function DatabaseConfigurationPanel({
                         }}
                         title="Generate a strong password"
                         aria-label="Generate a strong password"
-                        className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                        className="flex size-7 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
                       >
                         <ArrowsClockwise className="size-3.5" />
                       </button>
@@ -1591,7 +1602,7 @@ function DatabaseConfigurationPanel({
                       title={showPassword ? "Hide password" : "Show password"}
                       aria-label={showPassword ? "Hide password" : "Show password"}
                       aria-pressed={showPassword}
-                      className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                      className="flex size-7 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
                     >
                       {showPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
                     </button>
@@ -1619,7 +1630,7 @@ function DatabaseConfigurationPanel({
                     title={showPassword ? "Hide password" : "Show password"}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     aria-pressed={showPassword}
-                    className="absolute inset-y-0 right-2 my-auto flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                    className="absolute inset-y-0 right-2 my-auto flex size-7 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
                   >
                     {showPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
                   </button>
@@ -1666,7 +1677,7 @@ function DangerSection({
 
   return (
     <>
-      <div className="overflow-clip rounded-[4px] border-[0.5px]">
+      <div className="overflow-clip rounded-lg border-[0.5px]">
         {/* Row 1: Maintenance mode */}
         <div className="flex items-center justify-between gap-4 px-4 py-4">
           <div className="flex flex-col gap-1">
@@ -1691,7 +1702,7 @@ function DangerSection({
           </div>
           <button
             onClick={() => setDeleteOpen(true)}
-            className="shrink-0 rounded-[4px] border border-red-500/30 bg-gradient-to-b from-red-500 via-red-600 to-red-700 px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+            className="shrink-0 rounded-lg border border-red-500/30 bg-gradient-to-b from-red-500 via-red-600 to-red-700 px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
           >
             Delete project
           </button>
@@ -1718,10 +1729,7 @@ function DangerSection({
           setDeleting(true);
           let deleted = false;
           try {
-            await withStepUp(
-              (twoFactorToken) => deleteProject({ data: { projectId, workspace, twoFactorToken } }),
-              requestStepUp,
-            );
+            await withStepUp((twoFactorToken) => deleteProject({ data: { projectId, workspace, twoFactorToken } }), requestStepUp);
             toast.success("Project deleted successfully");
             deleted = true;
           } catch (error) {
@@ -2231,7 +2239,7 @@ function ConfigurationPage() {
       {/* Sidebar + Content layout */}
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
         {/* Sidebar nav */}
-        <nav className="scrollbar-hidden flex w-full gap-1 overflow-x-auto rounded-[4px] border-[0.5px] border-dash-border p-1 lg:sticky lg:top-8 lg:w-[180px] lg:shrink-0 lg:flex-col lg:gap-0.5 lg:self-start lg:overflow-visible lg:rounded-none lg:border-0 lg:p-0">
+        <nav className="scrollbar-hidden flex w-full gap-1 overflow-x-auto rounded-lg border-[0.5px] border-dash-border p-1 lg:sticky lg:top-8 lg:w-[180px] lg:shrink-0 lg:flex-col lg:gap-0.5 lg:self-start lg:overflow-visible lg:rounded-none lg:border-0 lg:p-0">
           {sections.map((s) => (
             <button
               key={s.id}
@@ -2239,7 +2247,7 @@ function ConfigurationPage() {
                 haptics.selection();
                 setActiveSection(s.id);
               }}
-              className={`shrink-0 whitespace-nowrap lg:w-full flex items-center gap-2.5 rounded-[4px] px-3 py-2 text-left text-sm transition-colors ${
+              className={`shrink-0 whitespace-nowrap lg:w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                 s.id === activeSection
                   ? "bg-dash-bg-elevated font-medium text-dash-text-strong"
                   : "text-dash-text-faded hover:bg-dash-bg-elevated/50 hover:text-dash-text-body"

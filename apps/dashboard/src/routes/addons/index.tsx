@@ -175,7 +175,7 @@ function AddonsPage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease }}
-        className="relative overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft"
+        className="relative overflow-clip rounded-lg border-[0.5px] border-dash-border-soft"
       >
         <div className="relative z-10 px-8 py-8">
           <h2 className="text-base font-medium tracking-[-0.03px] text-dash-text-strong">Discover MCP Servers</h2>

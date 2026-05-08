@@ -72,13 +72,13 @@ function TimeIntervalDropdown({ value, onChange }: { value: string; onChange: (v
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex h-[34px] items-center gap-1.5 rounded-[4px] border-[0.5px] border-dash-border px-3 text-xs font-medium text-dash-text-strong"
+        className="flex h-[34px] items-center gap-1.5 rounded-lg border-[0.5px] border-dash-border px-3 text-xs font-medium text-dash-text-strong"
       >
         {value}
         <ChevronDown className={`size-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
           {timeIntervals.map((interval) => (
             <button
               key={interval}
@@ -262,7 +262,7 @@ function AppMetrics({
         />
       </div>
 
-      <div className="rounded-[4px] border-[0.5px] border-dash-border">
+      <div className="rounded-lg border-[0.5px] border-dash-border">
         <div className="flex flex-col gap-2 border-b-[0.5px] border-dash-border sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <div className="scrollbar-hidden min-w-0 overflow-x-auto">
             <div className="flex min-w-max">
@@ -474,9 +474,9 @@ function VisitorBarChart({ points, unit, seriesLabel }: { points: { x: string; y
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
             >
-              <div className="relative w-full overflow-hidden rounded-[4px]" style={{ height: barH }}>
+              <div className="relative w-full overflow-hidden rounded-lg" style={{ height: barH }}>
                 <div
-                  className="absolute inset-0 rounded-[4px]"
+                  className="absolute inset-0 rounded-lg"
                   style={{
                     backgroundColor: "var(--color-dash-bg-elevated)",
                     backgroundImage:
@@ -545,7 +545,7 @@ function ListCard({
   const canExpand = showSeeAll && items.length > collapsedCount;
   const visible = expanded || !canExpand ? items : items.slice(0, collapsedCount);
   return (
-    <div className="flex flex-1 flex-col rounded-[4px] border-[0.5px] border-dash-border">
+    <div className="flex flex-1 flex-col rounded-lg border-[0.5px] border-dash-border">
       <div className="flex items-start justify-between gap-3 border-b-[0.5px] border-dash-border px-4 py-3">
         <div>
           <h3 className="text-sm font-medium text-dash-text-strong">{title}</h3>
@@ -1008,14 +1008,14 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
           <button
             type="button"
             onClick={() => setInstallOpen(true)}
-            className="shrink-0 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-3 py-1.5 text-xs font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+            className="shrink-0 rounded-lg border-[0.5px] border-dash-border bg-dash-bg px-3 py-1.5 text-xs font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
           >
             Install snippet
           </button>
         </div>
       </div>
 
-      <div className="flex flex-col gap-6 overflow-hidden rounded-[4px] bg-[#0a1430] px-5 py-6 shadow-lg sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:pl-7 sm:pr-10 sm:py-7">
+      <div className="flex flex-col gap-6 overflow-hidden rounded-lg bg-[#0a1430] px-5 py-6 shadow-lg sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:pl-7 sm:pr-10 sm:py-7">
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-medium uppercase tracking-[1.5px] text-[#cfe0ff]/70">Analytics:</span>
           <p className="text-xs font-light leading-[1.4] text-[#cfe0ff]/50">
@@ -1066,7 +1066,7 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
         </div>
       </div>
 
-      <div className="rounded-[4px] border-[0.5px] border-dash-border p-5">
+      <div className="rounded-lg border-[0.5px] border-dash-border p-5">
         <div className="mb-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-light text-dash-text-faded">{chartLabel}</p>
@@ -1084,7 +1084,7 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
                   type="button"
                   onClick={() => setHostOpen((open) => !open)}
                   disabled={refetching}
-                  className="flex w-full items-center justify-between gap-1.5 rounded-[4px] border-[0.5px] border-dash-border px-3 py-1.5 text-xs font-medium text-dash-text-strong sm:w-auto sm:justify-start"
+                  className="flex w-full items-center justify-between gap-1.5 rounded-lg border-[0.5px] border-dash-border px-3 py-1.5 text-xs font-medium text-dash-text-strong sm:w-auto sm:justify-start"
                 >
                   {selectedDomain
                     ? `${selectedDomain.host} · ${formatNumber(selectedDomain.pageviews)}`
@@ -1092,7 +1092,7 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
                   <ChevronDown className={`size-3 transition-transform ${hostOpen ? "rotate-180" : ""}`} />
                 </button>
                 {hostOpen && (
-                  <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
+                  <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
                     <button
                       type="button"
                       onClick={() => void handleHostChange(undefined)}
@@ -1126,13 +1126,13 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
               <button
                 onClick={() => setPeriodOpen(!periodOpen)}
                 disabled={refetching}
-                className="flex w-full items-center justify-between gap-1.5 rounded-[4px] border-[0.5px] border-dash-border px-3 py-1.5 text-xs font-medium text-dash-text-strong sm:w-auto sm:justify-start"
+                className="flex w-full items-center justify-between gap-1.5 rounded-lg border-[0.5px] border-dash-border px-3 py-1.5 text-xs font-medium text-dash-text-strong sm:w-auto sm:justify-start"
               >
                 {refetching ? "Loading..." : preset.label}
                 <ChevronDown className={`size-3 transition-transform ${periodOpen ? "rotate-180" : ""}`} />
               </button>
               {periodOpen && (
-                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-lg">
                   {RANGE_PRESETS.map((p) => (
                     <button
                       key={p.label}
@@ -1153,7 +1153,7 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
       </div>
 
       {hasFilteredEmptyState ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-[4px] border-[0.5px] border-dash-border px-6 py-16 text-center">
+        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border-[0.5px] border-dash-border px-6 py-16 text-center">
           <img src="/icons/traffic.svg" alt="" className="size-12 opacity-70 dark:opacity-60 dark:invert" />
           <div className="flex max-w-[420px] flex-col gap-1">
             <p className="text-sm font-medium text-dash-text-strong">No traffic from {data.filteredHost} in this date range</p>
@@ -1162,7 +1162,7 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
           <button
             type="button"
             onClick={() => void handleHostChange(undefined)}
-            className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-3 py-1.5 text-xs font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+            className="rounded-lg border-[0.5px] border-dash-border bg-dash-bg px-3 py-1.5 text-xs font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
           >
             View all domains
           </button>
@@ -1176,7 +1176,7 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
             }))}
           />
 
-          <div className="flex flex-col rounded-[4px] border-[0.5px] border-dash-border">
+          <div className="flex flex-col rounded-lg border-[0.5px] border-dash-border">
             <div className="border-b-[0.5px] border-dash-border px-4 py-3">
               <h3 className="text-sm font-medium text-dash-text-strong">Page performance</h3>
               <p className="text-xs font-light text-dash-text-faded">Core Web Vitals (p75) over this window</p>
@@ -1234,7 +1234,7 @@ export function AppAnalytics({ initial, projectId }: { initial: AnalyticsPayload
                 value: `${formatNumber(c.y)} visitors`,
               }))}
             />
-            <div className="flex flex-1 flex-col rounded-[4px] border-[0.5px] border-dash-border">
+            <div className="flex flex-1 flex-col rounded-lg border-[0.5px] border-dash-border">
               <div className="flex flex-col gap-2 border-b-[0.5px] border-dash-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-sm font-medium text-dash-text-strong">Browser &amp; Device Information</h3>
                 <SegmentedToggle
@@ -1329,10 +1329,7 @@ function ObservabilityPage() {
     return (
       <div className="mx-auto flex max-w-[1000px] flex-col gap-6 px-4 py-8 sm:px-0">
         <TabHeader title="Metrics & Observability">Monitor your app's key metrics and health.</TabHeader>
-        <PlanUpgradePrompt
-          feature="Observability"
-          description="Upgrade to a higher plan to monitor your app's metrics."
-        />
+        <PlanUpgradePrompt feature="Observability" description="Upgrade to a higher plan to monitor your app's metrics." />
       </div>
     );
   }

@@ -37,7 +37,7 @@ function splitDomain(domainName: string): { base: string; tld: string } {
 
 const variantClasses = {
   dashboard: {
-    root: "flex items-center justify-between rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-3 text-left transition-colors",
+    root: "flex items-center justify-between rounded-lg border-[0.5px] border-dash-border px-3.5 py-3 text-left transition-colors",
     hover: "hover:bg-dash-bg-elevated",
     unavailable: "cursor-default opacity-50",
     text: "flex items-center gap-1.5 text-sm text-dash-text-body",

@@ -91,7 +91,7 @@ function formatCardType(cardType?: string): string {
 
 function CardChip() {
   return (
-    <div className="relative h-8 w-[45px] shrink-0 overflow-hidden rounded-[4px] bg-[radial-gradient(circle_at_84%_10%,#5a5454_0%,#383636_55%,#1f1f1f_100%)] shadow-[0px_1px_1px_rgba(0,0,0,0.16),0px_1px_0px_rgba(0,0,0,0.11)]">
+    <div className="relative h-8 w-[45px] shrink-0 overflow-hidden rounded-lg bg-[radial-gradient(circle_at_84%_10%,#5a5454_0%,#383636_55%,#1f1f1f_100%)] shadow-[0px_1px_1px_rgba(0,0,0,0.16),0px_1px_0px_rgba(0,0,0,0.11)]">
       <div className="absolute left-[5px] top-[12px] h-[7px] w-[10px] rounded-[1.5px] bg-white/10" />
       <div className="absolute bottom-[5px] right-[5px] flex items-center gap-0.5">
         <span className="size-[3px] rounded-full bg-[#ea4335]" />
@@ -252,7 +252,7 @@ function BuyDomainPage() {
 
       toast.success(`${target.domainName} purchased successfully!`);
       setPurchaseTarget(null);
-      await router.invalidate({ filter: (route) => route.routeId === '/domains/' });
+      await router.invalidate({ filter: (route) => route.routeId === "/domains/" });
       const detailPath = `/domains/${encodeURIComponent(target.domainName)}`;
       router.navigate({
         to: withWorkspaceQuery({ pathname: detailPath, searchStr }) as any,
@@ -335,10 +335,11 @@ function BuyDomainPage() {
         </GlossyButton>
       </div>
       {showDiscountBanner && (
-        <div className="mb-4 flex items-center gap-3 rounded-[4px] bg-[#34d399]/10 px-4 py-2.5 dark:bg-[#34d399]/15">
+        <div className="mb-4 flex items-center gap-3 rounded-lg bg-[#34d399]/10 px-4 py-2.5 dark:bg-[#34d399]/15">
           <Tag className="size-4 shrink-0 text-[#229464] dark:text-[#34d399]" />
           <p className="flex-1 text-sm text-dash-text-body dark:text-dash-text-strong">
-            Domain sale is on — save up to <span className="font-medium text-[#229464] dark:text-[#34d399]">{maxDiscountPercent}%</span> on first-year registration.
+            Domain sale is on — save up to <span className="font-medium text-[#229464] dark:text-[#34d399]">{maxDiscountPercent}%</span> on
+            first-year registration.
           </p>
           <button
             type="button"
@@ -351,7 +352,7 @@ function BuyDomainPage() {
         </div>
       )}
       {showUnavailableBanner && (
-        <div className="mb-4 flex items-center gap-3 rounded-[4px] bg-[#ef2f1f]/5 px-4 py-2.5 dark:bg-[#ef2f1f]/15">
+        <div className="mb-4 flex items-center gap-3 rounded-lg bg-[#ef2f1f]/5 px-4 py-2.5 dark:bg-[#ef2f1f]/15">
           <AlertCircle className="size-4 shrink-0 text-[#ef2f1f]" />
           <p className="text-sm text-dash-text-body dark:text-dash-text-strong">{searchedDomain} is not available for purchase.</p>
         </div>
@@ -430,118 +431,120 @@ function BuyDomainPage() {
       {/* Purchase modal */}
       <PaymentProvider>
         <Modal
-        open={!!purchaseTarget}
-        onOpenChange={(open) => {
-          if (!open && !purchasing) {
-            setPurchaseTarget(null);
-          }
-        }}
-        width={420}
-      >
-        <ModalHeader title="Purchase domain" description="Complete your domain purchase" />
+          open={!!purchaseTarget}
+          onOpenChange={(open) => {
+            if (!open && !purchasing) {
+              setPurchaseTarget(null);
+            }
+          }}
+          width={420}
+        >
+          <ModalHeader title="Purchase domain" description="Complete your domain purchase" />
 
-        {purchaseTarget && (
-          <div className="flex flex-col gap-4 px-6 py-5">
-            {/* Domain + price */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3">
-                <span className="text-sm font-medium text-dash-text-strong">{purchaseTarget.domainName}</span>
-                <span className="text-sm font-medium text-[#34d399]">{formatUsd(purchaseTarget.price ?? 0)}/yr</span>
-              </div>
-              {purchaseTarget.renewalPrice != null && purchaseTarget.renewalPrice !== purchaseTarget.price && (
-                <p className="px-1 text-xs text-dash-text-extra-faded">Renews at {formatUsd(purchaseTarget.renewalPrice)}/yr after the first year.</p>
-              )}
-            </div>
-
-            {/* Payment method */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm text-dash-text-faded">Payment method</label>
-              {defaultCard ? (
-                <>
-                  <div className="flex items-center gap-3 rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-2.5">
-                    <CardChip />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-dash-text-strong">{formatCardType(defaultCard.cardType)}</span>
-                      <span className="text-xs text-dash-text-faded">ending in {defaultCard.last4 ?? "****"}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-dash-text-extra-faded">Domain purchases use your available saved card automatically.</p>
-                </>
-              ) : (
-                <AddCardForm
-                  onClose={() => {}}
-                  showHeader={false}
-                  showCancel={false}
-                  animated={false}
-                  submitLabel="Add card & continue"
-                  onSuccess={handleCardAddedDuringPurchase}
-                />
-              )}
-            </div>
-
-            {/* Duration */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm text-dash-text-faded">
-                Duration
-                {isAi && <span className="ml-1 text-xs text-dash-text-extra-faded">(.ai domains require 2-year terms)</span>}
-              </label>
-              <Dropdown value={String(years)} options={getDurationOptions()} onChange={(id) => setYears(Number(id))} />
-            </div>
-
-            {/* Privacy protection */}
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-sm text-dash-text-body">Privacy protection</span>
-                <span className="text-xs text-dash-text-faded">
-                  {isApp ? "Included free with .app domains" : `${formatUsd(PRIVACY_PRICE)}/yr — hides your WHOIS info`}
-                </span>
-              </div>
-              <ToggleSwitch checked={effectivePrivacy} onChange={setPrivacyEnabled} disabled={isApp} />
-            </div>
-
-            {/* Auto renewal */}
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-sm text-dash-text-body">Auto renewal</span>
-                <span className="text-xs text-dash-text-faded">Automatically renew before expiration</span>
-              </div>
-              <ToggleSwitch checked={autoRenewal} onChange={setAutoRenewal} />
-            </div>
-
-            {/* Total */}
-            <div className="flex flex-col gap-1.5 border-t-[0.5px] border-dash-border pt-3">
-              <div className="flex items-center justify-between text-sm text-dash-text-faded">
-                <span>
-                  Domain ({years} {years === 1 ? "year" : "years"})
-                </span>
-                <span>{formatUsd(domainCost)}</span>
-              </div>
-              {effectivePrivacy && (
-                <div className="flex items-center justify-between text-sm text-dash-text-faded">
-                  <span>Privacy protection</span>
-                  <span>{isApp ? "Free" : formatUsd(PRIVACY_PRICE)}</span>
+          {purchaseTarget && (
+            <div className="flex flex-col gap-4 px-6 py-5">
+              {/* Domain + price */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between rounded-lg border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3">
+                  <span className="text-sm font-medium text-dash-text-strong">{purchaseTarget.domainName}</span>
+                  <span className="text-sm font-medium text-[#34d399]">{formatUsd(purchaseTarget.price ?? 0)}/yr</span>
                 </div>
-              )}
-              <div className="flex items-center justify-between pt-1.5">
-                <span className="text-sm font-medium text-dash-text-body">Total</span>
-                <span className="text-base font-medium text-dash-text-strong">{formatUsd(total)}</span>
+                {purchaseTarget.renewalPrice != null && purchaseTarget.renewalPrice !== purchaseTarget.price && (
+                  <p className="px-1 text-xs text-dash-text-extra-faded">
+                    Renews at {formatUsd(purchaseTarget.renewalPrice)}/yr after the first year.
+                  </p>
+                )}
+              </div>
+
+              {/* Payment method */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm text-dash-text-faded">Payment method</label>
+                {defaultCard ? (
+                  <>
+                    <div className="flex items-center gap-3 rounded-lg border-[0.5px] border-dash-border px-3.5 py-2.5">
+                      <CardChip />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-dash-text-strong">{formatCardType(defaultCard.cardType)}</span>
+                        <span className="text-xs text-dash-text-faded">ending in {defaultCard.last4 ?? "****"}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-dash-text-extra-faded">Domain purchases use your available saved card automatically.</p>
+                  </>
+                ) : (
+                  <AddCardForm
+                    onClose={() => {}}
+                    showHeader={false}
+                    showCancel={false}
+                    animated={false}
+                    submitLabel="Add card & continue"
+                    onSuccess={handleCardAddedDuringPurchase}
+                  />
+                )}
+              </div>
+
+              {/* Duration */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm text-dash-text-faded">
+                  Duration
+                  {isAi && <span className="ml-1 text-xs text-dash-text-extra-faded">(.ai domains require 2-year terms)</span>}
+                </label>
+                <Dropdown value={String(years)} options={getDurationOptions()} onChange={(id) => setYears(Number(id))} />
+              </div>
+
+              {/* Privacy protection */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-sm text-dash-text-body">Privacy protection</span>
+                  <span className="text-xs text-dash-text-faded">
+                    {isApp ? "Included free with .app domains" : `${formatUsd(PRIVACY_PRICE)}/yr — hides your WHOIS info`}
+                  </span>
+                </div>
+                <ToggleSwitch checked={effectivePrivacy} onChange={setPrivacyEnabled} disabled={isApp} />
+              </div>
+
+              {/* Auto renewal */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-sm text-dash-text-body">Auto renewal</span>
+                  <span className="text-xs text-dash-text-faded">Automatically renew before expiration</span>
+                </div>
+                <ToggleSwitch checked={autoRenewal} onChange={setAutoRenewal} />
+              </div>
+
+              {/* Total */}
+              <div className="flex flex-col gap-1.5 border-t-[0.5px] border-dash-border pt-3">
+                <div className="flex items-center justify-between text-sm text-dash-text-faded">
+                  <span>
+                    Domain ({years} {years === 1 ? "year" : "years"})
+                  </span>
+                  <span>{formatUsd(domainCost)}</span>
+                </div>
+                {effectivePrivacy && (
+                  <div className="flex items-center justify-between text-sm text-dash-text-faded">
+                    <span>Privacy protection</span>
+                    <span>{isApp ? "Free" : formatUsd(PRIVACY_PRICE)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-1.5">
+                  <span className="text-sm font-medium text-dash-text-body">Total</span>
+                  <span className="text-base font-medium text-dash-text-strong">{formatUsd(total)}</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <ModalFooter>
-          <ModalCancelButton />
-          <GlossyButton
-            variant="blue"
-            onClick={handlePurchase}
-            disabled={purchasing || !defaultCard}
-            loading={purchasing}
-            loadingLabel="Purchasing..."
-          >
-            Purchase domain
-          </GlossyButton>
-        </ModalFooter>
+          <ModalFooter>
+            <ModalCancelButton />
+            <GlossyButton
+              variant="blue"
+              onClick={handlePurchase}
+              disabled={purchasing || !defaultCard}
+              loading={purchasing}
+              loadingLabel="Purchasing..."
+            >
+              Purchase domain
+            </GlossyButton>
+          </ModalFooter>
         </Modal>
       </PaymentProvider>
     </div>

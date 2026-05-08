@@ -296,7 +296,8 @@ function EditNameserversModal({
 
   useEffect(() => {
     if (!open) return;
-    const seed = initialNameservers.length >= 2 ? initialNameservers : [...initialNameservers, ...Array(2 - initialNameservers.length).fill("")];
+    const seed =
+      initialNameservers.length >= 2 ? initialNameservers : [...initialNameservers, ...Array(2 - initialNameservers.length).fill("")];
     setEntries(seed.map((value, index) => ({ id: index, value })));
     idRef.current = seed.length;
   }, [open, initialNameservers]);
@@ -308,7 +309,11 @@ function EditNameserversModal({
     acc[value] = (acc[value] ?? 0) + 1;
     return acc;
   }, {});
-  const duplicateValues = new Set(Object.entries(seenCounts).filter(([, count]) => count > 1).map(([value]) => value));
+  const duplicateValues = new Set(
+    Object.entries(seenCounts)
+      .filter(([, count]) => count > 1)
+      .map(([value]) => value),
+  );
   const hasDuplicate = duplicateValues.size > 0;
   const filled = trimmed.filter(Boolean);
   const uniqueFilled = Array.from(new Set(filled));
@@ -360,7 +365,7 @@ function EditNameserversModal({
                   <button
                     type="button"
                     onClick={() => removeEntry(entry.id)}
-                    className="rounded-[4px] p-2 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                    className="rounded-lg p-2 text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
                     title="Remove nameserver"
                   >
                     <X className="size-4" />
@@ -777,7 +782,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
       {/* Content */}
       <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-6 py-8">
         {/* Domain info card */}
-        <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border p-4 sm:p-6">
+        <div className="overflow-clip rounded-lg border-[0.5px] border-dash-border p-4 sm:p-6">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <InfoColumn label="Registrar" value={domain.registrar} />
             <InfoColumn label="Nameservers" value={domain.nameserversType} />
@@ -812,7 +817,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
 
         {/* Domain status banner — priority: expired > expiring soon > nameserver warning > DNS status */}
         {domain.isExpired ? (
-          <div className="flex items-center gap-3 rounded-[4px] bg-[#fef2f2] px-4 py-3 dark:bg-[#2a1818]">
+          <div className="flex items-center gap-3 rounded-lg bg-[#fef2f2] px-4 py-3 dark:bg-[#2a1818]">
             <AlertCircle className="size-5 shrink-0 text-[#ef4444]" />
             <span className="text-sm text-dash-text-body">
               This domain has expired. DNS records cannot be managed until the domain is renewed.
@@ -827,7 +832,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
             </GlossyButton>
           </div>
         ) : expiringSoon ? (
-          <div className="flex items-center gap-3 rounded-[4px] bg-[#fffbeb] px-4 py-3 dark:bg-[#2a2518]">
+          <div className="flex items-center gap-3 rounded-lg bg-[#fffbeb] px-4 py-3 dark:bg-[#2a2518]">
             <Warning size={20} weight="fill" className="shrink-0 text-[#f5a623]" />
             <span className="text-sm text-dash-text-body">
               This domain expires in less than 7 days. Renew it soon to avoid losing ownership.
@@ -842,12 +847,12 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
             </GlossyButton>
           </div>
         ) : domain.nameserverWarning ? null : domainActive ? (
-          <div className="flex items-center gap-3 rounded-[4px] bg-[#f0fdf4] px-4 py-3 dark:bg-[#162317]">
+          <div className="flex items-center gap-3 rounded-lg bg-[#f0fdf4] px-4 py-3 dark:bg-[#162317]">
             <CheckCircle className="size-5 shrink-0 text-[#34d399]" weight="fill" />
             <span className="text-sm text-dash-text-body">Domain is active — DNS has propagated and your settings are live.</span>
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-[4px] bg-[#fffbeb] px-4 py-3 dark:bg-[#2a2518]">
+          <div className="flex items-center gap-3 rounded-lg bg-[#fffbeb] px-4 py-3 dark:bg-[#2a2518]">
             <AlertCircle className="size-5 shrink-0 text-[#e89c30]" />
             <span className="text-sm text-dash-text-body">DNS is still propagating. This can take up to 48 hours.</span>
             <button
@@ -882,7 +887,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
             {records.length > 0 &&
               (domain.isExpired ? (
                 <SimpleTooltip content="DNS cannot be managed for expired domains" side="left">
-                  <span className="flex w-fit shrink-0 cursor-not-allowed items-center gap-1 whitespace-nowrap rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 py-[5px] text-sm font-medium text-white opacity-50 shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
+                  <span className="flex w-fit shrink-0 cursor-not-allowed items-center gap-1 whitespace-nowrap rounded-lg border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 py-[5px] text-sm font-medium text-white opacity-50 shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
                     <Plus className="size-4" />
                     <span className="px-1">Add a New Record</span>
                   </span>
@@ -893,7 +898,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                     setEditingRecord(null);
                     setAddRecordOpen(true);
                   }}
-                  className="flex w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
+                  className="flex w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-3 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90"
                 >
                   <Plus className="size-4" />
                   <span className="px-1">Add a New Record</span>
@@ -982,7 +987,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                     <div className="flex items-center gap-2">
                       {domain.isExpired ? (
                         <SimpleTooltip content="DNS cannot be managed for expired domains">
-                          <span className="cursor-not-allowed rounded-[4px] p-1 text-dash-text-faded opacity-50">
+                          <span className="cursor-not-allowed rounded-lg p-1 text-dash-text-faded opacity-50">
                             <Pencil className="size-3.5" />
                           </span>
                         </SimpleTooltip>
@@ -992,7 +997,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                             setEditingRecord(record);
                             setAddRecordOpen(true);
                           }}
-                          className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-body"
+                          className="rounded-lg p-1 text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-body"
                           title="Edit record"
                         >
                           <Pencil className="size-3.5" />
@@ -1000,7 +1005,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                       )}
                       {domain.isExpired ? (
                         <SimpleTooltip content="DNS cannot be managed for expired domains">
-                          <span className="cursor-not-allowed rounded-[4px] p-1 opacity-50">
+                          <span className="cursor-not-allowed rounded-lg p-1 opacity-50">
                             <FolderTrashIcon className="size-3.5" />
                           </span>
                         </SimpleTooltip>
@@ -1008,7 +1013,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                         <button
                           onClick={() => deleteRecord(i)}
                           disabled={deletingRecordId === record.id}
-                          className="rounded-[4px] p-1 transition-opacity hover:opacity-70"
+                          className="rounded-lg p-1 transition-opacity hover:opacity-70"
                           title="Delete record"
                         >
                           <FolderTrashIcon className="size-3.5" />
@@ -1036,7 +1041,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                               setEditingRecord(record);
                               setAddRecordOpen(true);
                             }}
-                            className="rounded-[4px] p-1 text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-body"
+                            className="rounded-lg p-1 text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-body"
                           >
                             <Pencil className="size-3.5" />
                           </button>
@@ -1045,7 +1050,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                           <button
                             onClick={() => deleteRecord(i)}
                             disabled={deletingRecordId === record.id}
-                            className="rounded-[4px] p-1 transition-opacity hover:opacity-70"
+                            className="rounded-lg p-1 transition-opacity hover:opacity-70"
                           >
                             <FolderTrashIcon className="size-3.5" />
                           </button>
@@ -1121,7 +1126,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
 
         {/* Nameserver warning banner */}
         {domain.nameserverWarning && (
-          <div className="flex items-center gap-3 rounded-[4px] bg-[#fff8f0] px-4 py-3 dark:bg-[#2a2118]">
+          <div className="flex items-center gap-3 rounded-lg bg-[#fff8f0] px-4 py-3 dark:bg-[#2a2118]">
             <AlertCircle className="size-5 shrink-0 text-[#e89c30]" />
             <span className="text-sm text-dash-text-body">{domain.nameserverWarning}</span>
           </div>
@@ -1400,7 +1405,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                       <button
                         type="button"
                         onClick={() => setTransferAuthCodeRevealed((v) => !v)}
-                        className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-strong"
+                        className="flex size-7 items-center justify-center rounded-lg text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-strong"
                         aria-label={transferAuthCodeRevealed ? "Hide EPP/Auth code" : "Show EPP/Auth code"}
                         aria-pressed={transferAuthCodeRevealed}
                       >
@@ -1446,12 +1451,12 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                     );
                     window.location.href = `mailto:hello@brimble.app?subject=${subject}&body=${body}`;
                   }}
-                  className="h-[34px] rounded-[4px] px-3.5 text-sm"
+                  className="h-[34px] rounded-lg px-3.5 text-sm"
                 >
                   Contact support
                 </GlossyButton>
               ) : (
-                <GlossyButton variant="white" onClick={() => setTransferStep("setup")} className="h-[34px] rounded-[4px] px-3.5 text-sm">
+                <GlossyButton variant="white" onClick={() => setTransferStep("setup")} className="h-[34px] rounded-lg px-3.5 text-sm">
                   Back
                 </GlossyButton>
               )}

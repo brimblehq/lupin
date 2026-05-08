@@ -112,7 +112,7 @@ function Stepper({
 
 function InfoBanner({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-2 flex items-start gap-2.5 rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
+    <div className="mt-2 flex items-start gap-2.5 rounded-lg bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
       <Info className="mt-0.5 size-3.5 shrink-0 text-[#f59e0b]" />
       <div className="text-sm font-light leading-[1.4] text-dash-text-body">{children}</div>
     </div>

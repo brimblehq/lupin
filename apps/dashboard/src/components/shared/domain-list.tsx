@@ -66,7 +66,7 @@ function DomainActionsMenu({ items }: { items: DomainMenuItem[] }) {
         <MoreVertical className="size-4" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[160px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_rgba(0,0,0,0.08)]">
+        <div className="absolute right-0 top-full z-50 mt-1 w-[160px] overflow-clip rounded-lg border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_rgba(0,0,0,0.08)]">
           {items.map((item, index) => {
             const showDivider = Boolean(item.danger) && index > 0;
 
@@ -544,7 +544,7 @@ export function DomainList({
 
       {/* Empty state */}
       {filtered.length === 0 && (
-        <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-[4px] bg-dash-bg-elevated/40">
+        <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg bg-dash-bg-elevated/40">
           <div className="flex size-8 items-center justify-center rounded-full bg-dash-bg-elevated text-dash-text-faded">
             <LifeBuoy className="size-4" />
           </div>
@@ -558,7 +558,7 @@ export function DomainList({
         const domainDetailsPath = getDomainDetailsPath(domain);
         const isAssigned = hasAssignedProject(domain);
         return (
-          <div key={`failed-${i}`} className="overflow-visible rounded-[4px] border-[0.5px] border-dash-border">
+          <div key={`failed-${i}`} className="overflow-visible rounded-lg border-[0.5px] border-dash-border">
             <table className="w-full border-collapse">
               <tbody>
                 <tr className="h-[68px] bg-dash-bg">
@@ -610,7 +610,7 @@ export function DomainList({
                     <button
                       onClick={() => void handleRefresh(domain)}
                       disabled={refreshing.has(domain.name)}
-                      className="inline-flex items-center gap-2 rounded-[4px] border border-dash-border bg-dash-bg px-3.5 py-1 shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-lg border border-dash-border bg-dash-bg px-3.5 py-1 shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:opacity-60"
                     >
                       {refreshing.has(domain.name) ? (
                         <Spinner className="text-dash-text-body" />
@@ -662,7 +662,7 @@ export function DomainList({
         const domainDetailsPath = getDomainDetailsPath(domain);
         const isAssigned = hasAssignedProject(domain);
         return (
-          <div key={`expired-${i}`} className="overflow-visible rounded-[4px] border-[0.5px] border-dash-border">
+          <div key={`expired-${i}`} className="overflow-visible rounded-lg border-[0.5px] border-dash-border">
             <table className="w-full border-collapse">
               <tbody>
                 <tr className="h-[68px] bg-dash-bg">
@@ -744,7 +744,7 @@ export function DomainList({
 
       {/* Active domains (grouped in one card) */}
       {activeDomains.length > 0 && (
-        <div className="overflow-visible rounded-[4px] border-[0.5px] border-dash-border">
+        <div className="overflow-visible rounded-lg border-[0.5px] border-dash-border">
           <table className="w-full border-collapse">
             <tbody>
               {activeDomains.map((domain, i) => {

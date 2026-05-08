@@ -58,7 +58,7 @@ function InlineColorPicker({ color, onChange }: { color: string; onChange: (colo
             color={color}
             onChange={onChange}
             prefixed={false}
-            className="w-full rounded-[4px] bg-transparent px-1.5 py-1 font-mono text-xs text-dash-text-strong outline-none ring-1 ring-dash-border focus:ring-dash-text-faded"
+            className="w-full rounded-lg bg-transparent px-1.5 py-1 font-mono text-xs text-dash-text-strong outline-none ring-1 ring-dash-border focus:ring-dash-text-faded"
           />
         </div>
 
@@ -144,7 +144,7 @@ export function TagManagementModal({ open, onOpenChange }: TagManagementModalPro
 
         {tags.map((tag) => (
           <div key={tag.id}>
-            <div className="group flex items-center gap-2 rounded-[4px] px-2 py-1.5 transition-colors hover:bg-dash-bg-elevated">
+            <div className="group flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-dash-bg-elevated">
               {/* Color dot — toggle inline picker (disabled for Viewers) */}
               {canWrite ? (
                 <button type="button" onClick={() => setColorPickerId((v) => (v === tag.id ? null : tag.id))} className="shrink-0">
@@ -169,7 +169,7 @@ export function TagManagementModal({ open, onOpenChange }: TagManagementModalPro
                     if (e.key === "Enter") handleRename(tag.id);
                     if (e.key === "Escape") setEditingId(null);
                   }}
-                  className="flex-1 rounded-[4px] bg-transparent px-1 text-sm text-dash-text-strong outline-none ring-1 ring-dash-border focus:ring-dash-text-faded"
+                  className="flex-1 rounded-lg bg-transparent px-1 text-sm text-dash-text-strong outline-none ring-1 ring-dash-border focus:ring-dash-text-faded"
                 />
               ) : (
                 <span className="flex-1 truncate text-sm text-dash-text-strong">{tag.name}</span>
@@ -270,7 +270,7 @@ export function TagManagementModal({ open, onOpenChange }: TagManagementModalPro
                       color={newColor}
                       onChange={setNewColor}
                       prefixed={false}
-                      className="w-full rounded-[4px] bg-transparent px-1.5 py-1 font-mono text-xs text-dash-text-strong outline-none ring-1 ring-dash-border focus:ring-dash-text-faded"
+                      className="w-full rounded-lg bg-transparent px-1.5 py-1 font-mono text-xs text-dash-text-strong outline-none ring-1 ring-dash-border focus:ring-dash-text-faded"
                     />
                   </div>
 
