@@ -1504,14 +1504,8 @@ function Phase3DatabaseConfigure({
   const limitReached = projectLimit !== null && projectCount > projectLimit;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  const effectiveCpuSteps = useMemo(
-    () => (isFreePlan && dbMaxCpu != null ? [dbMaxCpu] : cpuSteps),
-    [isFreePlan, dbMaxCpu],
-  );
-  const effectiveMemorySteps = useMemo(
-    () => (isFreePlan && dbMaxMemory != null ? [dbMaxMemory] : memorySteps),
-    [isFreePlan, dbMaxMemory],
-  );
+  const effectiveCpuSteps = useMemo(() => (isFreePlan && dbMaxCpu != null ? [dbMaxCpu] : cpuSteps), [isFreePlan, dbMaxCpu]);
+  const effectiveMemorySteps = useMemo(() => (isFreePlan && dbMaxMemory != null ? [dbMaxMemory] : memorySteps), [isFreePlan, dbMaxMemory]);
   const lockedStorageId = isFreePlan && dbMaxStorage != null ? String(dbMaxStorage) : null;
   const storageOptions = useMemo(() => {
     if (!lockedStorageId) return diskSizes;
@@ -1662,7 +1656,7 @@ function Phase3DatabaseConfigure({
 
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1.5 block text-sm text-dash-text-body">Database name</label>
+          <label className="mb-1.5 block text-sm text-dash-text-body">Service name</label>
           <input type="text" value={dbName} onChange={(e) => setDbName(e.target.value)} className={inputClass} />
         </div>
 
@@ -1755,8 +1749,8 @@ function Phase3DatabaseConfigure({
 
       {/* Credentials */}
       <div>
-        <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Database credentials</h4>
-        <p className="mb-4 text-sm text-dash-text-faded">These values are used to connect to your database after provisioning.</p>
+        <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Service credentials</h4>
+        <p className="mb-4 text-sm text-dash-text-faded">These values are used to connect to your service after provisioning.</p>
         <div className="rounded-[4px] border-[0.5px] border-dash-border p-4">
           <div className="flex flex-col gap-2.5">
             {envDrafts.length > 0 ? (

@@ -102,10 +102,32 @@ export interface SetupIntentResult {
   client_secret: string;
 }
 
+export interface AddPaymentMethodPendingData {
+  requires_action: boolean;
+  setup_intent_id: string;
+  client_secret: string;
+  redirect_url: string;
+}
+
+export interface AddPaymentMethodSuccessResult {
+  status: "success";
+  message: string;
+  data: null;
+}
+
+export interface AddPaymentMethodPendingResult {
+  status: "pending";
+  message: string;
+  data: AddPaymentMethodPendingData;
+}
+
+export type AddPaymentMethodResult = AddPaymentMethodSuccessResult | AddPaymentMethodPendingResult;
+
 /* ── Mutation inputs ── */
 
 export interface AddPaymentMethodInput {
   payment_method: string;
+  return_url: string;
 }
 
 export interface CreateSubscriptionInput {
@@ -168,7 +190,8 @@ export interface VerifyTransactionResult {
 export interface PaymentsApi {
   listPaymentMethods(): Promise<PaymentMethod[]>;
   createSetupIntent(): Promise<SetupIntentResult>;
-  addPaymentMethod(input: AddPaymentMethodInput): Promise<PaymentMethod>;
+  addPaymentMethod(input: AddPaymentMethodInput): Promise<AddPaymentMethodResult>;
+  confirmPaymentMethod(setupIntentId: string): Promise<void>;
   removePaymentMethod(id: string): Promise<void>;
   setDefaultPaymentMethod(id: string): Promise<void>;
   getSubscription(): Promise<Subscription | null>;

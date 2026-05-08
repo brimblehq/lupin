@@ -7,6 +7,7 @@ import type {
   PaymentMethod,
   SetupIntentResult,
   AddPaymentMethodInput,
+  AddPaymentMethodResult,
   Subscription,
   SubscriptionStats,
   CreateSubscriptionInput,
@@ -28,6 +29,10 @@ export type {
   PaymentMethodCard,
   SetupIntentResult,
   AddPaymentMethodInput,
+  AddPaymentMethodResult,
+  AddPaymentMethodPendingData,
+  AddPaymentMethodPendingResult,
+  AddPaymentMethodSuccessResult,
   Subscription,
   CreateSubscriptionInput,
   SwapPlanInput,
@@ -78,12 +83,56 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       return { client_secret: String(data?.client_secret ?? "") };
     },
 
-    async addPaymentMethod(input: AddPaymentMethodInput): Promise<PaymentMethod> {
-      const res = await client.request<any>(`${base}/payment/payment-method`, {
+    async addPaymentMethod(input: AddPaymentMethodInput): Promise<AddPaymentMethodResult> {
+      try {
+        const res = await client.request<any>(`${base}/payment/payment-method`, {
+          method: "POST",
+          body: {
+            payment_method: input.payment_method,
+            return_url: input.return_url,
+          },
+        });
+
+        const message = res?.message?.trim?.() || "Payment method added successfully";
+
+        return {
+          status: "success",
+          message,
+          data: null,
+        };
+      } catch (error) {
+        if (!(error instanceof BackendApiError) || error.status !== 402) {
+          throw error;
+        }
+
+        const payload = error.details as any;
+        const data = unwrapData<any>(payload);
+        const setupIntentId = String(data?.setup_intent_id ?? "").trim();
+        const clientSecret = String(data?.client_secret ?? "").trim();
+        const redirectUrl = String(data?.redirect_url ?? "").trim();
+
+        if (!setupIntentId || !clientSecret || !redirectUrl) {
+          throw new Error("Card confirmation is required, but payment confirmation details are missing.");
+        }
+
+        return {
+          status: "pending",
+          message: error.message || "Card requires 3D Secure confirmation",
+          data: {
+            requires_action: Boolean(data?.requires_action),
+            setup_intent_id: setupIntentId,
+            client_secret: clientSecret,
+            redirect_url: redirectUrl,
+          },
+        };
+      }
+    },
+
+    async confirmPaymentMethod(setupIntentId: string): Promise<void> {
+      await client.request(`${base}/payment/payment-method/confirm`, {
         method: "POST",
-        body: { payment_method: input.payment_method },
+        body: { setup_intent_id: setupIntentId },
       });
-      return unwrapData<PaymentMethod>(res);
     },
 
     async removePaymentMethod(id: string): Promise<void> {

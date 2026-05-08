@@ -5,6 +5,7 @@
  * Default export `RoutePending` is a generic shell used as the router-wide
  * fallback for routes that don't declare their own pendingComponent.
  */
+import { useRouterState } from "@tanstack/react-router";
 
 const PULSE_BG_STRONG = "bg-dash-border-soft/70";
 const PULSE_BG_MEDIUM = "bg-dash-border-soft/50";
@@ -57,6 +58,30 @@ export function RoutePending() {
       <TableRowSkeleton count={6} />
     </div>
   );
+}
+
+export function DefaultRoutePending() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname || state.resolvedLocation?.pathname || "/",
+  });
+
+  if (/^\/projects\/new(?:\/|$)/.test(pathname)) {
+    return <NewProjectPending />;
+  }
+
+  if (/^\/projects\/[^/]+(?:\/|$)/.test(pathname) && !/^\/projects\/new(?:\/|$)/.test(pathname)) {
+    return <ProjectOverviewPending />;
+  }
+
+  if (pathname === "/" || pathname.startsWith("/workspace")) {
+    return <HomePending />;
+  }
+
+  if (pathname.startsWith("/scaling")) {
+    return <ScalingPending />;
+  }
+
+  return <RoutePending />;
 }
 
 /* ─────────────────────────────────────────────

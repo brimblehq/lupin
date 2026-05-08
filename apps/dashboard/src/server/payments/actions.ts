@@ -56,21 +56,42 @@ export const getSubscriptionStatsServerFn = createServerFn({
 
 /* ── Mutations ── */
 
-export const createSetupIntentServerFn = createServerFn({
-  method: "POST",
-}).handler(async () => {
-  return withTokenRefresh(async (api) => {
-    return api.payments.createSetupIntent();
-  });
-});
-
 export const addPaymentMethodServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
   const input = data as unknown as AddPaymentMethodInput;
+  const paymentMethod = String(input?.payment_method ?? "").trim();
+  const returnUrl = String(input?.return_url ?? "").trim();
+
+  if (!paymentMethod) {
+    throw new Error("Payment method is required");
+  }
+
+  if (!returnUrl) {
+    throw new Error("Return URL is required");
+  }
 
   return withTokenRefresh(async (api) => {
-    return api.payments.addPaymentMethod(input);
+    return api.payments.addPaymentMethod({
+      payment_method: paymentMethod,
+      return_url: returnUrl,
+    });
+  });
+});
+
+export const confirmPaymentMethodServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as unknown as { setup_intent_id?: string } | undefined;
+  const setupIntentId = String(payload?.setup_intent_id ?? "").trim();
+
+  if (!setupIntentId) {
+    throw new Error("Setup intent ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    await api.payments.confirmPaymentMethod(setupIntentId);
+    return { ok: true } as const;
   });
 });
 

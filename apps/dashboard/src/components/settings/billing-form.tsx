@@ -25,8 +25,8 @@ import {
   usePaymentMethods,
   useSubscription,
   useInvoices,
-  useCreateSetupIntent,
   useAddPaymentMethod,
+  useConfirmPaymentMethod,
   useRemovePaymentMethod,
   useSetDefaultPaymentMethod,
   useCancelSubscription,
@@ -908,8 +908,8 @@ export function AddCardForm({
   const router = useRouter();
   const stripe = useStripe();
   const elements = useElements();
-  const setupIntentMutation = useCreateSetupIntent();
   const addMethodMutation = useAddPaymentMethod();
+  const confirmMethodMutation = useConfirmPaymentMethod();
   const removeMethodMutation = useRemovePaymentMethod();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cardError, setCardError] = useState(false);
@@ -947,6 +947,12 @@ export function AddCardForm({
     [isDark],
   );
 
+  function buildCardSetupReturnUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("card_setup", "1");
+    return url.toString();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!stripe || !elements) {
@@ -963,26 +969,37 @@ export function AddCardForm({
     setIsSubmitting(true);
 
     try {
-      const { client_secret } = await setupIntentMutation.mutateAsync();
-
-      if (!client_secret) {
-        throw new Error("Failed to create setup intent");
-      }
-
-      const result = await stripe.confirmCardSetup(client_secret, {
-        payment_method: { card: cardElement },
+      const { paymentMethod, error: createError } = await stripe.createPaymentMethod({
+        type: "card",
+        card: cardElement,
       });
 
-      if (result.error) {
-        throw new Error(result.error.message ?? "Card setup failed");
+      if (createError) {
+        throw new Error(createError.message ?? "Failed to create payment method");
       }
 
-      const paymentMethodId = result.setupIntent?.payment_method;
-      if (!paymentMethodId || typeof paymentMethodId !== "string") {
+      const paymentMethodId = String(paymentMethod?.id ?? "").trim();
+
+      if (!paymentMethodId) {
         throw new Error("No payment method returned");
       }
 
-      await addMethodMutation.mutateAsync(paymentMethodId);
+      const addResult = await addMethodMutation.mutateAsync({
+        payment_method: paymentMethodId,
+        return_url: buildCardSetupReturnUrl(),
+      });
+
+      if (addResult.status === "pending") {
+        const nextActionResult = await stripe.handleNextAction({
+          clientSecret: addResult.data.client_secret,
+        });
+
+        if (nextActionResult.error) {
+          throw new Error(nextActionResult.error.message ?? "3D Secure confirmation failed");
+        }
+
+        await confirmMethodMutation.mutateAsync(addResult.data.setup_intent_id);
+      }
 
       if (replacePaymentMethodId && replacePaymentMethodId !== paymentMethodId) {
         try {
