@@ -132,9 +132,7 @@ export const deployMcpTemplateServerFn = createServerFn({
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    teamId = await resolveTeamId(api, workspaceSlug);
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     const body = {
       git: "github",

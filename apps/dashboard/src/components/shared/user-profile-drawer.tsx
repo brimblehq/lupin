@@ -33,7 +33,7 @@ import { WarningModal } from "./warning-modal";
 import { GlossyButton } from "./glossy-button";
 import { OtpInput } from "../auth/auth-split-layout";
 import { Turnstile } from "@marsidev/react-turnstile";
-import { CheckCircle, XCircle, TreeStructure, CopySimple } from "@phosphor-icons/react";
+import { CheckCircle, XCircle, TreeStructure } from "@phosphor-icons/react";
 import {
   confirmDeleteAccountServerFn,
   getTwoFactorStatusServerFn,
@@ -56,7 +56,6 @@ import {
   testSettingsWebhookServerFn,
   updateSettingsBuildsServerFn,
   updateSettingsHapticsServerFn,
-  updateSettingsFollowedXServerFn,
   updateSettingsNotificationsServerFn,
   updateSettingsProfileServerFn,
   updateSettingsWebhooksServerFn,
@@ -1986,7 +1985,17 @@ export function UserProfileDrawer({
     return () => {
       window.removeEventListener("brimble:git-connection-changed", handleConnectionChanged);
     };
-  }, [open, getTwoFactorStatus, hasActiveWorkspace, listPasskeys, prefetchedPasskeys, twoFactorStatus]);
+  }, [
+    open,
+    getTwoFactorStatus,
+    hasActiveWorkspace,
+    listBitbucketAccounts,
+    listGithubAccounts,
+    listGitlabAccounts,
+    listPasskeys,
+    prefetchedPasskeys,
+    twoFactorStatus,
+  ]);
 
   useEffect(() => {
     if (!hasActiveWorkspace && activeTab === ProfileTab.Members) {
@@ -2405,7 +2414,9 @@ export function UserProfileDrawer({
                               window.dispatchEvent(new Event("brimble:git-connection-changed"));
                               toast.success(`${providerId.charAt(0).toUpperCase() + providerId.slice(1)} connected successfully`);
                             }
-                          } catch {}
+                          } catch {
+                            return;
+                          }
                         }, 3000);
                         window.setTimeout(() => {
                           window.clearInterval(interval);
@@ -2546,7 +2557,6 @@ export function UserProfileDrawer({
                   profile={profile}
                   initialPaymentMethods={initialPaymentMethods}
                   initialInvoices={hasActiveWorkspace ? undefined : initialInvoices}
-                  initialSpendingStats={snapshot?.billing.spending}
                   initialSubscriptionStats={initialSubscriptionStats}
                   initialUserOverview={initialUserOverview}
                   hidePaymentMethods={hasActiveWorkspace}
@@ -3855,7 +3865,7 @@ function MembersForm({
         .then(setEnvironments)
         .catch(() => {});
     }
-  }, [initialEnvironments, workspace]);
+  }, [getEnvironments, initialEnvironments, workspace]);
 
   useEffect(() => {
     if (!team?.members?.length) return;
@@ -3905,7 +3915,6 @@ function MembersForm({
   const pendingInvites = mapPendingInvites(team);
   const configuredSeats = team?.seatCount ?? 0;
   const memberCount = team?.totalMembers ?? members.length;
-  const billableSeats = Math.max(configuredSeats, memberCount);
   const currentUserTeamMember = team?.members.find((member) => {
     const memberUserId = member.userId?.trim();
     const currentUserId = currentUser?.uniqueId?.trim();
@@ -3921,30 +3930,33 @@ function MembersForm({
   const currentUserRole = currentUserTeamMember ? normalizeMemberRole(currentUserTeamMember) : null;
   const canManageMembers = currentUserRole === "Creator" || currentUserRole === "Administrator";
 
-  const refreshMembers = async (options?: { silent?: boolean }) => {
-    if (!options?.silent) {
-      setIsLoadingMembers(true);
-    }
-    setMembersError(null);
-
-    try {
-      const nextTeam = await getTeamMembers({ data: { workspace } });
-      setTeam(nextTeam);
-    } catch (error) {
-      setMembersError(error instanceof Error ? error.message : "Failed to load team members");
-    } finally {
+  const refreshMembers = useCallback(
+    async (options?: { silent?: boolean }) => {
       if (!options?.silent) {
-        setIsLoadingMembers(false);
+        setIsLoadingMembers(true);
       }
-    }
-  };
+      setMembersError(null);
+
+      try {
+        const nextTeam = await getTeamMembers({ data: { workspace } });
+        setTeam(nextTeam);
+      } catch (error) {
+        setMembersError(error instanceof Error ? error.message : "Failed to load team members");
+      } finally {
+        if (!options?.silent) {
+          setIsLoadingMembers(false);
+        }
+      }
+    },
+    [getTeamMembers, workspace],
+  );
 
   useEffect(() => {
     setTeam(initialTeam);
     setIsLoadingMembers(!initialTeam);
     setMembersError(null);
     void refreshMembers({ silent: Boolean(initialTeam) });
-  }, [workspace, initialTeam]);
+  }, [workspace, initialTeam, refreshMembers]);
 
   return (
     <div className="flex max-w-[488px] flex-col gap-8">

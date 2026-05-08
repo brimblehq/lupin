@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Plus, Minus, X, Check, Info } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "../shared/modal";

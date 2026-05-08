@@ -50,6 +50,8 @@ const createSub = createSubscriptionServerFn as unknown as (args: {
 
 const swap = swapPlanServerFn as unknown as (args: { data: { target_plan: string } }) => Promise<any>;
 
+const cancelSub = cancelSubscriptionServerFn as unknown as (args: { data: { comment: string } }) => Promise<{ ok: true }>;
+
 const purchase = purchaseServerFn as unknown as (args: {
   data: {
     type: "PURCHASE_DOMAIN" | "RENEW_DOMAIN" | "SERVICE_PURCHASE" | "LLM_TOKENS" | "BUILD_MINUTES";
@@ -180,7 +182,7 @@ export function useSwapPlan() {
 export function useCancelSubscription() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => cancelSubscriptionServerFn(),
+    mutationFn: (input: { comment: string }) => cancelSub({ data: input }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: paymentKeys.subscription() });
     },

@@ -18,6 +18,14 @@ import {
 } from "../server/auth/actions";
 import { usePasskeyFeature } from "@/hooks/use-passkey-feature";
 import type { OauthProvider } from "../lib/auth/oauth-popup";
+import type {
+  FinalizeOauthSessionCaller,
+  GetPasskeyAuthOptionsCaller,
+  RequestLoginOtpCaller,
+  ResendAuthCodeCaller,
+  VerifyEmailCodeCaller,
+  VerifyPasskeyAuthCaller,
+} from "./auth.types";
 const loadOauthPopup = () => import("../lib/auth/oauth-popup");
 const loadPasskey = () => import("@/lib/auth/passkey");
 const loadTwoFactor = () => import("@/lib/auth/two-factor");
@@ -385,16 +393,12 @@ function saveLastAuthMethod(method: AuthMethod) {
 function LoginPage() {
   const haptics = useHaptics();
   const navigate = useNavigate();
-  const requestLoginOtp = useServerFn(requestLoginOtpServerFn);
-  const resendAuthCode = useServerFn(resendAuthCodeServerFn);
-  const verifyEmailCode = useServerFn(verifyEmailCodeServerFn);
-  const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn);
-  const getPasskeyAuthOptions = useServerFn(getPasskeyAuthOptionsServerFn as any) as (args: {
-    data: { email?: string };
-  }) => Promise<{ options: Record<string, unknown>; challengeToken: string }>;
-  const verifyPasskeyAuth = useServerFn(verifyPasskeyAuthServerFn as any) as (args: {
-    data: { challengeToken: string; credential: unknown; geo?: any };
-  }) => Promise<{ ok: true; user: { firstName?: string } }>;
+  const requestLoginOtp = useServerFn(requestLoginOtpServerFn as any) as RequestLoginOtpCaller;
+  const resendAuthCode = useServerFn(resendAuthCodeServerFn as any) as ResendAuthCodeCaller;
+  const verifyEmailCode = useServerFn(verifyEmailCodeServerFn as any) as VerifyEmailCodeCaller;
+  const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn as any) as FinalizeOauthSessionCaller;
+  const getPasskeyAuthOptions = useServerFn(getPasskeyAuthOptionsServerFn as any) as GetPasskeyAuthOptionsCaller;
+  const verifyPasskeyAuth = useServerFn(verifyPasskeyAuthServerFn as any) as VerifyPasskeyAuthCaller;
   const passkeyFeature = usePasskeyFeature();
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const autofillStartedRef = useRef(false);

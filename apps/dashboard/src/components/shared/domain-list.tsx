@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { MoreVertical, RefreshCw, AlertCircle, LifeBuoy, Minus, Plus, Pencil, ArrowRightLeft, Settings } from "lucide-react";
-import * as Dialog from "@radix-ui/react-dialog";
+import { useState, useRef, useEffect } from "react";
+import { MoreVertical, RefreshCw, AlertCircle, LifeBuoy, Pencil, ArrowRightLeft, Settings } from "lucide-react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { FilterDropdown, type FilterOption } from "./filter-dropdown";
@@ -383,7 +382,6 @@ export function DomainList({
   searchQuery: searchQueryProp,
   onSearchQueryChange,
   searchLoading = false,
-  onAddDomain,
   onRefreshDomain,
   onConfigureDomain,
   onDeleteDomain,
@@ -394,7 +392,6 @@ export function DomainList({
   searchQuery?: string;
   onSearchQueryChange?: (value: string) => void;
   searchLoading?: boolean;
-  onAddDomain?: () => void;
   onRefreshDomain?: (domain: Domain) => Promise<void>;
   onConfigureDomain?: (input: {
     domain: Domain;

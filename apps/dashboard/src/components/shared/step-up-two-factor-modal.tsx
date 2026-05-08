@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Modal, ModalCancelButton, ModalFooter, ModalHeader } from "./modal";
 import { GlossyButton } from "./glossy-button";
@@ -57,39 +57,42 @@ export function StepUpTwoFactorModal({ open, requirement, onResolve, onCancel }:
     return () => window.clearInterval(timer);
   }, [open, countdownSeconds]);
 
+  const submit = useCallback(
+    async (rawCode: string) => {
+      if (!requirement || submitting || countdownSeconds <= 0) return;
+      setError(null);
+      setSubmitting(true);
+      try {
+        const result = await exchange({
+          data: {
+            code: rawCode,
+            action: requirement.action,
+            resourceId: requirement.resourceId,
+          },
+        });
+        onResolve(result.token);
+      } catch (err: any) {
+        const message = typeof err?.message === "string" ? err.message : "Verification failed";
+        setError(message);
+        setCode("");
+        setSubmitting(false);
+      }
+    },
+    [countdownSeconds, exchange, onResolve, requirement, submitting],
+  );
+
   // Auto-submit once the user types all 6 digits — matches the existing
   // 2FA login flow's UX.
   useEffect(() => {
     if (mode !== "totp" || code.length !== 6 || countdownSeconds <= 0) return;
     void submit(code);
-  }, [code, countdownSeconds, mode]);
+  }, [code, countdownSeconds, mode, submit]);
 
   useEffect(() => {
     if (mode === "recovery") {
       recoveryRef.current?.focus();
     }
   }, [mode]);
-
-  async function submit(rawCode: string) {
-    if (!requirement || submitting || countdownSeconds <= 0) return;
-    setError(null);
-    setSubmitting(true);
-    try {
-      const result = await exchange({
-        data: {
-          code: rawCode,
-          action: requirement.action,
-          resourceId: requirement.resourceId,
-        },
-      });
-      onResolve(result.token);
-    } catch (err: any) {
-      const message = typeof err?.message === "string" ? err.message : "Verification failed";
-      setError(message);
-      setCode("");
-      setSubmitting(false);
-    }
-  }
 
   function handleManualSubmit() {
     if (mode === "totp") {

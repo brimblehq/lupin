@@ -17,6 +17,7 @@ import { GlossyButton } from "../shared/glossy-button";
 import { Spinner } from "../shared/spinner";
 import { CursorPagination } from "../shared/pagination";
 import { WarningModal } from "../shared/warning-modal";
+import { CancelSubscriptionModal } from "./cancel-subscription-modal";
 import { ChangePlanModal } from "../shared/change-plan-modal";
 import { SimpleTooltip } from "../shared/tooltip";
 import { dashInputClassName } from "../shared/dash-input";
@@ -29,7 +30,6 @@ import {
   useConfirmPaymentMethod,
   useRemovePaymentMethod,
   useSetDefaultPaymentMethod,
-  useCancelSubscription,
   usePayInvoice,
   useUpdateSpendingLimit,
   useSpendingLimitStatus,
@@ -47,7 +47,6 @@ export function BillingForm({
   profile,
   initialPaymentMethods,
   initialInvoices,
-  initialSpendingStats,
   initialSubscriptionStats,
   initialUserOverview,
   hidePaymentMethods = false,
@@ -59,7 +58,6 @@ export function BillingForm({
   profile: UserProfile;
   initialPaymentMethods?: PaymentMethod[] | null;
   initialInvoices?: any;
-  initialSpendingStats?: { used: number; spendingLimit: number } | null;
   initialSubscriptionStats?: SubscriptionStats | null;
   initialUserOverview?: UserOverview | null;
   hidePaymentMethods?: boolean;
@@ -74,7 +72,6 @@ export function BillingForm({
         profile={profile}
         initialPaymentMethods={initialPaymentMethods}
         initialInvoices={initialInvoices}
-        initialSpendingStats={initialSpendingStats}
         initialSubscriptionStats={initialSubscriptionStats}
         initialUserOverview={initialUserOverview}
         hidePaymentMethods={hidePaymentMethods}
@@ -93,7 +90,6 @@ function BillingFormInner({
   profile,
   initialPaymentMethods,
   initialInvoices,
-  initialSpendingStats,
   initialSubscriptionStats,
   initialUserOverview,
   hidePaymentMethods = false,
@@ -105,7 +101,6 @@ function BillingFormInner({
   profile: UserProfile;
   initialPaymentMethods?: PaymentMethod[] | null;
   initialInvoices?: any;
-  initialSpendingStats?: { used: number; spendingLimit: number } | null;
   initialSubscriptionStats?: SubscriptionStats | null;
   initialUserOverview?: UserOverview | null;
   hidePaymentMethods?: boolean;
@@ -146,7 +141,6 @@ function BillingFormInner({
   const { data: subscription } = useSubscription();
   const { data: spendingLimitStatus } = useSpendingLimitStatus(teamId);
   const { data: invoices } = useInvoices(invoiceCursor, teamId, initialInvoices);
-  const cancelMutation = useCancelSubscription();
   const payInvoiceMutation = usePayInvoice();
   const spendingLimitMutation = useUpdateSpendingLimit(teamId);
   const isTeamMode = hideCurrentPlan || Boolean(teamId);
@@ -503,24 +497,7 @@ function BillingFormInner({
             </div>
           </div>
 
-          <WarningModal
-            open={cancelOpen}
-            onOpenChange={setCancelOpen}
-            title="Cancel your subscription?"
-            description={`Your plan will be cancelled at the end of the current billing period. You will be moved to the Free plan and lose access to ${currentPlan} features.`}
-            confirmLabel="Cancel subscription"
-            cancelLabel="Keep my plan"
-            confirmLoadingLabel="Cancelling..."
-            onConfirm={async () => {
-              try {
-                await cancelMutation.mutateAsync();
-                toast.success("Subscription cancelled. You'll keep access until the end of this billing period.");
-                router.invalidate();
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Failed to cancel subscription");
-              }
-            }}
-          />
+          <CancelSubscriptionModal open={cancelOpen} onOpenChange={setCancelOpen} currentPlan={currentPlan} />
         </>
       )}
 

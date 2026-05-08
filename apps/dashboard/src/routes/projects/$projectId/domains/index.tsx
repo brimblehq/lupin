@@ -162,23 +162,6 @@ function ProjectDomainsPage() {
   const { settingsSnapshot } = (RootRoute.useLoaderData() ?? {}) as any;
   const { customDomain } = usePlanGate();
   const { canWrite } = useWorkspaceRole();
-  if (!shouldShowProjectDomainsTab(project)) {
-    return (
-      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
-        <TabHeader title="Project domains">Domains are not available for this project type.</TabHeader>
-      </div>
-    );
-  }
-
-  if (!customDomain) {
-    return (
-      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
-        <TabHeader title="Project domains">Connect your own domain to this project.</TabHeader>
-        <PlanUpgradePrompt feature="Custom Domains" description="Upgrade to connect your own domain to this project." />
-      </div>
-    );
-  }
-
   const { domains: domainsResult, projects } = Route.useLoaderData();
   const [addDomainOpen, setAddDomainOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(search.q ?? "");
@@ -246,6 +229,23 @@ function ProjectDomainsPage() {
       window.clearTimeout(timeout);
     };
   }, [navigate, projectId, search, searchQuery]);
+
+  if (!shouldShowProjectDomainsTab(project)) {
+    return (
+      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
+        <TabHeader title="Project domains">Domains are not available for this project type.</TabHeader>
+      </div>
+    );
+  }
+
+  if (!customDomain) {
+    return (
+      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
+        <TabHeader title="Project domains">Connect your own domain to this project.</TabHeader>
+        <PlanUpgradePrompt feature="Custom Domains" description="Upgrade to connect your own domain to this project." />
+      </div>
+    );
+  }
 
   function handlePageChange(page: number) {
     if (page < 1 || page === domainsResult.currentPage || page > domainsResult.totalPages) {
@@ -462,7 +462,6 @@ function ProjectDomainsPage() {
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         searchLoading={searchQuery.trim() !== (search.q?.trim() ?? "") || (isRouterLoading && (search.q?.trim() ?? "") !== "")}
-        onAddDomain={canWrite ? () => setAddDomainOpen(true) : undefined}
         onRefreshDomain={handleRefreshDomain}
         onConfigureDomain={canWrite ? handleConfigureDomain : undefined}
         onDeleteDomain={canWrite ? handleDeleteDomain : undefined}

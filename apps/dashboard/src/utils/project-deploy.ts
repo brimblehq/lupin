@@ -1,4 +1,4 @@
-export type ProjectDeploySourceType = "github" | "bitbucket" | "docker" | "database";
+export type ProjectDeploySourceType = "github" | "gitlab" | "bitbucket" | "docker" | "database";
 
 export function getLegacyServiceType(sourceType: ProjectDeploySourceType, frameworkId: string) {
   if (sourceType === "docker") return "web-service";

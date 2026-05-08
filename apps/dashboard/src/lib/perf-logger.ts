@@ -45,7 +45,7 @@ function scheduleFlush() {
     const workspace = entries[0]?.workspace ?? "(personal)";
     const label = `[serverFn] ${entries.length} calls · sum ${sum.toFixed(0)}ms · workspace=${workspace}`;
 
-    /* eslint-disable no-console */
+     
     console.groupCollapsed(label);
     console.table(
       sorted.map((e) => ({
@@ -57,7 +57,7 @@ function scheduleFlush() {
       })),
     );
     console.groupEnd();
-    /* eslint-enable no-console */
+     
   }, FLUSH_DEBOUNCE_MS);
 }
 
@@ -112,7 +112,7 @@ export function installServerFnPerfLogger() {
       bucket.push({ fn, method, ms, status: res.status, kb, workspace: getCurrentWorkspace() });
       scheduleFlush();
 
-      // eslint-disable-next-line no-console
+       
       console.log(
         `%c[serverFn] ${fn} %c${ms.toFixed(0)}ms %c· ${res.status}${kb ? ` · ${kb}kb` : ""}`,
         colorFor(ms),
@@ -123,7 +123,7 @@ export function installServerFnPerfLogger() {
       return res;
     } catch (err) {
       const ms = performance.now() - start;
-      // eslint-disable-next-line no-console
+       
       console.warn(`[serverFn] ${fn} failed after ${ms.toFixed(0)}ms`, err);
       throw err;
     }

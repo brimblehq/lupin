@@ -40,6 +40,7 @@ import {
 import { useTagsStore } from "@/hooks/use-tags-store";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import config from "@/config";
+import type { ProjectsRouteLoaderData } from "./types";
 
 const environmentFormSchema = Yup.object({
   name: Yup.string()
@@ -140,7 +141,7 @@ export const Route = createFileRoute("/projects/")({
     status: parseTextSearchValue(search.status),
     environmentId: parseTextSearchValue(search.environmentId),
   }),
-  loader: async ({ deps }) => {
+  loader: async ({ deps }): Promise<ProjectsRouteLoaderData> => {
     const [environments, persistedEnvironmentId, frameworks] = await Promise.all([
       (listProjectEnvironmentsServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<ProjectEnvironment[]>)({
         data: { workspace: deps.workspace },
@@ -553,7 +554,7 @@ function ProjectsPage() {
   const navigate = useNavigate({ from: "/projects/" });
   const router = useRouter();
   const search = Route.useSearch();
-  const loaderData = Route.useLoaderData()!;
+  const loaderData = Route.useLoaderData() as ProjectsRouteLoaderData;
   const { canWrite } = useWorkspaceRole();
   const [projects, setProjects] = useState(loaderData.projects);
   const [pagination, setPagination] = useState(loaderData.pagination);
@@ -574,8 +575,8 @@ function ProjectsPage() {
   const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
   const pendingPage = useRouterState({
     select: (s) => {
-      const pending = s.pendingLocation ?? s.location;
-      return parsePositivePageSearchValue((pending.search as Record<string, unknown>)?.page) ?? 1;
+      const activeSearch = (s.location.search ?? s.resolvedLocation?.search) as Record<string, unknown> | undefined;
+      return parsePositivePageSearchValue(activeSearch?.page) ?? 1;
     },
   });
 
@@ -761,7 +762,7 @@ function ProjectsPage() {
         // Keep previous project list if refresh fails.
       }
     })();
-  }, [refreshSignal, search.environmentId, effectiveEnvironmentId, search.page, search.q, search.status, search.type, search.workspace]);
+  }, [loaderData.frameworkLogos, refreshSignal, search.environmentId, effectiveEnvironmentId, search.page, search.q, search.status, search.type, search.workspace]);
 
   const filteredProjects = activeTagId ? projects.filter((p) => p.tags?.some((t) => t.id === activeTagId)) : projects;
   const hasSearchQuery = Boolean(search.q?.trim());

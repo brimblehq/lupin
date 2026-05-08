@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, getRouteApi, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { Search, Globe, AlertCircle, Tag, X } from "lucide-react";
 import { DomainSearchResultCard } from "@brimble/ui";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
-import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
+import { AccessDenied } from "../../components/shared/access-denied";
+import { accessDeniedForbidden } from "../../components/shared/access-denied-presets";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { Dropdown } from "../../components/shared/dropdown";
 import { GlossyButton } from "../../components/shared/glossy-button";
@@ -165,41 +166,51 @@ function BuyDomainPage() {
   const domainCost = (purchaseTarget?.price ?? 0) * years;
   const total = domainCost + privacyCost;
 
-  async function handleSearch(nextQuery?: string, options?: { autoOpenPurchase?: boolean }) {
-    const rawQuery = nextQuery ?? query;
-    const name = normalizeQuery(rawQuery);
-    if (!name || searching) return;
+  const handleOpenPurchase = useCallback((domain: DomainResult) => {
+    setPurchaseTarget(domain);
+    setYears(isAiDomain(domain.domainName) ? 2 : 1);
+    setPrivacyEnabled(false);
+    setAutoRenewal(false);
+  }, []);
 
-    setSearching(true);
-    setSearchedQuery(name.replace(/\.[a-z]+$/, ""));
-    setSearchedDomain(name);
-    setHasSearched(true);
-    setPage(0);
+  const handleSearch = useCallback(
+    async (nextQuery?: string, options?: { autoOpenPurchase?: boolean }) => {
+      const rawQuery = nextQuery ?? query;
+      const name = normalizeQuery(rawQuery);
+      if (!name || searching) return;
 
-    try {
-      const data = await searchDomains({ data: { name } });
-      const mappedResults = data.map((item) => ({
-        domainName: item.domainName,
-        available: item.purchasable,
-        price: item.purchasePrice ?? null,
-        previousPrice: item.previousPrice ?? null,
-        renewalPrice: item.renewalPrice ?? null,
-      }));
-      setResults(mappedResults);
+      setSearching(true);
+      setSearchedQuery(name.replace(/\.[a-z]+$/, ""));
+      setSearchedDomain(name);
+      setHasSearched(true);
+      setPage(0);
 
-      if (options?.autoOpenPurchase) {
-        const exactMatch = mappedResults.find((result) => result.domainName === name && result.available);
-        if (exactMatch) {
-          handleOpenPurchase(exactMatch);
+      try {
+        const data = await searchDomains({ data: { name } });
+        const mappedResults = data.map((item) => ({
+          domainName: item.domainName,
+          available: item.purchasable,
+          price: item.purchasePrice ?? null,
+          previousPrice: item.previousPrice ?? null,
+          renewalPrice: item.renewalPrice ?? null,
+        }));
+        setResults(mappedResults);
+
+        if (options?.autoOpenPurchase) {
+          const exactMatch = mappedResults.find((result) => result.domainName === name && result.available);
+          if (exactMatch) {
+            handleOpenPurchase(exactMatch);
+          }
         }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Domain search failed");
+        setResults([]);
+      } finally {
+        setSearching(false);
       }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Domain search failed");
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }
+    },
+    [handleOpenPurchase, query, searchDomains, searching],
+  );
 
   useEffect(() => {
     if (!canWrite) {
@@ -220,14 +231,7 @@ function BuyDomainPage() {
     autoSearchedQueryRef.current = normalized;
     setQuery(urlQuery);
     void handleSearch(urlQuery, { autoOpenPurchase: true });
-  }, [canWrite, searchStr]);
-
-  function handleOpenPurchase(domain: DomainResult) {
-    setPurchaseTarget(domain);
-    setYears(isAiDomain(domain.domainName) ? 2 : 1);
-    setPrivacyEnabled(false);
-    setAutoRenewal(false);
-  }
+  }, [canWrite, handleSearch, searchStr]);
 
   async function executePurchase(target: DomainResult) {
     try {

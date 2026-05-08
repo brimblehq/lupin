@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { Moon, Sun } from "lucide-react";
 import { Desktop } from "@phosphor-icons/react";
 import { cn } from "@brimble/ui";
-import { Sidebar, mainNav, moreNav } from "./sidebar";
+import { Sidebar } from "./sidebar";
+import { mainNav, moreNav } from "./sidebar-nav";
 import { Topbar } from "./topbar";
 import { Footer } from "./footer";
 import { RouterProgressBar } from "./router-progress-bar";
@@ -1058,7 +1059,6 @@ export function DashboardLayout({
                         onSettingsClick={() => setProfileOpen(true)}
                         onMobileNavToggle={() => setMobileNavOpen((v) => !v)}
                         mobileNavOpen={mobileNavOpen}
-                        settingsSnapshot={activeSettingsSnapshot}
                         userProfile={userProfile}
                         workspaces={effectiveWorkspaces}
                         workspaceTeamMembers={activeWorkspaceTeamMembers}
@@ -1175,7 +1175,7 @@ export function DashboardLayout({
                       ) : (
                         <div className="mx-auto flex w-full max-w-screen-xl flex-1 overflow-hidden">
                           <div className="hidden md:flex">
-                            <Sidebar profileOpen={profileOpen} onProfileOpenChange={setProfileOpen} />
+                            <Sidebar onProfileOpenChange={setProfileOpen} />
                           </div>
                           <main className="scrollbar-hidden flex min-h-0 flex-1 flex-col overflow-y-auto">
                             <div className="flex-1 px-4 py-6 md:py-8 md:pl-10 md:pr-0">

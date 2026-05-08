@@ -16,9 +16,7 @@ export const getHomeOverviewServerFn = createServerFn({
   const environmentId = payload?.environmentId?.trim();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    teamId = await resolveTeamId(api, workspaceSlug);
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.overview.get({
       teamId,

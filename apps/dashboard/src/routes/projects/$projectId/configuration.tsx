@@ -14,7 +14,6 @@ import {
   MagnifyingGlass,
   GithubLogo,
   X,
-  Info,
   ArrowsClockwise,
   Eye,
   EyeSlash,
@@ -495,7 +494,7 @@ function RepoSection({
 
   useEffect(() => {
     setLocalConnectedRepo(connectedRepo ?? null);
-  }, [project?.id]);
+  }, [connectedRepo]);
 
   const hasRepo = Boolean(localConnectedRepo?.fullName || localConnectedRepo?.name);
   const repoDisplay = localConnectedRepo?.fullName || localConnectedRepo?.name || "";
@@ -625,7 +624,7 @@ function RepoSection({
         setConnecting(null);
       }
     },
-    [linkRepo, project?.id, workspace, pickerProvider, haptics, onRepoChanged],
+    [linkRepo, project?.id, project?.repo, workspace, pickerProvider, haptics, onRepoChanged],
   );
 
   const handleDisconnect = useCallback(async () => {
@@ -638,7 +637,6 @@ function RepoSection({
       onRepoChanged();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to disconnect repository");
-    } finally {
     }
   }, [unlinkRepo, project?.id, workspace, haptics, onRepoChanged]);
 
@@ -1003,16 +1001,7 @@ function BuildSection({
 
   useEffect(() => {
     setValues(initialValues);
-  }, [
-    initialValues.installCommand,
-    initialValues.buildCommand,
-    initialValues.startCommand,
-    initialValues.healthCheckPath,
-    initialValues.preStartCommand,
-    initialValues.dockerImage,
-    initialValues.outputDirectory,
-    initialValues.watchPaths,
-  ]);
+  }, [initialValues]);
 
   const watchPathsChanged =
     values.watchPaths.length !== initialValues.watchPaths.length || values.watchPaths.some((p, i) => p !== initialValues.watchPaths[i]);

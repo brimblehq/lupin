@@ -74,8 +74,6 @@ export async function startOauthPopup(provider: OauthProvider, opts?: { timeoutM
   return await new Promise<OauthAuthEventPayload>((resolve, reject) => {
     let settled = false;
 
-    let popupPollId: ReturnType<typeof setInterval> | undefined;
-
     function tryExtractAuth(obj: any): OauthAuthEventPayload | null {
       if (!obj || typeof obj !== "object") return null;
 
@@ -112,48 +110,9 @@ export async function startOauthPopup(provider: OauthProvider, opts?: { timeoutM
     }
 
     window.addEventListener("message", handlePostMessage);
-
-    const cleanup = () => {
-      window.removeEventListener("message", handlePostMessage);
-
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
-
-      if (popupPollId !== undefined) {
-        clearInterval(popupPollId);
-      }
-
-      try {
-        channel.unsubscribe("auth");
-      } catch {
-        // noop
-      }
-
-      try {
-        ably.close();
-      } catch {
-        // noop
-      }
-    };
-
-    const finish = (fn: () => void) => {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      cleanup();
-      fn();
-    };
-
-    const timeoutId = window.setTimeout(() => {
-      finish(() => reject(new Error("OAuth login timed out. Please try again.")));
-    }, timeoutMs);
-
     let popupClosedAt: number | null = null;
 
-    popupPollId = setInterval(() => {
+    const popupPollId = window.setInterval(() => {
       if (popup.closed) {
         if (!popupClosedAt) {
           popupClosedAt = Date.now();
@@ -191,6 +150,42 @@ export async function startOauthPopup(provider: OauthProvider, opts?: { timeoutM
         // Ignore cross-origin access errors until popup returns to this origin.
       }
     }, 500);
+
+    const cleanup = () => {
+      window.removeEventListener("message", handlePostMessage);
+
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+
+      clearInterval(popupPollId);
+
+      try {
+        channel.unsubscribe("auth");
+      } catch {
+        // noop
+      }
+
+      try {
+        ably.close();
+      } catch {
+        // noop
+      }
+    };
+
+    const finish = (fn: () => void) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      fn();
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      finish(() => reject(new Error("OAuth login timed out. Please try again.")));
+    }, timeoutMs);
 
     channel.subscribe("auth", (message: any) => {
       const data = message?.data as OauthAuthEventPayload | undefined;

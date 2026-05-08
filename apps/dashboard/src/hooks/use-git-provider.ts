@@ -115,7 +115,7 @@ export function useGitProvider({
     if (active && phase >= 2 && accounts.length === 0 && !accountsLoading) {
       void refreshAccounts({ silent: false });
     }
-  }, [active, phase]);
+  }, [active, phase, accounts.length, accountsLoading, refreshAccounts]);
 
   const loadRepos = useCallback(
     async (input: { installationId?: number | string; q?: string }) => {
@@ -220,7 +220,7 @@ export function useGitProvider({
     } finally {
       setConnectOpening(false);
     }
-  }, [api, providerName, accounts, refreshAccounts]);
+  }, [api, providerName, accounts, refreshAccounts, stopPolling]);
 
   useEffect(() => {
     if (connectPolling && accountsSignature.length > 0 && accountsSignature !== pollingBaselineSignatureRef.current) {
@@ -230,7 +230,7 @@ export function useGitProvider({
         window.dispatchEvent(new Event("brimble:git-connection-changed"));
       }
     }
-  }, [accountsSignature, connectPolling, providerName]);
+  }, [accountsSignature, connectPolling, providerName, stopPolling]);
 
   const handleRepoSelect = useCallback(
     async (repo: GithubRepoListItem) => {

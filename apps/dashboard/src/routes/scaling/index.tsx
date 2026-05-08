@@ -245,33 +245,6 @@ function ScalingGroupCard({
   );
 }
 
-function ScalingCardSkeleton() {
-  return (
-    <div className="flex h-[164px] animate-pulse flex-col rounded-[4px] border-[0.5px] border-dash-border">
-      <div className="flex items-center justify-between px-3.5 pb-1 pt-3">
-        <div className="h-4 w-28 rounded bg-dash-bg-elevated" />
-        <div className="h-4 w-20 rounded bg-dash-bg-elevated" />
-      </div>
-      <div className="px-3.5 pb-3">
-        <div className="h-3 w-32 rounded bg-dash-bg-elevated" />
-      </div>
-      <div className="grid grid-cols-2 gap-3 px-3.5 pb-3">
-        <div className="space-y-2">
-          <div className="h-3 w-16 rounded bg-dash-bg-elevated" />
-          <div className="h-4 w-20 rounded bg-dash-bg-elevated" />
-          <div className="h-3 w-16 rounded bg-dash-bg-elevated" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-3 w-16 rounded bg-dash-bg-elevated" />
-          <div className="h-3 w-20 rounded bg-dash-bg-elevated" />
-          <div className="h-3 w-20 rounded bg-dash-bg-elevated" />
-        </div>
-      </div>
-      <div className="mt-auto h-10 border-t-[0.5px] border-dash-border px-3.5" />
-    </div>
-  );
-}
-
 function CreationForm({
   initialValues,
   onCancel,

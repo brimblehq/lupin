@@ -1,5 +1,4 @@
 import type { ApiClient, ApiListResponse } from "./types";
-import config from "@/config";
 import { asNonEmptyString, asRecord, pickBoolean, pickNonEmptyString, pickNumber, pickString } from "./normalize";
 
 export interface DomainRecord {

@@ -342,7 +342,7 @@ export function OnboardingChecklist({
         });
       }
     },
-    [navigate, searchStr, haptics],
+    [navigate, searchStr, haptics, updateFollowedX],
   );
 
   // Avoid flash-then-disappear while workspace-specific checks are still resolving.

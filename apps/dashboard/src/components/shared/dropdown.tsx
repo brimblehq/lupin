@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { ChevronDown, Search } from "lucide-react";
@@ -49,12 +49,13 @@ export function Dropdown({
   const haptics = useHaptics();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const triggerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const MENU_MAX_HEIGHT = 200;
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, placement: "bottom" as "bottom" | "top" });
-  const safeOptions = Array.isArray(options) ? options : [];
+  const safeOptions = useMemo(() => (Array.isArray(options) ? options : []), [options]);
   const isObject = safeOptions.length > 0 && typeof safeOptions[0] === "object";
   const menuWidth = pos.width > 0 ? pos.width : 240;
   const trimmedQuery = query.trim().toLowerCase();
@@ -114,20 +115,127 @@ export function Dropdown({
   const selectedOption = isObject ? (safeOptions as DropdownOption[]).find((o) => o.id === value) : undefined;
   const displayLabel = isObject ? selectedOption?.label : renderOption ? renderOption(value) : value;
 
-  const filteredObjectOptions = isObject
-    ? (safeOptions as DropdownOption[]).filter((opt) => (trimmedQuery ? opt.label.toLowerCase().includes(trimmedQuery) : true))
-    : [];
+  const filteredObjectOptions = useMemo(
+    () =>
+      isObject
+        ? (safeOptions as DropdownOption[]).filter((opt) => (trimmedQuery ? opt.label.toLowerCase().includes(trimmedQuery) : true))
+        : [],
+    [isObject, safeOptions, trimmedQuery],
+  );
 
-  const filteredStringOptions = !isObject
-    ? (safeOptions as string[]).filter((opt) => {
-        if (!trimmedQuery) {
-          return true;
+  const filteredStringOptions = useMemo(
+    () =>
+      !isObject
+        ? (safeOptions as string[]).filter((opt) => {
+            if (!trimmedQuery) {
+              return true;
+            }
+
+            const label = renderOption ? renderOption(opt) : opt;
+            return label.toLowerCase().includes(trimmedQuery);
+          })
+        : [],
+    [isObject, renderOption, safeOptions, trimmedQuery],
+  );
+
+  const getNextEnabledIndex = useCallback(
+    (start: number, direction: 1 | -1): number => {
+      if (isObject) {
+        const objectOptions = filteredObjectOptions;
+        if (objectOptions.length === 0) {
+          return -1;
         }
 
-        const label = renderOption ? renderOption(opt) : opt;
-        return label.toLowerCase().includes(trimmedQuery);
-      })
-    : [];
+        for (let step = 1; step <= objectOptions.length; step += 1) {
+          const candidate = (start + direction * step + objectOptions.length) % objectOptions.length;
+          if (!objectOptions[candidate]?.disabled) {
+            return candidate;
+          }
+        }
+
+        return -1;
+      }
+
+      if (filteredStringOptions.length === 0) {
+        return -1;
+      }
+
+      return (start + direction + filteredStringOptions.length) % filteredStringOptions.length;
+    },
+    [filteredObjectOptions, filteredStringOptions, isObject],
+  );
+
+  const selectHighlighted = useCallback(() => {
+    if (highlightedIndex < 0) {
+      return;
+    }
+
+    if (isObject) {
+      const option = filteredObjectOptions[highlightedIndex];
+      if (!option || option.disabled) {
+        return;
+      }
+
+      haptics.selection();
+      (onChange as (id: string) => void)(option.id);
+      setOpen(false);
+      return;
+    }
+
+    const option = filteredStringOptions[highlightedIndex];
+    if (!option) {
+      return;
+    }
+
+    haptics.selection();
+    (onChange as (v: string) => void)(option);
+    setOpen(false);
+  }, [filteredObjectOptions, filteredStringOptions, haptics, highlightedIndex, isObject, onChange]);
+
+  useEffect(() => {
+    if (!open) {
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    if (isObject) {
+      if (filteredObjectOptions.length === 0) {
+        setHighlightedIndex(-1);
+        return;
+      }
+
+      const selectedIndex = filteredObjectOptions.findIndex((opt) => opt.id === value && !opt.disabled);
+      if (selectedIndex >= 0) {
+        setHighlightedIndex(selectedIndex);
+        return;
+      }
+
+      setHighlightedIndex(getNextEnabledIndex(-1, 1));
+      return;
+    }
+
+    if (filteredStringOptions.length === 0) {
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    const selectedIndex = filteredStringOptions.findIndex((opt) => opt === value);
+    if (selectedIndex >= 0) {
+      setHighlightedIndex(selectedIndex);
+      return;
+    }
+
+    setHighlightedIndex(0);
+  }, [filteredObjectOptions, filteredStringOptions, getNextEnabledIndex, isObject, open, value]);
+
+  useEffect(() => {
+    if (!open || highlightedIndex < 0) {
+      return;
+    }
+
+    const highlightedOption = menuRef.current?.querySelector<HTMLElement>(`[data-dropdown-index='${highlightedIndex}']`);
+    highlightedOption?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex, open]);
 
   return (
     <div>
@@ -152,6 +260,21 @@ export function Dropdown({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
                   e.stopPropagation();
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlightedIndex((current) => getNextEnabledIndex(current < 0 ? -1 : current, 1));
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightedIndex((current) => getNextEnabledIndex(current < 0 ? 0 : current, -1));
+                    return;
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    selectHighlighted();
+                    return;
+                  }
                   if (e.key === "Escape") {
                     setOpen(false);
                   }
@@ -174,6 +297,24 @@ export function Dropdown({
                 updatePos();
               }
               setOpen((prev) => !prev);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                if (!open) {
+                  updatePos();
+                  setOpen(true);
+                  return;
+                }
+                const direction: 1 | -1 = e.key === "ArrowDown" ? 1 : -1;
+                setHighlightedIndex((current) => getNextEnabledIndex(current < 0 ? -1 : current, direction));
+                return;
+              }
+
+              if (e.key === "Enter" && open) {
+                e.preventDefault();
+                selectHighlighted();
+              }
             }}
             className={`flex min-h-[46px] w-full items-center justify-between input-base px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] ${className ?? ""}`}
           >
@@ -217,10 +358,12 @@ export function Dropdown({
                 }}
               >
                 {isObject
-                  ? filteredObjectOptions.map((opt) => (
+                  ? filteredObjectOptions.map((opt, index) => (
                       <button
                         key={opt.id}
                         type="button"
+                        data-dropdown-index={index}
+                        onMouseEnter={() => setHighlightedIndex(index)}
                         onClick={() => {
                           if (opt.disabled) {
                             return;
@@ -236,7 +379,7 @@ export function Dropdown({
                             : opt.id === value
                               ? "font-medium text-dash-text-strong"
                               : "text-dash-text-faded"
-                        }`}
+                        } ${index === highlightedIndex && !opt.disabled ? "bg-dash-bg-elevated" : ""}`}
                       >
                         <span className="flex min-w-0 items-center gap-2">
                           {opt.icon && (
@@ -247,9 +390,11 @@ export function Dropdown({
                         {opt.asideText && <span className="ml-auto shrink-0 text-[11px] text-[#4879f8]">{opt.asideText}</span>}
                       </button>
                     ))
-                  : filteredStringOptions.map((opt) => (
+                  : filteredStringOptions.map((opt, index) => (
                       <button
                         key={opt}
+                        data-dropdown-index={index}
+                        onMouseEnter={() => setHighlightedIndex(index)}
                         onClick={() => {
                           haptics.selection();
                           (onChange as (v: string) => void)(opt);
@@ -257,7 +402,7 @@ export function Dropdown({
                         }}
                         className={`flex w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-dash-bg-elevated ${
                           opt === value ? "font-medium text-dash-text-strong" : "text-dash-text-faded"
-                        }`}
+                        } ${index === highlightedIndex ? "bg-dash-bg-elevated" : ""}`}
                       >
                         {renderOption ? renderOption(opt) : opt}
                       </button>

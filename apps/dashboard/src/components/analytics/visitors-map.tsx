@@ -297,7 +297,7 @@ function Globe({ countries }: { countries: CountryVisitor[] }) {
       cancelAnimationFrame(frame);
       globe.destroy();
     };
-  }, [isDark, labelMarkers.length]);
+  }, [isDark, labelMarkers]);
 
   return (
     <div className="relative flex h-full w-full items-center justify-center">

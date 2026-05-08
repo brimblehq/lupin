@@ -86,7 +86,7 @@ function isBrimbleIconSource(src: string): boolean {
 
 function ProjectIdentityIcon({ project }: { project: Project }) {
   const [candidateIndex, setCandidateIndex] = useState(0);
-  const candidates = useMemo(() => buildProjectIconCandidates(project), [project.domain, project.frameworkLogo]);
+  const candidates = useMemo(() => buildProjectIconCandidates(project), [project]);
 
   useEffect(() => {
     setCandidateIndex(0);

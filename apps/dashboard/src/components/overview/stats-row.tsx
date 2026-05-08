@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Infinity } from "@phosphor-icons/react";
+import { Infinity as InfinityIcon } from "@phosphor-icons/react";
 import { SUBSCRIPTION_PLAN_TYPE } from "@brimble/models/dist/enum";
 import { AreaChart, Area, YAxis, ResponsiveContainer } from "recharts";
 import { DashButton } from "../shared/dash-button";
@@ -225,7 +225,7 @@ export function StatsRow({
                 <span className="text-dash-text-extra-faded">
                   /
                   <span className="ml-0.5 inline-flex align-middle">
-                    <Infinity className="size-5" weight="light" aria-label="Unlimited" />
+                    <InfinityIcon className="size-5" weight="light" aria-label="Unlimited" />
                   </span>
                 </span>
               ) : (

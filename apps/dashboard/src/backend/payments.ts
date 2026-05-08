@@ -12,6 +12,7 @@ import type {
   SubscriptionStats,
   CreateSubscriptionInput,
   SwapPlanInput,
+  CancelSubscriptionInput,
   InvoicePage,
   InvoicePaymentResult,
   PurchaseInput,
@@ -36,6 +37,7 @@ export type {
   Subscription,
   CreateSubscriptionInput,
   SwapPlanInput,
+  CancelSubscriptionInput,
   Invoice,
   InvoicePage,
   InvoicePaymentResult,
@@ -194,9 +196,10 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       return unwrapData<Subscription>(res);
     },
 
-    async cancelSubscription(): Promise<void> {
+    async cancelSubscription(input: CancelSubscriptionInput): Promise<void> {
       await client.request(`${base}/subscription/cancel`, {
         method: "POST",
+        body: { comment: input.comment },
       });
     },
 

@@ -52,7 +52,7 @@ function TwoFactorChallengePage() {
   const [recoveryCode, setRecoveryCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const didExpireRef = useRef(false);
   const didParseHashRef = useRef(false);
 
@@ -68,6 +68,7 @@ function TwoFactorChallengePage() {
 
     setChallengeToken(parsed.challengeToken);
     setDeadlineAt(Date.now() + parsed.expiresIn * 1000);
+    setNow(Date.now());
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
   }, []);
 

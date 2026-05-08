@@ -8,8 +8,6 @@ import type {
   DecryptSettingsApiKeyInput,
   SettingsInvoiceItem,
   SettingsInvoicePage,
-  SettingsPaymentCard,
-  SettingsPaymentProvider,
   SettingsPlan,
   SettingsSidebarSnapshot,
   SettingsSpendingStats,
@@ -183,32 +181,6 @@ async function getCurrentPersonalPlanType(client: ApiClient, currentSubscription
   } catch {
     return undefined;
   }
-}
-
-function mapCards(payload: any): SettingsPaymentCard[] {
-  const data = unwrapData<any[]>(payload) ?? [];
-
-  return data.map((card) => ({
-    id: String(card?._id ?? card?.id ?? ""),
-    cardType: card?.card_type,
-    expMonth: card?.exp_month,
-    expYear: card?.exp_year,
-    last4: card?.last4,
-    preferred: Boolean(card?.preferred),
-    provider: card?.provider,
-  }));
-}
-
-function mapProviders(payload: any): SettingsPaymentProvider[] {
-  const data = unwrapData<any[]>(payload) ?? [];
-
-  return data.map((provider) => ({
-    name: String(provider?.name ?? ""),
-    enum: String(provider?.enum ?? ""),
-    logo: provider?.logo,
-    description: provider?.description,
-    features: Array.isArray(provider?.features) ? provider.features.map((feature: unknown) => String(feature)) : [],
-  }));
 }
 
 function mapSpendingStats(payload: any): SettingsSpendingStats {

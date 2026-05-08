@@ -189,13 +189,14 @@ function DomainsPage() {
     data: { workspace?: string; domainId: string; projectId?: string };
   }) => Promise<{ success: boolean }>;
 
-  function buildDomainsSearch(next: { page?: number; q?: string }) {
-    return {
+  const buildDomainsSearch = useCallback(
+    (next: { page?: number; q?: string }) => ({
       page: next.page,
       workspace: workspaceFromUrl,
       q: next.q,
-    };
-  }
+    }),
+    [workspaceFromUrl],
+  );
 
   useEffect(() => {
     setRows(domainsResult.items.map((item) => mapDomainToRow(item)));
@@ -225,7 +226,7 @@ function DomainsPage() {
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [navigate, search, search.q, searchQuery]);
+  }, [buildDomainsSearch, navigate, search, search.q, searchQuery]);
 
   const openAddDomain = useCallback((step?: DomainStep) => {
     setAddDomainStep(step);

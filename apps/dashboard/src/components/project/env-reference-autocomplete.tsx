@@ -295,12 +295,11 @@ function RootList({
   }
   const visibleRows = expanded ? rows : rows.slice(0, COLLAPSED_LIMIT);
   const hiddenCount = rows.length - visibleRows.length;
-  let lastGroup: string | null = null;
   return (
     <>
       {visibleRows.map((row, index) => {
-        const showHeader = row.group === "shared" && row.group !== lastGroup;
-        lastGroup = row.group;
+        const previous = index > 0 ? visibleRows[index - 1] : null;
+        const showHeader = row.group === "shared" && previous?.group !== "shared";
         return (
           <div key={`${row.kind}:${row.label}:${index}`}>
             {showHeader && <GroupHeader label="Shared" />}

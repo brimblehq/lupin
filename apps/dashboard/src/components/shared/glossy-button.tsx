@@ -51,7 +51,11 @@ export function GlossyButton({
       {...props}
       onClick={(e) => {
         if (!disableHaptic && !props.disabled && !loading) {
-          variant === "red" ? haptics.medium() : haptics.light();
+          if (variant === "red") {
+            haptics.medium();
+          } else {
+            haptics.light();
+          }
         }
         props.onClick?.(e);
       }}

@@ -149,11 +149,6 @@ function AddDnsRecordModal({
     });
   }
 
-  let submitLabel = isEditing ? "Save Changes" : "Add Record";
-  if (submitting) {
-    submitLabel = isEditing ? "Saving..." : "Creating...";
-  }
-
   return (
     <Modal open={open} onOpenChange={onOpenChange} width={500} className="overflow-visible">
       <ModalHeader
@@ -688,9 +683,6 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
   const renewalUnitPrice = Number(domain.renewalPrice ?? 0);
   const totalRenewalPrice = renewalUnitPrice * renewDuration;
   const canAutomaticallyTransfer = domain.canTransferOut !== false;
-  const transferSupportMessage =
-    domain.transferOutMessage ||
-    "This domain does not support automatic transfer in the dashboard. Contact support and we will help you complete the transfer manually.";
   const canContinueTransfer = transferChecklist.unlocked && transferChecklist.registrantEmailReady && transferChecklist.understandDnsImpact;
 
   async function handleCheckDnsStatus() {

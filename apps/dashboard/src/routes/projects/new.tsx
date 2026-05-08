@@ -34,9 +34,11 @@ import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { RangeSlider } from "../../components/shared/range-slider";
 import { Dropdown } from "../../components/shared/dropdown";
 import { SimpleTooltip } from "../../components/shared/tooltip";
-import { DiskSizeSelect, diskSizes } from "../../components/shared/disk-size-select";
+import { DiskSizeSelect } from "../../components/shared/disk-size-select";
+import { diskSizes } from "../../components/shared/disk-size-options";
 import { RootDirectoryTrigger } from "../../components/shared/root-directory-trigger";
-import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
+import { AccessDenied } from "../../components/shared/access-denied";
+import { accessDeniedForbidden } from "../../components/shared/access-denied-presets";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { RootDirectoryDrawer } from "../../components/project/root-directory-drawer";
 import { ConfirmServerRuntimeModal } from "../../components/project/confirm-server-runtime-modal";
@@ -91,6 +93,7 @@ import { formatUsdMonthly } from "@/utils/billing";
 import { generateStrongPassword } from "@/utils/password";
 import { NewProjectPending } from "@/components/shared/route-pending";
 import config from "@/config";
+import type { Phase3DeployInput } from "./new.types";
 
 export const Route = createFileRoute("/projects/new")({
   pendingComponent: NewProjectPending,
@@ -224,31 +227,6 @@ function slugifyProjectName(input: string) {
     .replace(/^-|-$/g, "");
 }
 
-function debugMaskDeployPayload(payload: Record<string, unknown>) {
-  const copy: Record<string, unknown> = { ...payload };
-
-  if (Array.isArray(copy.environments)) {
-    copy.environments = copy.environments.map((env) => {
-      if (!env || typeof env !== "object") return env;
-      const row = env as Record<string, unknown>;
-      return {
-        ...row,
-        value: typeof row.value === "string" && row.value.length > 0 ? "[REDACTED]" : row.value,
-      };
-    });
-  }
-
-  if (copy.registry_credentials && typeof copy.registry_credentials === "object") {
-    const creds = copy.registry_credentials as Record<string, unknown>;
-    copy.registry_credentials = {
-      ...creds,
-      token: typeof creds.token === "string" && creds.token.length > 0 ? "[REDACTED]" : creds.token,
-    };
-  }
-
-  return copy;
-}
-
 type DockerRegistryCredentials = {
   username: string;
   token: string;
@@ -258,44 +236,6 @@ type DockerSourceSelection = {
   imageUri: string;
   credentials?: DockerRegistryCredentials;
 };
-
-const mockOrgs = [
-  {
-    id: "personal",
-    name: "Kemdirimakujuobi",
-    avatar: "radial-gradient(circle at 62% 30%, #b8fce8, #91f2d5 25%, #6ae8c3 50%, #43deb0 75%, #1bd49d)",
-  },
-  {
-    id: "team",
-    name: "Brimble Team",
-    avatar: "radial-gradient(circle at 62% 30%, #b8cffc, #94b6f8 25%, #6f9cf3 50%, #4b82ee 75%, #2769e9)",
-  },
-];
-
-const mockRepos = [
-  {
-    name: "brimble-dashboard",
-    visibility: "private" as const,
-    language: "TypeScript",
-  },
-  {
-    name: "landing-page",
-    visibility: "public" as const,
-    language: "TypeScript",
-  },
-  { name: "api-server", visibility: "private" as const, language: "Go" },
-  {
-    name: "design-system",
-    visibility: "public" as const,
-    language: "TypeScript",
-  },
-  {
-    name: "mobile-app",
-    visibility: "private" as const,
-    language: "React Native",
-  },
-  { name: "docs-site", visibility: "public" as const, language: "MDX" },
-];
 
 const frameworks = [
   {
@@ -349,8 +289,6 @@ const frameworks = [
 ];
 
 const regions = ["US East", "EU West", "Asia Pacific"];
-const branches = ["main", "develop", "staging"];
-
 /* ─── Database Config ─── */
 
 interface DbEngine {
@@ -426,8 +364,8 @@ function ComputeSliderField({
   const [trackValue, setTrackValue] = useState(() => indexToTrack(value));
 
   useEffect(() => {
-    setTrackValue(indexToTrack(value));
-  }, [value]);
+    setTrackValue((value / maxIndex) * 100);
+  }, [value, maxIndex]);
 
   const previewIndex = trackToIndex(trackValue);
 
@@ -717,7 +655,6 @@ function Phase2GitRepoSelect({
   onLoadRepos?: (input: { installationId?: number | string; q?: string }) => void;
   onSelect: (repo: GithubRepoListItem) => void;
 }) {
-  const { Icon: ProviderIcon } = provider;
   const { deployPrivateOrganization } = usePlanGate();
   const [selectedInstallationId, setSelectedInstallationId] = useState<string>("");
   const [search, setSearch] = useState("");
@@ -1150,25 +1087,6 @@ function Phase2DbEngine({
     environments: Array<{ name: string; value: string }>;
   }) => void | Promise<void>;
 }) {
-  function renderEngineIcon(engine: { name: string; imageUrl?: string }) {
-    const imageUrl = engine.imageUrl?.trim();
-    if (!imageUrl) {
-      return <Database className="size-5 text-dash-text-body" />;
-    }
-
-    if (imageUrl.startsWith("<svg")) {
-      return (
-        <span
-          className="flex size-5 items-center justify-center [&>svg]:size-5"
-          dangerouslySetInnerHTML={{ __html: imageUrl }}
-          aria-hidden
-        />
-      );
-    }
-
-    return <img src={imageUrl} alt="" className="size-5 object-contain" loading="lazy" />;
-  }
-
   const { data: paymentMethods, isLoading: paymentMethodsLoading } = usePaymentMethods();
   const hasPaymentCard = (paymentMethods?.length ?? 0) > 0;
   const [showAddCardForm, setShowAddCardForm] = useState(false);
@@ -1582,7 +1500,7 @@ function Phase3DatabaseConfigure({
       };
     });
     setEnvDrafts(generated);
-  }, [engine.id, dbName]);
+  }, [engine.id, engine.envs, dbName]);
 
   function updateEnvDraft(id: number, value: string) {
     setEnvDrafts((prev) => prev.map((row) => (row.id === id ? { ...row, value } : row)));
@@ -1937,25 +1855,6 @@ interface EnvVar {
 }
 
 let envNextId = 1;
-
-type Phase3DeployInput = {
-  name: string;
-  regionId: string;
-  serviceType: string;
-  authEnabled: boolean;
-  branch?: string;
-  rootDirectory: string;
-  framework: string;
-  preStartCommand: string;
-  buildCommand: string;
-  startCommand: string;
-  outputDirectory: string;
-  installCommand: string;
-  envVars: Array<{ key: string; value: string }>;
-  diskEnabled: boolean;
-  diskSizeGb?: number;
-  mountPath?: string;
-};
 
 const SERVER_RUNTIME_FRAMEWORK_TYPES: string[] = [FrameworkApplicationType.Ssr, FrameworkApplicationType.Backend, "other"];
 const FREE_PLAN_FRAMEWORK_TYPES: string[] = [FrameworkApplicationType.Static, FrameworkApplicationType.Spa, FrameworkApplicationType.Ssr];
@@ -3094,7 +2993,7 @@ function NewProjectPage() {
     return () => {
       active = false;
     };
-  }, [listFrameworks, listRegions, workspace]);
+  }, [listAvailableDatabases, listFrameworks, listRegions, workspace]);
 
   function handleSourceTypeSelect(type: SourceType) {
     setSourceType(type);

@@ -29,7 +29,6 @@ interface AddDomainModalProps {
   onContinue: (projectId: string, domainUrl: string) => void | Promise<void>;
   defaultRegistrantEmail?: string;
   paymentCards?: SettingsPaymentCard[];
-  onCreateProject?: () => void;
   /** Called to validate the domain before submitting. Return null if valid, or an error. */
   onValidate?: (domainUrl: string) => DomainValidationError | null | Promise<DomainValidationError | null>;
   /** Called when user clicks "Register" for a domain that doesn't exist. */
@@ -111,7 +110,6 @@ export function AddDomainModal({
   onContinue,
   defaultRegistrantEmail,
   paymentCards = [],
-  onCreateProject,
   onValidate,
   onRegisterDomain,
   initialStep,

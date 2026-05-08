@@ -20,9 +20,7 @@ export const getProjectObservabilityMetricsServerFn = createServerFn({
 
   return withTokenRefresh(async (api) => {
     const workspaceSlug = payload?.workspace?.trim().toLowerCase();
-    let teamId: string | undefined;
-
-    teamId = await resolveTeamId(api, workspaceSlug);
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.observability.getProjectMetrics({
       projectId,

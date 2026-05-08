@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 
 export function useInvalidate() {
   const router = useRouter();
@@ -11,15 +11,13 @@ export function useInvalidate() {
 
 export function useInvalidatingServerFn<TArgs extends { data?: unknown }, TResult>(serverFn: (args: TArgs) => Promise<TResult>) {
   const router = useRouter();
-  const routerRef = useRef(router);
-  routerRef.current = router;
 
   return useCallback(
     async (args: TArgs): Promise<TResult> => {
       const result = await serverFn(args);
-      routerRef.current.invalidate();
+      router.invalidate();
       return result;
     },
-    [serverFn],
+    [router, serverFn],
   );
 }

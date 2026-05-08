@@ -3,6 +3,7 @@ import type {
   AddPaymentMethodInput,
   CreateSubscriptionInput,
   SwapPlanInput,
+  CancelSubscriptionInput,
   PurchaseInput,
   UpdateSpendingLimitInput,
   UpdateTeamSpendingLimitInput,
@@ -139,9 +140,18 @@ export const swapPlanServerFn = createServerFn({
 
 export const cancelSubscriptionServerFn = createServerFn({
   method: "POST",
-}).handler(async () => {
+}).handler(async ({ data }) => {
+  const input = data as unknown as CancelSubscriptionInput;
+  const comment = String(input?.comment ?? "").trim();
+  if (!comment) {
+    throw new Error("Please tell us why you're cancelling.");
+  }
+  if (comment.length > 500) {
+    throw new Error("Feedback must be 500 characters or fewer.");
+  }
+
   return withTokenRefresh(async (api) => {
-    await api.payments.cancelSubscription();
+    await api.payments.cancelSubscription({ comment });
     return { ok: true } as const;
   });
 });

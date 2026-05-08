@@ -678,9 +678,7 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       const { logId, messageId, message } = debugMessageSchema.validateSync(input);
 
       const path = `${listEndpoint}/${encodeURIComponent(projectId)}/debug-suggestions`;
-      const fullUrl = `${config.gatewayUrl}${path}`;
       const requestBody = { logId, messageId, message, debugModel: config.aiDebugModel };
-      // eslint-disable-next-line no-console
 
       const response = await client.request<any>(path, {
         method: "POST",

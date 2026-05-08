@@ -18,12 +18,24 @@ import {
 import { mapDeploymentRunLogsToDrawerEntries, sortDeploymentDrawerEntries } from "@/utils/deployment-logs";
 import { usePushNotification } from "@/hooks/use-push-notification";
 import config from "@/config";
+import type { ProjectDetailRouteProject } from "./project-detail.types";
 
 const SUCCESS_LOG_PATTERN = /site (is )?(live|running)\b/i;
 const FAILURE_LOG_PATTERN = /deployment failed|build failed|failed to deploy/i;
 
 const DEPLOYMENT_EVENT_NAMES: readonly string[] = ["deployment:started", "deployment:completed", "deployment:failed"];
 const DATABASE_EVENT_NAMES: readonly string[] = ["database:provisioned", "database:updated"];
+
+function toRouteProject(project: BackendProject): ProjectDetailRouteProject {
+  return project as unknown as ProjectDetailRouteProject;
+}
+
+function toRouteProjectList(response: ApiListResponse<BackendProject>): ApiListResponse<ProjectDetailRouteProject> {
+  return {
+    ...response,
+    items: response.items.map(toRouteProject),
+  };
+}
 
 function getDrawerEntryKey(entry: DeploymentDrawerLogEntry): string {
   const rawId = entry.rawId?.trim();
@@ -74,10 +86,10 @@ function mergeDeploymentDrawerEntries(
   return sortDeploymentDrawerEntries(next);
 }
 
-const projectCache = new Map<string, { data: BackendProject; fetchedAt: number }>();
+const projectCache = new Map<string, { data: ProjectDetailRouteProject; fetchedAt: number }>();
 const PROJECT_CACHE_TTL = 300_000;
 
-function getProjectIdentityCandidates(project: BackendProject): string[] {
+function getProjectIdentityCandidates(project: Pick<ProjectDetailRouteProject, "slug" | "id" | "name">): string[] {
   return [project.slug, project.id, project.name]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .map((value) => value.trim().toLowerCase());
@@ -117,7 +129,7 @@ export const Route = createFileRoute("/projects/$projectId")({
     }
 
     try {
-      const project = await (
+      const projectResponse = await (
         getProjectDetailsServerFn as unknown as (input: { data: { projectId: string; workspace?: string } }) => Promise<BackendProject>
       )({
         data: {
@@ -125,6 +137,7 @@ export const Route = createFileRoute("/projects/$projectId")({
           workspace,
         },
       });
+      const project = toRouteProject(projectResponse);
 
       projectCache.set(cacheKey, { data: project, fetchedAt: Date.now() });
 
@@ -146,9 +159,10 @@ export const Route = createFileRoute("/projects/$projectId")({
         )({
           data: { workspace },
         });
+        const routeProjects = toRouteProjectList(projects);
 
         const requestedProjectId = params.projectId.trim().toLowerCase();
-        const recoveredProject = projects.items.find((item) => getProjectIdentityCandidates(item).includes(requestedProjectId));
+        const recoveredProject = routeProjects.items.find((item) => getProjectIdentityCandidates(item).includes(requestedProjectId));
 
         if (recoveredProject) {
           console.warn("[project-route] recovered project from list after details fetch failed", {
@@ -176,8 +190,8 @@ export const Route = createFileRoute("/projects/$projectId")({
     const searchEnvironmentId = deps.environmentId;
     const hasExplicitEnvironment = hasExplicitEnvironmentSelection(searchEnvironmentId);
 
-    const project = (context as any).project as BackendProject;
-    const fallbackSwitcherProjects: ApiListResponse<BackendProject> = {
+    const project = (context as any).project as ProjectDetailRouteProject;
+    const fallbackSwitcherProjects: ApiListResponse<ProjectDetailRouteProject> = {
       items: [project],
       total: 1,
     };
@@ -194,20 +208,20 @@ export const Route = createFileRoute("/projects/$projectId")({
         data: { workspace },
       }).catch(() => null),
       (
-        listHomeProjectsServerFn as unknown as (input: {
-          data: { workspace?: string; environmentId?: string };
-        }) => Promise<ApiListResponse<BackendProject>>
-      )({
-        data: { workspace, environmentId: searchEnvironmentId },
-      }),
+          listHomeProjectsServerFn as unknown as (input: {
+            data: { workspace?: string; environmentId?: string };
+          }) => Promise<ApiListResponse<BackendProject>>
+        )({
+          data: { workspace, environmentId: searchEnvironmentId },
+        }),
     ]);
 
     const environments = environmentsResult.status === "fulfilled" ? environmentsResult.value : [];
     const persistedEnvironmentId = persistedEnvironmentResult.status === "fulfilled" ? persistedEnvironmentResult.value : null;
 
-    let projectSwitcherProjects = fallbackSwitcherProjects;
+    let projectSwitcherProjects: ApiListResponse<ProjectDetailRouteProject> = fallbackSwitcherProjects;
     if (allProjectsResult.status === "fulfilled") {
-      projectSwitcherProjects = allProjectsResult.value;
+      projectSwitcherProjects = toRouteProjectList(allProjectsResult.value);
     } else {
       console.warn("[project-route] listHomeProjects failed; falling back to current project", {
         projectId: params.projectId,
@@ -224,13 +238,14 @@ export const Route = createFileRoute("/projects/$projectId")({
 
     if (environmentId && environmentId !== searchEnvironmentId) {
       try {
-        projectSwitcherProjects = await (
+        const resolvedProjects = await (
           listHomeProjectsServerFn as unknown as (input: {
             data: { workspace?: string; environmentId?: string };
           }) => Promise<ApiListResponse<BackendProject>>
         )({
           data: { workspace, environmentId },
         });
+        projectSwitcherProjects = toRouteProjectList(resolvedProjects);
       } catch {
         console.warn("[project-route] listHomeProjects for resolved environment failed; keeping fallback data", {
           projectId: params.projectId,
@@ -467,8 +482,9 @@ function ProjectLayout() {
     };
   }, [drawerOpen, selectedDeployment, fetchLogsForDeployment]);
 
+  const backendProjectId = (project as BackendProject)?.id;
+
   useEffect(() => {
-    const backendProjectId = (project as BackendProject)?.id;
     if (!backendProjectId) return;
 
     let cancelled = false;
@@ -515,7 +531,7 @@ function ProjectLayout() {
       cancelled = true;
       cleanup?.();
     };
-  }, [(project as BackendProject)?.id, router]);
+  }, [backendProjectId, router]);
 
   const openDeploymentDrawer = useCallback(
     (deployment: DeploymentLog) => {

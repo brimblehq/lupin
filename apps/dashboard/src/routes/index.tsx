@@ -185,7 +185,7 @@ function DashboardHome() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceSlug, invitationData, isTeamWorkspace]);
+  }, [workspaceSlug, invitationData, isTeamWorkspace, navigate]);
 
   useEffect(() => {
     setOwnershipTransferOpen(search.transferOwnership === "1");

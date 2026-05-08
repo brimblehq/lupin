@@ -26,7 +26,6 @@ import { DashButton } from "../shared/dash-button";
 import { Spinner } from "../shared/spinner";
 import { Avatar } from "../shared/avatar";
 import { useScoutBar } from "../../contexts/scoutbar-context";
-import config from "@/config";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import type { Workspace } from "@/backend/workspaces";
@@ -1146,7 +1145,6 @@ export function Topbar({
   onSettingsClick,
   onMobileNavToggle,
   mobileNavOpen,
-  settingsSnapshot,
   userProfile,
   workspaces,
   projectSwitcherProjects,
@@ -1155,7 +1153,6 @@ export function Topbar({
   onSettingsClick: () => void;
   onMobileNavToggle?: () => void;
   mobileNavOpen?: boolean;
-  settingsSnapshot?: SettingsSidebarSnapshot | null;
   userProfile?: SettingsSidebarSnapshot["profile"] | null;
   workspaces?: Workspace[];
   projectSwitcherProjects?: Project[];
