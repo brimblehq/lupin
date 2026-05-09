@@ -12,6 +12,8 @@ export type Phase3DeployInput = {
   outputDirectory: string;
   installCommand: string;
   envVars: Array<{ key: string; value: string }>;
+  cpu: number;
+  memory: number;
   diskEnabled: boolean;
   diskSizeGb?: number;
   mountPath?: string;

@@ -839,34 +839,48 @@ function Phase2GitRepoSelect({
             ) : repos.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-dash-text-faded">No repositories found.</div>
             ) : (
-              repos.map((repo, i) => (
-                <motion.div
-                  key={repo.fullName}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.04 * i, ease }}
-                  className={`flex items-center justify-between px-4 py-3 ${i > 0 ? "border-t-[0.5px] border-dash-border" : ""}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <img src="/icons/git-circle.svg" alt="" className="size-6 shrink-0" />
-                    <span className="text-sm font-medium text-dash-text-strong">{repo.name}</span>
-                    {repo.private ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-dash-border-soft px-2 py-0.5 text-[11px] text-dash-text-faded">
-                        <Lock className="size-3" />
-                        Private
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-dash-border-soft px-2 py-0.5 text-[11px] text-dash-text-faded">
-                        <Globe className="size-3" />
-                        Public
-                      </span>
-                    )}
-                  </div>
-                  <DashButton size="sm" onClick={() => onSelect(repo)} disabled={importingRepoFullName === repo.fullName}>
-                    {importingRepoFullName === repo.fullName ? "Importing…" : "Import"}
-                  </DashButton>
-                </motion.div>
-              ))
+              repos.map((repo, i) => {
+                const repoHost =
+                  provider.id === "gitlab" ? "https://gitlab.com" : provider.id === "bitbucket" ? "https://bitbucket.org" : "https://github.com";
+                const repoUrl = `${repoHost}/${repo.fullName}`;
+                return (
+                  <motion.div
+                    key={repo.fullName}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: 0.04 * i, ease }}
+                    className={`group flex items-center justify-between px-4 py-3 ${i > 0 ? "border-t-[0.5px] border-dash-border" : ""}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <img src="/icons/git-circle.svg" alt="" className="size-6 shrink-0" />
+                      <span className="text-sm font-medium text-dash-text-strong">{repo.name}</span>
+                      {repo.private ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-dash-border-soft px-2 py-0.5 text-[11px] text-dash-text-faded">
+                          <Lock className="size-3" />
+                          Private
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-dash-border-soft px-2 py-0.5 text-[11px] text-dash-text-faded">
+                          <Globe className="size-3" />
+                          Public
+                        </span>
+                      )}
+                      <a
+                        href={repoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`View ${repo.name} on ${provider.name}`}
+                        className="rounded-full p-1 text-dash-text-faded opacity-0 transition-opacity hover:bg-dash-bg-elevated hover:text-dash-text-strong focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <ArrowUpRight className="size-3.5" />
+                      </a>
+                    </div>
+                    <DashButton size="sm" onClick={() => onSelect(repo)} disabled={importingRepoFullName === repo.fullName}>
+                      {importingRepoFullName === repo.fullName ? "Importing…" : "Import"}
+                    </DashButton>
+                  </motion.div>
+                );
+              })
             )}
           </div>
         </>
@@ -2005,6 +2019,10 @@ function Phase3Configure({
   const defaultPort = detectedFramework?.port ?? frameworkOptions.find((f) => f.id === defaultFrameworkId)?.port ?? 3000;
   const [envVars, setEnvVars] = useState<EnvVar[]>(() => [{ id: envNextId++, key: "PORT", value: String(defaultPort) }]);
   const [envExpanded, setEnvExpanded] = useState(true);
+  const [cpuIdx, setCpuIdx] = useState(0);
+  const [memIdx, setMemIdx] = useState(0);
+  const effectiveCpu = cpuSteps[Math.min(cpuIdx, cpuSteps.length - 1)] ?? cpuSteps[0];
+  const effectiveMemory = memorySteps[Math.min(memIdx, memorySteps.length - 1)] ?? memorySteps[0];
   const [diskEnabled, setDiskEnabled] = useState(false);
   const [diskSize, setDiskSize] = useState("10");
   const [mountPath, setMountPath] = useState("/mnt/data");
@@ -2184,6 +2202,8 @@ function Phase3Configure({
       outputDirectory: outputDir.trim(),
       installCommand: installCmd.trim(),
       envVars: cleanedEnvVars,
+      cpu: effectiveCpu,
+      memory: effectiveMemory,
       diskEnabled,
       diskSizeGb: diskEnabled ? Number(diskSize) : undefined,
       mountPath: diskEnabled ? mountPath.trim() : undefined,
@@ -2431,6 +2451,40 @@ function Phase3Configure({
           <hr className="my-6 border-dash-border-soft" />
         </>
       )}
+
+      {/* Compute — CPU and memory tier for the deployed container */}
+      <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Compute</h4>
+      <p className="mb-4 text-sm text-dash-text-faded">Choose CPU and memory for your container. You can change this later.</p>
+      <div className="flex flex-col gap-4">
+        <ComputeSliderField
+          label="CPU"
+          value={cpuIdx}
+          steps={cpuSteps}
+          formatValue={(v) => `${v} vCPU`}
+          onCommit={(idx) => setCpuIdx(idx)}
+          disabled={isFreePlan}
+          disabledReason="Compute is locked on the Free plan. Upgrade to customize CPU."
+        />
+        <ComputeSliderField
+          label="Memory"
+          value={memIdx}
+          steps={memorySteps}
+          formatValue={(v) => (v < 1 ? `${v * 1024} MB` : `${v} GB`)}
+          onCommit={(idx) => setMemIdx(idx)}
+          disabled={isFreePlan}
+          disabledReason="Compute is locked on the Free plan. Upgrade to customize memory."
+        />
+        {isFreePlan && (
+          <p className="text-xs text-dash-text-faded">
+            Compute is fixed on the Free plan.{" "}
+            <button type="button" onClick={() => setShowUpgradeModal(true)} className="font-medium text-[#4879f8] hover:text-[#3060d0]">
+              Upgrade for more
+            </button>
+          </p>
+        )}
+      </div>
+
+      <hr className="my-6 border-dash-border-soft" />
 
       {/* Secrets — hidden for no-build frameworks (HTML, Static) */}
       {!isNoBuildFramework(framework) && (
@@ -3128,8 +3182,8 @@ function NewProjectPage() {
         },
         configurations: {
           region: input.regionId,
-          cpu: 0.2,
-          memory: 0.5,
+          cpu: input.cpu,
+          memory: input.memory,
           storage: 3,
         },
         autoscalingGroup: null,
@@ -3175,8 +3229,8 @@ function NewProjectPage() {
         },
         configurations: {
           region: input.regionId,
-          cpu: 0.2,
-          memory: 0.5,
+          cpu: input.cpu,
+          memory: input.memory,
           storage: 3,
         },
         autoscalingGroup: null,
