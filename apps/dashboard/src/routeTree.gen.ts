@@ -34,6 +34,7 @@ import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$p
 import { Route as TeamsTeamNameTransferRouteImport } from './routes/teams/$teamName/transfer'
 import { Route as TeamsTeamNameOwnershipTransferRouteImport } from './routes/teams/$teamName/ownership-transfer'
 import { Route as TeamsTeamNameInvitationRouteImport } from './routes/teams/$teamName/invitation'
+import { Route as TeamsTeamName2faRequiredRouteImport } from './routes/teams/$teamName/2fa-required'
 import { Route as ProjectsProjectIdWebAnalyticsRouteImport } from './routes/projects/$projectId/web-analytics'
 import { Route as ProjectsProjectIdObservabilityRouteImport } from './routes/projects/$projectId/observability'
 import { Route as ProjectsProjectIdLogsRouteImport } from './routes/projects/$projectId/logs'
@@ -170,6 +171,12 @@ const TeamsTeamNameInvitationRoute = TeamsTeamNameInvitationRouteImport.update({
   path: '/teams/$teamName/invitation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsTeamName2faRequiredRoute =
+  TeamsTeamName2faRequiredRouteImport.update({
+    id: '/teams/$teamName/2fa-required',
+    path: '/teams/$teamName/2fa-required',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProjectsProjectIdWebAnalyticsRoute =
   ProjectsProjectIdWebAnalyticsRouteImport.update({
     id: '/web-analytics',
@@ -253,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
+  '/teams/$teamName/2fa-required': typeof TeamsTeamName2faRequiredRoute
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
@@ -283,6 +291,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
+  '/teams/$teamName/2fa-required': typeof TeamsTeamName2faRequiredRoute
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
@@ -320,6 +329,7 @@ export interface FileRoutesById {
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
+  '/teams/$teamName/2fa-required': typeof TeamsTeamName2faRequiredRoute
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
@@ -358,6 +368,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
     | '/projects/$projectId/web-analytics'
+    | '/teams/$teamName/2fa-required'
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
@@ -388,6 +399,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
     | '/projects/$projectId/web-analytics'
+    | '/teams/$teamName/2fa-required'
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
@@ -424,6 +436,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
     | '/projects/$projectId/web-analytics'
+    | '/teams/$teamName/2fa-required'
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
@@ -445,6 +458,7 @@ export interface RootRouteChildren {
   ScalingRoute: typeof ScalingRouteWithChildren
   SignupRoute: typeof SignupRoute
   WorkspaceNewRoute: typeof WorkspaceNewRoute
+  TeamsTeamName2faRequiredRoute: typeof TeamsTeamName2faRequiredRoute
   TeamsTeamNameInvitationRoute: typeof TeamsTeamNameInvitationRoute
   TeamsTeamNameOwnershipTransferRoute: typeof TeamsTeamNameOwnershipTransferRoute
   TeamsTeamNameTransferRoute: typeof TeamsTeamNameTransferRoute
@@ -627,6 +641,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsTeamNameInvitationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/$teamName/2fa-required': {
+      id: '/teams/$teamName/2fa-required'
+      path: '/teams/$teamName/2fa-required'
+      fullPath: '/teams/$teamName/2fa-required'
+      preLoaderRoute: typeof TeamsTeamName2faRequiredRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects/$projectId/web-analytics': {
       id: '/projects/$projectId/web-analytics'
       path: '/web-analytics'
@@ -804,6 +825,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScalingRoute: ScalingRouteWithChildren,
   SignupRoute: SignupRoute,
   WorkspaceNewRoute: WorkspaceNewRoute,
+  TeamsTeamName2faRequiredRoute: TeamsTeamName2faRequiredRoute,
   TeamsTeamNameInvitationRoute: TeamsTeamNameInvitationRoute,
   TeamsTeamNameOwnershipTransferRoute: TeamsTeamNameOwnershipTransferRoute,
   TeamsTeamNameTransferRoute: TeamsTeamNameTransferRoute,

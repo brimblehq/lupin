@@ -21,6 +21,15 @@ export function parseStepUpRequirement(error: unknown): StepUpRequirement | null
   return { action: match[1], resourceId: match[2] };
 }
 
+/**
+ * Detect the team-2FA-setup-required 403. Backend message starts with
+ * "This team requires 2FA" for both team-mutation gating and invitation accept.
+ */
+export function isTeamTwoFactorSetupRequiredError(error: unknown): boolean {
+  const message = (error as { message?: unknown })?.message;
+  return typeof message === "string" && /this team requires 2fa/i.test(message);
+}
+
 /** Strip the step-up sentinel from a message before showing it to the user. */
 export function stripStepUpPrefix(message: string): string {
   return message.replace(STEP_UP_MESSAGE_RE, "");

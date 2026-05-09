@@ -4,7 +4,7 @@ import axios from "axios";
 import { Drawer } from "vaul";
 import { cn } from "@brimble/ui";
 import { SUBSCRIPTION_PLAN_TYPE } from "@brimble/models/dist/enum";
-import { useRouterState } from "@tanstack/react-router";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -84,6 +84,7 @@ import {
   updateMemberEnvironmentsServerFn,
   updateMemberRoleServerFn,
   transferOwnershipServerFn,
+  toggleTeamTwoFactorEnforcementServerFn,
 } from "@/server/teams/actions";
 import {
   getBitbucketConnectUrlServerFn,
@@ -102,6 +103,7 @@ import { formatUsdMonthly } from "@/utils/billing";
 import { usePricing } from "@/contexts/pricing-context";
 import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
+import { ToggleSwitch } from "./toggle-switch";
 import { ProfileTab, Theme } from "../../types/enums";
 type UserProfile = DrawerUserProfile;
 
@@ -1697,6 +1699,7 @@ export function UserProfileDrawer({
 }) {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const getSettingsSnapshot = useServerFn(getSettingsSidebarSnapshotServerFn as any) as (args?: {
     data?: { workspace?: string };
@@ -2154,6 +2157,7 @@ export function UserProfileDrawer({
                         },
                       }));
 
+                      void router.invalidate();
                       toast.success("Workspace profile updated");
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Failed to update workspace profile");
@@ -2211,6 +2215,7 @@ export function UserProfileDrawer({
                           },
                         };
                       });
+                      void router.invalidate();
                       toast.success("Profile updated");
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Failed to update profile");
@@ -3495,6 +3500,7 @@ interface Member {
   gradient?: string;
   avatarUrl?: string;
   userId?: string;
+  is2FACompliant?: boolean;
 }
 
 interface PendingInvite {
@@ -3562,6 +3568,7 @@ function mapActiveMembers(team?: TeamDetails | null): Member[] {
         avatarUrl: member.avatarUrl,
         gradient: buildAvatarGradient(member.email || name || member.id),
         userId: member.userId,
+        is2FACompliant: member.is2FACompliant,
       } satisfies Member;
     });
 }
@@ -3797,6 +3804,74 @@ function MemberActionMenu({
   );
 }
 
+function countNonCompliantMembers(team: TeamDetails | null): number {
+  if (!team?.members?.length) return 0;
+  return team.members.filter(
+    (m) => m.accepted !== false && normalizeRole(m) !== "Creator" && m.is2FACompliant === false,
+  ).length;
+}
+
+function WorkspaceSecuritySection({
+  workspace,
+  team,
+  onChanged,
+}: {
+  workspace: string;
+  team: TeamDetails | null;
+  onChanged: (next: { enforce2FA: boolean }) => void;
+}) {
+  const toggleEnforcement = useServerFn(toggleTeamTwoFactorEnforcementServerFn as any) as (args: {
+    data: { workspace: string; enforce: boolean; twoFactorToken?: string };
+  }) => Promise<{ id: string; enforce2FA: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
+  const [busy, setBusy] = useState(false);
+
+  const enforce2FA = Boolean(team?.enforce2FA);
+  const nonCompliantCount = enforce2FA ? countNonCompliantMembers(team) : 0;
+
+  const handleToggle = async (next: boolean) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await withStepUp(
+        (twoFactorToken) => toggleEnforcement({ data: { workspace, enforce: next, twoFactorToken } }),
+        requestStepUp,
+      );
+      onChanged({ enforce2FA: result.enforce2FA });
+      toast.success(result.enforce2FA ? "2FA enforcement enabled" : "2FA enforcement disabled");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update 2FA enforcement";
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Require 2FA for all members</span>
+            {enforce2FA && (
+              <span className="rounded-full bg-[#4879f8]/10 px-2 py-0.5 text-[10px] font-medium text-[#4879f8]">2FA required</span>
+            )}
+          </div>
+          <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
+            Non-compliant members lose access until they enable 2FA on their account.
+          </span>
+          {enforce2FA && nonCompliantCount > 0 && (
+            <span className="text-xs leading-4 text-[#f5a623]">
+              {nonCompliantCount} {nonCompliantCount === 1 ? "member is" : "members are"} non-compliant
+            </span>
+          )}
+        </div>
+        <ToggleSwitch checked={enforce2FA} onChange={handleToggle} disabled={busy} />
+      </div>
+    </div>
+  );
+}
+
 function MembersForm({
   workspace,
   initialTeam = null,
@@ -3958,8 +4033,31 @@ function MembersForm({
     void refreshMembers({ silent: Boolean(initialTeam) });
   }, [workspace, initialTeam, refreshMembers]);
 
+  const enforce2FA = Boolean(team?.enforce2FA);
+  const selfNonCompliant = enforce2FA && currentUserTeamMember?.is2FACompliant === false;
+
   return (
     <div className="flex max-w-[488px] flex-col gap-8">
+      {selfNonCompliant && (
+        <div className="rounded-[6px] border border-[#f5a623]/30 bg-[#f5a623]/5 px-4 py-3 text-sm leading-5 text-[#a16207] dark:text-[#f5a623]">
+          This workspace requires 2FA. Set it up on your account to keep your access.
+        </div>
+      )}
+
+      {canManageMembers && (
+        <>
+          <WorkspaceSecuritySection
+            workspace={workspace}
+            team={team}
+            onChanged={({ enforce2FA }) => {
+              setTeam((prev) => (prev ? { ...prev, enforce2FA } : prev));
+              void refreshMembers({ silent: true });
+            }}
+          />
+          <hr className="-ml-8 border-dash-border-soft" />
+        </>
+      )}
+
       {/* Invite button */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
@@ -4021,6 +4119,13 @@ function MembersForm({
                   </span>
                   <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">{member.email}</span>
                 </div>
+                {enforce2FA && member.role !== "Creator" && member.is2FACompliant === false && (
+                  <SimpleTooltip content="Member must enable 2FA on their account to regain access.">
+                    <span className="shrink-0 rounded-full bg-[#f5a623]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#f5a623]">
+                      Locked out
+                    </span>
+                  </SimpleTooltip>
+                )}
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                     roleBadgeStyles[member.role] ?? roleBadgeStyles.Member
@@ -4095,7 +4200,13 @@ function MembersForm({
                   <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">{invite.email}</span>
                   <span className="text-xs leading-4 text-dash-text-extra-faded">Sent {invite.sentAt}</span>
                 </div>
-                <span className="shrink-0 rounded-full bg-[#f5a623]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#f5a623]">Pending</span>
+                <SimpleTooltip
+                  content={enforce2FA ? "Invitee must enable 2FA on their account before they can join." : "Invitation is pending"}
+                >
+                  <span className="shrink-0 rounded-full bg-[#f5a623]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#f5a623]">
+                    Pending
+                  </span>
+                </SimpleTooltip>
                 <div className="flex shrink-0 items-center gap-2">
                   {canManageMembers && (
                     <button

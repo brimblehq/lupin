@@ -22,6 +22,7 @@ import {
   acceptOwnershipTransferServerFn,
   denyOwnershipTransferServerFn,
 } from "@/server/teams/actions";
+import { getTwoFactorStatusServerFn } from "@/server/auth/actions";
 import { getActiveEnvironmentPreferenceServerFn, listProjectEnvironmentsServerFn } from "@/server/environments/actions";
 import type { ApiListResponse } from "@/backend";
 import type { Project as BackendProject } from "@/backend/projects";
@@ -161,6 +162,7 @@ function DashboardHome() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteLoadingAction, setInviteLoadingAction] = useState<"accept" | "decline">();
   const [invitationData, setInvitationData] = useState<TeamInvitation | null>(null);
+  const [viewerHas2FA, setViewerHas2FA] = useState<boolean | null>(null);
   const [ownershipTransferOpen, setOwnershipTransferOpen] = useState(search.transferOwnership === "1");
   const [ownershipTransferLoading, setOwnershipTransferLoading] = useState(false);
   const [ownershipTransferLoadingAction, setOwnershipTransferLoadingAction] = useState<"accept" | "deny" | undefined>(undefined);
@@ -186,6 +188,21 @@ function DashboardHome() {
       cancelled = true;
     };
   }, [workspaceSlug, invitationData, isTeamWorkspace, navigate]);
+
+  useEffect(() => {
+    if (!invitationData?.team.enforce2FA || viewerHas2FA !== null) return;
+    let cancelled = false;
+    (getTwoFactorStatusServerFn as unknown as () => Promise<{ enabled: boolean }>)()
+      .then((status) => {
+        if (!cancelled) setViewerHas2FA(Boolean(status?.enabled));
+      })
+      .catch(() => {
+        if (!cancelled) setViewerHas2FA(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [invitationData?.team.enforce2FA, viewerHas2FA]);
 
   useEffect(() => {
     setOwnershipTransferOpen(search.transferOwnership === "1");
@@ -246,6 +263,8 @@ function DashboardHome() {
           workspaceAvatarUrl={invitationData.team.avatar ?? workspaceTeamMembers?.avatarUrl}
           loading={inviteLoading}
           loadingAction={inviteLoadingAction}
+          enforce2FA={Boolean(invitationData.team.enforce2FA)}
+          viewerHas2FA={viewerHas2FA}
           onAccept={async () => {
             const teamId = invitationData?.team.id;
             if (!teamId) return;

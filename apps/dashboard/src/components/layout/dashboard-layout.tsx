@@ -33,6 +33,7 @@ import { WorkspaceRoleProvider } from "@/contexts/workspace-role-context";
 import { canWorkspaceRoleWrite, resolveCurrentWorkspaceRole } from "@/utils/workspace-role";
 import { ProfileDrawerProvider } from "@/contexts/profile-drawer-context";
 import { StepUpTwoFactorProvider } from "@/contexts/step-up-two-factor-context";
+import { isTeamTwoFactorSetupRequiredError } from "@/lib/auth/two-factor-step-up";
 import { DEFAULT_PRICING } from "@/utils/default-pricing";
 import { ProfileTab, Theme } from "../../types/enums";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
@@ -656,7 +657,7 @@ export function DashboardLayout({
   });
   const navigate = useNavigate();
   const isAuthRoute = /^\/(login|signup)$/.test(layoutPathname) || /^\/(login|signup)$/.test(pathname);
-  const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace)?(\/|$)/;
+  const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace|teams)?(\/|$)/;
   const isCatchAll = layoutPathname !== "/" && !knownPrefixes.test(layoutPathname);
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const resolvedSearchStr = useRouterState({
@@ -692,6 +693,23 @@ export function DashboardLayout({
     const params = new URLSearchParams(searchStr || "");
     return params.get("workspace")?.trim() || undefined;
   }, [searchStr]);
+
+  useEffect(() => {
+    if (!currentWorkspace) return;
+    if (pathname === `/teams/${currentWorkspace}/2fa-required`) return;
+    const handle = (event: { type: string; query?: { state: { error: unknown } }; mutation?: { state: { error: unknown } } }) => {
+      const err = event.query?.state.error ?? event.mutation?.state.error;
+      if (isTeamTwoFactorSetupRequiredError(err)) {
+        void navigate({ to: "/teams/$teamName/2fa-required", params: { teamName: currentWorkspace } });
+      }
+    };
+    const unsubQ = dashboardQueryClient.getQueryCache().subscribe(handle as any);
+    const unsubM = dashboardQueryClient.getMutationCache().subscribe(handle as any);
+    return () => {
+      unsubQ();
+      unsubM();
+    };
+  }, [currentWorkspace, navigate, pathname]);
   const dashboardProjects =
     matchedProjects ?? matchedProjectSwitcherProjects ?? initialOnboardingProjects?.items ?? initialProjectSwitcherProjects?.items ?? [];
   const checklistProjects =

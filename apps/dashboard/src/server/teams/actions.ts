@@ -292,3 +292,29 @@ export const declineTeamInvitationServerFn = createServerFn({
     return api.teams.denyInvite(teamId);
   });
 });
+
+export const toggleTeamTwoFactorEnforcementServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        enforce?: boolean;
+        twoFactorToken?: string;
+      }
+    | undefined;
+
+  if (typeof payload?.enforce !== "boolean") {
+    throw new Error("`enforce` is required");
+  }
+
+  const enforce = payload.enforce;
+
+  return withTokenRefresh(
+    async (api) => {
+      const { teamId } = await resolveWorkspaceTeam(api, payload?.workspace);
+      return api.teams.toggleTwoFactorEnforcement(teamId, enforce);
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
+});

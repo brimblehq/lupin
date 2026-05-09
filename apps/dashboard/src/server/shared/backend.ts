@@ -70,10 +70,7 @@ async function getCachedWorkspaces(api: BackendApi): Promise<WorkspaceListResult
 
 type WorkspaceItem = WorkspaceListResult["items"][number];
 
-export async function resolveWorkspace(
-  api: BackendApi,
-  slug: string | undefined | null,
-): Promise<WorkspaceItem | undefined> {
+export async function resolveWorkspace(api: BackendApi, slug: string | undefined | null): Promise<WorkspaceItem | undefined> {
   if (!slug) return undefined;
   const normalized = slug.trim().toLowerCase();
   if (!normalized) return undefined;
@@ -294,17 +291,6 @@ function extractStepUpRequirement(payload: unknown): { action: string; resourceI
   return { action, resourceId };
 }
 
-/**
- * TanStack Start serializes errors via seroval's ShallowErrorPlugin. Of the
- * preserved fields (`name`, `message`, `stack`, `cause`), `message` is the
- * one we control end-to-end — engines don't regenerate it on rehydration.
- *
- * Encoding strategy:
- *   - HTTP status: still prefixed into `stack` for legacy parsers.
- *   - Step-up 2FA challenge: prepended to `message` as
- *       `[STEP_UP|<action>|<resource_id>] <original message>`
- *     The client strips this prefix before display.
- */
 function makeSerializableError(error: any): any {
   if (!error || typeof error !== "object") {
     return error;
