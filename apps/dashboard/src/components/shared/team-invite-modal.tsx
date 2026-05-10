@@ -117,7 +117,7 @@ export function TeamInviteModal({
           </div>
         )}
         <a
-          href="https://docs.brimble.io/team-workspaces"
+          href="https://paper.brimble.io/team-workspaces"
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 inline-block text-xs text-dash-text-faded underline decoration-dash-border underline-offset-2 transition-colors hover:text-dash-text-strong"

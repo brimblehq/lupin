@@ -7,7 +7,7 @@ export const siteConfig = {
     { label: "Careers", href: "/careers" },
     { label: "Changelog", href: "/changelog" },
     { label: "FAQ", href: "/faq" },
-    { label: "Docs", href: "https://docs.brimble.io" },
+    { label: "Docs", href: "https://paper.brimble.io" },
     { label: "Status", href: "https://status.brimble.io", status: true },
     // { label: "Talk to Founder", href: "https://cal.com/brimble/15min" },
   ],

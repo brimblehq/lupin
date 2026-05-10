@@ -37,7 +37,7 @@ export const moreNav = [
   {
     label: "Documentation",
     icon: "/icons/documentation.svg",
-    href: "https://docs.brimble.io",
+    href: "https://paper.brimble.io",
     external: true,
     tourId: "docs",
   },

@@ -579,7 +579,7 @@ export function CommandPalette() {
                             </Command.Item>
                             <Command.Item
                               value="cli docs documentation"
-                              onSelect={() => runAction(() => window.open("https://docs.brimble.io", "_blank"))}
+                              onSelect={() => runAction(() => window.open("https://paper.brimble.io", "_blank"))}
                             >
                               <img src="/icons/scoutbar/desktop.svg" width="16" height="16" alt="" />
                               <span>CLI docs</span>
