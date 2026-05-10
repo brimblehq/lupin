@@ -837,16 +837,25 @@ function levelIcon(level: NotificationLevel): { src: string; className?: string;
   return { src: "/icons/info.svg", className: "invert dark:invert-0" };
 }
 
+const NOTIFICATIONS_PAGE_SIZE = 8;
+
 function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHaptics> }) {
   const [open, setOpen] = useState(false);
+  const [limit, setLimit] = useState(NOTIFICATIONS_PAGE_SIZE);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspaceSearch = getWorkspaceSearch(searchStr);
   const workspace = workspaceSearch?.workspace;
 
-  const { data, isLoading, refetch } = useNotifications({ workspace, limit: 8 });
+  useEffect(() => {
+    setLimit(NOTIFICATIONS_PAGE_SIZE);
+  }, [workspace]);
+
+  const { data, isLoading, isFetching, refetch } = useNotifications({ workspace, limit });
   const items = data?.items ?? [];
+  const total = data?.total ?? items.length;
+  const hasMore = items.length < total;
   const unreadCount = data?.unseenCount ?? 0;
   const markSeen = useMarkNotificationSeen(workspace);
   const markAllSeen = useMarkAllNotificationsSeen(workspace);
@@ -946,37 +955,50 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
               ) : items.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-dash-text-faded">No notifications</div>
               ) : (
-                items.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => handleNotificationClick(n)}
-                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated ${
-                      n.seen ? "" : "bg-[#4879f8]/[0.04] dark:bg-[#4879f8]/[0.06]"
-                    }`}
-                  >
-                    {(() => {
-                      const icon = levelIcon(n.level);
-                      return (
-                        <img
-                          src={icon.src}
-                          alt=""
-                          style={icon.style}
-                          className={`mt-0.5 size-4 shrink-0 ${icon.className ?? ""} ${n.seen ? "opacity-60" : ""}`}
-                        />
-                      );
-                    })()}
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span
-                        className={`text-sm leading-[1.4] ${
-                          n.seen ? "font-light text-dash-text-faded" : "font-medium text-dash-text-strong"
-                        }`}
-                      >
-                        {n.message}
-                      </span>
-                      <span className="text-xs text-dash-text-extra-faded">{formatRelativeTime(n.createdAt)}</span>
-                    </div>
-                  </button>
-                ))
+                <>
+                  {items.map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => handleNotificationClick(n)}
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated ${
+                        n.seen ? "" : "bg-[#4879f8]/[0.04] dark:bg-[#4879f8]/[0.06]"
+                      }`}
+                    >
+                      {(() => {
+                        const icon = levelIcon(n.level);
+                        return (
+                          <img
+                            src={icon.src}
+                            alt=""
+                            style={icon.style}
+                            className={`mt-0.5 size-4 shrink-0 ${icon.className ?? ""} ${n.seen ? "opacity-60" : ""}`}
+                          />
+                        );
+                      })()}
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span
+                          className={`text-sm leading-[1.4] ${
+                            n.seen ? "font-light text-dash-text-faded" : "font-medium text-dash-text-strong"
+                          }`}
+                        >
+                          {n.message}
+                        </span>
+                        <span className="text-xs text-dash-text-extra-faded">{formatRelativeTime(n.createdAt)}</span>
+                      </div>
+                    </button>
+                  ))}
+                  {hasMore && (
+                    <button
+                      type="button"
+                      onClick={() => setLimit((l) => l + NOTIFICATIONS_PAGE_SIZE)}
+                      disabled={isFetching}
+                      className="flex w-full items-center justify-center gap-2 border-t-[0.5px] border-dash-border px-4 py-2.5 text-xs font-medium text-[#4879f8] transition-colors hover:bg-dash-bg-elevated hover:text-[#3a6ae6] disabled:opacity-60"
+                    >
+                      <span>Load more ({total - items.length} left)</span>
+                      {isFetching && <LoaderCircle className="size-3.5 animate-spin" />}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </motion.div>

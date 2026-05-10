@@ -16,7 +16,7 @@ import {
   updateTeamSpendingLimitServerFn,
   getSpendingLimitStatusServerFn,
 } from "@/server/payments/actions";
-import type { AddPaymentMethodResult, PurchaseResult } from "@/backend/payments";
+import type { AddPaymentMethodResult, PurchaseResult, SubscriptionMutationResult } from "@/backend/payments";
 
 /* ── Query key factory ── */
 
@@ -46,9 +46,9 @@ const setDefault = setDefaultPaymentMethodServerFn as unknown as (args: { data: 
 
 const createSub = createSubscriptionServerFn as unknown as (args: {
   data: { type: string; payment_method?: string; accept_terms: boolean };
-}) => Promise<any>;
+}) => Promise<SubscriptionMutationResult>;
 
-const swap = swapPlanServerFn as unknown as (args: { data: { target_plan: string } }) => Promise<any>;
+const swap = swapPlanServerFn as unknown as (args: { data: { target_plan: string } }) => Promise<SubscriptionMutationResult>;
 
 const cancelSub = cancelSubscriptionServerFn as unknown as (args: { data: { comment: string } }) => Promise<{ ok: true }>;
 

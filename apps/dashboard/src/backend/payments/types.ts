@@ -123,6 +123,28 @@ export interface AddPaymentMethodPendingResult {
 
 export type AddPaymentMethodResult = AddPaymentMethodSuccessResult | AddPaymentMethodPendingResult;
 
+/* ── Subscription mutation result (SCA handling) ── */
+
+export interface SubscriptionPaymentPendingData {
+  requires_action: boolean;
+  payment_intent_id: string;
+  client_secret: string | null;
+}
+
+export interface SubscriptionMutationSuccessResult {
+  status: "success";
+  message: string;
+  data: Subscription | null;
+}
+
+export interface SubscriptionMutationPendingResult {
+  status: "pending";
+  message: string;
+  data: SubscriptionPaymentPendingData;
+}
+
+export type SubscriptionMutationResult = SubscriptionMutationSuccessResult | SubscriptionMutationPendingResult;
+
 /* ── Mutation inputs ── */
 
 export interface AddPaymentMethodInput {
@@ -199,8 +221,8 @@ export interface PaymentsApi {
   removePaymentMethod(id: string): Promise<void>;
   setDefaultPaymentMethod(id: string): Promise<void>;
   getSubscription(): Promise<Subscription | null>;
-  createSubscription(input: CreateSubscriptionInput): Promise<Subscription>;
-  swapPlan(input: SwapPlanInput): Promise<Subscription>;
+  createSubscription(input: CreateSubscriptionInput): Promise<SubscriptionMutationResult>;
+  swapPlan(input: SwapPlanInput): Promise<SubscriptionMutationResult>;
   cancelSubscription(input: CancelSubscriptionInput): Promise<void>;
   listInvoices(input?: { cursor?: string | null; per_page?: number; team_id?: string }): Promise<InvoicePage>;
   payInvoice(input: { invoice_id: string; team_id?: string }): Promise<InvoicePaymentResult>;

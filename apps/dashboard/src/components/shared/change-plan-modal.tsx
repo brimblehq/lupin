@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
+import { useStripe } from "@stripe/react-stripe-js";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "./modal";
 import { Dropdown } from "./dropdown";
 import { usePricing } from "@/contexts/pricing-context";
 import { usePaymentMethods, useSubscription, useCreateSubscription, useSwapPlan } from "@/hooks/use-payments";
+import { PaymentProvider } from "@/providers/payment-provider";
 import type { PaymentMethod } from "@/backend/payments";
 
 const PLAN_ID_TO_API_TYPE: Record<string, string> = {
@@ -11,19 +13,30 @@ const PLAN_ID_TO_API_TYPE: Record<string, string> = {
   developer: "DEVELOPER_PLAN",
 };
 
-export function ChangePlanModal({
-  open,
-  onOpenChange,
-  currentPlan,
-  defaultSelectedPlan,
-  initialPaymentMethods,
-}: {
+interface ChangePlanModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentPlan: string;
   defaultSelectedPlan?: string;
   initialPaymentMethods?: PaymentMethod[] | null;
-}) {
+}
+
+export function ChangePlanModal(props: ChangePlanModalProps) {
+  return (
+    <PaymentProvider>
+      <ChangePlanModalInner {...props} />
+    </PaymentProvider>
+  );
+}
+
+function ChangePlanModalInner({
+  open,
+  onOpenChange,
+  currentPlan,
+  defaultSelectedPlan,
+  initialPaymentMethods,
+}: ChangePlanModalProps) {
+  const stripe = useStripe();
   const [selectedPlan, setSelectedPlan] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const pricing = usePricing();
@@ -101,7 +114,7 @@ export function ChangePlanModal({
     window.location.reload();
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!selectedObj) return;
 
     const apiType = PLAN_ID_TO_API_TYPE[selectedObj.planId];
@@ -120,39 +133,47 @@ export function ChangePlanModal({
       return;
     }
 
-    if (!hasSubscription) {
-      createSubscription.mutate(
-        {
-          type: apiType,
-          accept_terms: true,
-          ...(defaultMethod?.id ? { payment_method: defaultMethod.id } : {}),
-        },
-        {
-          onSuccess: () => {
-            toast.success("Subscription created");
-            setSelectedPlan("");
-            setAcceptedTerms(false);
-            onOpenChange(false);
-            hardRefreshPage();
-          },
-          onError: (err) => {
-            toast.error(err instanceof Error ? err.message : "Failed to create subscription");
-          },
-        },
-      );
-    } else {
-      swapPlan.mutate(apiType, {
-        onSuccess: () => {
-          toast.success("Plan changed");
-          setSelectedPlan("");
-          setAcceptedTerms(false);
-          onOpenChange(false);
-          hardRefreshPage();
-        },
-        onError: (err) => {
-          toast.error(err instanceof Error ? err.message : "Failed to change plan");
-        },
-      });
+    try {
+      const result = !hasSubscription
+        ? await createSubscription.mutateAsync({
+            type: apiType,
+            accept_terms: true,
+            ...(defaultMethod?.id ? { payment_method: defaultMethod.id } : {}),
+          })
+        : await swapPlan.mutateAsync(apiType);
+
+      if (result.status === "pending") {
+        const clientSecret = result.data.client_secret;
+        if (!clientSecret) {
+          toast.error("Bank verification couldn't start. Try again.");
+          return;
+        }
+        if (!stripe) {
+          toast.error("Stripe isn't ready yet. Please try again.");
+          return;
+        }
+        if (!defaultMethod?.id) {
+          toast.error("No payment method on file to confirm with.");
+          return;
+        }
+
+        toast("Verifying with your bank…");
+        const { error } = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: defaultMethod.id,
+        });
+        if (error) {
+          toast.error(error.message ?? "Bank verification failed");
+          return;
+        }
+      }
+
+      toast.success(hasSubscription ? "Plan changed" : "Subscription created");
+      setSelectedPlan("");
+      setAcceptedTerms(false);
+      onOpenChange(false);
+      hardRefreshPage();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : hasSubscription ? "Failed to change plan" : "Failed to create subscription");
     }
   }
 

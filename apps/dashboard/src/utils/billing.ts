@@ -48,3 +48,4 @@ export function resolveCardSummary(method: PaymentMethod | undefined): CardSumma
     last4: source.last4 ?? "",
   };
 }
+

@@ -10,6 +10,7 @@ import type {
   AddPaymentMethodResult,
   Subscription,
   SubscriptionStats,
+  SubscriptionMutationResult,
   CreateSubscriptionInput,
   SwapPlanInput,
   CancelSubscriptionInput,
@@ -35,6 +36,10 @@ export type {
   AddPaymentMethodPendingResult,
   AddPaymentMethodSuccessResult,
   Subscription,
+  SubscriptionPaymentPendingData,
+  SubscriptionMutationResult,
+  SubscriptionMutationPendingResult,
+  SubscriptionMutationSuccessResult,
   CreateSubscriptionInput,
   SwapPlanInput,
   CancelSubscriptionInput,
@@ -61,6 +66,30 @@ function unwrapData<T = any>(payload: any): T {
 
 function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function mapPaymentConfirmationError(error: unknown, fallbackMessage: string): SubscriptionMutationResult {
+  if (!(error instanceof BackendApiError) || error.status !== 402) {
+    throw error;
+  }
+
+  const data = unwrapData<any>(error.details);
+  const paymentIntentId = String(data?.payment_intent_id ?? "").trim();
+  const clientSecret = typeof data?.client_secret === "string" ? data.client_secret.trim() || null : null;
+
+  if (!paymentIntentId || !clientSecret) {
+    throw error;
+  }
+
+  return {
+    status: "pending",
+    message: error.message || fallbackMessage,
+    data: {
+      requires_action: Boolean(data?.requires_action),
+      payment_intent_id: paymentIntentId,
+      client_secret: clientSecret,
+    },
+  };
 }
 
 export function createPaymentsApi(client: ApiClient): PaymentsApi {
@@ -175,25 +204,35 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       }
     },
 
-    async createSubscription(input: CreateSubscriptionInput): Promise<Subscription> {
-      const res = await client.request<any>(`${base}/subscription/create`, {
-        method: "POST",
-        body: {
-          type: input.type,
-          accept_terms: input.accept_terms,
-          ...(input.payment_method ? { payment_method: input.payment_method } : {}),
-        },
-        headers: { "Idempotency-Key": generateIdempotencyKey() },
-      });
-      return unwrapData<Subscription>(res);
+    async createSubscription(input: CreateSubscriptionInput): Promise<SubscriptionMutationResult> {
+      try {
+        const res = await client.request<any>(`${base}/subscription/create`, {
+          method: "POST",
+          body: {
+            type: input.type,
+            accept_terms: input.accept_terms,
+            ...(input.payment_method ? { payment_method: input.payment_method } : {}),
+          },
+          headers: { "Idempotency-Key": generateIdempotencyKey() },
+        });
+        const message = res?.message?.trim?.() || "Subscription created successfully";
+        return { status: "success", message, data: unwrapData<Subscription>(res) ?? null };
+      } catch (error) {
+        return mapPaymentConfirmationError(error, "Subscription requires payment confirmation");
+      }
     },
 
-    async swapPlan(input: SwapPlanInput): Promise<Subscription> {
-      const res = await client.request<any>(`${base}/subscription/swap`, {
-        method: "POST",
-        body: { target_plan: input.target_plan },
-      });
-      return unwrapData<Subscription>(res);
+    async swapPlan(input: SwapPlanInput): Promise<SubscriptionMutationResult> {
+      try {
+        const res = await client.request<any>(`${base}/subscription/swap`, {
+          method: "POST",
+          body: { target_plan: input.target_plan },
+        });
+        const message = res?.message?.trim?.() || "Plan changed successfully";
+        return { status: "success", message, data: unwrapData<Subscription>(res) ?? null };
+      } catch (error) {
+        return mapPaymentConfirmationError(error, "Plan change requires payment confirmation");
+      }
     },
 
     async cancelSubscription(input: CancelSubscriptionInput): Promise<void> {

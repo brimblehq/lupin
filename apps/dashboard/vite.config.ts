@@ -55,7 +55,11 @@ const config = defineConfig({
     tailwindcss(),
     cacheHeaders(),
     staleAssetGuard(),
-    tanstackStart(),
+    tanstackStart({
+      router: {
+        routeFileIgnorePattern: "types\\.ts$|project-route-cache\\.ts$",
+      },
+    }),
     ...(process.env.SENTRY_AUTH_TOKEN
       ? [
           sentryTanstackStart({
