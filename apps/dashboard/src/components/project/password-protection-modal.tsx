@@ -10,14 +10,40 @@ import { dashInputClassName } from "@/components/shared/dash-input";
 
 const MIN_PASSWORD_LENGTH = 6;
 
+type Mode = "enable" | "disable" | "rotate";
+
 interface PasswordProtectionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: "enable" | "disable";
+  mode: Mode;
   projectId: string;
   workspace?: string;
   onSuccess: () => void | Promise<void>;
 }
+
+const MODE_COPY: Record<Mode, { title: string; description: string; cta: string; loading: string; toast: string }> = {
+  enable: {
+    title: "Enable password protection",
+    description: "Visitors will be asked for this password before they can access this project's domains.",
+    cta: "Enable",
+    loading: "Enabling...",
+    toast: "Password protection enabled",
+  },
+  disable: {
+    title: "Disable password protection",
+    description: "Visitors will no longer need a password to access this project.",
+    cta: "Disable",
+    loading: "Disabling...",
+    toast: "Password protection disabled",
+  },
+  rotate: {
+    title: "Change password",
+    description: "Set a new visitor password. The old one stops working immediately.",
+    cta: "Save",
+    loading: "Saving...",
+    toast: "Password updated",
+  },
+};
 
 export function PasswordProtectionModal({ open, onOpenChange, mode, projectId, workspace, onSuccess }: PasswordProtectionModalProps) {
   const setPasswordProtection = useServerFn(setProjectPasswordProtectionServerFn as any) as (args: {
@@ -37,8 +63,10 @@ export function PasswordProtectionModal({ open, onOpenChange, mode, projectId, w
     }
   }, [open]);
 
-  const passwordTooShort = mode === "enable" && password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
-  const canSubmit = mode === "disable" || password.length >= MIN_PASSWORD_LENGTH;
+  const needsPasswordInput = mode !== "disable";
+  const copy = MODE_COPY[mode];
+  const passwordTooShort = needsPasswordInput && password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
+  const canSubmit = !needsPasswordInput || password.length >= MIN_PASSWORD_LENGTH;
 
   async function handleSubmit() {
     if (!canSubmit || submitting) return;
@@ -48,11 +76,11 @@ export function PasswordProtectionModal({ open, onOpenChange, mode, projectId, w
         data: {
           workspace,
           projectId,
-          passwordEnabled: mode === "enable",
-          ...(mode === "enable" ? { password } : {}),
+          passwordEnabled: mode !== "disable",
+          ...(needsPasswordInput ? { password } : {}),
         },
       });
-      toast.success(mode === "enable" ? "Password protection enabled" : "Password protection disabled");
+      toast.success(copy.toast);
       await onSuccess();
       onOpenChange(false);
     } catch (error) {
@@ -64,15 +92,8 @@ export function PasswordProtectionModal({ open, onOpenChange, mode, projectId, w
 
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
-      <ModalHeader
-        title={mode === "enable" ? "Enable password protection" : "Disable password protection"}
-        description={
-          mode === "enable"
-            ? "Visitors will be asked for this password before they can access this project's domains."
-            : "Visitors will no longer need a password to access this project."
-        }
-      />
-      {mode === "enable" && (
+      <ModalHeader title={copy.title} description={copy.description} />
+      {needsPasswordInput && (
         <div className="flex flex-col gap-4 px-6 pb-5 pt-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-dash-text-strong">Visitor password</label>
@@ -123,13 +144,8 @@ export function PasswordProtectionModal({ open, onOpenChange, mode, projectId, w
       )}
       <ModalFooter>
         <ModalCancelButton />
-        <ModalContinueButton
-          onClick={handleSubmit}
-          disabled={!canSubmit || submitting}
-          loading={submitting}
-          loadingLabel={mode === "enable" ? "Enabling..." : "Disabling..."}
-        >
-          {mode === "enable" ? "Enable" : "Disable"}
+        <ModalContinueButton onClick={handleSubmit} disabled={!canSubmit || submitting} loading={submitting} loadingLabel={copy.loading}>
+          {copy.cta}
         </ModalContinueButton>
       </ModalFooter>
     </Modal>

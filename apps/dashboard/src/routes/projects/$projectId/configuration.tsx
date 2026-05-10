@@ -811,7 +811,7 @@ function GeneralSection({
   passwordEnabled: boolean;
   onPasswordChanged: () => void | Promise<void>;
 }) {
-  const [passwordModalMode, setPasswordModalMode] = useState<"enable" | "disable" | null>(null);
+  const [passwordModalMode, setPasswordModalMode] = useState<"enable" | "disable" | "rotate" | null>(null);
   return (
     <Formik
       initialValues={initialValues}
@@ -968,6 +968,15 @@ function GeneralSection({
                 <span className="text-xs text-dash-text-faded">
                   Require visitors to enter a password before they can access this project's domains.
                 </span>
+                {passwordEnabled && canWrite && (
+                  <button
+                    type="button"
+                    onClick={() => setPasswordModalMode("rotate")}
+                    className="self-start text-xs font-medium text-[#4879f8] transition-colors hover:text-[#3060d0]"
+                  >
+                    Change password
+                  </button>
+                )}
               </div>
               <ToggleSwitch
                 checked={passwordEnabled}
