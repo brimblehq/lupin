@@ -29,6 +29,7 @@ import {
   parseWorkspaceSearchValue,
   workspacePageLoaderDeps,
 } from "@/utils/workspace-route-search";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 export const Route = createFileRoute("/domains/")({
   staleTime: 60_000,
@@ -355,7 +356,7 @@ function DomainsPage() {
       } else {
         toast.success("Domain status refreshed");
       }
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to refresh domain status");
     }
@@ -392,7 +393,7 @@ function DomainsPage() {
       const createdRow = mapDomainToRow(created);
       setRows((prev) => [createdRow, ...prev]);
       toast.success("Domain added successfully");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to add domain");
     }
@@ -453,7 +454,7 @@ function DomainsPage() {
     );
 
     toast.success("Domain settings updated");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   async function handleDeleteDomain(domain: Domain) {
@@ -475,7 +476,7 @@ function DomainsPage() {
 
     setRows((prev) => prev.filter((row) => row.id !== domain.id));
     toast.success("Domain deleted successfully");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   return (

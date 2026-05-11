@@ -31,6 +31,7 @@ import { shouldShowProjectDomainsTab } from "@/utils/project-capabilities";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -293,7 +294,7 @@ function ProjectDomainsPage() {
       } else {
         toast.success("Domain status refreshed");
       }
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to refresh domain status");
     }
@@ -323,7 +324,7 @@ function ProjectDomainsPage() {
       });
       setRows((prev) => [mapDomainToRow(created, project.name), ...prev]);
       toast.success("Domain added successfully");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to add domain");
     }
@@ -404,7 +405,7 @@ function ProjectDomainsPage() {
     if (nextProjectId && nextProjectId !== project.id) {
       setRows((prev) => prev.filter((row) => row.id !== input.domain.id));
       toast.success("Domain moved to another project");
-      router.invalidate();
+      invalidateActiveMatches(router);
       return;
     }
 
@@ -423,7 +424,7 @@ function ProjectDomainsPage() {
     );
 
     toast.success("Domain settings updated");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   async function handleDeleteDomain(domain: Domain) {
@@ -446,7 +447,7 @@ function ProjectDomainsPage() {
 
     setRows((prev) => prev.filter((row) => row.id !== domain.id));
     toast.success("Domain deleted successfully");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   return (

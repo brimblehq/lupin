@@ -37,6 +37,7 @@ import {
 import type { PaymentMethod, SubscriptionStats, UsageBreakdown as UsageBreakdownData } from "@/backend/payments";
 import type { TeamDetails } from "@/backend/teams";
 import type { DrawerUserProfile } from "@/utils/dashboard";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 type UserProfile = DrawerUserProfile;
 const settingsInputClass = dashInputClassName;
@@ -216,7 +217,7 @@ function BillingFormInner({
         setIsEditingLimit(false);
         setSpendingLimitInput("");
         await onSpendingLimitSaved?.();
-        router.invalidate();
+        invalidateActiveMatches(router);
       },
       onError: (err) => {
         toast.error(err instanceof Error ? err.message : "Failed to update spending limit");
@@ -243,7 +244,7 @@ function BillingFormInner({
 
           if (outcome === "paid" || status === "paid") {
             toast.success("Invoice paid successfully");
-            router.invalidate();
+            invalidateActiveMatches(router);
             return;
           }
 
@@ -773,7 +774,7 @@ function PaymentMethodRow({
     removeMutation.mutate(method.id, {
       onSuccess: () => {
         toast.success("Payment method removed");
-        router.invalidate();
+        invalidateActiveMatches(router);
         setConfirmOpen(false);
       },
       onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to remove payment method"),
@@ -819,7 +820,7 @@ function PaymentMethodRow({
               setDefaultMutation.mutate(method.id, {
                 onSuccess: () => {
                   toast.success("Default payment method updated");
-                  router.invalidate();
+                  invalidateActiveMatches(router);
                 },
                 onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to set default"),
               })
@@ -990,7 +991,7 @@ export function AddCardForm({
       if (onSuccess) {
         onSuccess(paymentMethodId);
       } else {
-        router.invalidate();
+        invalidateActiveMatches(router);
       }
       onClose();
     } catch (err) {

@@ -20,6 +20,7 @@ import { friendlyAnalyticsError } from "@/lib/analytics-errors";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 import { ChangePlanModal } from "@/components/shared/change-plan-modal";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const PLAN_DISPLAY: Record<string, string> = {
   free: "Free",
@@ -189,7 +190,7 @@ function ErrorCard({ message }: { message: string }) {
         <p className="text-sm text-dash-text-body">{message}</p>
         <button
           type="button"
-          onClick={() => void router.invalidate()}
+          onClick={() => void invalidateActiveMatches(router)}
           className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-3 py-[7px] text-xs font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
         >
           Retry

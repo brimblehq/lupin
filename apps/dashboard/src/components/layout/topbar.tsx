@@ -47,6 +47,7 @@ import { Dropdown } from "../shared/dropdown";
 import { toTitleCase } from "@/utils/dashboard";
 import { Theme } from "@/types/enums";
 import { buildProjectSwitchUrl, buildWorkspaceSwitchUrl, setPendingDomainsAction, withWorkspaceQuery } from "@/utils/topbar-navigation";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 function getWorkspaceSearch(searchStr?: string) {
   const params = new URLSearchParams(searchStr || "");
@@ -588,7 +589,9 @@ function EnvironmentDropdown({
     }
 
     const params = new URLSearchParams(searchStr || "");
+    const currentSearchString = params.toString();
     params.delete("environmentId");
+    const nextSearchString = params.toString();
     const search = Object.fromEntries(params.entries());
 
     await navigate({
@@ -596,7 +599,10 @@ function EnvironmentDropdown({
       search: Object.keys(search).length > 0 ? (search as any) : undefined,
       replace: true,
     });
-    await router.invalidate();
+
+    if (currentSearchString === nextSearchString) {
+      await invalidateActiveMatches(router);
+    }
   }
 
   async function handleCreateSubmit() {

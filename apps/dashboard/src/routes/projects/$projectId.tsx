@@ -20,6 +20,7 @@ import { usePushNotification } from "@/hooks/use-push-notification";
 import config from "@/config";
 import type { ProjectDetailRouteProject } from "./project-detail.types";
 import { PROJECT_CACHE_TTL, markProjectCacheStale, projectCache } from "./project-route-cache";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const SUCCESS_LOG_PATTERN = /site (is )?(live|running)\b/i;
 const FAILURE_LOG_PATTERN = /deployment failed|build failed|failed to deploy/i;
@@ -506,7 +507,7 @@ function ProjectLayout() {
 
         if (DATABASE_EVENT_NAMES.includes(eventName)) {
           markProjectCacheStale();
-          void router.invalidate();
+          void invalidateActiveMatches(router);
         }
       });
 

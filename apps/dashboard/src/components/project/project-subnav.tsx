@@ -50,6 +50,7 @@ import { TransferProjectModal } from "./transfer-project-modal";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const baseTabs = [
   { label: "Projects details", slug: "", Icon: GlobeSimple },
@@ -311,7 +312,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         projectId: actualProjectId,
         workspace,
       });
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to redeploy project", {
         id: toastId,
@@ -344,7 +345,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         id: toastId,
         description: result?.message || "Backup has been queued.",
       });
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to initiate backup", {
         id: toastId,
@@ -377,7 +378,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         id: toastId,
         description: result?.message || "Updates should be visible shortly.",
       });
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to update database", {
         id: toastId,
@@ -699,7 +700,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
               description: typeof error?.message === "string" ? error.message : "Please try again.",
             });
           } finally {
-            await router.invalidate();
+            await invalidateActiveMatches(router);
             setDeleting(false);
           }
 

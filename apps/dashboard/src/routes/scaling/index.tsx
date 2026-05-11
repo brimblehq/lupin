@@ -26,6 +26,7 @@ import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { PlanUpgradePrompt } from "../../components/shared/plan-upgrade-prompt";
 import { ScalingPending } from "@/components/shared/route-pending";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 export const Route = createFileRoute("/scaling/")({
   staleTime: 300_000,
@@ -552,7 +553,7 @@ function ScalingPage() {
       } else {
         toast.success(`Created ${saved.name}`);
       }
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save scaling group");
     } finally {
@@ -592,7 +593,7 @@ function ScalingPage() {
       });
 
       toast.success(`${nextActive ? "Enabled" : "Disabled"} ${group.name}`);
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       setRows((prev) =>
         prev.map((row) => {
@@ -642,7 +643,7 @@ function ScalingPage() {
       setRows((prev) => prev.filter((row) => row.id !== target.id));
       setDeleteTarget(null);
       toast.success(`Deleted ${target.name}`);
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete scaling group");
       throw error;

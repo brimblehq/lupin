@@ -8,6 +8,7 @@ import { listWorkspacesServerFn } from "@/server/workspaces/actions";
 import { buildWorkspaceSwitchUrl } from "@/utils/topbar-navigation";
 import { Dropdown } from "@/components/shared/dropdown";
 import { Modal, ModalCancelButton, ModalContinueButton, ModalFooter, ModalHeader } from "@/components/shared/modal";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 interface TransferProjectModalProps {
   open: boolean;
@@ -143,7 +144,7 @@ export function TransferProjectModal({
       onOpenChange(false);
       toast.success("Project transferred successfully");
 
-      await router.invalidate();
+      await invalidateActiveMatches(router);
       await navigate({
         to: nextUrl as any,
         replace: true,

@@ -90,6 +90,7 @@ import { PasswordProtectionModal } from "@/components/project/password-protectio
 import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
 import { markProjectCacheStale } from "@/routes/projects/project-route-cache";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -415,7 +416,7 @@ function EnvironmentSection({
                 setSelectedId(result.environmentId);
                 setInheritEnvVars(result.inheritEnvVars);
                 toast.success("Environment updated successfully");
-                await router.invalidate();
+                await invalidateActiveMatches(router);
               } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Failed to update environment");
               } finally {
@@ -1775,7 +1776,7 @@ function DangerSection({
           } catch (error) {
             toast.error(error instanceof Error ? error.message : "Failed to delete project");
           } finally {
-            await router.invalidate();
+            await invalidateActiveMatches(router);
             setDeleting(false);
           }
 
@@ -2143,7 +2144,7 @@ function ConfigurationPage() {
         workspace,
       });
       toast.success("Configuration saved. Redeploy started.");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save configuration");
     }
@@ -2169,7 +2170,7 @@ function ConfigurationPage() {
         workspace,
       });
       toast.success("Build configuration saved. Redeploy started.");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save build configuration");
     }
@@ -2208,7 +2209,7 @@ function ConfigurationPage() {
     }
 
     toast.success("Database configuration updated");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   async function handleSubmitResources(values: ResourcesConfigValues) {
@@ -2235,7 +2236,7 @@ function ConfigurationPage() {
         workspace,
       });
       toast.success("Resources updated. Redeploy started.");
-      router.invalidate();
+      invalidateActiveMatches(router);
       return;
     }
 
@@ -2262,7 +2263,7 @@ function ConfigurationPage() {
     });
 
     toast.success("Resources updated");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   return (
@@ -2322,7 +2323,7 @@ function ConfigurationPage() {
                   />
                 ) : (
                   <>
-                    <RepoSection project={project} workspace={workspace} canWrite={canWrite} onRepoChanged={() => router.invalidate()} />
+                    <RepoSection project={project} workspace={workspace} canWrite={canWrite} onRepoChanged={() => invalidateActiveMatches(router)} />
                     <EnvironmentSection
                       projectId={project?.id || params.projectId}
                       currentEnvironmentId={project?.projectEnvironmentId}
@@ -2349,7 +2350,7 @@ function ConfigurationPage() {
                       passwordEnabled={Boolean(project?.passwordEnabled)}
                       onPasswordChanged={() => {
                         markProjectCacheStale();
-                        return router.invalidate();
+                        return invalidateActiveMatches(router);
                       }}
                     />
                   </>

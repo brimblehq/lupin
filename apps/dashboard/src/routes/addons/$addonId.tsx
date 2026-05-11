@@ -16,6 +16,7 @@ import { finalizeOauthSessionServerFn } from "@/server/auth/actions";
 import { deployMcpTemplateServerFn, getMcpTemplateServerFn, listMcpTemplatesServerFn } from "@/server/mcp/actions";
 import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import { mapMcpTemplateToAddon, mapMcpTemplateToAddonDetail } from "@/utils/discover-mcp";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 export const Route = createFileRoute("/addons/$addonId")({
   staleTime: 300_000,
@@ -237,7 +238,7 @@ function AddonDetailPage() {
       }
 
       toast.success("MCP server deployment started");
-      await router.invalidate();
+      await invalidateActiveMatches(router);
       await navigate({
         to: "/projects/$projectId",
         params: { projectId },

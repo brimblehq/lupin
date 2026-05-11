@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/tanstackstart-react";
 import { BackendApiError } from "@/backend/errors";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { AccessDenied } from "./access-denied";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const HTTP_STATUS_PREFIX = /^\[HTTP (\d{3})\]\s*/;
 
@@ -105,7 +106,7 @@ export function DefaultErrorComponent({ error }: { error: Error }) {
       description={friendly.description}
       action={{
         label: "Try again",
-        onClick: () => router.invalidate(),
+        onClick: () => invalidateActiveMatches(router),
       }}
       secondaryAction={{
         label: "Back to dashboard",

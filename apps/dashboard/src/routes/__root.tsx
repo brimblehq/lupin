@@ -117,8 +117,8 @@ export const Route = createRootRoute({
       },
     ],
   }),
-  beforeLoad: async ({ location }) => {
-    await enforceRouteAuth(location.pathname, location.searchStr);
+  beforeLoad: async ({ location, preload }) => {
+    await enforceRouteAuth(location.pathname, location.searchStr, { preload });
   },
   loader: (async ({ location, deps }: any) => {
     const isAuthRoute = /^\/(login|signup|2fa)$/.test(location.pathname);

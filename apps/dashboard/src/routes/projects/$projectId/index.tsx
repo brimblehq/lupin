@@ -24,6 +24,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { WarningModal } from "@/components/shared/warning-modal";
 import { ProjectOverviewPending } from "@/components/shared/route-pending";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -110,7 +111,7 @@ function ProjectDetailPage() {
 
   useEffect(() => {
     function handleDeploymentUpdated() {
-      router.invalidate();
+      invalidateActiveMatches(router);
     }
     window.addEventListener("brimble:deployment-updated", handleDeploymentUpdated);
     return () => window.removeEventListener("brimble:deployment-updated", handleDeploymentUpdated);
@@ -138,7 +139,7 @@ function ProjectDetailPage() {
     try {
       await redeployProject({ data: { projectId } });
       toast.success("Database restart triggered");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error(typeof error?.message === "string" ? error.message : "Couldn't restart");
     } finally {
@@ -633,7 +634,7 @@ function ProjectDetailPage() {
                           {i < deploymentRows.length - 1 && <div className="absolute -bottom-3.5 left-[7.5px] h-3.5 w-px bg-dash-border" />}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{dep.url}</span>
+                          <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{dep.url}</span>
                           <span className="text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-faded">{dep.date}</span>
                         </div>
                       </div>

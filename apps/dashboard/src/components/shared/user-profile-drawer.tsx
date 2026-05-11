@@ -105,6 +105,7 @@ import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
 import { ToggleSwitch } from "./toggle-switch";
 import { ProfileTab, Theme } from "../../types/enums";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 type UserProfile = DrawerUserProfile;
 
 export { ProfileTab };
@@ -2157,7 +2158,7 @@ export function UserProfileDrawer({
                         },
                       }));
 
-                      void router.invalidate();
+                      void invalidateActiveMatches(router);
                       toast.success("Workspace profile updated");
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Failed to update workspace profile");
@@ -2215,7 +2216,7 @@ export function UserProfileDrawer({
                           },
                         };
                       });
-                      void router.invalidate();
+                      void invalidateActiveMatches(router);
                       toast.success("Profile updated");
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Failed to update profile");

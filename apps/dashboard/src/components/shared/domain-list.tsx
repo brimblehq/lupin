@@ -19,6 +19,7 @@ import { transferDomainWorkspaceServerFn } from "@/server/domains/actions";
 import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 export interface Domain {
   id?: string;
@@ -196,7 +197,7 @@ function TransferDomainModal({ open, onOpenChange, domain }: { open: boolean; on
       );
       toast.success("Domain moved successfully");
       onOpenChange(false);
-      await router.invalidate();
+      await invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to transfer domain");
     } finally {

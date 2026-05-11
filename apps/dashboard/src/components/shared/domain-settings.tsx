@@ -26,6 +26,7 @@ import {
 import { getPaymentMethodsServerFn } from "@/server/payments/actions";
 import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const dnsRecordTypes = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"];
 
@@ -524,7 +525,7 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
       setNameservers(updated);
       setEditNameserversOpen(false);
       toast.success("Nameservers updated. Changes can take up to 24 hours to propagate.");
-      void router.invalidate();
+      void invalidateActiveMatches(router);
     } catch (err: any) {
       toast.error(err?.message || "Failed to update nameservers");
     } finally {

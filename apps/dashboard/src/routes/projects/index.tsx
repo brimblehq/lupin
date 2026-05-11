@@ -41,6 +41,7 @@ import { useTagsStore } from "@/hooks/use-tags-store";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import config from "@/config";
 import type { ProjectsRouteLoaderData } from "./types";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const environmentFormSchema = Yup.object({
   name: Yup.string()
@@ -355,7 +356,7 @@ function EnvironmentManagerModal({
 
                   onEnvironmentListChange(environments.map((env) => (env._id === selectedEnvironment._id ? nextEnvironment : env)));
                   toast.success("Environment updated");
-                  router.invalidate();
+                  invalidateActiveMatches(router);
                 } else {
                   nextEnvironment = await createEnvironment({
                     data: {
@@ -368,7 +369,7 @@ function EnvironmentManagerModal({
                   onEnvironmentListChange([...environments, nextEnvironment]);
                   setSelectedEnvironmentId(nextEnvironment._id);
                   toast.success("Environment created");
-                  router.invalidate();
+                  invalidateActiveMatches(router);
                 }
               } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Failed to save environment");
@@ -463,7 +464,7 @@ function EnvironmentManagerModal({
 
                     setSelectedEnvironmentId(nextEnvironments[0]?._id ?? null);
                     toast.success("Environment deleted");
-                    router.invalidate();
+                    invalidateActiveMatches(router);
                   } catch (error) {
                     toast.error(error instanceof Error ? error.message : "Failed to delete environment");
                   } finally {
@@ -624,7 +625,7 @@ function ProjectsPage() {
       if (invalidateTimer !== null) return;
       invalidateTimer = window.setTimeout(() => {
         invalidateTimer = null;
-        void router.invalidate();
+        void invalidateActiveMatches(router);
       }, 750);
     };
 

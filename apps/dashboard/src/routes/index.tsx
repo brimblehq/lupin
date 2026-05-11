@@ -39,6 +39,7 @@ import { mapMcpTemplateToAddon } from "@/utils/discover-mcp";
 import { resolveEnvironmentId } from "@/utils/environment-selection";
 import { workspaceLoaderDeps } from "@/utils/workspace-route-search";
 import { getRouteApi } from "@tanstack/react-router";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const rootRoute = getRouteApi("__root__");
 const EMPTY_PROJECTS: BackendProject[] = [];
@@ -276,7 +277,7 @@ function DashboardHome() {
               });
               toast.success("Invitation accepted! Welcome to the team.");
               setInviteModalOpen(false);
-              await router.invalidate();
+              await invalidateActiveMatches(router);
             } catch (err: any) {
               toast.error(err?.message || "Failed to accept invitation");
             } finally {
@@ -340,7 +341,7 @@ function DashboardHome() {
                   ...(search.environmentId ? { environmentId: search.environmentId } : {}),
                 },
               });
-              await router.invalidate();
+              await invalidateActiveMatches(router);
             } catch (err: any) {
               const message = err?.message || "Failed to accept ownership transfer";
               if (/no pending ownership transfer found/i.test(message)) {
@@ -377,7 +378,7 @@ function DashboardHome() {
                   ...(search.environmentId ? { environmentId: search.environmentId } : {}),
                 },
               });
-              await router.invalidate();
+              await invalidateActiveMatches(router);
             } catch (err: any) {
               const message = err?.message || "Failed to deny ownership transfer";
               if (/no pending ownership transfer found/i.test(message)) {

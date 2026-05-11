@@ -12,13 +12,13 @@ export function DashToaster() {
       toastOptions={{
         classNames: {
           toast:
-            "!rounded-[4px] !border-[0.5px] !border-[var(--dash-border)] !bg-[var(--dash-bg)] !font-[var(--font-family-body)] !shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] dark:!shadow-[0px_2px_3px_rgba(0,0,0,0.2)]",
+            "!rounded-lg !border-[0.5px] !border-[var(--dash-border)] !bg-[var(--dash-bg)] !font-[var(--font-family-body)] !shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] dark:!shadow-[0px_2px_3px_rgba(0,0,0,0.2)]",
           title: "!text-[var(--dash-text-strong)] !text-sm !font-normal",
           description: "!text-[var(--dash-text-body)] !text-[13px] !font-light",
           actionButton:
-            "!rounded-[4px] !border !border-[#232931] !bg-gradient-to-b !from-[#545459] !via-[#45454b] !to-[#2d2d32] !px-3 !py-[3px] !text-[13px] !font-medium !text-white !shadow-[0px_1px_2px_rgba(18,18,23,0.05)]",
+            "!rounded-lg !border !border-[#232931] !bg-gradient-to-b !from-[#545459] !via-[#45454b] !to-[#2d2d32] !px-3 !py-[3px] !text-[13px] !font-medium !text-white !shadow-[0px_1px_2px_rgba(18,18,23,0.05)]",
           cancelButton:
-            "!rounded-[4px] !border !border-[var(--dash-border)] !bg-[var(--dash-bg)] !px-3 !py-[3px] !text-[13px] !font-medium !text-[var(--dash-text-strong)] !shadow-[0px_1px_2px_rgba(18,18,23,0.05)]",
+            "!rounded-lg !border !border-[var(--dash-border)] !bg-[var(--dash-bg)] !px-3 !py-[3px] !text-[13px] !font-medium !text-[var(--dash-text-strong)] !shadow-[0px_1px_2px_rgba(18,18,23,0.05)]",
           closeButton: "!border-[var(--dash-border)] !bg-[var(--dash-bg)] !text-[var(--dash-text-faded)]",
           success: "!border-[var(--dash-border)]",
           error: "!border-[var(--dash-border)]",

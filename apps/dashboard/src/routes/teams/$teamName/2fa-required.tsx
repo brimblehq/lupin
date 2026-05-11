@@ -7,6 +7,7 @@ import { useProfileDrawer } from "@/contexts/profile-drawer-context";
 import { ProfileTab } from "@/types/enums";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
 import type { TeamDetails } from "@/backend/teams";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 export const Route = createFileRoute("/teams/$teamName/2fa-required")({
   component: TeamTwoFactorRequiredPage,
@@ -62,7 +63,7 @@ function TeamTwoFactorRequiredPage() {
           <button
             type="button"
             onClick={() => {
-              void navigate({ to: "/", search: { workspace: teamName } as any }).then(() => router.invalidate());
+              void navigate({ to: "/", search: { workspace: teamName } as any }).then(() => invalidateActiveMatches(router));
             }}
             className="text-xs font-medium text-dash-text-faded transition-colors hover:text-dash-text-strong"
           >

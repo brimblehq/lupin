@@ -86,6 +86,7 @@ import { usePlanGate } from "@/hooks/use-plan-gate";
 import { usePricing } from "@/contexts/pricing-context";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import { PaymentProvider } from "@/providers/payment-provider";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const AddCardForm = lazy(() => import("@/components/settings/billing-form").then((m) => ({ default: m.AddCardForm })));
 import { estimateComputeCost } from "@/utils/compute-pricing";
@@ -840,8 +841,12 @@ function Phase2GitRepoSelect({
               <div className="px-4 py-8 text-center text-sm text-dash-text-faded">No repositories found.</div>
             ) : (
               repos.map((repo, i) => {
-                const repoHost =
-                  provider.id === "gitlab" ? "https://gitlab.com" : provider.id === "bitbucket" ? "https://bitbucket.org" : "https://github.com";
+                let repoHost = "https://github.com";
+                if (provider.id === "gitlab") {
+                  repoHost = "https://gitlab.com";
+                } else if (provider.id === "bitbucket") {
+                  repoHost = "https://bitbucket.org";
+                }
                 const repoUrl = `${repoHost}/${repo.fullName}`;
                 return (
                   <motion.div
@@ -2452,39 +2457,42 @@ function Phase3Configure({
         </>
       )}
 
-      {/* Compute — CPU and memory tier for the deployed container */}
-      <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Compute</h4>
-      <p className="mb-4 text-sm text-dash-text-faded">Choose CPU and memory for your container. You can change this later.</p>
-      <div className="flex flex-col gap-4">
-        <ComputeSliderField
-          label="CPU"
-          value={cpuIdx}
-          steps={cpuSteps}
-          formatValue={(v) => `${v} vCPU`}
-          onCommit={(idx) => setCpuIdx(idx)}
-          disabled={isFreePlan}
-          disabledReason="Compute is locked on the Free plan. Upgrade to customize CPU."
-        />
-        <ComputeSliderField
-          label="Memory"
-          value={memIdx}
-          steps={memorySteps}
-          formatValue={(v) => (v < 1 ? `${v * 1024} MB` : `${v} GB`)}
-          onCommit={(idx) => setMemIdx(idx)}
-          disabled={isFreePlan}
-          disabledReason="Compute is locked on the Free plan. Upgrade to customize memory."
-        />
-        {isFreePlan && (
-          <p className="text-xs text-dash-text-faded">
-            Compute is fixed on the Free plan.{" "}
-            <button type="button" onClick={() => setShowUpgradeModal(true)} className="font-medium text-[#4879f8] hover:text-[#3060d0]">
-              Upgrade for more
-            </button>
-          </p>
-        )}
-      </div>
+      {serviceType !== ServiceType.Static && (
+        <>
+          <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Compute</h4>
+          <p className="mb-4 text-sm text-dash-text-faded">Choose CPU and memory for your container. You can change this later.</p>
+          <div className="flex flex-col gap-4">
+            <ComputeSliderField
+              label="CPU"
+              value={cpuIdx}
+              steps={cpuSteps}
+              formatValue={(v) => `${v} vCPU`}
+              onCommit={(idx) => setCpuIdx(idx)}
+              disabled={isFreePlan}
+              disabledReason="Compute is locked on the Free plan. Upgrade to customize CPU."
+            />
+            <ComputeSliderField
+              label="Memory"
+              value={memIdx}
+              steps={memorySteps}
+              formatValue={(v) => (v < 1 ? `${v * 1024} MB` : `${v} GB`)}
+              onCommit={(idx) => setMemIdx(idx)}
+              disabled={isFreePlan}
+              disabledReason="Compute is locked on the Free plan. Upgrade to customize memory."
+            />
+            {isFreePlan && (
+              <p className="text-xs text-dash-text-faded">
+                Compute is fixed on the Free plan.{" "}
+                <button type="button" onClick={() => setShowUpgradeModal(true)} className="font-medium text-[#4879f8] hover:text-[#3060d0]">
+                  Upgrade for more
+                </button>
+              </p>
+            )}
+          </div>
 
-      <hr className="my-6 border-dash-border-soft" />
+          <hr className="my-6 border-dash-border-soft" />
+        </>
+      )}
 
       {/* Secrets — hidden for no-build frameworks (HTML, Static) */}
       {!isNoBuildFramework(framework) && (
@@ -3296,7 +3304,7 @@ function NewProjectPage() {
       } else {
         toast.success("Project saved. You can continue configuring it anytime.");
       }
-      await router.invalidate();
+      await invalidateActiveMatches(router);
       navigate({
         to: withWorkspaceQuery({
           pathname: deploy
@@ -3361,7 +3369,7 @@ function NewProjectPage() {
 
       const targetProjectId = created?.name?.trim() || normalizedName;
       toast.success("Database provisioning started");
-      await router.invalidate();
+      await invalidateActiveMatches(router);
       navigate({
         to: withWorkspaceQuery({
           pathname: `/projects/${encodeURIComponent(targetProjectId)}`,

@@ -13,6 +13,7 @@ import {
   cancelSubscriptionSchema,
   type CancelSubscriptionFormValues,
 } from "@/utils/billing";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 interface CancelSubscriptionModalProps {
   open: boolean;
@@ -34,7 +35,7 @@ export function CancelSubscriptionModal({ open, onOpenChange, currentPlan }: Can
           try {
             await cancelMutation.mutateAsync({ comment: values.comment.trim() });
             toast.success("Subscription cancelled. You'll keep access until the end of this billing period.");
-            router.invalidate();
+            invalidateActiveMatches(router);
             onOpenChange(false);
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Failed to cancel subscription");

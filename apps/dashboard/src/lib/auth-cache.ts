@@ -1,5 +1,5 @@
 let lastVerifiedAt = 0;
-const AUTH_CACHE_TTL_MS = 2 * 60 * 1000;
+const AUTH_CACHE_TTL_MS = 5 * 60 * 1000;
 const isBrowser = typeof window !== "undefined";
 
 export function markSessionVerified(): void {

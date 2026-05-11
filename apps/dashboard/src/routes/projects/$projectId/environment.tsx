@@ -50,6 +50,7 @@ import { hasReferenceTrigger, highlightReferences, type ReferenceValidationConte
 import type { ProjectOption, ProjectVarOption, SharedVarOption } from "@/components/project/env-reference-autocomplete";
 import { ReferenceHighlightInput } from "@/components/project/reference-highlight-input";
 import { ReferenceCountBadge, ReferenceWarnings } from "@/components/project/env-reference-widgets";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 const DEFAULT_TARGET = "PRODUCTION";
@@ -1164,7 +1165,7 @@ function EnvironmentPage() {
       });
       markDeploymentHistoryForRefresh({ projectId, workspace });
       toast.success("Redeploy started");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to start redeploy");
     }
