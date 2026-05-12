@@ -51,6 +51,7 @@ import type { ProjectOption, ProjectVarOption, SharedVarOption } from "@/compone
 import { ReferenceHighlightInput } from "@/components/project/reference-highlight-input";
 import { ReferenceCountBadge, ReferenceWarnings } from "@/components/project/env-reference-widgets";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
+import { parseEnvPaste } from "@/utils/env-paste";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 const DEFAULT_TARGET = "PRODUCTION";
@@ -1179,6 +1180,17 @@ function EnvironmentPage() {
     setDraftRows((prev) => prev.map((row) => (row.id === id ? { ...row, [field]: nextValue } : row)));
   }
 
+  function handleDraftPaste(rowId: string, event: React.ClipboardEvent<HTMLInputElement>) {
+    const parsed = parseEnvPaste(event.clipboardData.getData("text"));
+    if (!parsed) return;
+    event.preventDefault();
+    setDraftRows((prev) => {
+      const withoutCurrent = prev.filter((row) => row.id !== rowId || row.name || row.value);
+      const additions = parsed.map((p) => ({ id: createDraftId(), name: p.name, value: p.value, shared: false }));
+      return [...withoutCurrent, ...additions];
+    });
+  }
+
   function toggleDraftShared(id: string) {
     setDraftRows((prev) => prev.map((row) => (row.id === id ? { ...row, shared: !row.shared } : row)));
   }
@@ -1595,6 +1607,7 @@ function EnvironmentPage() {
                                 type="text"
                                 value={row.name}
                                 onChange={(event) => updateDraftRow(row.id, "name", event.target.value)}
+                                onPaste={(event) => handleDraftPaste(row.id, event)}
                                 placeholder="APP_ENV"
                                 className="input-base input-focus h-[36px] min-w-0 flex-1 px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded"
                               />

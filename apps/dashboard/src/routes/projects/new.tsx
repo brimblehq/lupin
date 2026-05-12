@@ -92,6 +92,7 @@ const AddCardForm = lazy(() => import("@/components/settings/billing-form").then
 import { estimateComputeCost } from "@/utils/compute-pricing";
 import { formatUsdMonthly } from "@/utils/billing";
 import { generateStrongPassword } from "@/utils/password";
+import { parseEnvPaste } from "@/utils/env-paste";
 import { NewProjectPending } from "@/components/shared/route-pending";
 import config from "@/config";
 import type { Phase3DeployInput } from "./new.types";
@@ -2160,25 +2161,12 @@ function Phase3Configure({
   }
 
   function handleEnvPaste(id: number, e: React.ClipboardEvent<HTMLInputElement>) {
-    const text = e.clipboardData.getData("text");
-    const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith("#"));
-    if (lines.length < 2 && !text.includes("=")) return;
+    const parsed = parseEnvPaste(e.clipboardData.getData("text"));
+    if (!parsed) return;
     e.preventDefault();
-    const parsed: Array<{ key: string; value: string }> = [];
-    for (const line of lines) {
-      const eqIdx = line.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = line.slice(0, eqIdx).trim();
-      let value = line.slice(eqIdx + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      if (key) parsed.push({ key, value });
-    }
-    if (!parsed.length) return;
     setEnvVars((prev) => {
       const withoutCurrent = prev.filter((v) => v.id !== id || v.key || v.value);
-      const newVars = parsed.map((p) => ({ id: envNextId++, ...p }));
+      const newVars = parsed.map((p) => ({ id: envNextId++, key: p.name, value: p.value }));
       return [...withoutCurrent, ...newVars];
     });
     setEnvExpanded(true);
