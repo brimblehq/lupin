@@ -39,6 +39,7 @@ export type {
   UpdateSettingsHapticsInput,
   UpdateSettingsNotificationsInput,
   UpdateSettingsProfileInput,
+  UpdateSettingsThemeInput,
   UpdateSettingsWebhooksInput,
 } from "./settings/types";
 
@@ -61,6 +62,11 @@ function mapProfile(payload: any): SettingsUserProfile {
   const username = String(data?.username ?? "");
   const email = String(data?.email ?? "");
   const id = String(data?._id ?? data?.id ?? "");
+  const rawTheme = String(data?.theme ?? "").trim().toLowerCase();
+  const theme =
+    rawTheme === "light" || rawTheme === "dark" || rawTheme === "system"
+      ? (rawTheme as SettingsUserProfile["theme"])
+      : undefined;
 
   return {
     id,
@@ -68,6 +74,7 @@ function mapProfile(payload: any): SettingsUserProfile {
     username,
     firstName,
     lastName,
+    theme,
     avatarUrl: data?.avatar,
     buildDisabled: Boolean(data?.build_disabled),
     buildDisabledBy: data?.build_disabled_by ?? null,
@@ -370,6 +377,14 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
 
       const refreshed = await client.request(endpoints.authUserMe, { method: "GET" });
       return mapProfile(refreshed);
+    },
+    async updateTheme(input) {
+      await client.request(endpoints.updateUser, {
+        method: "PUT",
+        body: {
+          theme: input.theme,
+        },
+      });
     },
     async requestEmailVerification(email) {
       await client.request(endpoints.requestEmailVerification, {

@@ -4,6 +4,7 @@ export interface SettingsUserProfile {
   username: string;
   firstName: string;
   lastName: string;
+  theme?: "light" | "dark" | "system";
   avatarUrl?: string;
   buildDisabled: boolean;
   buildDisabledBy?: string | null;
@@ -27,6 +28,10 @@ export interface UpdateSettingsProfileInput {
   lastName: string;
   username: string;
   avatarUrl?: string;
+}
+
+export interface UpdateSettingsThemeInput {
+  theme: "light" | "dark" | "system";
 }
 
 export interface UpdateSettingsNotificationsInput {
@@ -153,6 +158,7 @@ export interface SettingsApi {
   getSidebarSnapshot(page?: number, options?: { subscriptionId?: string }): Promise<SettingsSidebarSnapshot>;
   getProfile(): Promise<SettingsUserProfile>;
   updateProfile(input: UpdateSettingsProfileInput): Promise<SettingsUserProfile>;
+  updateTheme(input: UpdateSettingsThemeInput): Promise<void>;
   requestEmailVerification(email: string): Promise<void>;
   updateNotifications(input: UpdateSettingsNotificationsInput): Promise<void>;
   updateBuilds(input: UpdateSettingsBuildsInput): Promise<void>;

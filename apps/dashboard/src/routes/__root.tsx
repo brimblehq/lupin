@@ -235,14 +235,6 @@ gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
 }
 
 function RootComponent() {
-  useTheme();
-
-  useEffect(() => {
-    import("@/lib/client-geo").then((m) => m.getClientGeo());
-  }, []);
-
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-
   const {
     workspace: loaderWorkspace,
     settingsSnapshot,
@@ -254,6 +246,13 @@ function RootComponent() {
     userOverview,
     pricing,
   } = Route.useLoaderData() ?? ({} as any);
+  useTheme(settingsSnapshot?.profile?.theme);
+
+  useEffect(() => {
+    import("@/lib/client-geo").then((m) => m.getClientGeo());
+  }, []);
+
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspace = (() => {

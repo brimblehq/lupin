@@ -7,6 +7,7 @@ import type {
   UpdateSettingsBuildsInput,
   UpdateSettingsNotificationsInput,
   UpdateSettingsProfileInput,
+  UpdateSettingsThemeInput,
   UpdateSettingsWebhooksInput,
 } from "@/backend/settings";
 import { withTokenRefresh } from "@/server/shared/backend";
@@ -72,6 +73,16 @@ export const updateSettingsProfileServerFn = createServerFn({
 }).handler(async ({ data }) => {
   const input = data as unknown as UpdateSettingsProfileInput;
   return withTokenRefresh((api) => api.settings.updateProfile(input));
+});
+
+export const updateSettingsThemeServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const input = data as unknown as UpdateSettingsThemeInput;
+  return withTokenRefresh(async (api) => {
+    await api.settings.updateTheme(input);
+    return { ok: true } as const;
+  });
 });
 
 export const requestSettingsEmailVerificationServerFn = createServerFn({
