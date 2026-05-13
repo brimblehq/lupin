@@ -46,8 +46,8 @@ export const config = {
   buildMinutesTopUpPerDollar: Number(readEnv("VITE_BUILD_MINUTES_TOPUP_PER_DOLLAR") ?? "288"),
   databaseFreeTrialDays: Number(readEnv("VITE_DB_FREE_TRIAL_DAYS") ?? "15"),
 
-  accessTokenTtl: Number(readEnv("VITE_ACCESS_TOKEN_TTL") ?? String(60 * 30)),
-  refreshTokenTtl: Number(readEnv("VITE_REFRESH_TOKEN_TTL") ?? String(60 * 60 * 24 * 14)),
+  accessTokenTtl: Number(readEnv("VITE_ACCESS_TOKEN_TTL") ?? String(60 * 60)),
+  refreshTokenTtl: Number(readEnv("VITE_REFRESH_TOKEN_TTL") ?? String(60 * 60 * 24)),
 
   turnstileSiteKey: readEnv("VITE_TURNSTILE_SITE_KEY") ?? "",
 

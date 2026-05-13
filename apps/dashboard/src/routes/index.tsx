@@ -95,43 +95,50 @@ export const Route = createFileRoute("/")({
       environments,
     });
 
-    const [projectsResult, overviewResult, bandwidthResult] = await Promise.allSettled([
-      (listHomeProjectsServerFn as unknown as (input: {
+    let projects = EMPTY_PROJECTS;
+    let overview = EMPTY_OVERVIEW;
+    let bandwidth = EMPTY_BANDWIDTH;
+
+    try {
+      const projectsResponse = await (listHomeProjectsServerFn as unknown as (input: {
         data: { workspace?: string; environmentId?: string };
       }) => Promise<ApiListResponse<BackendProject>>)({
         data: { workspace, environmentId },
-      }),
-      (getHomeOverviewServerFn as unknown as (input: {
+      });
+      projects = projectsResponse.items;
+    } catch (error) {
+      console.warn("[dashboard-home loader] failed to load projects", error);
+    }
+
+    try {
+      overview = await (getHomeOverviewServerFn as unknown as (input: {
         data: { workspace?: string; environmentId?: string };
       }) => Promise<OverviewSummary>)({
         data: { workspace, environmentId },
-      }),
-      (getHomeBandwidthServerFn as unknown as (input: {
+      });
+    } catch (error) {
+      console.warn("[dashboard-home loader] failed to load overview", error);
+    }
+
+    try {
+      bandwidth = await (getHomeBandwidthServerFn as unknown as (input: {
         data: { workspace?: string; environmentId?: string };
       }) => Promise<BandwidthSummary>)({
         data: { workspace, environmentId },
-      }),
-    ]);
+      });
+    } catch (error) {
+      console.warn("[dashboard-home loader] failed to load bandwidth", error);
+    }
 
     const frameworkLogoMap = new Map<string, string>();
     for (const fw of frameworksList) {
       if (fw.slug && fw.logo) frameworkLogoMap.set(fw.slug.toLowerCase(), fw.logo);
     }
 
-    if (projectsResult.status === "rejected") {
-      console.warn("[dashboard-home loader] failed to load projects", projectsResult.reason);
-    }
-    if (overviewResult.status === "rejected") {
-      console.warn("[dashboard-home loader] failed to load overview", overviewResult.reason);
-    }
-    if (bandwidthResult.status === "rejected") {
-      console.warn("[dashboard-home loader] failed to load bandwidth", bandwidthResult.reason);
-    }
-
     return {
-      projects: projectsResult.status === "fulfilled" ? projectsResult.value.items : EMPTY_PROJECTS,
-      overview: overviewResult.status === "fulfilled" ? overviewResult.value : EMPTY_OVERVIEW,
-      bandwidth: bandwidthResult.status === "fulfilled" ? bandwidthResult.value : EMPTY_BANDWIDTH,
+      projects,
+      overview,
+      bandwidth,
       featuredAddons: mcpTemplatesResult.servers.slice(0, 3).map(mapMcpTemplateToAddon),
       frameworkLogos: Object.fromEntries(frameworkLogoMap),
       workspace,

@@ -156,22 +156,28 @@ export const Route = createRootRoute({
         });
       })();
 
-      const [settingsSnapshot, workspaces, onboardingProjects, pricingResult, tags, subscriptionStats, userOverview] = await Promise.allSettled([
+      const [settingsSnapshot, workspaces, userOverview] = await Promise.allSettled([
         (getSettingsSidebarSnapshotServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SettingsSidebarSnapshot>)({
           data: { workspace },
         }),
         workspacesRequest,
+        userOverviewRequest,
+      ]);
+
+      const [onboardingProjects, tags] = await Promise.allSettled([
         (listHomeProjectsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<ApiListResponse<Project>>)({
           data: { workspace },
         }),
-        (getSubscriptionSpecsServerFn as unknown as () => Promise<Pricing>)(),
         (listTagsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<BackendTag[]>)({
           data: { workspace },
         }),
+      ]);
+
+      const [pricingResult, subscriptionStats] = await Promise.allSettled([
+        (getSubscriptionSpecsServerFn as unknown as () => Promise<Pricing>)(),
         (getSubscriptionStatsServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SubscriptionStats>)({
           data: { workspace },
         }),
-        userOverviewRequest,
       ]);
 
       return createRootLoaderData({

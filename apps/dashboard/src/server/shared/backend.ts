@@ -35,6 +35,20 @@ function isRefreshTokenReuseError(error: any): boolean {
   return /reuse detected/i.test(message);
 }
 
+function isRefreshRotationInProgressError(error: any): boolean {
+  const status = error?.status;
+  const message = (getErrorMessage(error) ?? "").toLowerCase();
+
+  if (status === 409) {
+    return true;
+  }
+
+  return (
+    message.includes("refresh already in progress") ||
+    message.includes("refresh token already used")
+  );
+}
+
 const activeRefreshPromises = new Map<string, Promise<AuthSession>>();
 const recentRefreshSessions = new Map<string, { session: AuthSession; expiresAt: number }>();
 const RECENT_REFRESH_TTL_MS = 2 * 60 * 1000;
@@ -236,6 +250,7 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
     const latestRefreshTokenFp = tokenFingerprint(latestRefreshToken);
     const attemptMatchesLatestRefreshToken = latestRefreshToken === refreshToken;
     const isRefreshReuse = isRefreshTokenReuseError(error);
+    const isRefreshInProgress = isRefreshRotationInProgressError(error);
     const fallbackSession = getRecentRefreshSession(refreshToken);
     if (fallbackSession) {
       setServerAuthCookies(fallbackSession);
@@ -266,10 +281,17 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
       currentRefreshTokenFp: latestRefreshTokenFp,
       attemptMatchesLatestRefreshToken,
       isRefreshTokenReuse: isRefreshReuse,
+      isRefreshInProgress,
     });
 
     const isTerminalAuthFailure = status === 401 || status === 403;
-    if (isTerminalAuthFailure && attemptMatchesLatestRefreshToken) {
+    const shouldClearCookies =
+      isTerminalAuthFailure &&
+      attemptMatchesLatestRefreshToken &&
+      !isRefreshReuse &&
+      !isRefreshInProgress;
+
+    if (shouldClearCookies) {
       authLogger.warn("refreshServerSession clearing cookies after terminal refresh failure", {
         status: status ?? null,
         message: getErrorMessage(error),
