@@ -132,7 +132,7 @@ const reachUsNav = [
 ];
 
 const aboutNav = [
-  { label: "Changelog", emoji: "👥" },
+  { label: "Changelog", emoji: "👥", href: "https://brimble.io/changelog" },
   { label: "Terms and privacy", emoji: "🔔", href: "https://brimble.io/legal" },
 ];
 
