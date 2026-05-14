@@ -282,7 +282,6 @@ type RefreshSessionServerResult =
 export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler(async () => {
   const refreshToken = getServerRefreshToken();
   if (!refreshToken) {
-    authLogger.warn("refreshSession skipped: missing refresh token");
     return {
       status: "missing",
     } satisfies RefreshSessionServerResult;

@@ -290,7 +290,6 @@ const frameworks = [
   },
 ];
 
-const regions = ["US East", "EU West", "Asia Pacific"];
 /* ─── Database Config ─── */
 
 interface DbEngine {
@@ -2501,13 +2500,16 @@ function Phase3Configure({
           <AnimatePresence>
             {envExpanded && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, height: 0, overflow: "hidden" }}
+                animate={{
+                  opacity: 1,
+                  height: "auto",
+                  transitionEnd: { overflow: "visible" },
+                }}
+                exit={{ overflow: "hidden", opacity: 0, height: 0 }}
                 transition={{ duration: 0.2, ease }}
-                className="overflow-hidden"
               >
-                <div className="scrollbar-subtle mt-3 flex max-h-[340px] flex-col gap-2 overflow-y-auto px-px pb-px pr-1">
+                <div className="scrollbar-subtle mt-3 flex max-h-[340px] flex-col gap-2 overflow-y-auto px-px py-px pr-1">
                   {envVars.map((v) => (
                     <div key={v.id} className="flex items-center gap-2">
                       <input
@@ -2867,8 +2869,8 @@ function NewProjectPage() {
       install: f.install,
     })),
   );
-  const [regionOptions, setRegionOptions] = useState<RegionOption[]>(() => regions.map((r) => ({ id: r, label: r })));
-  const [databaseRegionOptions, setDatabaseRegionOptions] = useState<RegionOption[]>(() => regions.map((r) => ({ id: r, label: r })));
+  const [regionOptions, setRegionOptions] = useState<RegionOption[]>([]);
+  const [databaseRegionOptions, setDatabaseRegionOptions] = useState<RegionOption[]>([]);
   const [databaseEngineOptions, setDatabaseEngineOptions] = useState<DatabaseEngineOption[]>(() =>
     fallbackDbEngines.map((engine) => ({
       id: engine.id,
@@ -2983,7 +2985,7 @@ function NewProjectPage() {
         );
       })
       .catch(() => {
-        // Keep UI fallback options.
+        // Keep existing options.
       });
 
     void listRegions({ data: { type: "web", enabled: true, workspace } })
@@ -3000,7 +3002,7 @@ function NewProjectPage() {
         }
       })
       .catch(() => {
-        // Keep UI fallback options.
+        // Keep existing options.
       });
 
     void listRegions({ data: { type: "database", enabled: true, workspace } })

@@ -52,8 +52,6 @@ function isRefreshRotationInProgressError(error: any): boolean {
 const activeRefreshPromises = new Map<string, Promise<AuthSession>>();
 const recentRefreshSessions = new Map<string, { session: AuthSession; expiresAt: number }>();
 const RECENT_REFRESH_TTL_MS = 2 * 60 * 1000;
-const MISSING_SESSION_WARN_THROTTLE_MS = 15_000;
-let lastMissingSessionWarnAt = 0;
 
 type WorkspaceListResult = Awaited<ReturnType<BackendApi["workspaces"]["list"]>>;
 
@@ -204,7 +202,6 @@ export function getServerBackendApi(geo?: ClientGeoData | null) {
 
 export async function refreshServerSession(refreshToken = getServerRefreshToken()): Promise<AuthSession | null> {
   if (!refreshToken) {
-    authLogger.warn("refreshSession skipped: missing refresh token");
     return null;
   }
 
@@ -382,14 +379,6 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>, opti
   const refreshToken = getServerRefreshToken();
 
   if (!accessToken && !refreshToken) {
-    const now = Date.now();
-    if (now - lastMissingSessionWarnAt >= MISSING_SESSION_WARN_THROTTLE_MS) {
-      authLogger.warn("withTokenRefresh skipped request: missing access and refresh tokens", {
-        hasAccessToken: false,
-        hasRefreshToken: false,
-      });
-      lastMissingSessionWarnAt = now;
-    }
     throw createUnauthorizedError("Unauthorized");
   }
 
