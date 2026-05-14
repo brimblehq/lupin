@@ -282,6 +282,11 @@ export const siteConfig = {
             description:
               "Yes. You can search for, register, and manage domains directly from the Brimble dashboard — no third-party registrar needed.",
           },
+          {
+            title: "Can I transfer a domain to or from Brimble?",
+            description:
+              "Yes. To transfer a domain in, open Domains → Transfer in, enter your domain and authorization (EPP) code, and confirm. To transfer out, open the domain's settings and request a transfer code to share with your new registrar.",
+          },
         ],
       },
       {
