@@ -20,11 +20,25 @@ export function invalidateSessionCache() {
   clearSessionCache();
 }
 
-export async function enforceRouteAuth(pathname: string, search?: string) {
+type EnforceRouteAuthOptions = {
+  preload?: boolean;
+};
+
+export async function enforceRouteAuth(pathname: string, search?: string, options?: EnforceRouteAuthOptions) {
   const isPublicRoute = publicRoutes.has(pathname);
   const isTwoFactorRoute = pathname === "/2fa";
+  const isPreload = options?.preload === true;
+  const recentlyVerified = isSessionRecentlyVerified();
 
-  if (isPublicRoute && !isTwoFactorRoute && isSessionRecentlyVerified()) {
+  if (isPreload) {
+    return { session: null };
+  }
+
+  if (!isPublicRoute && recentlyVerified) {
+    return { session: null };
+  }
+
+  if (isPublicRoute && !isTwoFactorRoute && recentlyVerified) {
     const nextParam = new URLSearchParams(search?.startsWith("?") ? search : `?${search || ""}`).get("next");
     throw redirect({ to: nextParam || "/" });
   }

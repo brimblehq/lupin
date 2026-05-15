@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, type ReactNode } from "react";
 import { DEFAULT_PRICING } from "@/utils/default-pricing";
 import type { Pricing } from "@/types/pricing";

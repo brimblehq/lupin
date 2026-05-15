@@ -75,7 +75,7 @@ export function Tooltip({ children, user, side = "top", sideOffset = 6, delayDur
                 animate={animate}
                 exit={exit}
                 transition={springTransition}
-                className="z-50 flex flex-col rounded-lg border border-[#141414] bg-gradient-to-b from-[#434343] to-[#232323] pb-px shadow-[0px_0.6px_0px_rgba(0,0,0,0.1),0px_2px_4px_rgba(0,0,0,0.18),inset_0px_1px_0px_rgba(255,255,255,0.18)]"
+                className="z-50 flex flex-col rounded-[4px] border border-[#141414] bg-gradient-to-b from-[#434343] to-[#232323] pb-px shadow-[0px_0.6px_0px_rgba(0,0,0,0.1),0px_2px_4px_rgba(0,0,0,0.18),inset_0px_1px_0px_rgba(255,255,255,0.18)]"
               >
                 {/* Name row */}
                 <div className="flex items-center gap-1 pl-1 pr-2 pt-px">

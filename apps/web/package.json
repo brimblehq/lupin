@@ -6,7 +6,7 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "NODE_OPTIONS=--dns-result-order=ipv4first vite dev --port 3000",
     "build": "pnpm --filter @brimble/ui build && vite build",
     "preview": "vite preview",
     "test": "vitest run"
@@ -17,6 +17,7 @@
     "@tailwindcss/vite": "^4.1.18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "axios": "^1.15.1",
     "radix-ui": "^1.4.3",
     "tailwind-merge": "^3.5.0",
     "@tanstack/react-devtools": "^0.7.0",

@@ -342,7 +342,7 @@ export function OnboardingChecklist({
         });
       }
     },
-    [navigate, searchStr, haptics],
+    [navigate, searchStr, haptics, updateFollowedX],
   );
 
   // Avoid flash-then-disappear while workspace-specific checks are still resolving.
@@ -415,7 +415,7 @@ export function OnboardingChecklist({
         {expanded && (
           <motion.div
             key="card"
-            className="overflow-hidden rounded-lg border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]"
+            className="overflow-hidden rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]"
             initial={{ opacity: 0, height: 0, scale: 0.95 }}
             animate={{ opacity: 1, height: "auto", scale: 1 }}
             exit={{ opacity: 0, height: 0, scale: 0.95 }}

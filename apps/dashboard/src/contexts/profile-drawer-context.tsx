@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useCallback, type ReactNode } from "react";
 import { ProfileTab } from "@/types/enums";
 
@@ -10,7 +11,13 @@ const ProfileDrawerContext = createContext<ProfileDrawerAPI>({
 });
 
 export function ProfileDrawerProvider({ onOpen, children }: { onOpen: (tab?: ProfileTab) => void; children: ReactNode }) {
-  const api: ProfileDrawerAPI = { open: useCallback(onOpen, [onOpen]) };
+  const open = useCallback(
+    (tab?: ProfileTab) => {
+      onOpen(tab);
+    },
+    [onOpen],
+  );
+  const api: ProfileDrawerAPI = { open };
   return <ProfileDrawerContext value={api}>{children}</ProfileDrawerContext>;
 }
 

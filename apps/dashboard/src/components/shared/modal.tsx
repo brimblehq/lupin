@@ -13,9 +13,11 @@ interface ModalProps {
   width?: number;
   /** Extra classes merged onto the modal container */
   className?: string;
+  /** When false, ESC and click-outside are blocked. Default: true. */
+  dismissible?: boolean;
 }
 
-export function Modal({ open, onOpenChange, children, width = 500, className }: ModalProps) {
+export function Modal({ open, onOpenChange, children, width = 500, className, dismissible = true }: ModalProps) {
   const haptics = useHaptics();
   const prevOpen = useRef(false);
 
@@ -25,7 +27,13 @@ export function Modal({ open, onOpenChange, children, width = 500, className }: 
   }, [open, haptics]);
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !dismissible) return;
+        onOpenChange(next);
+      }}
+    >
       <AnimatePresence>
         {open && (
           <Dialog.Portal forceMount>
@@ -41,15 +49,24 @@ export function Modal({ open, onOpenChange, children, width = 500, className }: 
 
             <Dialog.Content
               asChild
+              onEscapeKeyDown={(e) => {
+                if (!dismissible) e.preventDefault();
+              }}
               onPointerDownOutside={(e) => {
-                // Prevent Radix from closing the dialog when clicking on portaled
-                // elements (e.g. dropdown menus) that render outside Dialog.Content
+                if (!dismissible) {
+                  e.preventDefault();
+                  return;
+                }
                 const target = e.target as HTMLElement;
                 if (target.closest("[data-dropdown-menu]")) {
                   e.preventDefault();
                 }
               }}
               onInteractOutside={(e) => {
+                if (!dismissible) {
+                  e.preventDefault();
+                  return;
+                }
                 const target = e.target as HTMLElement;
                 if (target.closest("[data-dropdown-menu]")) {
                   e.preventDefault();
@@ -66,7 +83,7 @@ export function Modal({ open, onOpenChange, children, width = 500, className }: 
                 }}
                 style={{ width }}
                 className={cn(
-                  "fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-32px)] max-w-[calc(100vw-16px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] sm:max-w-[calc(100vw-32px)] dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]",
+                  "fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-32px)] max-w-[calc(100vw-16px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] sm:max-w-[calc(100vw-32px)] dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]",
                   className,
                 )}
               >

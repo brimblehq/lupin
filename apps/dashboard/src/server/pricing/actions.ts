@@ -73,7 +73,7 @@ function normalizePricing(raw: any): Pricing {
   const specsMap: Record<string, PlanSpecs> = {};
   for (const key of ["free", "hacker", "developer", "team"] as const) {
     if (specs[key]) {
-      specsMap[key] = normalizePlanSpecs(specs[key]);
+      specsMap[key] = normalizePlanSpecs(specs[key], DEFAULT_PRICING.specs[key]);
     }
   }
 
@@ -88,7 +88,17 @@ function toBool(value: unknown, fallback = false): boolean {
   return fallback;
 }
 
-function normalizePlanSpecs(raw: any): PlanSpecs {
+function normalizePlanSpecs(raw: any, defaults?: PlanSpecs): PlanSpecs {
+  // Returns null when the value is explicitly null / "unlimited" / -1, the
+  // fallback when the value is undefined (i.e. backend hasn't supplied the
+  // field yet), and the parsed number otherwise.
+  const toNullableNumberWithFallback = (value: unknown, fallback: number | null | undefined): number | null => {
+    if (value === undefined) return fallback ?? null;
+    if (value === null || value === "unlimited" || value === -1) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : (fallback ?? null);
+  };
+
   return {
     projectLimit: raw?.project_limit === -1 || raw?.project_limit === "unlimited" ? null : Number(raw?.project_limit ?? 3),
     webhookEnabled: toBool(raw?.webhook_enabled),
@@ -103,5 +113,8 @@ function normalizePlanSpecs(raw: any): PlanSpecs {
     concurrentBuilds: Number(raw?.concurrent_builds ?? 1),
     logRetention: Number(raw?.log_retention ?? 1),
     supportLevel: String(raw?.support ?? "community"),
+    dbMaxCpu: toNullableNumberWithFallback(raw?.db_max_cpu, defaults?.dbMaxCpu),
+    dbMaxMemory: toNullableNumberWithFallback(raw?.db_max_memory, defaults?.dbMaxMemory),
+    dbMaxStorage: toNullableNumberWithFallback(raw?.db_max_storage, defaults?.dbMaxStorage),
   };
 }

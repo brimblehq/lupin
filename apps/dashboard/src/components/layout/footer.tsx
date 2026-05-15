@@ -3,7 +3,7 @@ import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 
 const footerLinks = [
   { label: "Home", href: "/", internal: true },
-  { label: "Docs", href: "https://docs.brimble.io" },
+  { label: "Docs", href: "https://paper.brimble.io" },
   { label: "Pricing", href: "https://brimble.io/pricing" },
 ];
 

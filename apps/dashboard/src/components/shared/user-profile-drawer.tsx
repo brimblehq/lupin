@@ -4,7 +4,7 @@ import axios from "axios";
 import { Drawer } from "vaul";
 import { cn } from "@brimble/ui";
 import { SUBSCRIPTION_PLAN_TYPE } from "@brimble/models/dist/enum";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -33,8 +33,9 @@ import { WarningModal } from "./warning-modal";
 import { GlossyButton } from "./glossy-button";
 import { OtpInput } from "../auth/auth-split-layout";
 import { Turnstile } from "@marsidev/react-turnstile";
-import { CheckCircle, XCircle, TreeStructure, CopySimple } from "@phosphor-icons/react";
+import { CheckCircle, XCircle, TreeStructure } from "@phosphor-icons/react";
 import {
+  checkUsernameAvailabilityServerFn,
   confirmDeleteAccountServerFn,
   getTwoFactorStatusServerFn,
   listPasskeysServerFn,
@@ -56,7 +57,6 @@ import {
   testSettingsWebhookServerFn,
   updateSettingsBuildsServerFn,
   updateSettingsHapticsServerFn,
-  updateSettingsFollowedXServerFn,
   updateSettingsNotificationsServerFn,
   updateSettingsProfileServerFn,
   updateSettingsWebhooksServerFn,
@@ -85,6 +85,7 @@ import {
   updateMemberEnvironmentsServerFn,
   updateMemberRoleServerFn,
   transferOwnershipServerFn,
+  toggleTeamTwoFactorEnforcementServerFn,
 } from "@/server/teams/actions";
 import {
   getBitbucketConnectUrlServerFn,
@@ -101,7 +102,11 @@ import { normalizeMemberRole as normalizeRole } from "@/utils/workspace-role";
 import { mapSettingsSnapshotToDrawerProfile, maskSecretWithAsterisks, type DrawerUserProfile } from "@/utils/dashboard";
 import { formatUsdMonthly } from "@/utils/billing";
 import { usePricing } from "@/contexts/pricing-context";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
+import { ToggleSwitch } from "./toggle-switch";
 import { ProfileTab, Theme } from "../../types/enums";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 type UserProfile = DrawerUserProfile;
 
 export { ProfileTab };
@@ -127,7 +132,7 @@ const reachUsNav = [
 ];
 
 const aboutNav = [
-  { label: "Changelog", emoji: "👥" },
+  { label: "Changelog", emoji: "👥", href: "https://brimble.io/changelog" },
   { label: "Terms and privacy", emoji: "🔔", href: "https://brimble.io/legal" },
 ];
 
@@ -192,12 +197,18 @@ function ActivitySessionSkeleton() {
         {rows.map((row, index) => (
           <div
             key={row}
-            className={cn("grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3", index !== 0 && "border-t border-dash-border-soft")}
+            className={cn(
+              "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3",
+              index !== 0 && "border-t border-dashed border-dash-border-soft",
+            )}
           >
             <div className="size-5 shrink-0 animate-pulse rounded-full bg-dash-bg-elevated" style={{ animationDelay: `${index * 80}ms` }} />
             <div className="min-w-0">
               <div className="h-4 w-[68%] animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 40}ms` }} />
-              <div className="mt-2 h-3 w-[88%] animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 80}ms` }} />
+              <div
+                className="mt-2 h-3 w-[88%] animate-pulse rounded bg-dash-bg-elevated"
+                style={{ animationDelay: `${index * 80 + 80}ms` }}
+              />
             </div>
             <div className="h-3 w-14 animate-pulse rounded bg-dash-bg-elevated" style={{ animationDelay: `${index * 80 + 120}ms` }} />
           </div>
@@ -296,7 +307,7 @@ function ActivitySessionForm({
                       key={item._id}
                       className={cn(
                         "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3",
-                        index !== 0 && "border-t border-dash-border-soft",
+                        index !== 0 && "border-t border-dashed border-dash-border-soft",
                       )}
                     >
                       {item.status === "success" ? (
@@ -415,10 +426,41 @@ function ProfileForm({
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isAltPressed, setIsAltPressed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+
+  const checkUsername = useServerFn(checkUsernameAvailabilityServerFn as any) as (args: {
+    data: { username: string };
+  }) => Promise<{ exists: boolean }>;
+
+  useEffect(() => {
+    const trimmed = username.trim();
+    if (!trimmed || trimmed === profile.username) {
+      setUsernameStatus("idle");
+      return;
+    }
+    setUsernameStatus("checking");
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      void checkUsername({ data: { username: trimmed } })
+        .then((result) => {
+          if (cancelled) return;
+          setUsernameStatus(result.exists ? "taken" : "available");
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setUsernameStatus("idle");
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [username, profile.username, checkUsername]);
 
   const isTextDirty = firstName !== profile.firstName || lastName !== profile.lastName || username !== profile.username;
   const isAvatarDirty = avatarUrl !== (profile.avatarUrl ?? "");
   const isDirty = isTextDirty || isAvatarDirty;
+  const isUsernameBlocking = usernameStatus === "taken" || usernameStatus === "checking";
 
   const inputClass = dashInputClassName;
   const normalizedPlanType = (profile.subscriptionPlanType ?? "").toUpperCase();
@@ -588,7 +630,16 @@ function ProfileForm({
         {/* Username */}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Username</label>
-          <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className={inputClass} />
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.replace(/[^\w.-]/g, ""))}
+            autoComplete="username"
+            spellCheck={false}
+            autoCapitalize="none"
+            className={cn(inputClass, usernameStatus === "taken" && "input-error")}
+          />
+          {usernameStatus === "taken" && <p className="text-xs text-[#ef2f1f]">This username is already taken.</p>}
         </div>
 
         {/* Unique ID */}
@@ -606,7 +657,7 @@ function ProfileForm({
       {/* Save button */}
       <GlossyButton
         onClick={handleSave}
-        disabled={!isDirty || isUploadingAvatar || Boolean(isSaving)}
+        disabled={!isDirty || isUploadingAvatar || Boolean(isSaving) || isUsernameBlocking}
         fullWidth
         loading={Boolean(isSaving)}
         loadingLabel="Saving..."
@@ -1688,9 +1739,9 @@ export function UserProfileDrawer({
   projectCount?: number;
   requestedTab?: ProfileTab;
 }) {
-  const navigate = useNavigate();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const getSettingsSnapshot = useServerFn(getSettingsSidebarSnapshotServerFn as any) as (args?: {
     data?: { workspace?: string };
@@ -1979,7 +2030,17 @@ export function UserProfileDrawer({
     return () => {
       window.removeEventListener("brimble:git-connection-changed", handleConnectionChanged);
     };
-  }, [open, getTwoFactorStatus, hasActiveWorkspace, listPasskeys, prefetchedPasskeys, twoFactorStatus]);
+  }, [
+    open,
+    getTwoFactorStatus,
+    hasActiveWorkspace,
+    listBitbucketAccounts,
+    listGithubAccounts,
+    listGitlabAccounts,
+    listPasskeys,
+    prefetchedPasskeys,
+    twoFactorStatus,
+  ]);
 
   useEffect(() => {
     if (!hasActiveWorkspace && activeTab === ProfileTab.Members) {
@@ -2046,7 +2107,7 @@ export function UserProfileDrawer({
       .then(() => {
         posthog.reset();
         invalidateSessionCache();
-        void navigate({ to: "/login" });
+        window.location.href = "/login";
       });
   }
 
@@ -2138,6 +2199,7 @@ export function UserProfileDrawer({
                         },
                       }));
 
+                      void invalidateActiveMatches(router);
                       toast.success("Workspace profile updated");
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Failed to update workspace profile");
@@ -2195,6 +2257,7 @@ export function UserProfileDrawer({
                           },
                         };
                       });
+                      void invalidateActiveMatches(router);
                       toast.success("Profile updated");
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Failed to update profile");
@@ -2398,7 +2461,9 @@ export function UserProfileDrawer({
                               window.dispatchEvent(new Event("brimble:git-connection-changed"));
                               toast.success(`${providerId.charAt(0).toUpperCase() + providerId.slice(1)} connected successfully`);
                             }
-                          } catch {}
+                          } catch {
+                            return;
+                          }
                         }, 3000);
                         window.setTimeout(() => {
                           window.clearInterval(interval);
@@ -2539,7 +2604,6 @@ export function UserProfileDrawer({
                   profile={profile}
                   initialPaymentMethods={initialPaymentMethods}
                   initialInvoices={hasActiveWorkspace ? undefined : initialInvoices}
-                  initialSpendingStats={snapshot?.billing.spending}
                   initialSubscriptionStats={initialSubscriptionStats}
                   initialUserOverview={initialUserOverview}
                   hidePaymentMethods={hasActiveWorkspace}
@@ -3478,6 +3542,7 @@ interface Member {
   gradient?: string;
   avatarUrl?: string;
   userId?: string;
+  is2FACompliant?: boolean;
 }
 
 interface PendingInvite {
@@ -3545,6 +3610,7 @@ function mapActiveMembers(team?: TeamDetails | null): Member[] {
         avatarUrl: member.avatarUrl,
         gradient: buildAvatarGradient(member.email || name || member.id),
         userId: member.userId,
+        is2FACompliant: member.is2FACompliant,
       } satisfies Member;
     });
 }
@@ -3780,6 +3846,72 @@ function MemberActionMenu({
   );
 }
 
+function countNonCompliantMembers(team: TeamDetails | null): number {
+  if (!team?.members?.length) return 0;
+  return team.members.filter((m) => m.accepted !== false && normalizeRole(m) !== "Creator" && m.is2FACompliant === false).length;
+}
+
+function WorkspaceSecuritySection({
+  workspace,
+  team,
+  onChanged,
+}: {
+  workspace: string;
+  team: TeamDetails | null;
+  onChanged: (next: { enforce2FA: boolean }) => void;
+}) {
+  const toggleEnforcement = useServerFn(toggleTeamTwoFactorEnforcementServerFn as any) as (args: {
+    data: { workspace: string; enforce: boolean; twoFactorToken?: string };
+  }) => Promise<{ id: string; enforce2FA: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
+  const [busy, setBusy] = useState(false);
+
+  const enforce2FA = Boolean(team?.enforce2FA);
+  const nonCompliantCount = enforce2FA ? countNonCompliantMembers(team) : 0;
+
+  const handleToggle = async (next: boolean) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await withStepUp(
+        (twoFactorToken) => toggleEnforcement({ data: { workspace, enforce: next, twoFactorToken } }),
+        requestStepUp,
+      );
+      onChanged({ enforce2FA: result.enforce2FA });
+      toast.success(result.enforce2FA ? "2FA enforcement enabled" : "2FA enforcement disabled");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update 2FA enforcement";
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Require 2FA for all members</span>
+            {enforce2FA && (
+              <span className="rounded-full bg-[#4879f8]/10 px-2 py-0.5 text-[10px] font-medium text-[#4879f8]">2FA required</span>
+            )}
+          </div>
+          <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">
+            Non-compliant members lose access until they enable 2FA on their account.
+          </span>
+          {enforce2FA && nonCompliantCount > 0 && (
+            <span className="text-xs leading-4 text-[#f5a623]">
+              {nonCompliantCount} {nonCompliantCount === 1 ? "member is" : "members are"} non-compliant
+            </span>
+          )}
+        </div>
+        <ToggleSwitch checked={enforce2FA} onChange={handleToggle} disabled={busy} />
+      </div>
+    </div>
+  );
+}
+
 function MembersForm({
   workspace,
   initialTeam = null,
@@ -3811,8 +3943,9 @@ function MembersForm({
     data: { workspace: string; memberId: string; role: string };
   }) => Promise<{ ok: true }>;
   const transferOwnership = useServerFn(transferOwnershipServerFn as any) as (args: {
-    data: { workspace: string; memberId: string };
+    data: { workspace: string; memberId: string; twoFactorToken?: string };
   }) => Promise<TeamOwnershipTransfer>;
+  const { requestStepUp } = useStepUpTwoFactor();
 
   const [team, setTeam] = useState<TeamDetails | null>(initialTeam);
   const [isLoadingMembers, setIsLoadingMembers] = useState(!initialTeam);
@@ -3847,7 +3980,7 @@ function MembersForm({
         .then(setEnvironments)
         .catch(() => {});
     }
-  }, [initialEnvironments, workspace]);
+  }, [getEnvironments, initialEnvironments, workspace]);
 
   useEffect(() => {
     if (!team?.members?.length) return;
@@ -3897,7 +4030,6 @@ function MembersForm({
   const pendingInvites = mapPendingInvites(team);
   const configuredSeats = team?.seatCount ?? 0;
   const memberCount = team?.totalMembers ?? members.length;
-  const billableSeats = Math.max(configuredSeats, memberCount);
   const currentUserTeamMember = team?.members.find((member) => {
     const memberUserId = member.userId?.trim();
     const currentUserId = currentUser?.uniqueId?.trim();
@@ -3913,33 +4045,59 @@ function MembersForm({
   const currentUserRole = currentUserTeamMember ? normalizeMemberRole(currentUserTeamMember) : null;
   const canManageMembers = currentUserRole === "Creator" || currentUserRole === "Administrator";
 
-  const refreshMembers = async (options?: { silent?: boolean }) => {
-    if (!options?.silent) {
-      setIsLoadingMembers(true);
-    }
-    setMembersError(null);
-
-    try {
-      const nextTeam = await getTeamMembers({ data: { workspace } });
-      setTeam(nextTeam);
-    } catch (error) {
-      setMembersError(error instanceof Error ? error.message : "Failed to load team members");
-    } finally {
+  const refreshMembers = useCallback(
+    async (options?: { silent?: boolean }) => {
       if (!options?.silent) {
-        setIsLoadingMembers(false);
+        setIsLoadingMembers(true);
       }
-    }
-  };
+      setMembersError(null);
+
+      try {
+        const nextTeam = await getTeamMembers({ data: { workspace } });
+        setTeam(nextTeam);
+      } catch (error) {
+        setMembersError(error instanceof Error ? error.message : "Failed to load team members");
+      } finally {
+        if (!options?.silent) {
+          setIsLoadingMembers(false);
+        }
+      }
+    },
+    [getTeamMembers, workspace],
+  );
 
   useEffect(() => {
     setTeam(initialTeam);
     setIsLoadingMembers(!initialTeam);
     setMembersError(null);
     void refreshMembers({ silent: Boolean(initialTeam) });
-  }, [workspace, initialTeam]);
+  }, [workspace, initialTeam, refreshMembers]);
+
+  const enforce2FA = Boolean(team?.enforce2FA);
+  const selfNonCompliant = enforce2FA && currentUserTeamMember?.is2FACompliant === false;
 
   return (
     <div className="flex max-w-[488px] flex-col gap-8">
+      {selfNonCompliant && (
+        <div className="rounded-[6px] border border-[#f5a623]/30 bg-[#f5a623]/5 px-4 py-3 text-sm leading-5 text-[#a16207] dark:text-[#f5a623]">
+          This workspace requires 2FA. Set it up on your account to keep your access.
+        </div>
+      )}
+
+      {canManageMembers && (
+        <>
+          <WorkspaceSecuritySection
+            workspace={workspace}
+            team={team}
+            onChanged={({ enforce2FA }) => {
+              setTeam((prev) => (prev ? { ...prev, enforce2FA } : prev));
+              void refreshMembers({ silent: true });
+            }}
+          />
+          <hr className="-ml-8 border-dash-border-soft" />
+        </>
+      )}
+
       {/* Invite button */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
@@ -4001,6 +4159,13 @@ function MembersForm({
                   </span>
                   <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">{member.email}</span>
                 </div>
+                {enforce2FA && member.role !== "Creator" && member.is2FACompliant === false && (
+                  <SimpleTooltip content="Member must enable 2FA on their account to regain access.">
+                    <span className="shrink-0 rounded-full bg-[#f5a623]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#f5a623]">
+                      Locked out
+                    </span>
+                  </SimpleTooltip>
+                )}
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                     roleBadgeStyles[member.role] ?? roleBadgeStyles.Member
@@ -4075,7 +4240,13 @@ function MembersForm({
                   <span className="truncate text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">{invite.email}</span>
                   <span className="text-xs leading-4 text-dash-text-extra-faded">Sent {invite.sentAt}</span>
                 </div>
-                <span className="shrink-0 rounded-full bg-[#f5a623]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#f5a623]">Pending</span>
+                <SimpleTooltip
+                  content={enforce2FA ? "Invitee must enable 2FA on their account before they can join." : "Invitation is pending"}
+                >
+                  <span className="shrink-0 rounded-full bg-[#f5a623]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#f5a623]">
+                    Pending
+                  </span>
+                </SimpleTooltip>
                 <div className="flex shrink-0 items-center gap-2">
                   {canManageMembers && (
                     <button
@@ -4217,9 +4388,13 @@ function MembersForm({
               if (!transferTarget) return;
               setTransferring(true);
               try {
-                await transferOwnership({
-                  data: { workspace, memberId: transferTarget.id },
-                });
+                await withStepUp(
+                  (twoFactorToken) =>
+                    transferOwnership({
+                      data: { workspace, memberId: transferTarget.id, twoFactorToken },
+                    }),
+                  requestStepUp,
+                );
                 toast.success("Transfer request sent. Expires in 7 days.");
                 setTransferOpen(false);
                 setTransferTarget(null);

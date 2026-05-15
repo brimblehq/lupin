@@ -1,5 +1,4 @@
 import type { ApiClient, ApiListResponse } from "./types";
-import config from "@/config";
 import { asNonEmptyString, asRecord, pickBoolean, pickNonEmptyString, pickNumber, pickString } from "./normalize";
 
 export interface DomainRecord {
@@ -83,6 +82,7 @@ export interface SearchDomainResult {
   domainName: string;
   purchasable: boolean;
   purchasePrice?: number;
+  previousPrice?: number;
   renewalPrice?: number;
 }
 
@@ -133,6 +133,7 @@ export interface DomainsApi {
   add(input: AddDomainInput): Promise<DomainRecord>;
   update(input: UpdateDomainInput): Promise<DomainRecord>;
   transfer(input: { domainId: string; projectId: string; teamId?: string }): Promise<void>;
+  transferWorkspace(input: { domainId: string; targetTeamId?: string | null }): Promise<void>;
   transferOut(domainName: string, teamId?: string): Promise<{ domainName: string; authCode: string; unlocked: boolean }>;
   transferIn(input: TransferInInput): Promise<TransferInResult>;
   searchSale(domainName: string): Promise<SearchDomainResult[]>;
@@ -152,6 +153,7 @@ export interface DomainsApi {
     teamId?: string;
   }): Promise<DomainDetailDnsRecord>;
   deleteDnsRecord(input: { domain: string; recordId: string; teamId?: string }): Promise<void>;
+  setNameservers(input: { domainId: string; nameservers: string[]; teamId?: string }): Promise<DomainDetailsRecord | null>;
 }
 
 function mapDomainRecord(domain: any): DomainRecord | null {
@@ -489,6 +491,14 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
       });
     },
 
+    async transferWorkspace(input) {
+      const targetTeamId = typeof input.targetTeamId === "string" && input.targetTeamId.trim() ? input.targetTeamId.trim() : null;
+      await client.request<any>(`${listEndpoint}/${encodeURIComponent(input.domainId)}/transfer-workspace`, {
+        method: "POST",
+        body: targetTeamId ? { teamId: targetTeamId } : {},
+      });
+    },
+
     async transferOut(domainName, teamId) {
       const response = await client.request<any>(`${listEndpoint}/${encodeURIComponent(domainName)}/transfer-out`, {
         method: "POST",
@@ -549,6 +559,7 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
             domainName: name,
             purchasable: Boolean(row?.purchasable),
             purchasePrice: pickNumber(row, "purchasePrice"),
+            previousPrice: pickNumber(row, "previousPrice"),
             renewalPrice: pickNumber(row, "renewalPrice"),
           } satisfies SearchDomainResult;
         })
@@ -568,6 +579,9 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
       await client.request<any>(endpoint, {
         method: "POST",
         body,
+        headers: {
+          "X-Payment-Key": btoa(crypto.randomUUID()),
+        },
       });
     },
 
@@ -614,13 +628,12 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
     },
 
     async createDnsRecord(input) {
-      const response = await client.request<any>(config.dnsApiUrl, {
+      const response = await client.request<any>(`${listEndpoint}/${encodeURIComponent(input.domain)}/records`, {
         method: "POST",
         query: {
           teamId: input.teamId,
         },
         body: {
-          domain: input.domain,
           record: input.record,
         },
       });
@@ -642,7 +655,7 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
 
     async updateDnsRecord(input) {
       const response = await client.request<any>(
-        `${config.dnsApiUrl}/${encodeURIComponent(input.domain)}/${encodeURIComponent(input.recordId)}`,
+        `${listEndpoint}/${encodeURIComponent(input.domain)}/records/${encodeURIComponent(input.recordId)}`,
         {
           method: "PATCH",
           query: {
@@ -673,12 +686,32 @@ export function createDomainsApi(client: ApiClient): DomainsApi {
     },
 
     async deleteDnsRecord(input) {
-      await client.request<any>(`${config.dnsApiUrl}/${encodeURIComponent(input.domain)}/${encodeURIComponent(input.recordId)}`, {
-        method: "DELETE",
-        query: {
+      await client.request<any>(
+        `${listEndpoint}/${encodeURIComponent(input.domain)}/records/${encodeURIComponent(input.recordId)}`,
+        {
+          method: "DELETE",
+          query: {
+            teamId: input.teamId,
+          },
+        },
+      );
+    },
+
+    async setNameservers(input) {
+      const response = await client.request<any>(`${listEndpoint}/${encodeURIComponent(input.domainId)}/nameservers`, {
+        method: "POST",
+        body: {
+          nameservers: input.nameservers,
           teamId: input.teamId,
         },
       });
+
+      const root = response?.data?.data ?? response?.data ?? response ?? null;
+      if (!root) {
+        return null;
+      }
+
+      return mapDomainDetailsRecord(root);
     },
   };
 }

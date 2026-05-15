@@ -2,11 +2,10 @@ import { useState } from "react";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Copy, Check, ExternalLink, ChevronDown } from "lucide-react";
+import { ArrowLeft, ExternalLink, ChevronDown } from "lucide-react";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { hapticToast as toast } from "@/utils/haptic-toast";
-import { useHaptics } from "@/hooks/use-haptics";
 import { AddonCard } from "../../components/shared/addon-card";
 import { GlossyButton } from "../../components/shared/glossy-button";
 import { startOauthPopup } from "@/lib/auth/oauth-popup";
@@ -17,6 +16,7 @@ import { finalizeOauthSessionServerFn } from "@/server/auth/actions";
 import { deployMcpTemplateServerFn, getMcpTemplateServerFn, listMcpTemplatesServerFn } from "@/server/mcp/actions";
 import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import { mapMcpTemplateToAddon, mapMcpTemplateToAddonDetail } from "@/utils/discover-mcp";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 export const Route = createFileRoute("/addons/$addonId")({
   staleTime: 300_000,
@@ -238,7 +238,7 @@ function AddonDetailPage() {
       }
 
       toast.success("MCP server deployment started");
-      await router.invalidate();
+      await invalidateActiveMatches(router);
       await navigate({
         to: "/projects/$projectId",
         params: { projectId },

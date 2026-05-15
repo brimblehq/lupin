@@ -1,17 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { BackendApi } from "@/backend";
-import { withTokenRefresh } from "@/server/shared/backend";
+import { withTokenRefresh, resolveWorkspace } from "@/server/shared/backend";
 import { teamsLogger } from "@/server/shared/logger";
 
 async function resolveWorkspaceTeam(api: BackendApi, workspace?: string) {
-  const workspaceSlug = workspace?.trim().toLowerCase();
-  if (!workspaceSlug) {
+  if (!workspace?.trim()) {
     throw new Error("Workspace is required");
   }
 
-  const teams = await api.workspaces.list();
-  const match = teams.items.find((item) => item.slug === workspaceSlug);
-
+  const match = await resolveWorkspace(api, workspace);
   if (!match?.id || !match.slug) {
     throw new Error("Workspace team not found");
   }
@@ -207,6 +204,7 @@ export const transferOwnershipServerFn = createServerFn({
     | {
         workspace?: string;
         memberId?: string;
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -217,10 +215,13 @@ export const transferOwnershipServerFn = createServerFn({
 
   teamsLogger.info("transferOwnershipServerFn payload", { payload });
 
-  return withTokenRefresh(async (api) => {
-    const { teamId } = await resolveWorkspaceTeam(api, payload?.workspace);
-    return api.teams.transferOwnership(teamId, memberId);
-  });
+  return withTokenRefresh(
+    async (api) => {
+      const { teamId } = await resolveWorkspaceTeam(api, payload?.workspace);
+      return api.teams.transferOwnership(teamId, memberId);
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const acceptOwnershipTransferServerFn = createServerFn({
@@ -290,4 +291,30 @@ export const declineTeamInvitationServerFn = createServerFn({
   return withTokenRefresh(async (api) => {
     return api.teams.denyInvite(teamId);
   });
+});
+
+export const toggleTeamTwoFactorEnforcementServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        enforce?: boolean;
+        twoFactorToken?: string;
+      }
+    | undefined;
+
+  if (typeof payload?.enforce !== "boolean") {
+    throw new Error("`enforce` is required");
+  }
+
+  const enforce = payload.enforce;
+
+  return withTokenRefresh(
+    async (api) => {
+      const { teamId } = await resolveWorkspaceTeam(api, payload?.workspace);
+      return api.teams.toggleTwoFactorEnforcement(teamId, enforce);
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });

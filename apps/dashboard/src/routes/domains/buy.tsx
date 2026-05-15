@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, getRouteApi, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { Search, Globe, AlertCircle } from "lucide-react";
+import { Search, Globe, AlertCircle, Tag, X } from "lucide-react";
 import { DomainSearchResultCard } from "@brimble/ui";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
-import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
+import { AccessDenied } from "../../components/shared/access-denied";
+import { accessDeniedForbidden } from "../../components/shared/access-denied-presets";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { Dropdown } from "../../components/shared/dropdown";
 import { GlossyButton } from "../../components/shared/glossy-button";
@@ -19,6 +20,8 @@ import { getPaymentMethodsServerFn } from "@/server/payments/actions";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import type { PaymentMethod } from "@/backend/payments";
 import { getWorkspaceFromSearch, withWorkspaceQuery } from "@/utils/topbar-navigation";
+import { PaymentProvider } from "@/providers/payment-provider";
+import { AddCardForm } from "@/components/settings/billing-form";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -40,6 +43,8 @@ interface DomainResult {
   domainName: string;
   available: boolean;
   price: number | null;
+  previousPrice?: number | null;
+  renewalPrice?: number | null;
 }
 
 /* ─── Helpers ─── */
@@ -105,7 +110,7 @@ function BuyDomainPage() {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const searchDomains = useServerFn(searchDomainSaleServerFn as any) as (args: {
     data: { name: string };
-  }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number }>>;
+  }) => Promise<Array<{ domainName: string; purchasable: boolean; purchasePrice?: number; previousPrice?: number; renewalPrice?: number }>>;
   const purchaseDomain = useServerFn(purchaseDomainServerFn as any) as (args: {
     data: {
       workspace?: string;
@@ -139,12 +144,20 @@ function BuyDomainPage() {
   const [autoRenewal, setAutoRenewal] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [page, setPage] = useState(0);
+  const [discountBannerDismissed, setDiscountBannerDismissed] = useState(false);
   const autoSearchedQueryRef = useRef("");
 
   const totalPages = Math.ceil(results.length / PAGE_SIZE);
   const paginatedResults = results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const exactDomainAvailable = results.some((result) => result.domainName === searchedDomain && result.available);
   const showUnavailableBanner = hasSearched && !searching && Boolean(searchedDomain) && !exactDomainAvailable;
+  const maxDiscountPercent = results.reduce((max, result) => {
+    const prev = result.previousPrice ?? 0;
+    const curr = result.price ?? 0;
+    if (prev <= curr) return max;
+    return Math.max(max, Math.round(((prev - curr) / prev) * 100));
+  }, 0);
+  const showDiscountBanner = hasSearched && !searching && maxDiscountPercent > 0 && !discountBannerDismissed;
 
   const isAi = purchaseTarget ? isAiDomain(purchaseTarget.domainName) : false;
   const isApp = purchaseTarget ? isAppDomain(purchaseTarget.domainName) : false;
@@ -153,39 +166,51 @@ function BuyDomainPage() {
   const domainCost = (purchaseTarget?.price ?? 0) * years;
   const total = domainCost + privacyCost;
 
-  async function handleSearch(nextQuery?: string, options?: { autoOpenPurchase?: boolean }) {
-    const rawQuery = nextQuery ?? query;
-    const name = normalizeQuery(rawQuery);
-    if (!name || searching) return;
+  const handleOpenPurchase = useCallback((domain: DomainResult) => {
+    setPurchaseTarget(domain);
+    setYears(isAiDomain(domain.domainName) ? 2 : 1);
+    setPrivacyEnabled(false);
+    setAutoRenewal(false);
+  }, []);
 
-    setSearching(true);
-    setSearchedQuery(name.replace(/\.[a-z]+$/, ""));
-    setSearchedDomain(name);
-    setHasSearched(true);
-    setPage(0);
+  const handleSearch = useCallback(
+    async (nextQuery?: string, options?: { autoOpenPurchase?: boolean }) => {
+      const rawQuery = nextQuery ?? query;
+      const name = normalizeQuery(rawQuery);
+      if (!name || searching) return;
 
-    try {
-      const data = await searchDomains({ data: { name } });
-      const mappedResults = data.map((item) => ({
-        domainName: item.domainName,
-        available: item.purchasable,
-        price: item.purchasePrice ?? null,
-      }));
-      setResults(mappedResults);
+      setSearching(true);
+      setSearchedQuery(name.replace(/\.[a-z]+$/, ""));
+      setSearchedDomain(name);
+      setHasSearched(true);
+      setPage(0);
 
-      if (options?.autoOpenPurchase) {
-        const exactMatch = mappedResults.find((result) => result.domainName === name && result.available);
-        if (exactMatch) {
-          handleOpenPurchase(exactMatch);
+      try {
+        const data = await searchDomains({ data: { name } });
+        const mappedResults = data.map((item) => ({
+          domainName: item.domainName,
+          available: item.purchasable,
+          price: item.purchasePrice ?? null,
+          previousPrice: item.previousPrice ?? null,
+          renewalPrice: item.renewalPrice ?? null,
+        }));
+        setResults(mappedResults);
+
+        if (options?.autoOpenPurchase) {
+          const exactMatch = mappedResults.find((result) => result.domainName === name && result.available);
+          if (exactMatch) {
+            handleOpenPurchase(exactMatch);
+          }
         }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Domain search failed");
+        setResults([]);
+      } finally {
+        setSearching(false);
       }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Domain search failed");
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }
+    },
+    [handleOpenPurchase, query, searchDomains, searching],
+  );
 
   useEffect(() => {
     if (!canWrite) {
@@ -206,50 +231,53 @@ function BuyDomainPage() {
     autoSearchedQueryRef.current = normalized;
     setQuery(urlQuery);
     void handleSearch(urlQuery, { autoOpenPurchase: true });
-  }, [canWrite, searchStr]);
+  }, [canWrite, handleSearch, searchStr]);
 
-  function handleOpenPurchase(domain: DomainResult) {
-    setPurchaseTarget(domain);
-    setYears(isAiDomain(domain.domainName) ? 2 : 1);
-    setPrivacyEnabled(false);
-    setAutoRenewal(false);
-  }
-
-  async function handlePurchase() {
-    if (!purchaseTarget || purchasing) return;
-
-    setPurchasing(true);
-
+  async function executePurchase(target: DomainResult) {
     try {
       const latestMethods = await getPaymentMethodsServerFn();
       const methods = Array.isArray(latestMethods) ? latestMethods : [];
       const latestDefaultMethod = methods.find((method: any) => method.is_default) ?? methods[0];
       if (!latestDefaultMethod?.id) {
         toast.error("Add a payment method before purchasing a domain.");
+        setPurchasing(false);
         return;
       }
 
       await purchaseDomain({
         data: {
           ...(workspace ? { workspace } : {}),
-          name: purchaseTarget.domainName,
+          name: target.domainName,
           duration: years,
           privacyEnabled: effectivePrivacy,
           autoRenewal,
         },
       });
 
-      toast.success(`${purchaseTarget.domainName} purchased successfully!`);
+      toast.success(`${target.domainName} purchased successfully!`);
       setPurchaseTarget(null);
-      await router.invalidate();
-      const detailPath = `/domains/${encodeURIComponent(purchaseTarget.domainName)}`;
+      await router.invalidate({ filter: (route) => route.routeId === "/domains/" });
+      const detailPath = `/domains/${encodeURIComponent(target.domainName)}`;
       router.navigate({
         to: withWorkspaceQuery({ pathname: detailPath, searchStr }) as any,
       });
     } catch (error) {
+      console.error("[domain-purchase] error", error);
       toast.error(error instanceof Error ? error.message : "Purchase failed");
       setPurchasing(false);
     }
+  }
+
+  async function handlePurchase() {
+    if (!purchaseTarget || purchasing) return;
+    setPurchasing(true);
+    await executePurchase(purchaseTarget);
+  }
+
+  async function handleCardAddedDuringPurchase() {
+    if (!purchaseTarget) return;
+    setPurchasing(true);
+    await executePurchase(purchaseTarget);
   }
 
   function getDurationOptions() {
@@ -310,6 +338,23 @@ function BuyDomainPage() {
           Search
         </GlossyButton>
       </div>
+      {showDiscountBanner && (
+        <div className="mb-4 flex items-center gap-3 rounded-[4px] bg-[#34d399]/10 px-4 py-2.5 dark:bg-[#34d399]/15">
+          <Tag className="size-4 shrink-0 text-[#229464] dark:text-[#34d399]" />
+          <p className="flex-1 text-sm text-dash-text-body dark:text-dash-text-strong">
+            Domain sale is on — save up to <span className="font-medium text-[#229464] dark:text-[#34d399]">{maxDiscountPercent}%</span> on
+            first-year registration.
+          </p>
+          <button
+            type="button"
+            onClick={() => setDiscountBannerDismissed(true)}
+            aria-label="Dismiss"
+            className="shrink-0 rounded p-0.5 text-dash-text-faded transition-colors hover:bg-[#34d399]/15 hover:text-dash-text-strong dark:hover:bg-[#34d399]/25"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
       {showUnavailableBanner && (
         <div className="mb-4 flex items-center gap-3 rounded-[4px] bg-[#ef2f1f]/5 px-4 py-2.5 dark:bg-[#ef2f1f]/15">
           <AlertCircle className="size-4 shrink-0 text-[#ef2f1f]" />
@@ -388,106 +433,124 @@ function BuyDomainPage() {
       )}
 
       {/* Purchase modal */}
-      <Modal
-        open={!!purchaseTarget}
-        onOpenChange={(open) => {
-          if (!open && !purchasing) {
-            setPurchaseTarget(null);
-          }
-        }}
-        width={420}
-      >
-        <ModalHeader title="Purchase domain" description="Complete your domain purchase" />
+      <PaymentProvider>
+        <Modal
+          open={!!purchaseTarget}
+          onOpenChange={(open) => {
+            if (!open && !purchasing) {
+              setPurchaseTarget(null);
+            }
+          }}
+          width={420}
+        >
+          <ModalHeader title="Purchase domain" description="Complete your domain purchase" />
 
-        {purchaseTarget && (
-          <div className="flex flex-col gap-4 px-6 py-5">
-            {/* Domain + price */}
-            <div className="flex items-center justify-between rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3">
-              <span className="text-sm font-medium text-dash-text-strong">{purchaseTarget.domainName}</span>
-              <span className="text-sm font-medium text-[#34d399]">{formatUsd(purchaseTarget.price ?? 0)}/yr</span>
-            </div>
-
-            {/* Payment method */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm text-dash-text-faded">Payment method</label>
-              {defaultCard ? (
-                <>
-                  <div className="flex items-center gap-3 rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-2.5">
-                    <CardChip />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-dash-text-strong">{formatCardType(defaultCard.cardType)}</span>
-                      <span className="text-xs text-dash-text-faded">ending in {defaultCard.last4 ?? "****"}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-dash-text-extra-faded">Domain purchases use your available saved card automatically.</p>
-                </>
-              ) : (
-                <div className="rounded-[4px] border-[0.5px] border-dash-border px-4 py-3 text-center">
-                  <p className="text-sm text-dash-text-faded">
-                    No payment methods found. Add a card in <span className="font-medium text-dash-text-strong">Settings</span>.
+          {purchaseTarget && (
+            <div className="flex flex-col gap-4 px-6 py-5">
+              {/* Domain + price */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-4 py-3">
+                  <span className="text-sm font-medium text-dash-text-strong">{purchaseTarget.domainName}</span>
+                  <span className="text-sm font-medium text-[#34d399]">{formatUsd(purchaseTarget.price ?? 0)}/yr</span>
+                </div>
+                {purchaseTarget.renewalPrice != null && purchaseTarget.renewalPrice !== purchaseTarget.price && (
+                  <p className="px-1 text-xs text-dash-text-extra-faded">
+                    Renews at {formatUsd(purchaseTarget.renewalPrice)}/yr after the first year.
                   </p>
+                )}
+              </div>
+
+              {/* Payment method */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm text-dash-text-faded">Payment method</label>
+                {defaultCard ? (
+                  <>
+                    <div className="flex items-center gap-3 rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-2.5">
+                      <CardChip />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-dash-text-strong">{formatCardType(defaultCard.cardType)}</span>
+                        <span className="text-xs text-dash-text-faded">ending in {defaultCard.last4 ?? "****"}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-dash-text-extra-faded">Domain purchases use your available saved card automatically.</p>
+                  </>
+                ) : (
+                  <AddCardForm
+                    onClose={() => {}}
+                    showHeader={false}
+                    showCancel={false}
+                    animated={false}
+                    submitLabel="Add card & continue"
+                    onSuccess={handleCardAddedDuringPurchase}
+                  />
+                )}
+              </div>
+
+              {/* Duration */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm text-dash-text-faded">
+                  Duration
+                  {isAi && <span className="ml-1 text-xs text-dash-text-extra-faded">(.ai domains require 2-year terms)</span>}
+                </label>
+                <Dropdown value={String(years)} options={getDurationOptions()} onChange={(id) => setYears(Number(id))} />
+              </div>
+
+              {/* Privacy protection */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-sm text-dash-text-body">Privacy protection</span>
+                  <span className="text-xs text-dash-text-faded">
+                    {isApp ? "Included free with .app domains" : `${formatUsd(PRIVACY_PRICE)}/yr — hides your WHOIS info`}
+                  </span>
                 </div>
-              )}
-            </div>
-
-            {/* Duration */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm text-dash-text-faded">
-                Duration
-                {isAi && <span className="ml-1 text-xs text-dash-text-extra-faded">(.ai domains require 2-year terms)</span>}
-              </label>
-              <Dropdown value={String(years)} options={getDurationOptions()} onChange={(id) => setYears(Number(id))} />
-            </div>
-
-            {/* Privacy protection */}
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-sm text-dash-text-body">Privacy protection</span>
-                <span className="text-xs text-dash-text-faded">
-                  {isApp ? "Included free with .app domains" : `${formatUsd(PRIVACY_PRICE)}/yr — hides your WHOIS info`}
-                </span>
+                <ToggleSwitch checked={effectivePrivacy} onChange={setPrivacyEnabled} disabled={isApp} />
               </div>
-              <ToggleSwitch checked={effectivePrivacy} onChange={setPrivacyEnabled} disabled={isApp} />
-            </div>
 
-            {/* Auto renewal */}
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-sm text-dash-text-body">Auto renewal</span>
-                <span className="text-xs text-dash-text-faded">Automatically renew before expiration</span>
+              {/* Auto renewal */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-sm text-dash-text-body">Auto renewal</span>
+                  <span className="text-xs text-dash-text-faded">Automatically renew before expiration</span>
+                </div>
+                <ToggleSwitch checked={autoRenewal} onChange={setAutoRenewal} />
               </div>
-              <ToggleSwitch checked={autoRenewal} onChange={setAutoRenewal} />
-            </div>
 
-            {/* Total */}
-            <div className="flex flex-col gap-1.5 border-t-[0.5px] border-dash-border pt-3">
-              <div className="flex items-center justify-between text-sm text-dash-text-faded">
-                <span>
-                  Domain ({years} {years === 1 ? "year" : "years"})
-                </span>
-                <span>{formatUsd(domainCost)}</span>
-              </div>
-              {effectivePrivacy && (
+              {/* Total */}
+              <div className="flex flex-col gap-1.5 border-t-[0.5px] border-dash-border pt-3">
                 <div className="flex items-center justify-between text-sm text-dash-text-faded">
-                  <span>Privacy protection</span>
-                  <span>{isApp ? "Free" : formatUsd(PRIVACY_PRICE)}</span>
+                  <span>
+                    Domain ({years} {years === 1 ? "year" : "years"})
+                  </span>
+                  <span>{formatUsd(domainCost)}</span>
                 </div>
-              )}
-              <div className="flex items-center justify-between pt-1.5">
-                <span className="text-sm font-medium text-dash-text-body">Total</span>
-                <span className="text-base font-medium text-dash-text-strong">{formatUsd(total)}</span>
+                {effectivePrivacy && (
+                  <div className="flex items-center justify-between text-sm text-dash-text-faded">
+                    <span>Privacy protection</span>
+                    <span>{isApp ? "Free" : formatUsd(PRIVACY_PRICE)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-1.5">
+                  <span className="text-sm font-medium text-dash-text-body">Total</span>
+                  <span className="text-base font-medium text-dash-text-strong">{formatUsd(total)}</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <ModalFooter>
-          <ModalCancelButton />
-          <GlossyButton variant="blue" onClick={handlePurchase} disabled={purchasing} loading={purchasing} loadingLabel="Purchasing...">
-            Purchase domain
-          </GlossyButton>
-        </ModalFooter>
-      </Modal>
+          <ModalFooter>
+            <ModalCancelButton />
+            <GlossyButton
+              variant="blue"
+              onClick={handlePurchase}
+              disabled={purchasing || !defaultCard}
+              loading={purchasing}
+              loadingLabel="Purchasing..."
+            >
+              Purchase domain
+            </GlossyButton>
+          </ModalFooter>
+        </Modal>
+      </PaymentProvider>
     </div>
   );
 }

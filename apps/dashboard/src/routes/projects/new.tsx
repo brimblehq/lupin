@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import { createFileRoute, getRouteApi, Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,11 +17,11 @@ import {
   Eye,
   EyeOff,
   Copy,
+  RefreshCw,
   ShieldAlert,
   HardDrive,
   ArrowUpRight,
   AlertTriangle,
-  Info,
 } from "lucide-react";
 import { GithubLogo, Cube, Database, CircleNotch } from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
@@ -33,9 +33,12 @@ import { DashButton } from "../../components/shared/dash-button";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { RangeSlider } from "../../components/shared/range-slider";
 import { Dropdown } from "../../components/shared/dropdown";
-import { DiskSizeSelect, diskSizes } from "../../components/shared/disk-size-select";
+import { SimpleTooltip } from "../../components/shared/tooltip";
+import { DiskSizeSelect } from "../../components/shared/disk-size-select";
+import { diskSizes } from "../../components/shared/disk-size-options";
 import { RootDirectoryTrigger } from "../../components/shared/root-directory-trigger";
-import { AccessDenied, accessDeniedForbidden } from "../../components/shared/access-denied";
+import { AccessDenied } from "../../components/shared/access-denied";
+import { accessDeniedForbidden } from "../../components/shared/access-denied-presets";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { RootDirectoryDrawer } from "../../components/project/root-directory-drawer";
 import { ConfirmServerRuntimeModal } from "../../components/project/confirm-server-runtime-modal";
@@ -81,10 +84,21 @@ import type {
 import type { Project } from "@/backend/projects";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 import { usePricing } from "@/contexts/pricing-context";
+import { usePaymentMethods } from "@/hooks/use-payments";
+import { PaymentProvider } from "@/providers/payment-provider";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
+
+const AddCardForm = lazy(() => import("@/components/settings/billing-form").then((m) => ({ default: m.AddCardForm })));
 import { estimateComputeCost } from "@/utils/compute-pricing";
 import { formatUsdMonthly } from "@/utils/billing";
+import { generateStrongPassword } from "@/utils/password";
+import { parseEnvPaste } from "@/utils/env-paste";
+import { NewProjectPending } from "@/components/shared/route-pending";
+import config from "@/config";
+import type { Phase3DeployInput } from "./new.types";
 
 export const Route = createFileRoute("/projects/new")({
+  pendingComponent: NewProjectPending,
   component: NewProjectPage,
 });
 
@@ -132,7 +146,7 @@ const gitProviders: GitProvider[] = [
     id: "github",
     name: "GitHub",
     Icon: GithubLogo,
-    cardIcon: "/images/icons8-git.svg",
+    cardIcon: "/images/git.svg",
     description: "Connect a repository from your GitHub account",
     permissions: [
       {
@@ -215,31 +229,6 @@ function slugifyProjectName(input: string) {
     .replace(/^-|-$/g, "");
 }
 
-function debugMaskDeployPayload(payload: Record<string, unknown>) {
-  const copy: Record<string, unknown> = { ...payload };
-
-  if (Array.isArray(copy.environments)) {
-    copy.environments = copy.environments.map((env) => {
-      if (!env || typeof env !== "object") return env;
-      const row = env as Record<string, unknown>;
-      return {
-        ...row,
-        value: typeof row.value === "string" && row.value.length > 0 ? "[REDACTED]" : row.value,
-      };
-    });
-  }
-
-  if (copy.registry_credentials && typeof copy.registry_credentials === "object") {
-    const creds = copy.registry_credentials as Record<string, unknown>;
-    copy.registry_credentials = {
-      ...creds,
-      token: typeof creds.token === "string" && creds.token.length > 0 ? "[REDACTED]" : creds.token,
-    };
-  }
-
-  return copy;
-}
-
 type DockerRegistryCredentials = {
   username: string;
   token: string;
@@ -249,44 +238,6 @@ type DockerSourceSelection = {
   imageUri: string;
   credentials?: DockerRegistryCredentials;
 };
-
-const mockOrgs = [
-  {
-    id: "personal",
-    name: "Kemdirimakujuobi",
-    avatar: "radial-gradient(circle at 62% 30%, #b8fce8, #91f2d5 25%, #6ae8c3 50%, #43deb0 75%, #1bd49d)",
-  },
-  {
-    id: "team",
-    name: "Brimble Team",
-    avatar: "radial-gradient(circle at 62% 30%, #b8cffc, #94b6f8 25%, #6f9cf3 50%, #4b82ee 75%, #2769e9)",
-  },
-];
-
-const mockRepos = [
-  {
-    name: "brimble-dashboard",
-    visibility: "private" as const,
-    language: "TypeScript",
-  },
-  {
-    name: "landing-page",
-    visibility: "public" as const,
-    language: "TypeScript",
-  },
-  { name: "api-server", visibility: "private" as const, language: "Go" },
-  {
-    name: "design-system",
-    visibility: "public" as const,
-    language: "TypeScript",
-  },
-  {
-    name: "mobile-app",
-    visibility: "private" as const,
-    language: "React Native",
-  },
-  { name: "docs-site", visibility: "public" as const, language: "MDX" },
-];
 
 const frameworks = [
   {
@@ -339,49 +290,7 @@ const frameworks = [
   },
 ];
 
-const regions = ["US East", "EU West", "Asia Pacific"];
-const branches = ["main", "develop", "staging"];
-
 /* ─── Database Config ─── */
-
-interface DbEngine {
-  id: string;
-  name: string;
-  description: string;
-  defaultPort: number;
-  envPrefix: string;
-}
-
-const fallbackDbEngines: DbEngine[] = [
-  {
-    id: "postgresql",
-    name: "PostgreSQL",
-    description: "Relational, ACID-compliant",
-    defaultPort: 5432,
-    envPrefix: "POSTGRES",
-  },
-  {
-    id: "mysql",
-    name: "MySQL",
-    description: "Popular relational database",
-    defaultPort: 3306,
-    envPrefix: "MYSQL",
-  },
-  {
-    id: "mongodb",
-    name: "MongoDB",
-    description: "Document-oriented NoSQL",
-    defaultPort: 27017,
-    envPrefix: "MONGO",
-  },
-  {
-    id: "redis",
-    name: "Redis",
-    description: "In-memory key-value store",
-    defaultPort: 6379,
-    envPrefix: "REDIS",
-  },
-];
 
 const cpuSteps = [0.5, 1, 2, 4, 8];
 const memorySteps = [0.5, 1, 1.5, 2, 4, 8, 12, 16];
@@ -400,12 +309,16 @@ function ComputeSliderField({
   steps,
   formatValue,
   onCommit,
+  disabled = false,
+  disabledReason,
 }: {
   label: string;
   value: number;
   steps: number[];
   formatValue: (value: number) => string;
   onCommit: (value: number) => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
   const maxIndex = Math.max(steps.length - 1, 1);
   const indexToTrack = (index: number) => (index / maxIndex) * 100;
@@ -413,28 +326,49 @@ function ComputeSliderField({
   const [trackValue, setTrackValue] = useState(() => indexToTrack(value));
 
   useEffect(() => {
-    setTrackValue(indexToTrack(value));
-  }, [value]);
+    setTrackValue((value / maxIndex) * 100);
+  }, [value, maxIndex]);
 
   const previewIndex = trackToIndex(trackValue);
 
-  return (
-    <div>
+  const content = (
+    <div className={disabled ? "opacity-50" : ""}>
       <div className="mb-2 flex items-center justify-between">
         <label className="text-sm text-dash-text-body">{label}</label>
         <span className="text-sm font-medium text-dash-text-strong">{formatValue(steps[previewIndex] ?? steps[0] ?? 0)}</span>
       </div>
-      <RangeSlider
-        value={trackValue}
-        onChange={setTrackValue}
-        onCommit={(nextTrackValue) => onCommit(trackToIndex(nextTrackValue))}
-        min={0}
-        max={100}
-        step={1}
-        hideValue
-      />
+      {disabled && disabledReason ? (
+        <SimpleTooltip content={disabledReason} side="top" sideOffset={2} delayDuration={120}>
+          <div>
+            <div className="pointer-events-none">
+              <RangeSlider
+                value={trackValue}
+                onChange={disabled ? () => {} : setTrackValue}
+                onCommit={disabled ? () => {} : (nextTrackValue) => onCommit(trackToIndex(nextTrackValue))}
+                min={0}
+                max={100}
+                step={1}
+                hideValue
+              />
+            </div>
+          </div>
+        </SimpleTooltip>
+      ) : (
+        <div className={disabled ? "pointer-events-none" : ""}>
+          <RangeSlider
+            value={trackValue}
+            onChange={disabled ? () => {} : setTrackValue}
+            onCommit={disabled ? () => {} : (nextTrackValue) => onCommit(trackToIndex(nextTrackValue))}
+            min={0}
+            max={100}
+            step={1}
+            hideValue
+          />
+        </div>
+      )}
     </div>
   );
+  return content;
 }
 
 function generateMockCredential(length: number): string {
@@ -466,6 +400,7 @@ type DatabaseEnvDraft = {
   key: string;
   value: string;
   sensitive: boolean;
+  isPassword: boolean;
 };
 
 let dbEnvNextId = 1;
@@ -532,15 +467,15 @@ function Phase1SourceType({ onSelect }: { onSelect: (type: SourceType) => void }
     })),
     {
       type: SourceType.Docker,
-      icon: "/images/icons8-container.svg",
+      icon: "/images/container.svg",
       title: "Deploy Docker image",
       desc: "Deploy from a public or private registry",
     },
     {
       type: SourceType.Database,
-      icon: "/images/icons8-database.svg",
-      title: "Provision a Database",
-      desc: "Deploy a managed database instance",
+      icon: "/images/database.svg",
+      title: "Database & Queue",
+      desc: "Provision a managed database or message queue",
     },
   ];
 
@@ -682,7 +617,6 @@ function Phase2GitRepoSelect({
   onLoadRepos?: (input: { installationId?: number | string; q?: string }) => void;
   onSelect: (repo: GithubRepoListItem) => void;
 }) {
-  const { Icon: ProviderIcon } = provider;
   const { deployPrivateOrganization } = usePlanGate();
   const [selectedInstallationId, setSelectedInstallationId] = useState<string>("");
   const [search, setSearch] = useState("");
@@ -867,34 +801,52 @@ function Phase2GitRepoSelect({
             ) : repos.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-dash-text-faded">No repositories found.</div>
             ) : (
-              repos.map((repo, i) => (
-                <motion.div
-                  key={repo.fullName}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.04 * i, ease }}
-                  className={`flex items-center justify-between px-4 py-3 ${i > 0 ? "border-t-[0.5px] border-dash-border" : ""}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <img src="/icons/git-circle.svg" alt="" className="size-6 shrink-0" />
-                    <span className="text-sm font-medium text-dash-text-strong">{repo.name}</span>
-                    {repo.private ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-dash-border-soft px-2 py-0.5 text-[11px] text-dash-text-faded">
-                        <Lock className="size-3" />
-                        Private
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-dash-border-soft px-2 py-0.5 text-[11px] text-dash-text-faded">
-                        <Globe className="size-3" />
-                        Public
-                      </span>
-                    )}
-                  </div>
-                  <DashButton size="sm" onClick={() => onSelect(repo)} disabled={importingRepoFullName === repo.fullName}>
-                    {importingRepoFullName === repo.fullName ? "Importing…" : "Import"}
-                  </DashButton>
-                </motion.div>
-              ))
+              repos.map((repo, i) => {
+                let repoHost = "https://github.com";
+                if (provider.id === "gitlab") {
+                  repoHost = "https://gitlab.com";
+                } else if (provider.id === "bitbucket") {
+                  repoHost = "https://bitbucket.org";
+                }
+                const repoUrl = `${repoHost}/${repo.fullName}`;
+                return (
+                  <motion.div
+                    key={repo.fullName}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: 0.04 * i, ease }}
+                    className={`group flex items-center justify-between px-4 py-3 ${i > 0 ? "border-t-[0.5px] border-dash-border" : ""}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <img src="/icons/git-circle.svg" alt="" className="size-6 shrink-0" />
+                      <span className="text-sm font-medium text-dash-text-strong">{repo.name}</span>
+                      {repo.private ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-dash-border-soft px-2 py-0.5 text-[11px] text-dash-text-faded">
+                          <Lock className="size-3" />
+                          Private
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-dash-border-soft px-2 py-0.5 text-[11px] text-dash-text-faded">
+                          <Globe className="size-3" />
+                          Public
+                        </span>
+                      )}
+                      <a
+                        href={repoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`View ${repo.name} on ${provider.name}`}
+                        className="rounded-full p-1 text-dash-text-faded opacity-0 transition-opacity hover:bg-dash-bg-elevated hover:text-dash-text-strong focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <ArrowUpRight className="size-3.5" />
+                      </a>
+                    </div>
+                    <DashButton size="sm" onClick={() => onSelect(repo)} disabled={importingRepoFullName === repo.fullName}>
+                      {importingRepoFullName === repo.fullName ? "Importing…" : "Import"}
+                    </DashButton>
+                  </motion.div>
+                );
+              })
             )}
           </div>
         </>
@@ -1051,7 +1003,7 @@ function Phase2Docker({
                       <button
                         type="button"
                         onClick={() => setTokenVisible((prev) => !prev)}
-                        className="absolute top-1/2 right-2 -translate-y-1/2 rounded-lg p-1 text-dash-text-faded transition-colors hover:text-dash-text-strong"
+                        className="absolute top-1/2 right-2 -translate-y-1/2 rounded-[4px] p-1 text-dash-text-faded transition-colors hover:text-dash-text-strong"
                       >
                         {tokenVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                       </button>
@@ -1115,26 +1067,28 @@ function Phase2DbEngine({
     environments: Array<{ name: string; value: string }>;
   }) => void | Promise<void>;
 }) {
-  function renderEngineIcon(engine: { name: string; imageUrl?: string }) {
-    const imageUrl = engine.imageUrl?.trim();
-    if (!imageUrl) {
-      return <Database className="size-5 text-dash-text-body" />;
-    }
+  const { data: paymentMethods, isLoading: paymentMethodsLoading } = usePaymentMethods();
+  const hasPaymentCard = (paymentMethods?.length ?? 0) > 0;
+  const [showAddCardForm, setShowAddCardForm] = useState(false);
+  const { planKey } = usePlanGate();
+  const isFreePlan = planKey === "free";
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const orderedEngines = useMemo(() => {
+    return [...engines].sort((a, b) => {
+      const aGated = isFreePlan && !a.free;
+      const bGated = isFreePlan && !b.free;
 
-    if (imageUrl.startsWith("<svg")) {
-      return (
-        <span
-          className="flex size-5 items-center justify-center [&>svg]:size-5"
-          dangerouslySetInnerHTML={{ __html: imageUrl }}
-          aria-hidden
-        />
-      );
-    }
+      if (aGated !== bGated) {
+        return aGated ? 1 : -1;
+      }
 
-    return <img src={imageUrl} alt="" className="size-5 object-contain" loading="lazy" />;
-  }
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [engines, isFreePlan]);
 
-  if (loading) {
+  if (loading || paymentMethodsLoading) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -1142,8 +1096,8 @@ function Phase2DbEngine({
         exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.25, ease }}
       >
-        <h3 className="mb-1 text-sm font-medium text-dash-text-strong">Choose a database engine</h3>
-        <p className="mb-4 text-sm text-dash-text-faded">Loading available databases...</p>
+        <h3 className="mb-1 text-sm font-medium text-dash-text-strong">Choose an engine</h3>
+        <p className="mb-4 text-sm text-dash-text-faded">Loading available engines...</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-[4px] border-[0.5px] border-dash-border p-5">
@@ -1157,7 +1111,69 @@ function Phase2DbEngine({
     );
   }
 
-  const selectedEngine = engines.find((engine) => engine.id === selectedEngineId) ?? null;
+  if (!hasPaymentCard) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ duration: 0.25, ease }}
+      >
+        <h3 className="mb-1 text-sm font-medium text-dash-text-strong">Add a payment card to provision a database</h3>
+        <p className="mb-4 text-sm text-dash-text-faded">
+          Databases use persistent storage which is billed monthly. Add a card before provisioning so we can keep your data online.
+        </p>
+        <div className="rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-[6px] bg-dash-bg-elevated">
+                <img src="/icons/card-payment.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-dash-text-strong">No payment method on file</span>
+                <span className="text-xs text-dash-text-faded">
+                  You won't be charged until your database is active and storage is in use.
+                </span>
+              </div>
+            </div>
+            {!showAddCardForm && (
+              <DashButton onClick={() => setShowAddCardForm(true)} className="shrink-0">
+                Add a card
+              </DashButton>
+            )}
+          </div>
+
+          <AnimatePresence initial={false}>
+            {showAddCardForm && (
+              <motion.div
+                key="add-card-form"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{
+                  height: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+                  opacity: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                }}
+                style={{ overflow: "hidden" }}
+              >
+                {/* px-1 / py-1 keeps the Stripe input's box-shadow ring out of the
+                    motion wrapper's clip path during the height animation. */}
+                <div className="mt-5 border-t border-dash-border px-1 py-1 pt-5">
+                  <PaymentProvider>
+                    <Suspense fallback={<div className="h-10 w-full animate-pulse rounded bg-dash-bg-elevated" />}>
+                      <AddCardForm onClose={() => setShowAddCardForm(false)} showHeader={false} animated={false} />
+                    </Suspense>
+                  </PaymentProvider>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    );
+  }
+
+  const selectedEngine = orderedEngines.find((engine) => engine.id === selectedEngineId) ?? null;
   const getDropdownIconSrc = (value?: string) => {
     const raw = value?.trim();
     if (!raw) return undefined;
@@ -1172,12 +1188,17 @@ function Phase2DbEngine({
     }
     return undefined;
   };
-  const engineOptions = engines.map((engine) => ({
-    id: engine.id,
-    label: engine.name,
-    icon: getDropdownIconSrc(engine.imageUrl) || getDropdownIconSrc(engine.image),
-  }));
-
+  const engineOptions = orderedEngines.map((engine) => {
+    const gated = isFreePlan && !engine.free;
+    const version = engine.version?.trim();
+    return {
+      id: engine.id,
+      label: version ? `${engine.name} - v${version}` : engine.name,
+      icon: getDropdownIconSrc(engine.imageUrl) || getDropdownIconSrc(engine.image),
+      disabled: gated,
+      asideText: gated ? "Upgrade to access" : undefined,
+    };
+  });
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -1185,29 +1206,41 @@ function Phase2DbEngine({
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.25, ease }}
     >
-      <h3 className="mb-1 text-sm font-medium text-dash-text-strong">Provision a database</h3>
-      <p className="mb-4 text-sm text-dash-text-faded">
-        Select a database engine, then configure compute, storage, and access in one step.
-      </p>
-      <div className="rounded-[4px] border-[0.5px] border-dash-border p-4">
-        <label className="mb-2 block text-xs font-medium uppercase tracking-[0.08em] text-dash-text-faded">Database engine</label>
+      <h3 className="mb-1 text-sm font-medium text-dash-text-strong">Provision a database or queue</h3>
+      <p className="mb-4 text-sm text-dash-text-faded">Select an engine, then configure compute, storage, and access in one step.</p>
+      {isFreePlan && (
+        <div className="mb-4 flex items-start gap-3 rounded-[6px] bg-[#4879f8]/[0.08] px-3.5 py-3 dark:bg-[#4879f8]/[0.12]">
+          <img src="/icons/info.svg" alt="" aria-hidden="true" className="mt-0.5 size-4 shrink-0 invert dark:invert-0" />
+          <div className="flex-1 text-sm leading-[1.4] text-dash-text-body">
+            The free plan includes one database. Need more?{" "}
+            <button
+              type="button"
+              onClick={() => setShowUpgradeModal(true)}
+              className="font-medium text-[#4879f8] transition-colors hover:text-[#3060d0]"
+            >
+              Upgrade your plan
+            </button>{" "}
+            to provision additional databases.
+          </div>
+        </div>
+      )}
+      <div>
+        <label className="mb-1.5 block text-sm text-dash-text-body">Database engine</label>
         <Dropdown
           value={selectedEngineId}
           options={engineOptions}
-          onChange={onSelect}
+          onChange={(nextId) => {
+            const nextOption = engineOptions.find((option) => option.id === nextId);
+            if (nextOption?.disabled) {
+              setShowUpgradeModal(true);
+              return;
+            }
+            onSelect(nextId);
+          }}
           placeholder="Select a database engine"
           searchable
           searchPlaceholder="Search database engines..."
         />
-        {selectedEngine && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-dash-text-faded">
-            {renderEngineIcon(selectedEngine)}
-            <span>
-              {selectedEngine.protocol ? `${selectedEngine.protocol.toUpperCase()} database` : "Managed database service"}
-              {selectedEngine.version ? ` • v${selectedEngine.version}` : ""}
-            </span>
-          </div>
-        )}
       </div>
 
       {selectedEngine ? (
@@ -1231,6 +1264,8 @@ function Phase2DbEngine({
           Choose an engine to continue with database configuration.
         </div>
       )}
+
+      <ChangePlanModal open={showUpgradeModal} onOpenChange={setShowUpgradeModal} currentPlan={planKey} />
     </motion.div>
   );
 }
@@ -1242,11 +1277,15 @@ function CredentialRow({
   value,
   onChange,
   sensitive = false,
+  canRegenerate = false,
+  onRegenerate,
 }: {
   label: string;
   value: string;
   onChange: (val: string) => void;
   sensitive?: boolean;
+  canRegenerate?: boolean;
+  onRegenerate?: () => void;
 }) {
   const haptics = useHaptics();
   const [revealed, setRevealed] = useState(!sensitive);
@@ -1276,8 +1315,20 @@ function CredentialRow({
         className="min-w-0 flex-1 truncate border-0 bg-transparent font-family-mono text-sm text-dash-text-body outline-none placeholder:text-dash-text-extra-faded"
       />
       <div className="flex shrink-0 items-center gap-1">
+        {canRegenerate && onRegenerate ? (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            title="Generate a strong password"
+            aria-label="Generate a strong password"
+            className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+          >
+            <RefreshCw className="size-3.5" />
+          </button>
+        ) : null}
         {sensitive && (
           <button
+            type="button"
             onClick={() => setRevealed(!revealed)}
             className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
           >
@@ -1285,6 +1336,7 @@ function CredentialRow({
           </button>
         )}
         <button
+          type="button"
           onClick={handleCopy}
           className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
         >
@@ -1320,16 +1372,10 @@ function Phase3DatabaseConfigure({
 }) {
   const [dbName, setDbName] = useState(`${engine.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-db-${generateMockCredential(4)}`);
   const [region, setRegion] = useState(regionOptions[0]?.id ?? "");
-  const [cpuIdx, setCpuIdx] = useState(() => {
-    const recommendedCpu = engine.recommendations?.[0]?.compute?.cpu;
-    const exactIndex = typeof recommendedCpu === "number" ? cpuSteps.indexOf(recommendedCpu) : -1;
-    return exactIndex >= 0 ? exactIndex : 0;
-  });
-  const [memIdx, setMemIdx] = useState(() => {
-    const recommendedMemory = engine.recommendations?.[0]?.compute?.memory;
-    const exactIndex = typeof recommendedMemory === "number" ? memorySteps.indexOf(recommendedMemory) : -1;
-    return exactIndex >= 0 ? exactIndex : 0;
-  });
+  // Compute defaults to the lowest tier — users opt in to more via the
+  // sliders or the "Apply recommended" button below the engine summary.
+  const [cpuIdx, setCpuIdx] = useState(0);
+  const [memIdx, setMemIdx] = useState(0);
   const [dbDiskSize, setDbDiskSize] = useState(() => {
     const recommendedStorage = engine.recommendations?.[0]?.compute?.storage;
     if (typeof recommendedStorage === "number") {
@@ -1344,31 +1390,56 @@ function Phase3DatabaseConfigure({
   });
   const [publicAccess, setPublicAccess] = useState(false);
   const [whitelistIps, setWhitelistIps] = useState<{ id: number; value: string }[]>([]);
+  const [whitelistIpErrors, setWhitelistIpErrors] = useState<Record<number, string | undefined>>({});
   const [envDrafts, setEnvDrafts] = useState<DatabaseEnvDraft[]>([]);
 
   const recommendation = engine.recommendations?.[0]?.compute;
 
-  const { planKey, projectLimit } = usePlanGate();
+  const planSpecs = usePlanGate();
+  const { planKey, projectLimit, dbMaxCpu, dbMaxMemory, dbMaxStorage } = planSpecs;
+  const isFreePlan = planKey === "free";
   const pricing = usePricing();
   const limitReached = projectLimit !== null && projectCount > projectLimit;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  const effectiveCpuSteps = useMemo(() => (isFreePlan && dbMaxCpu != null ? [dbMaxCpu] : cpuSteps), [isFreePlan, dbMaxCpu]);
+  const effectiveMemorySteps = useMemo(() => (isFreePlan && dbMaxMemory != null ? [dbMaxMemory] : memorySteps), [isFreePlan, dbMaxMemory]);
+  const lockedStorageId = isFreePlan && dbMaxStorage != null ? String(dbMaxStorage) : null;
+  const storageOptions = useMemo(() => {
+    if (!lockedStorageId) return diskSizes;
+    return diskSizes.map((option) => ({
+      ...option,
+      disabled: option.id !== lockedStorageId,
+      asideText: option.id === lockedStorageId ? undefined : "Upgrade to access",
+    }));
+  }, [lockedStorageId]);
+
+  useEffect(() => {
+    if (!isFreePlan) return;
+    if (cpuIdx !== 0) setCpuIdx(0);
+    if (memIdx !== 0) setMemIdx(0);
+    if (lockedStorageId && dbDiskSize !== lockedStorageId) setDbDiskSize(lockedStorageId);
+  }, [isFreePlan, cpuIdx, memIdx, dbDiskSize, lockedStorageId]);
   const nextPlanName = useMemo(() => {
     const currentIdx = pricing.plans.findIndex((p) => p.id === planKey || p.name.toLowerCase() === planKey);
     return currentIdx >= 0 && currentIdx < pricing.plans.length - 1 ? pricing.plans[currentIdx + 1].name : undefined;
   }, [pricing.plans, planKey]);
 
+  const effectiveCpu = effectiveCpuSteps[Math.min(cpuIdx, effectiveCpuSteps.length - 1)] ?? effectiveCpuSteps[0];
+  const effectiveMemory = effectiveMemorySteps[Math.min(memIdx, effectiveMemorySteps.length - 1)] ?? effectiveMemorySteps[0];
+  const effectiveStorage = lockedStorageId ? Number(lockedStorageId) : Number(dbDiskSize);
   const costBreakdown = useMemo(
     () =>
       estimateComputeCost(
         {
-          cpu: cpuSteps[cpuIdx],
-          memory: memorySteps[memIdx],
-          storage: Number(dbDiskSize),
+          cpu: effectiveCpu,
+          memory: effectiveMemory,
+          storage: effectiveStorage,
         },
         planKey,
         pricing.metered,
       ),
-    [cpuIdx, memIdx, dbDiskSize, planKey, pricing.metered],
+    [effectiveCpu, effectiveMemory, effectiveStorage, planKey, pricing.metered],
   );
 
   useEffect(() => {
@@ -1382,32 +1453,34 @@ function Phase3DatabaseConfigure({
       const key = env.value;
       const lowerType = (env.type ?? "").toLowerCase();
       const lowerKey = key.toLowerCase();
+      const isPassword = lowerType.includes("password") || lowerKey.includes("password") || lowerKey.includes("pass");
+      const isAuthValue = lowerType.includes("auth") || lowerKey.includes("auth");
       let value = "";
 
       if (lowerType.includes("user") || lowerKey.includes("user")) {
         value = `brimble_${generateMockCredential(6)}`;
-      } else if (lowerType.includes("password") || lowerKey.includes("password") || lowerKey.includes("pass")) {
-        value = generateSecureCredential(24);
+      } else if (isPassword) {
+        value = generateStrongPassword();
       } else if (lowerType.includes("database") || lowerKey.includes("database") || lowerKey.endsWith("_db")) {
         value = dbName.replace(/-/g, "_");
       } else if (lowerType.includes("license") || lowerKey.includes("license")) {
         value = "yes";
-      } else if (lowerType.includes("auth") || lowerKey.includes("auth")) {
+      } else if (isAuthValue) {
         value = `neo4j/${generateSecureCredential(18)}`;
       }
 
-      const sensitive =
-        lowerType.includes("password") || lowerKey.includes("password") || lowerKey.includes("pass") || lowerType.includes("auth");
+      const sensitive = isPassword || isAuthValue;
 
       return {
         id: dbEnvNextId++,
         key,
         value,
         sensitive,
+        isPassword,
       };
     });
     setEnvDrafts(generated);
-  }, [engine.id, dbName]);
+  }, [engine.id, engine.envs, dbName]);
 
   function updateEnvDraft(id: number, value: string) {
     setEnvDrafts((prev) => prev.map((row) => (row.id === id ? { ...row, value } : row)));
@@ -1419,10 +1492,38 @@ function Phase3DatabaseConfigure({
 
   function removeWhitelistIp(id: number) {
     setWhitelistIps((prev) => prev.filter((ip) => ip.id !== id));
+    setWhitelistIpErrors((prev) => {
+      if (prev[id] === undefined) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }
 
   function updateWhitelistIp(id: number, value: string) {
     setWhitelistIps((prev) => prev.map((ip) => (ip.id === id ? { ...ip, value } : ip)));
+    // Clear the error for this row as soon as the user edits it; we revalidate
+    // on submit so we don't badger them while they're typing.
+    setWhitelistIpErrors((prev) => {
+      if (prev[id] === undefined) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
+  function validateWhitelistIps(): boolean {
+    const errors: Record<number, string> = {};
+    for (const ip of whitelistIps) {
+      const trimmed = ip.value.trim();
+      if (!trimmed) {
+        errors[ip.id] = "Enter an IP or CIDR (e.g. 192.168.1.1/32) or remove this row.";
+      } else if (!isValidCidr(trimmed)) {
+        errors[ip.id] = "Use CIDR notation, e.g. 192.168.1.1/32 or 10.0.0.0/24.";
+      }
+    }
+    setWhitelistIpErrors(errors);
+    return Object.keys(errors).length === 0;
   }
 
   return (
@@ -1453,7 +1554,7 @@ function Phase3DatabaseConfigure({
 
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1.5 block text-sm text-dash-text-body">Database name</label>
+          <label className="mb-1.5 block text-sm text-dash-text-body">Service name</label>
           <input type="text" value={dbName} onChange={(e) => setDbName(e.target.value)} className={inputClass} />
         </div>
 
@@ -1463,7 +1564,7 @@ function Phase3DatabaseConfigure({
         </div>
       </div>
 
-      {recommendation ? (
+      {recommendation && !isFreePlan ? (
         <div className="mt-4 rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
           <p className="text-xs leading-relaxed text-dash-text-body">
             Recommended for {engine.name}: {recommendation.cpu ?? "?"} vCPU, {recommendation.memory ?? "?"} GB RAM,{" "}
@@ -1496,11 +1597,49 @@ function Phase3DatabaseConfigure({
 
       {/* Compute resources */}
       <div>
-        <h4 className="mb-4 text-sm font-medium text-dash-text-strong">Compute</h4>
+        <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Compute</h4>
+        <p className="mb-5 text-sm text-dash-text-faded">
+          Choose CPU, memory, and storage for your database instance. You can update these later.
+        </p>
         <div className="flex flex-col gap-5">
-          <ComputeSliderField label="CPU" value={cpuIdx} steps={cpuSteps} formatValue={formatCpu} onCommit={setCpuIdx} />
-          <ComputeSliderField label="Memory" value={memIdx} steps={memorySteps} formatValue={formatMemory} onCommit={setMemIdx} />
-          <DiskSizeSelect label="Storage" value={dbDiskSize} onChange={setDbDiskSize} />
+          <ComputeSliderField
+            label="CPU"
+            value={cpuIdx}
+            steps={effectiveCpuSteps}
+            formatValue={formatCpu}
+            onCommit={setCpuIdx}
+            disabled={isFreePlan}
+            disabledReason="Compute controls are locked on the Free plan. Upgrade your plan to customize CPU."
+          />
+          <ComputeSliderField
+            label="Memory"
+            value={memIdx}
+            steps={effectiveMemorySteps}
+            formatValue={formatMemory}
+            onCommit={setMemIdx}
+            disabled={isFreePlan}
+            disabledReason="Compute controls are locked on the Free plan. Upgrade your plan to customize memory."
+          />
+          <DiskSizeSelect
+            label="Storage"
+            value={dbDiskSize}
+            onChange={(nextId) => {
+              if (lockedStorageId && nextId !== lockedStorageId) {
+                setShowUpgradeModal(true);
+                return;
+              }
+              setDbDiskSize(nextId);
+            }}
+            options={storageOptions}
+          />
+          {isFreePlan && (
+            <p className="text-xs text-dash-text-faded">
+              Compute and storage are fixed on the free plan.{" "}
+              <button type="button" onClick={() => setShowUpgradeModal(true)} className="font-medium text-[#4879f8] hover:text-[#3060d0]">
+                Upgrade for more
+              </button>
+            </p>
+          )}
         </div>
       </div>
 
@@ -1508,7 +1647,8 @@ function Phase3DatabaseConfigure({
 
       {/* Credentials */}
       <div>
-        <h4 className="mb-3 text-sm font-medium text-dash-text-strong">Database credentials</h4>
+        <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Service credentials</h4>
+        <p className="mb-4 text-sm text-dash-text-faded">These values are used to connect to your service after provisioning.</p>
         <div className="rounded-[4px] border-[0.5px] border-dash-border p-4">
           <div className="flex flex-col gap-2.5">
             {envDrafts.length > 0 ? (
@@ -1519,6 +1659,8 @@ function Phase3DatabaseConfigure({
                   value={row.value}
                   onChange={(v) => updateEnvDraft(row.id, v)}
                   sensitive={row.sensitive}
+                  canRegenerate={row.isPassword}
+                  onRegenerate={() => updateEnvDraft(row.id, generateStrongPassword())}
                 />
               ))
             ) : (
@@ -1575,6 +1717,7 @@ function Phase3DatabaseConfigure({
                   onAdd={addWhitelistIp}
                   onRemove={(id) => removeWhitelistIp(id as number)}
                   onUpdate={(id, value) => updateWhitelistIp(id as number, value)}
+                  errors={whitelistIpErrors}
                   inputClassName={`${inputClass} flex-1 font-family-mono text-[13px]`}
                 />
               </div>
@@ -1588,7 +1731,11 @@ function Phase3DatabaseConfigure({
       {/* Estimated Billing */}
       <div>
         <h4 className="text-sm font-medium text-dash-text-strong">Estimated Billing</h4>
-        <p className="mt-0.5 text-xs text-dash-text-faded">Monthly cost based on your current plan</p>
+        <p className="mt-0.5 text-xs text-dash-text-faded">
+          {isFreePlan
+            ? `Free for the first ${config.databaseFreeTrialDays} days. Upgrade your plan before the trial ends or this database will be paused.`
+            : "Monthly cost based on your current plan"}
+        </p>
 
         <div className="mt-3 flex flex-col">
           {costBreakdown.cpu.excess > 0 && (
@@ -1616,7 +1763,14 @@ function Phase3DatabaseConfigure({
           <hr className="my-1.5 border-dash-border-soft" />
           <div className="flex items-center justify-between py-1.5 text-sm font-medium text-dash-text-strong">
             <span>Estimated total</span>
-            <span>{formatUsdMonthly(costBreakdown.total)}/mo</span>
+            {isFreePlan ? (
+              <span className="flex items-baseline gap-2">
+                <span className="text-xs font-normal text-dash-text-faded line-through">{formatUsdMonthly(costBreakdown.total)}/mo</span>
+                <span>$0.00 during {config.databaseFreeTrialDays}-day trial</span>
+              </span>
+            ) : (
+              <span>{formatUsdMonthly(costBreakdown.total)}/mo</span>
+            )}
           </div>
         </div>
       </div>
@@ -1634,9 +1788,7 @@ function Phase3DatabaseConfigure({
               setShowUpgradeModal(true);
               return;
             }
-            const hasInvalidIp = !publicAccess ? whitelistIps.some((ip) => ip.value.trim() && !isValidCidr(ip.value)) : false;
-            if (hasInvalidIp) {
-              toast.error("Please fix invalid IP addresses before provisioning.");
+            if (!publicAccess && !validateWhitelistIps()) {
               return;
             }
 
@@ -1649,9 +1801,9 @@ function Phase3DatabaseConfigure({
             void onProvision({
               name: dbName.trim(),
               regionId: region,
-              cpu: cpuSteps[cpuIdx],
-              memory: memorySteps[memIdx],
-              storage: Number(dbDiskSize),
+              cpu: effectiveCpu,
+              memory: effectiveMemory,
+              storage: effectiveStorage,
               whitelistedIps: publicAccess ? ["0.0.0.0/0"] : whitelistIps.map((ip) => ip.value.trim()).filter(Boolean),
               environments: envDrafts.map((row) => ({
                 name: row.key,
@@ -1684,29 +1836,8 @@ interface EnvVar {
 
 let envNextId = 1;
 
-type Phase3DeployInput = {
-  name: string;
-  regionId: string;
-  serviceType: string;
-  authEnabled: boolean;
-  branch?: string;
-  rootDirectory: string;
-  framework: string;
-  preStartCommand: string;
-  buildCommand: string;
-  startCommand: string;
-  outputDirectory: string;
-  installCommand: string;
-  envVars: Array<{ key: string; value: string }>;
-  diskEnabled: boolean;
-  diskSizeGb?: number;
-  mountPath?: string;
-};
-
-const SERVER_RUNTIME_FRAMEWORK_TYPES: string[] = [
-  FrameworkApplicationType.Ssr,
-  FrameworkApplicationType.Backend,
-];
+const SERVER_RUNTIME_FRAMEWORK_TYPES: string[] = [FrameworkApplicationType.Ssr, FrameworkApplicationType.Backend, "other"];
+const FREE_PLAN_FRAMEWORK_TYPES: string[] = [FrameworkApplicationType.Static, FrameworkApplicationType.Spa, FrameworkApplicationType.Ssr];
 
 function Phase3Configure({
   sourceType,
@@ -1766,7 +1897,6 @@ function Phase3Configure({
   const pricing = usePricing();
   const isFreePlan = planKey === "free";
   const limitReached = projectLimit !== null && projectCount > projectLimit;
-  const backendOnFreePlan = isFreePlan && detectedFramework?.type === FrameworkApplicationType.Backend;
 
   const deployValidationSchema = useMemo(
     () =>
@@ -1776,28 +1906,20 @@ function Phase3Configure({
           .required("Project name is required.")
           .matches(/^[a-z-]+$/, "Project name can only contain lowercase letters and hyphens."),
         region: Yup.string().required("Please select a region."),
-        limitReached: Yup.boolean().oneOf(
-          [false],
-          "You have reached your project limit. Upgrade your plan to create more.",
-        ),
-        backendOnFreePlan: Yup.boolean().oneOf(
-          [false],
-          `${detectedFramework?.name ?? "This framework"} runs server-side and needs a paid plan.`,
-        ),
+        limitReached: Yup.boolean().oneOf([false], "You have reached your project limit. Upgrade your plan to create more."),
       }),
-    [detectedFramework?.name],
+    [],
   );
 
   const deployFormik = useFormik({
-    initialValues: { projectName, region, limitReached, backendOnFreePlan },
+    initialValues: { projectName, region, limitReached },
     enableReinitialize: true,
     validateOnMount: true,
     validationSchema: deployValidationSchema,
     onSubmit: () => {},
   });
 
-  const projectNameError =
-    projectName.trim() && deployFormik.errors.projectName ? deployFormik.errors.projectName : null;
+  const projectNameError = projectName.trim() && deployFormik.errors.projectName ? deployFormik.errors.projectName : null;
   const hasProjectNameError = projectNameError !== null;
   const canSubmit = deployFormik.isValid;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -1863,6 +1985,10 @@ function Phase3Configure({
   const defaultPort = detectedFramework?.port ?? frameworkOptions.find((f) => f.id === defaultFrameworkId)?.port ?? 3000;
   const [envVars, setEnvVars] = useState<EnvVar[]>(() => [{ id: envNextId++, key: "PORT", value: String(defaultPort) }]);
   const [envExpanded, setEnvExpanded] = useState(true);
+  const [cpuIdx, setCpuIdx] = useState(0);
+  const [memIdx, setMemIdx] = useState(0);
+  const effectiveCpu = cpuSteps[Math.min(cpuIdx, cpuSteps.length - 1)] ?? cpuSteps[0];
+  const effectiveMemory = memorySteps[Math.min(memIdx, memorySteps.length - 1)] ?? memorySteps[0];
   const [diskEnabled, setDiskEnabled] = useState(false);
   const [diskSize, setDiskSize] = useState("10");
   const [mountPath, setMountPath] = useState("/mnt/data");
@@ -1876,8 +2002,7 @@ function Phase3Configure({
   const hideStorageSettings = isNoBuildFramework(framework) || serviceType === ServiceType.Static;
   const showMcpAuthToggle = serviceType === ServiceType.Mcp;
   const effectiveFrameworkType = fw.type ?? detectedFramework?.type;
-  const requiresServerRuntime =
-    SERVER_RUNTIME_FRAMEWORK_TYPES.includes(effectiveFrameworkType ?? "") && serviceType === ServiceType.Static;
+  const requiresServerRuntime = SERVER_RUNTIME_FRAMEWORK_TYPES.includes(effectiveFrameworkType ?? "") && serviceType === ServiceType.Static;
   const [confirmServerRuntimeOpen, setConfirmServerRuntimeOpen] = useState(false);
 
   useEffect(() => {
@@ -1954,18 +2079,19 @@ function Phase3Configure({
 
     const detectedSlug = detectedFramework?.slug?.trim();
     const matchedFramework = detectedSlug ? frameworkOptions.find((f) => f.id === detectedSlug) : undefined;
-    const fallbackFramework = matchedFramework ?? frameworkOptions[0];
 
     if (matchedFramework?.id) {
       setFramework(matchedFramework.id);
-    } else if (fallbackFramework?.id) {
-      setFramework(fallbackFramework.id);
+      setBuildCmd(detectedFramework?.buildCommand ?? matchedFramework.buildCmd ?? "");
+      setStartCmd(detectedFramework?.startCommand ?? matchedFramework.start ?? "");
+      setOutputDir(detectedFramework?.outputDirectory ?? matchedFramework.output ?? "");
+      setInstallCmd(detectedFramework?.installCommand ?? matchedFramework.install ?? "");
+    } else if (detectedFramework) {
+      setBuildCmd(detectedFramework.buildCommand ?? "");
+      setStartCmd(detectedFramework.startCommand ?? "");
+      setOutputDir(detectedFramework.outputDirectory ?? "");
+      setInstallCmd(detectedFramework.installCommand ?? "");
     }
-
-    setBuildCmd(detectedFramework?.buildCommand ?? matchedFramework?.buildCmd ?? fallbackFramework?.buildCmd ?? "");
-    setStartCmd(detectedFramework?.startCommand ?? matchedFramework?.start ?? fallbackFramework?.start ?? "");
-    setOutputDir(detectedFramework?.outputDirectory ?? matchedFramework?.output ?? fallbackFramework?.output ?? "");
-    setInstallCmd(detectedFramework?.installCommand ?? matchedFramework?.install ?? fallbackFramework?.install ?? "");
 
     lastAppliedSourceRef.current = sourceName;
   }, [detectedFramework, frameworkOptions, isGit, sourceName]);
@@ -1996,25 +2122,12 @@ function Phase3Configure({
   }
 
   function handleEnvPaste(id: number, e: React.ClipboardEvent<HTMLInputElement>) {
-    const text = e.clipboardData.getData("text");
-    const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith("#"));
-    if (lines.length < 2 && !text.includes("=")) return;
+    const parsed = parseEnvPaste(e.clipboardData.getData("text"));
+    if (!parsed) return;
     e.preventDefault();
-    const parsed: Array<{ key: string; value: string }> = [];
-    for (const line of lines) {
-      const eqIdx = line.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = line.slice(0, eqIdx).trim();
-      let value = line.slice(eqIdx + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      if (key) parsed.push({ key, value });
-    }
-    if (!parsed.length) return;
     setEnvVars((prev) => {
       const withoutCurrent = prev.filter((v) => v.id !== id || v.key || v.value);
-      const newVars = parsed.map((p) => ({ id: envNextId++, ...p }));
+      const newVars = parsed.map((p) => ({ id: envNextId++, key: p.name, value: p.value }));
       return [...withoutCurrent, ...newVars];
     });
     setEnvExpanded(true);
@@ -2043,6 +2156,8 @@ function Phase3Configure({
       outputDirectory: outputDir.trim(),
       installCommand: installCmd.trim(),
       envVars: cleanedEnvVars,
+      cpu: effectiveCpu,
+      memory: effectiveMemory,
       diskEnabled,
       diskSizeGb: diskEnabled ? Number(diskSize) : undefined,
       mountPath: diskEnabled ? mountPath.trim() : undefined,
@@ -2191,12 +2306,17 @@ function Phase3Configure({
               </label>
               <Dropdown
                 value={framework}
-                options={frameworkOptions.map((f) => ({
-                  id: f.id,
-                  label: f.name,
-                  icon: f.icon,
-                  iconClassName: f.iconClassName,
-                }))}
+                options={frameworkOptions.map((f) => {
+                  const gated = isFreePlan && !FREE_PLAN_FRAMEWORK_TYPES.includes(f.type ?? "");
+                  return {
+                    id: f.id,
+                    label: f.name,
+                    icon: f.icon,
+                    iconClassName: f.iconClassName,
+                    disabled: gated,
+                    asideText: gated ? "Upgrade to access" : undefined,
+                  };
+                })}
                 onChange={handleFrameworkChange}
                 searchable
                 searchPlaceholder="Search frameworks..."
@@ -2227,7 +2347,9 @@ function Phase3Configure({
                       className={`${inputClass} font-family-mono text-[13px]`}
                     />
                     <p className="mt-2 text-xs text-dash-text-extra-faded">
-                      Make sure your app listens on the port Brimble provides via the <code className="rounded bg-dash-bg-elevated px-1 py-0.5 font-family-mono text-[11px] text-dash-text-body">PORT</code> env var so health checks pass on startup.
+                      Make sure your app listens on the port Brimble provides via the{" "}
+                      <code className="rounded bg-dash-bg-elevated px-1 py-0.5 font-family-mono text-[11px] text-dash-text-body">PORT</code>{" "}
+                      env var so health checks pass on startup.
                     </p>
                   </div>
                 )}
@@ -2284,6 +2406,43 @@ function Phase3Configure({
         </>
       )}
 
+      {serviceType !== ServiceType.Static && (
+        <>
+          <h4 className="mb-1 text-sm font-medium text-dash-text-strong">Compute</h4>
+          <p className="mb-4 text-sm text-dash-text-faded">Choose CPU and memory for your container. You can change this later.</p>
+          <div className="flex flex-col gap-4">
+            <ComputeSliderField
+              label="CPU"
+              value={cpuIdx}
+              steps={cpuSteps}
+              formatValue={(v) => `${v} vCPU`}
+              onCommit={(idx) => setCpuIdx(idx)}
+              disabled={isFreePlan}
+              disabledReason="Compute is locked on the Free plan. Upgrade to customize CPU."
+            />
+            <ComputeSliderField
+              label="Memory"
+              value={memIdx}
+              steps={memorySteps}
+              formatValue={(v) => (v < 1 ? `${v * 1024} MB` : `${v} GB`)}
+              onCommit={(idx) => setMemIdx(idx)}
+              disabled={isFreePlan}
+              disabledReason="Compute is locked on the Free plan. Upgrade to customize memory."
+            />
+            {isFreePlan && (
+              <p className="text-xs text-dash-text-faded">
+                Compute is fixed on the Free plan.{" "}
+                <button type="button" onClick={() => setShowUpgradeModal(true)} className="font-medium text-[#4879f8] hover:text-[#3060d0]">
+                  Upgrade for more
+                </button>
+              </p>
+            )}
+          </div>
+
+          <hr className="my-6 border-dash-border-soft" />
+        </>
+      )}
+
       {/* Secrets — hidden for no-build frameworks (HTML, Static) */}
       {!isNoBuildFramework(framework) && (
         <div>
@@ -2303,13 +2462,16 @@ function Phase3Configure({
           <AnimatePresence>
             {envExpanded && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, height: 0, overflow: "hidden" }}
+                animate={{
+                  opacity: 1,
+                  height: "auto",
+                  transitionEnd: { overflow: "visible" },
+                }}
+                exit={{ overflow: "hidden", opacity: 0, height: 0 }}
                 transition={{ duration: 0.2, ease }}
-                className="overflow-hidden"
               >
-                <div className="scrollbar-subtle mt-3 flex max-h-[340px] flex-col gap-2 overflow-y-auto px-px pb-px pr-1">
+                <div className="scrollbar-subtle mt-3 flex max-h-[340px] flex-col gap-2 overflow-y-auto px-px py-px pr-1">
                   {envVars.map((v) => (
                     <div key={v.id} className="flex items-center gap-2">
                       <input
@@ -2412,22 +2574,6 @@ function Phase3Configure({
 
       {/* Save / Deploy actions */}
       <div className="mt-8">
-        {backendOnFreePlan && (
-          <div className="mb-4 flex items-center gap-3 rounded-md border-[0.5px] border-dash-border bg-[#f5a623]/5 px-4 py-3 dark:bg-[#f5a623]/15">
-            <Lock className="size-4 shrink-0 text-[#f5a623]" />
-            <p className="flex-1 text-sm text-dash-text-strong">
-              <span className="font-medium">{detectedFramework?.name || "This framework"}</span> runs server-side and needs a paid
-              plan &mdash; free plans only support static sites.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowUpgradeModal(true)}
-              className="shrink-0 text-sm font-medium text-[#4879f8] transition-colors hover:text-[#3a6ae6]"
-            >
-              Upgrade plan
-            </button>
-          </div>
-        )}
         <div className="flex flex-col gap-2 sm:flex-row">
           <GlossyButton
             variant="white"
@@ -2436,7 +2582,7 @@ function Phase3Configure({
             loadingLabel="Saving..."
             disabled={deploying || saving || !canSubmit}
             onClick={() => {
-              if (limitReached || backendOnFreePlan) {
+              if (limitReached) {
                 setShowUpgradeModal(true);
                 return;
               }
@@ -2458,7 +2604,7 @@ function Phase3Configure({
             loadingLabel="Deploying..."
             disabled={deploying || saving || !canSubmit}
             onClick={() => {
-              if (limitReached || backendOnFreePlan) {
+              if (limitReached) {
                 setShowUpgradeModal(true);
                 return;
               }
@@ -2488,7 +2634,6 @@ function Phase3Configure({
         <ConfirmServerRuntimeModal
           open={confirmServerRuntimeOpen}
           onOpenChange={setConfirmServerRuntimeOpen}
-          frameworkName={fw.name}
           tooltipMessage={fw.tooltipMessage ?? detectedFramework?.tooltipMessage}
           isFreePlan={isFreePlan}
           loading={deploying}
@@ -2686,25 +2831,9 @@ function NewProjectPage() {
       install: f.install,
     })),
   );
-  const [regionOptions, setRegionOptions] = useState<RegionOption[]>(() => regions.map((r) => ({ id: r, label: r })));
-  const [databaseRegionOptions, setDatabaseRegionOptions] = useState<RegionOption[]>(() => regions.map((r) => ({ id: r, label: r })));
-  const [databaseEngineOptions, setDatabaseEngineOptions] = useState<DatabaseEngineOption[]>(() =>
-    fallbackDbEngines.map((engine) => ({
-      id: engine.id,
-      name: engine.name,
-      imageUrl: undefined,
-      image: undefined,
-      version: "latest",
-      envs: [],
-      isAvailable: true,
-      isDefault: false,
-      hasPort: true,
-      port: engine.defaultPort,
-      volumePath: undefined,
-      protocol: undefined,
-      recommendations: [],
-    })),
-  );
+  const [regionOptions, setRegionOptions] = useState<RegionOption[]>([]);
+  const [databaseRegionOptions, setDatabaseRegionOptions] = useState<RegionOption[]>([]);
+  const [databaseEngineOptions, setDatabaseEngineOptions] = useState<DatabaseEngineOption[]>([]);
   const [databaseEnginesLoading, setDatabaseEnginesLoading] = useState(false);
 
   const handleProviderConnected = useCallback((providerId: string) => {
@@ -2802,47 +2931,47 @@ function NewProjectPage() {
         );
       })
       .catch(() => {
-        // Keep UI fallback options.
+        // Keep existing options.
       });
 
     void listRegions({ data: { type: "web", enabled: true, workspace } })
       .then((items) => {
-        if (!active || !Array.isArray(items) || items.length === 0) return;
+        if (!active || !Array.isArray(items)) return;
         const mapped = items
           .filter((region) => region.enabled !== false)
           .map((region) => ({
             id: region.id,
             label: buildRegionLabel(region),
           }));
-        if (mapped.length) {
-          setRegionOptions(mapped);
-        }
+        setRegionOptions(mapped);
       })
       .catch(() => {
-        // Keep UI fallback options.
+        if (active) {
+          setRegionOptions([]);
+        }
       });
 
     void listRegions({ data: { type: "database", enabled: true, workspace } })
       .then((items) => {
-        if (!active || !Array.isArray(items) || items.length === 0) return;
+        if (!active || !Array.isArray(items)) return;
         const mapped = items
           .filter((region) => region.enabled !== false)
           .map((region) => ({
             id: region.id,
             label: buildRegionLabel(region),
           }));
-        if (mapped.length) {
-          setDatabaseRegionOptions(mapped);
-        }
+        setDatabaseRegionOptions(mapped);
       })
       .catch(() => {
-        // Keep UI fallback options.
+        if (active) {
+          setDatabaseRegionOptions([]);
+        }
       });
 
     setDatabaseEnginesLoading(true);
     void listAvailableDatabases()
       .then((items) => {
-        if (!active || !Array.isArray(items) || items.length === 0) return;
+        if (!active || !Array.isArray(items)) return;
         const sorted = [...items].sort((a, b) => {
           if (a.isDefault && !b.isDefault) return -1;
           if (!a.isDefault && b.isDefault) return 1;
@@ -2851,7 +2980,9 @@ function NewProjectPage() {
         setDatabaseEngineOptions(sorted);
       })
       .catch(() => {
-        // Keep UI fallback options.
+        if (active) {
+          setDatabaseEngineOptions([]);
+        }
       })
       .finally(() => {
         if (active) {
@@ -2862,7 +2993,7 @@ function NewProjectPage() {
     return () => {
       active = false;
     };
-  }, [listFrameworks, listRegions, workspace]);
+  }, [listAvailableDatabases, listFrameworks, listRegions, workspace]);
 
   function handleSourceTypeSelect(type: SourceType) {
     setSourceType(type);
@@ -2997,8 +3128,8 @@ function NewProjectPage() {
         },
         configurations: {
           region: input.regionId,
-          cpu: 0.2,
-          memory: 0.5,
+          cpu: input.cpu,
+          memory: input.memory,
           storage: 3,
         },
         autoscalingGroup: null,
@@ -3044,8 +3175,8 @@ function NewProjectPage() {
         },
         configurations: {
           region: input.regionId,
-          cpu: 0.2,
-          memory: 0.5,
+          cpu: input.cpu,
+          memory: input.memory,
           storage: 3,
         },
         autoscalingGroup: null,
@@ -3111,7 +3242,7 @@ function NewProjectPage() {
       } else {
         toast.success("Project saved. You can continue configuring it anytime.");
       }
-      await router.invalidate();
+      await invalidateActiveMatches(router);
       navigate({
         to: withWorkspaceQuery({
           pathname: deploy
@@ -3176,7 +3307,7 @@ function NewProjectPage() {
 
       const targetProjectId = created?.name?.trim() || normalizedName;
       toast.success("Database provisioning started");
-      await router.invalidate();
+      await invalidateActiveMatches(router);
       navigate({
         to: withWorkspaceQuery({
           pathname: `/projects/${encodeURIComponent(targetProjectId)}`,

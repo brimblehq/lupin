@@ -41,7 +41,7 @@ Conventions for building **Modals**, **Input fields**, **Toggles**, and **Sideba
 ### Radii & borders
 
 - Inputs & pills: `rounded-[4px]` or `rounded-[6px]`
-- Modals & cards: `rounded-lg`
+- Modals & cards: `rounded-[4px]`
 - Borders are almost always `border-[0.5px] border-dash-border` (or `border-dash-border-soft` for dividers).
 
 ### Motion
@@ -80,7 +80,7 @@ import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton
 | Part | Class / token |
 |---|---|
 | Backdrop | `fixed inset-0 bg-black/40 backdrop-blur-[2px]` (fade 200ms) |
-| Container | `rounded-lg border-[0.5px] border-dash-border bg-dash-bg` |
+| Container | `rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg` |
 | Header | `rounded-t-lg border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-6 py-4` |
 | Body | `flex flex-col gap-4 px-6 py-5` |
 | Footer | `flex items-center justify-between border-t-[0.5px] border-dash-border px-4 py-4` |
@@ -308,7 +308,7 @@ For toggles that reveal a sub-section when on, wrap the sub-section in `AnimateP
 
 ### Not toggles — don't confuse
 
-- **Tab bars / segment controls** (e.g. application vs. request logs) are button groups, not `ToggleSwitch`. Use a `flex overflow-clip rounded-lg border` container with button children — reference `routes/projects/$projectId/logs.tsx` around the tab switcher.
+- **Tab bars / segment controls** (e.g. application vs. request logs) are button groups, not `ToggleSwitch`. Use a `flex overflow-clip rounded-[4px] border` container with button children — reference `routes/projects/$projectId/logs.tsx` around the tab switcher.
 - **Checkbox** for multi-select in forms (see above).
 - **FilterDropdown** for "All Levels / Info / Warn / …" single-select filters.
 
@@ -324,7 +324,7 @@ For toggles that reveal a sub-section when on, wrap the sub-section in `AnimateP
 | Error text | `text-sm font-light leading-5 text-[#e1291d]` |
 | Soft border | `border-[0.5px] border-dash-border` |
 | Divider | `border-dash-border-soft` |
-| Modal surface radius | `rounded-lg` |
+| Modal surface radius | `rounded-[4px]` |
 | Input / pill radius | `rounded-[4px]` |
 | Easing | `[0.16, 1, 0.3, 1]` |
 | Toggle | `ToggleSwitch` from `components/shared/toggle-switch.tsx` |

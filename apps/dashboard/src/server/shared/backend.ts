@@ -35,9 +35,67 @@ function isRefreshTokenReuseError(error: any): boolean {
   return /reuse detected/i.test(message);
 }
 
+function isRefreshRotationInProgressError(error: any): boolean {
+  const status = error?.status;
+  const message = (getErrorMessage(error) ?? "").toLowerCase();
+
+  if (status === 409) {
+    return true;
+  }
+
+  return (
+    message.includes("refresh already in progress") ||
+    message.includes("refresh token already used")
+  );
+}
+
 const activeRefreshPromises = new Map<string, Promise<AuthSession>>();
 const recentRefreshSessions = new Map<string, { session: AuthSession; expiresAt: number }>();
 const RECENT_REFRESH_TTL_MS = 2 * 60 * 1000;
+
+type WorkspaceListResult = Awaited<ReturnType<BackendApi["workspaces"]["list"]>>;
+
+const workspacesCache = new Map<string, { promise: Promise<WorkspaceListResult>; expiresAt: number }>();
+
+const WORKSPACES_CACHE_TTL_MS = 5_000;
+
+async function getCachedWorkspaces(api: BackendApi): Promise<WorkspaceListResult> {
+  const accessToken = getServerAccessToken();
+
+  if (!accessToken) {
+    return api.workspaces.list();
+  }
+
+  const key = tokenFingerprint(accessToken);
+  const existing = workspacesCache.get(key);
+  if (existing && existing.expiresAt > Date.now()) {
+    return existing.promise;
+  }
+
+  const promise = api.workspaces.list();
+  workspacesCache.set(key, { promise, expiresAt: Date.now() + WORKSPACES_CACHE_TTL_MS });
+  promise.catch(() => {
+    if (workspacesCache.get(key)?.promise === promise) {
+      workspacesCache.delete(key);
+    }
+  });
+  return promise;
+}
+
+type WorkspaceItem = WorkspaceListResult["items"][number];
+
+export async function resolveWorkspace(api: BackendApi, slug: string | undefined | null): Promise<WorkspaceItem | undefined> {
+  if (!slug) return undefined;
+  const normalized = slug.trim().toLowerCase();
+  if (!normalized) return undefined;
+  const teams = await getCachedWorkspaces(api);
+  return teams.items.find((item) => item.slug?.toLowerCase() === normalized);
+}
+
+export async function resolveTeamId(api: BackendApi, slug: string | undefined | null): Promise<string | undefined> {
+  const match = await resolveWorkspace(api, slug);
+  return match?.id ?? undefined;
+}
 
 function getRecentRefreshSession(refreshToken: string): AuthSession | null {
   const entry = recentRefreshSessions.get(refreshToken);
@@ -58,6 +116,13 @@ function rememberRefreshSession(consumedRefreshToken: string, session: AuthSessi
     session,
     expiresAt: Date.now() + RECENT_REFRESH_TTL_MS,
   });
+}
+
+function createUnauthorizedError(message: string) {
+  const error = new Error(message) as Error & { status?: number; code?: string };
+  error.status = 401;
+  error.code = "UNAUTHORIZED";
+  return error;
 }
 
 function doRefresh(refreshToken: string): Promise<AuthSession> {
@@ -89,7 +154,7 @@ function doRefresh(refreshToken: string): Promise<AuthSession> {
   return refreshPromise;
 }
 
-function getClientHeaders(): Record<string, string> {
+function getClientHeaders(opts?: { stepUpToken?: string }): Record<string, string> {
   const headers: Record<string, string> = {};
   const ua = getServerUserAgent();
   if (ua) {
@@ -98,6 +163,10 @@ function getClientHeaders(): Record<string, string> {
   const ip = getServerClientIp();
   if (ip) {
     headers["X-Forwarded-For"] = ip;
+  }
+  const stepUpToken = opts?.stepUpToken?.trim();
+  if (stepUpToken) {
+    headers["X-2FA-Token"] = stepUpToken;
   }
   return headers;
 }
@@ -133,7 +202,6 @@ export function getServerBackendApi(geo?: ClientGeoData | null) {
 
 export async function refreshServerSession(refreshToken = getServerRefreshToken()): Promise<AuthSession | null> {
   if (!refreshToken) {
-    authLogger.warn("refreshSession skipped: missing refresh token");
     return null;
   }
 
@@ -179,6 +247,7 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
     const latestRefreshTokenFp = tokenFingerprint(latestRefreshToken);
     const attemptMatchesLatestRefreshToken = latestRefreshToken === refreshToken;
     const isRefreshReuse = isRefreshTokenReuseError(error);
+    const isRefreshInProgress = isRefreshRotationInProgressError(error);
     const fallbackSession = getRecentRefreshSession(refreshToken);
     if (fallbackSession) {
       setServerAuthCookies(fallbackSession);
@@ -209,10 +278,17 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
       currentRefreshTokenFp: latestRefreshTokenFp,
       attemptMatchesLatestRefreshToken,
       isRefreshTokenReuse: isRefreshReuse,
+      isRefreshInProgress,
     });
 
     const isTerminalAuthFailure = status === 401 || status === 403;
-    if (isTerminalAuthFailure && attemptMatchesLatestRefreshToken) {
+    const shouldClearCookies =
+      isTerminalAuthFailure &&
+      attemptMatchesLatestRefreshToken &&
+      !isRefreshReuse &&
+      !isRefreshInProgress;
+
+    if (shouldClearCookies) {
       authLogger.warn("refreshServerSession clearing cookies after terminal refresh failure", {
         status: status ?? null,
         message: getErrorMessage(error),
@@ -229,13 +305,20 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
 const SERIALIZED_HTTP_STATUS_PREFIX = /^\[HTTP (\d{3})\]\s*/;
 
 /**
- * TanStack Start serializes errors across the SSR/client boundary using
- * seroval's ShallowErrorPlugin, which only preserves `message` and `stack`.
- * Custom fields like `status` and `code` on BackendApiError get stripped.
- *
- * Preserve HTTP status in `stack` for downstream checks while keeping
- * `message` clean for user-facing toasts and UI copy.
+ * Pull the step-up challenge fields out of a backend 403 response.
+ * Backend shape: `{ message, data: { requires_2fa: true, action, resource_id } }`.
  */
+function extractStepUpRequirement(payload: unknown): { action: string; resourceId: string } | null {
+  const data = (payload as any)?.data;
+  if (!data?.requires_2fa) return null;
+
+  const action = String(data.action ?? "").trim();
+  const resourceId = String(data.resource_id ?? "").trim();
+  if (!action || !resourceId) return null;
+
+  return { action, resourceId };
+}
+
 function makeSerializableError(error: any): any {
   if (!error || typeof error !== "object") {
     return error;
@@ -244,10 +327,7 @@ function makeSerializableError(error: any): any {
   const rawMessage = typeof error.message === "string" ? error.message : "";
   const statusFromMessage = (() => {
     const match = rawMessage.match(SERIALIZED_HTTP_STATUS_PREFIX);
-    if (!match) {
-      return undefined;
-    }
-    return Number(match[1]);
+    return match ? Number(match[1]) : undefined;
   })();
   const status = typeof error.status === "number" ? error.status : statusFromMessage;
 
@@ -255,9 +335,17 @@ function makeSerializableError(error: any): any {
     return error;
   }
 
-  const cleanMessage = rawMessage.replace(SERIALIZED_HTTP_STATUS_PREFIX, "");
-  if (cleanMessage) {
-    error.message = cleanMessage;
+  let nextMessage = rawMessage.replace(SERIALIZED_HTTP_STATUS_PREFIX, "");
+
+  if (status === 403) {
+    const stepUp = extractStepUpRequirement(error.details);
+    if (stepUp) {
+      nextMessage = `[STEP_UP|${stepUp.action}|${stepUp.resourceId}] ${nextMessage}`;
+    }
+  }
+
+  if (nextMessage) {
+    error.message = nextMessage;
   }
 
   const stackPrefix = `[HTTP ${status}]`;
@@ -272,23 +360,33 @@ function makeSerializableError(error: any): any {
   return error;
 }
 
-export async function withTokenRefresh<T>(fn: (api: BackendApi) => Promise<T>): Promise<T> {
+export interface WithTokenRefreshOptions {
+  /** Optional step-up 2FA token. When set, attached as `X-2FA-Token` header. */
+  stepUpToken?: string;
+}
+
+export async function withTokenRefresh<T>(fn: (api: BackendApi) => Promise<T>, options?: WithTokenRefreshOptions): Promise<T> {
   try {
-    return await withTokenRefreshImpl(fn);
+    return await withTokenRefreshImpl(fn, options);
   } catch (error: any) {
     throw makeSerializableError(error);
   }
 }
 
-async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Promise<T> {
+async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>, options?: WithTokenRefreshOptions): Promise<T> {
+  const stepUpToken = options?.stepUpToken;
   const accessToken = getServerAccessToken();
   const refreshToken = getServerRefreshToken();
+
+  if (!accessToken && !refreshToken) {
+    throw createUnauthorizedError("Unauthorized");
+  }
 
   if (refreshToken) {
     const recentSession = getRecentRefreshSession(refreshToken);
     if (recentSession?.accessToken) {
       setServerAuthCookies(recentSession);
-      authLogger.info("withTokenRefresh using recent session before request", {
+      authLogger.debug("withTokenRefresh using recent session before request", {
         refreshTokenFp: tokenFingerprint(refreshToken),
         nextAccessTokenFp: tokenFingerprint(recentSession.accessToken),
         nextRefreshTokenFp: tokenFingerprint(recentSession.refreshToken),
@@ -297,7 +395,7 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
       const recentApi = createBackendApi({
         baseUrl: serverConfig.apiUrl,
         getAccessToken: () => recentSession.accessToken ?? null,
-        defaultHeaders: getClientHeaders(),
+        defaultHeaders: getClientHeaders({ stepUpToken }),
         signatureSecret: serverConfig.hmacSecretKey,
         apiKey: serverConfig.apiKey,
       });
@@ -338,7 +436,7 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
       const freshApi = createBackendApi({
         baseUrl: serverConfig.apiUrl,
         getAccessToken: () => session.accessToken ?? null,
-        defaultHeaders: getClientHeaders(),
+        defaultHeaders: getClientHeaders({ stepUpToken }),
         signatureSecret: serverConfig.hmacSecretKey,
         apiKey: serverConfig.apiKey,
       });
@@ -353,7 +451,15 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
     }
   }
 
-  const api = getServerBackendApi();
+  const api = stepUpToken
+    ? createBackendApi({
+        baseUrl: serverConfig.apiUrl,
+        getAccessToken: getServerAccessToken,
+        defaultHeaders: getClientHeaders({ stepUpToken }),
+        signatureSecret: serverConfig.hmacSecretKey,
+        apiKey: serverConfig.apiKey,
+      })
+    : getServerBackendApi();
   try {
     return await fn(api);
   } catch (error: any) {
@@ -395,7 +501,7 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>): Pro
       const freshApi = createBackendApi({
         baseUrl: serverConfig.apiUrl,
         getAccessToken: () => session.accessToken ?? null,
-        defaultHeaders: getClientHeaders(),
+        defaultHeaders: getClientHeaders({ stepUpToken }),
         signatureSecret: serverConfig.hmacSecretKey,
         apiKey: serverConfig.apiKey,
       });

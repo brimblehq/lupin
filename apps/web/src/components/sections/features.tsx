@@ -24,7 +24,7 @@ export function Features() {
 
         {/* Accordion */}
         <motion.div
-          className="w-full overflow-hidden rounded-lg border border-[rgba(152,157,164,0.3)] dark:border-white/10 bg-brimble-surface dark:bg-[#1a1c1e] shadow-[var(--shadow-big)]"
+          className="w-full overflow-hidden rounded-[4px] border border-[rgba(152,157,164,0.3)] dark:border-white/10 bg-brimble-surface dark:bg-[#1a1c1e] shadow-[var(--shadow-big)]"
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}

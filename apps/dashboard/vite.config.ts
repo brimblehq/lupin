@@ -5,26 +5,21 @@ import { sentryTanstackStart } from "@sentry/tanstackstart-react/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-function staleAssetGuard(): Plugin {
+function cacheHeaders(): Plugin {
+  const IMMUTABLE = "public, max-age=31536000, immutable";
+  const REVALIDATE_DAILY = "public, max-age=86400, must-revalidate";
   return {
-    name: "brimble:stale-asset-guard",
-    configurePreviewServer: {
-      order: "post",
-      handler(server) {
-        return () => {
-          const assetPattern = /^\/(assets|icons|images|abc-marfa-font-family)\//;
-          server.middlewares.use((req, res, next) => {
-            const url = req.url?.split("?")[0] ?? "";
-            if (assetPattern.test(url)) {
-              res.statusCode = 404;
-              res.setHeader("Cache-Control", "no-cache");
-              res.end();
-              return;
-            }
-            next();
-          });
-        };
-      },
+    name: "brimble:cache-headers",
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split("?")[0] ?? "";
+        if (/^\/assets\//.test(url)) {
+          res.setHeader("Cache-Control", IMMUTABLE);
+        } else if (/^\/(icons|images|abc-marfa-font-family)\//.test(url)) {
+          res.setHeader("Cache-Control", REVALIDATE_DAILY);
+        }
+        next();
+      });
     },
   };
 }
@@ -34,13 +29,17 @@ const config = defineConfig({
   plugins: [
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),
-    staleAssetGuard(),
-    tanstackStart(),
+    cacheHeaders(),
+    tanstackStart({
+      router: {
+        routeFileIgnorePattern: "types\\.ts$|project-route-cache\\.ts$",
+      },
+    }),
     ...(process.env.SENTRY_AUTH_TOKEN
       ? [
           sentryTanstackStart({
             org: "brimble",
-            project: "brimble-dashboard-new",
+            project: "brimble-dashboard",
             authToken: process.env.SENTRY_AUTH_TOKEN,
           }),
         ]
@@ -61,7 +60,10 @@ const config = defineConfig({
           if (id.includes("/ably/")) return "ably";
           if (id.includes("/motion/") || id.includes("/framer-motion/")) return "motion";
           if (id.includes("/lucide-react/")) return "lucide";
+          if (id.includes("@phosphor-icons/")) return "phosphor";
           if (id.includes("@sentry/")) return "sentry";
+          if (id.includes("/formik/") || id.includes("/yup/")) return "forms";
+          if (id.includes("/recharts/") || id.includes("/d3-")) return "recharts";
         },
       },
     },

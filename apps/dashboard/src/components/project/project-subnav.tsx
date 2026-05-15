@@ -48,6 +48,9 @@ import { useHasActiveDeployment } from "@/hooks/use-has-active-deployment";
 import { DatabaseConnectionModal } from "./database-connection-modal";
 import { TransferProjectModal } from "./transfer-project-modal";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const baseTabs = [
   { label: "Projects details", slug: "", Icon: GlobeSimple },
@@ -100,8 +103,10 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
     data: {
       projectId: string;
       workspace?: string;
+      twoFactorToken?: string;
     };
   }) => Promise<{ success: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
   const backupDatabase = useServerFn(backupDatabaseProjectServerFn as any) as (args: {
     data: {
       projectId: string;
@@ -239,7 +244,9 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
     const isActive = tab.slug
       ? pathname === tabPath || pathname === `${tabPath}/`
       : pathname === `/projects/${projectId}` || pathname === `/projects/${projectId}/`;
-    const locked = (tab.slug === "observability" || tab.slug === "web-analytics") && !planSupportsAnalytics;
+    const observabilityLocked = tab.slug === "observability" && !planSupportsAnalytics && !databaseProject;
+    const webAnalyticsLocked = tab.slug === "web-analytics" && !planSupportsAnalytics;
+    const locked = observabilityLocked || webAnalyticsLocked;
 
     return {
       ...tab,
@@ -289,13 +296,23 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
       toast.success("Redeploy started", {
         id: toastId,
         description: `${projectName} is being redeployed to production.`,
+        action: {
+          label: "View deployment",
+          onClick: () => {
+            navigate({
+              to: "/projects/$projectId/deployment-history",
+              params: { projectId: actualProjectId },
+              search: workspace ? ({ workspace } as any) : ({} as any),
+            });
+          },
+        },
       });
 
       markDeploymentHistoryForRefresh({
         projectId: actualProjectId,
         workspace,
       });
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to redeploy project", {
         id: toastId,
@@ -328,7 +345,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         id: toastId,
         description: result?.message || "Backup has been queued.",
       });
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to initiate backup", {
         id: toastId,
@@ -361,7 +378,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         id: toastId,
         description: result?.message || "Updates should be visible shortly.",
       });
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to update database", {
         id: toastId,
@@ -661,12 +678,17 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
             setDeleting(true);
             toast.loading("Deleting project...", { id: toastId });
 
-            await deleteProject({
-              data: {
-                projectId: actualProjectId,
-                workspace,
-              },
-            });
+            await withStepUp(
+              (twoFactorToken) =>
+                deleteProject({
+                  data: {
+                    projectId: actualProjectId,
+                    workspace,
+                    twoFactorToken,
+                  },
+                }),
+              requestStepUp,
+            );
 
             toast.success(`${projectName} deleted successfully`, {
               id: toastId,
@@ -678,7 +700,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
               description: typeof error?.message === "string" ? error.message : "Please try again.",
             });
           } finally {
-            await router.invalidate();
+            await invalidateActiveMatches(router);
             setDeleting(false);
           }
 

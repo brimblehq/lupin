@@ -5,7 +5,6 @@ import { Modal, ModalFooter, ModalCancelButton, ModalContinueButton } from "@/co
 interface ConfirmServerRuntimeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  frameworkName: string;
   tooltipMessage?: string;
   isFreePlan?: boolean;
   loading?: boolean;
@@ -15,7 +14,6 @@ interface ConfirmServerRuntimeModalProps {
 export function ConfirmServerRuntimeModal({
   open,
   onOpenChange,
-  frameworkName,
   tooltipMessage,
   isFreePlan = false,
   loading = false,
@@ -23,7 +21,7 @@ export function ConfirmServerRuntimeModal({
 }: ConfirmServerRuntimeModalProps) {
   const body =
     tooltipMessage?.trim() ||
-    `${frameworkName} typically runs on a server. Deploying it as a Static Site may fail to build or render incorrectly if your project doesn't support static export.`;
+    `Deploying as a Static Site may fail to build or render incorrectly if your project requires a server runtime.`;
 
   return (
     <Modal open={open} onOpenChange={onOpenChange} width={460}>

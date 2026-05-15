@@ -5,10 +5,11 @@ export const siteConfig = {
     { label: "Pricing", href: "/pricing" },
     { label: "Domains", href: "/domains" },
     { label: "Careers", href: "/careers" },
+    { label: "Changelog", href: "/changelog" },
     { label: "FAQ", href: "/faq" },
-    { label: "Docs", href: "https://docs.brimble.io" },
+    { label: "Docs", href: "https://paper.brimble.io" },
     { label: "Status", href: "https://status.brimble.io", status: true },
-    { label: "Talk to Founder", href: "https://cal.com/brimble/15min" },
+    // { label: "Talk to Founder", href: "https://cal.com/brimble/15min" },
   ],
   socials: {
     heading: "Follow Brimble",
@@ -281,6 +282,11 @@ export const siteConfig = {
             description:
               "Yes. You can search for, register, and manage domains directly from the Brimble dashboard — no third-party registrar needed.",
           },
+          {
+            title: "Can I transfer a domain to or from Brimble?",
+            description:
+              "Yes. To transfer a domain in, open Domains → Transfer in, enter your domain and authorization (EPP) code, and confirm. To transfer out, open the domain's settings and request a transfer code to share with your new registrar.",
+          },
         ],
       },
       {
@@ -312,6 +318,17 @@ export const siteConfig = {
       primary: "Get started",
       secondary: "Terms & conditions",
       tertiary: "Contact us",
+    },
+  },
+  changelog: {
+    eyebrow: "Changelog",
+    heading: "What's new",
+    description: "Recent updates from the Brimble team.",
+    viewAllCta: "View all updates",
+    page: {
+      heading: "Changelog",
+      description: "What we've been shipping. Updated every friday.",
+      empty: "No updates yet — check back soon.",
     },
   },
 } as const;

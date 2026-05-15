@@ -7,6 +7,7 @@ export interface DeploymentLog {
   branch?: string;
   message?: string;
   commitLink?: string;
+  pullRequestLink?: string;
   environment?: string;
   startTime?: string;
   endTime?: string;
@@ -55,6 +56,7 @@ function mapDeploymentLog(log: any): DeploymentLog {
     branch: log.branch,
     message: log.message,
     commitLink: log.commitLink ?? log.commit_link,
+    pullRequestLink: log.pullRequestLink ?? log.pull_request_link ?? log.prLink ?? log.pr_link,
     environment: log.environment,
     startTime: log.startTime,
     endTime: log.endTime,

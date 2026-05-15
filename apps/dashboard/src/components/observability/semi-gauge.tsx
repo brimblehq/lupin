@@ -95,7 +95,7 @@ export function SemiGauge({
       ease: [0.16, 1, 0.3, 1],
     });
     return () => controls.stop();
-  }, [value]);
+  }, [progress, value]);
 
   return (
     <div className="flex flex-1 flex-col rounded-[4px] border-[0.5px] border-dash-border-soft bg-dash-bg">

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import type { Message as AblyMessage } from "ably";
 import {
   Search,
   ChevronDown,
@@ -21,6 +22,7 @@ import { createPortal } from "react-dom";
 import { type DateRange } from "react-day-picker";
 import { format, differenceInSeconds } from "date-fns";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { DeploymentHistoryPending } from "@/components/shared/route-pending";
 import { Tooltip } from "../../../components/shared/tooltip";
 import { DateRangePicker } from "../../../components/shared/date-range-picker";
 import {
@@ -42,6 +44,7 @@ import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { usePushNotification } from "@/hooks/use-push-notification";
 import { Route as RootRoute } from "@/routes/__root";
 import type { TeamDetails, TeamMember } from "@/backend/teams";
+import config from "@/config";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -55,10 +58,35 @@ function normalizeMemberRole(member: TeamMember): string {
 
 const PAGE_LIMIT = 10;
 const PAGE_CACHE_TTL_MS = 15_000;
+const DEPLOYMENTS_REQUEST_TIMEOUT_MS = 15_000;
 
 type DeploymentsCacheEntry = {
   data: PaginatedDeploymentsResponse;
   fetchedAt: number;
+};
+
+type DeploymentHistoryLoaderData = {
+  deployments: PaginatedDeploymentsResponse;
+  workspace?: string;
+  timedOut: boolean;
+};
+
+type AblyLogEventPayload = {
+  id?: string;
+  logId?: string;
+  name?: string;
+  status?: string;
+  createdAt?: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  message?: string;
+  branch?: string;
+  username?: string;
+  avatar?: string | null;
+  commitLink?: string | null;
+  pullRequestLink?: string | null;
+  environment?: string;
+  domain?: string | null;
 };
 
 function createEmptyDeployments(): PaginatedDeploymentsResponse {
@@ -72,6 +100,24 @@ function createEmptyDeployments(): PaginatedDeploymentsResponse {
   };
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 export const Route = createFileRoute("/projects/$projectId/deployment-history")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
@@ -81,31 +127,38 @@ export const Route = createFileRoute("/projects/$projectId/deployment-history")(
 
     const range = defaultDeploymentHistoryDateRange();
 
-    const result = await (
-      listDeploymentsServerFn as unknown as (input: {
-        data: {
-          projectId: string;
-          workspace?: string;
-          page?: number;
-          limit?: number;
-          start?: string;
-          end?: string;
-        };
-      }) => Promise<PaginatedDeploymentsResponse>
-    )({
-      data: {
-        projectId: project?.id || project?.name,
-        workspace,
-        page: 1,
-        limit: PAGE_LIMIT,
-        start: format(range.from!, "yyyy-MM-dd"),
-        end: format(range.to!, "yyyy-MM-dd"),
-      },
-    });
+    try {
+      const result = await withTimeout(
+        (listDeploymentsServerFn as unknown as (input: {
+          data: {
+            projectId: string;
+            workspace?: string;
+            page?: number;
+            limit?: number;
+            start?: string;
+            end?: string;
+          };
+        }) => Promise<PaginatedDeploymentsResponse>)({
+          data: {
+            projectId: project?.id || project?.name,
+            workspace,
+            page: 1,
+            limit: PAGE_LIMIT,
+            start: format(range.from!, "yyyy-MM-dd"),
+            end: format(range.to!, "yyyy-MM-dd"),
+          },
+        }),
+        DEPLOYMENTS_REQUEST_TIMEOUT_MS,
+        "Deployment history request timed out",
+      );
 
-    return { deployments: result, workspace };
+      return { deployments: result, workspace, timedOut: false } satisfies DeploymentHistoryLoaderData;
+    } catch {
+      return { deployments: createEmptyDeployments(), workspace, timedOut: true } satisfies DeploymentHistoryLoaderData;
+    }
   },
   component: DeploymentHistoryPage,
+  pendingComponent: DeploymentHistoryPending,
 });
 
 /* ─── Filter dropdown (reusable) ─── */
@@ -433,6 +486,70 @@ function normalizeDeploymentStatus(status?: string): string {
   return status?.trim().toLowerCase() ?? "";
 }
 
+function toAblyLogEventPayload(data: unknown): AblyLogEventPayload | null {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  return data as AblyLogEventPayload;
+}
+
+function mapAblyLogEventToDeployment(payload: AblyLogEventPayload): (Partial<DeploymentLog> & { id: string }) | null {
+  const logId = payload.logId ? payload.logId.trim() : "";
+
+  const eventId = payload.id ? payload.id.trim() : "";
+
+  const id = logId || eventId;
+
+  if (!id) {
+    return null;
+  }
+
+  const next: Partial<DeploymentLog> & { id: string } = { id };
+
+  if (payload.name && payload.name.trim()) {
+    next.name = payload.name;
+  }
+  if (payload.status && payload.status.trim()) {
+    next.status = payload.status;
+  }
+  if (payload.branch && payload.branch.trim()) {
+    next.branch = payload.branch;
+  }
+  if (payload.message) {
+    next.message = payload.message;
+  }
+  if (payload.commitLink && payload.commitLink.trim()) {
+    next.commitLink = payload.commitLink;
+  }
+  if (payload.pullRequestLink && payload.pullRequestLink.trim()) {
+    next.pullRequestLink = payload.pullRequestLink;
+  }
+  if (payload.environment && payload.environment.trim()) {
+    next.environment = payload.environment;
+  }
+  if (payload.startTime && payload.startTime.trim()) {
+    next.startTime = payload.startTime;
+  }
+  if (payload.endTime && payload.endTime.trim()) {
+    next.endTime = payload.endTime;
+  }
+  if (payload.createdAt && payload.createdAt.trim()) {
+    next.createdAt = payload.createdAt;
+  }
+  if (payload.username && payload.username.trim()) {
+    next.username = payload.username;
+  }
+  if (payload.avatar && payload.avatar.trim()) {
+    next.avatar = payload.avatar;
+  }
+  if (payload.domain && payload.domain.trim()) {
+    next.domain = payload.domain;
+  }
+
+  return next;
+}
+
 const TERMINAL_STATUSES = new Set([
   "active",
   "ready",
@@ -545,9 +662,11 @@ function DeploymentRow({
         <span className="truncate text-sm font-light leading-[1.4] tracking-[-0.28px] text-dash-text-strong">
           {deployment.message || "-"}
         </span>
-        <div className="flex items-center gap-1">
-          <GitBranch className="size-3.5 text-dash-text-faded" />
-          <span className="text-sm font-light leading-[1.3] text-dash-text-faded">{deployment.branch || "main"}</span>
+        <div className="flex min-w-0 items-center gap-1">
+          <GitBranch className="size-3.5 shrink-0 text-dash-text-faded" />
+          <span className="truncate text-sm font-light leading-[1.3] text-dash-text-faded" title={deployment.branch || "main"}>
+            {deployment.branch || "main"}
+          </span>
         </div>
       </div>
 
@@ -614,8 +733,9 @@ function DeploymentSkeleton() {
 
 function DeploymentHistoryPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
-  const loaderData = Route.useLoaderData();
+  const loaderData = Route.useLoaderData() as DeploymentHistoryLoaderData;
   const initialData = loaderData.deployments as PaginatedDeploymentsResponse;
+  const initialTimedOut = loaderData.timedOut;
   const { workspaceTeamMembers } = (RootRoute.useLoaderData() ?? {}) as {
     workspaceTeamMembers?: TeamDetails | null;
   };
@@ -661,9 +781,10 @@ function DeploymentHistoryPage() {
 
     return document.visibilityState === "visible";
   });
-  const { openDeploymentDrawer } = useProjectDeploymentLogsDrawer();
+  const { openDeploymentDrawer, syncDeploymentInDrawer } = useProjectDeploymentLogsDrawer();
   const { sendNotification } = usePushNotification(workspace);
   const prevStatusMapRef = useRef<Record<string, string>>({});
+  const failureToastDedupeRef = useRef<Set<string>>(new Set());
   const latestRequestRef = useRef(0);
   const previousProjectScopeRef = useRef<string | null>(null);
   const deploymentsCacheRef = useRef<Map<string, DeploymentsCacheEntry>>(new Map());
@@ -688,20 +809,12 @@ function DeploymentHistoryPage() {
 
   const buildCacheKey = useCallback(
     (page: number) =>
-      [
-        projectScope,
-        page,
-        statusesParam ?? "",
-        environmentParam ?? "",
-        startParam ?? "",
-        endParam ?? "",
-        searchParam ?? "",
-      ].join("|"),
+      [projectScope, page, statusesParam ?? "", environmentParam ?? "", startParam ?? "", endParam ?? "", searchParam ?? ""].join("|"),
     [projectScope, statusesParam, environmentParam, startParam, endParam, searchParam],
   );
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || initialTimedOut) {
       return;
     }
 
@@ -709,7 +822,7 @@ function DeploymentHistoryPage() {
       data: initialData,
       fetchedAt: Date.now(),
     });
-  }, [projectId, initialData, buildCacheKey]);
+  }, [projectId, initialData, buildCacheKey, initialTimedOut]);
 
   const fetchDeployments = useCallback(
     async (page: number, options?: { silent?: boolean; useCache?: boolean; force?: boolean }) => {
@@ -736,8 +849,8 @@ function DeploymentHistoryPage() {
       }
 
       try {
-        const result = await (
-          listDeploymentsServerFn as unknown as (input: {
+        const result = await withTimeout(
+          (listDeploymentsServerFn as unknown as (input: {
             data: {
               projectId: string;
               workspace?: string;
@@ -749,20 +862,22 @@ function DeploymentHistoryPage() {
               end?: string;
               search?: string;
             };
-          }) => Promise<PaginatedDeploymentsResponse>
-        )({
-          data: {
-            projectId,
-            workspace,
-            page,
-            limit: PAGE_LIMIT,
-            statuses: statusesParam,
-            environment: environmentParam,
-            start: startParam,
-            end: endParam,
-            search: searchParam,
-          },
-        });
+          }) => Promise<PaginatedDeploymentsResponse>)({
+            data: {
+              projectId,
+              workspace,
+              page,
+              limit: PAGE_LIMIT,
+              statuses: statusesParam,
+              environment: environmentParam,
+              start: startParam,
+              end: endParam,
+              search: searchParam,
+            },
+          }),
+          DEPLOYMENTS_REQUEST_TIMEOUT_MS,
+          "Deployment history request timed out",
+        );
 
         if (requestId !== latestRequestRef.current) {
           return;
@@ -820,7 +935,18 @@ function DeploymentHistoryPage() {
         }
       }
     },
-    [projectId, workspace, statusesParam, environmentParam, startParam, endParam, searchParam, projectName, sendNotification, buildCacheKey],
+    [
+      projectId,
+      workspace,
+      statusesParam,
+      environmentParam,
+      startParam,
+      endParam,
+      searchParam,
+      projectName,
+      sendNotification,
+      buildCacheKey,
+    ],
   );
 
   useEffect(() => {
@@ -859,6 +985,15 @@ function DeploymentHistoryPage() {
     void fetchDeployments(1, { force: true });
   }, [fetchDeployments, projectId, workspace]);
 
+  useEffect(() => {
+    if (!projectId || !initialTimedOut) {
+      return;
+    }
+
+    setFetching(true);
+    void fetchDeployments(1, { force: true });
+  }, [fetchDeployments, initialTimedOut, projectId]);
+
   // Re-fetch when filters change
   useEffect(() => {
     void fetchDeployments(1, { useCache: true });
@@ -896,6 +1031,143 @@ function DeploymentHistoryPage() {
 
     return () => window.clearInterval(intervalId);
   }, [currentPage, fetchDeployments, isPageVisible]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
+
+    const handleLogEvent = (message: AblyMessage) => {
+      const payload = toAblyLogEventPayload(message.data);
+      if (!payload) {
+        return;
+      }
+
+      const incoming = mapAblyLogEventToDeployment(payload);
+      if (!incoming) {
+        return;
+      }
+
+      const payloadLogId = payload?.logId ? payload.logId.trim() : "";
+      const payloadId = payload.id ? payload.id.trim() : "";
+      const previousStatus = prevStatusMapRef.current[incoming.id] ?? "";
+      const nextStatus = normalizeDeploymentStatus(incoming.status);
+
+      setDeployments((previous) => {
+        const items = [...(previous.items ?? [])];
+        let existingIndex = -1;
+        if (payloadLogId) {
+          existingIndex = items.findIndex((item) => item.id === payloadLogId);
+        }
+        if (existingIndex < 0 && payloadId) {
+          existingIndex = items.findIndex((item) => item.id === payloadId);
+        }
+        if (existingIndex < 0) {
+          existingIndex = items.findIndex((item) => item.id === incoming.id);
+        }
+
+        if (existingIndex >= 0) {
+          items[existingIndex] = {
+            ...items[existingIndex],
+            ...incoming,
+          };
+        } else {
+          items.unshift({
+            ...incoming,
+            name: incoming.name || incoming.id,
+            status: incoming.status || "pending",
+          });
+        }
+
+        return {
+          ...previous,
+          items,
+        };
+      });
+
+      syncDeploymentInDrawer(incoming);
+      if (payloadId && payloadId !== incoming.id) {
+        const incomingWithoutId: Partial<DeploymentLog> = { ...incoming };
+        delete incomingWithoutId.id;
+        syncDeploymentInDrawer({
+          id: payloadId,
+          ...incomingWithoutId,
+        });
+      }
+      if (nextStatus) {
+        prevStatusMapRef.current[incoming.id] = nextStatus;
+        if (payloadId && payloadId !== incoming.id) {
+          prevStatusMapRef.current[payloadId] = nextStatus;
+        }
+      }
+
+      if (nextStatus === "failed") {
+        const dedupeKey = `${payloadLogId || payloadId || incoming.id}:${String(payload.status ?? "")}:${payload.endTime || ""}`;
+        if (!failureToastDedupeRef.current.has(dedupeKey)) {
+          failureToastDedupeRef.current.add(dedupeKey);
+          const commitLink = incoming.commitLink?.trim();
+          const pullRequestLink = incoming.pullRequestLink?.trim();
+          let action:
+            | {
+                label: string;
+                onClick: () => void;
+              }
+            | undefined;
+          if (commitLink) {
+            action = {
+              label: "Open commit",
+              onClick: () => window.open(commitLink, "_blank", "noopener,noreferrer"),
+            };
+          } else if (pullRequestLink) {
+            action = {
+              label: "Open PR/MR",
+              onClick: () => window.open(pullRequestLink, "_blank", "noopener,noreferrer"),
+            };
+          }
+
+          toast.error("Deployment failed.", action ? { action } : undefined);
+        }
+      }
+
+      if (previousStatus !== "failed" && nextStatus === "failed") {
+        const env = incoming.environment || "Production";
+        sendNotification({
+          title: "Deployment Failed",
+          body: `${projectName} (${env}) deployment failed.`,
+          onClick: () => window.focus(),
+        });
+      }
+    };
+
+    void (async () => {
+      const { Realtime } = await import("ably");
+      if (cancelled) return;
+
+      const ably = new Realtime({
+        authUrl: `${config.apiUrl}/v1/ably/token?clientId=${projectId}`,
+        clientId: projectId,
+      });
+      const channel = ably.channels.get(projectId);
+      channel.subscribe("log", handleLogEvent);
+
+      cleanup = () => {
+        try {
+          channel.unsubscribe("log", handleLogEvent);
+          ably.close();
+        } catch {
+          // ignore
+        }
+      };
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, [projectId, projectName, sendNotification, syncDeploymentInDrawer]);
 
   function handlePageChange(page: number) {
     void fetchDeployments(page, { useCache: true });

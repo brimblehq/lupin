@@ -22,7 +22,9 @@ function writeStoredOrder(workspace: string | undefined, ids: string[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(`${TAG_ORDER_STORAGE_KEY}:${workspace ?? "__personal__"}`, JSON.stringify(ids));
-  } catch {}
+  } catch {
+    return;
+  }
 }
 
 function sortTagsByOrder(tags: Tag[], order: string[]): Tag[] {

@@ -7,6 +7,7 @@ import { SimpleTooltip } from "@/components/shared/tooltip";
 import { ArrowBendUpLeft, GlobeHemisphereWest, UsersThree } from "@phosphor-icons/react";
 import { motion, useInView } from "motion/react";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { ObservabilityPending } from "@/components/shared/route-pending";
 import { TimeSeriesChart } from "@/components/observability/time-series-chart";
 import { SemiGauge } from "@/components/observability/semi-gauge";
 import { SegmentedToggle } from "@/components/observability/segmented-toggle";
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/projects/$projectId/observability")({
     return { metrics };
   },
   component: ObservabilityPage,
+  pendingComponent: ObservabilityPending,
 });
 
 import { MetricChart } from "../../../types/enums";
@@ -1327,10 +1329,7 @@ function ObservabilityPage() {
     return (
       <div className="mx-auto flex max-w-[1000px] flex-col gap-6 px-4 py-8 sm:px-0">
         <TabHeader title="Metrics & Observability">Monitor your app's key metrics and health.</TabHeader>
-        <PlanUpgradePrompt
-          feature="Observability"
-          description="Upgrade to a higher plan to monitor your app's metrics."
-        />
+        <PlanUpgradePrompt feature="Observability" description="Upgrade to a higher plan to monitor your app's metrics." />
       </div>
     );
   }

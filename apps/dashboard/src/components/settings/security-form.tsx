@@ -439,7 +439,7 @@ export function SecurityForm({
       <div className="flex max-w-[488px] flex-col gap-8">
         <div className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-1">
-            <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Email address</span>
+            <span className="text-sm font-semibold leading-5 tracking-[-0.0224px] text-dash-text-strong">Email address</span>
             <span className="text-sm leading-5 text-dash-text-faded">
               This is a vital info. We would have to verify and save your changes
             </span>
@@ -477,7 +477,7 @@ export function SecurityForm({
         <hr className="border-dash-border-soft" />
 
         <div className="flex flex-col gap-1">
-          <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Two-factor authentication</span>
+          <span className="text-sm font-semibold leading-5 tracking-[-0.0224px] text-dash-text-strong">Two-factor authentication</span>
           <span className="text-sm leading-5 text-dash-text-faded">
             {status?.enabled
               ? "Your account is protected with two-factor authentication."
@@ -488,9 +488,12 @@ export function SecurityForm({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {status?.enabled ? (
-              <CheckCircle className="size-4 text-[#34d399]" weight="fill" />
+              <CheckCircle className="size-5 text-[#34d399]" weight="fill" />
             ) : (
-              <img src="/images/secure.svg" alt="" className="size-4" />
+              <div
+                aria-hidden
+                className="size-5 bg-dash-text-faded [mask-image:url(/images/secure.svg)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] [-webkit-mask-image:url(/images/secure.svg)] [-webkit-mask-position:center] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:contain]"
+              />
             )}
             <span className="text-sm text-dash-text-body">
               {loadingStatus ? "Checking 2FA status..." : status?.enabled ? "2FA is enabled" : "2FA is not enabled"}
@@ -548,7 +551,7 @@ export function SecurityForm({
             <hr className="border-dash-border-soft" />
             <div className="flex flex-col gap-3.5">
               <div className="flex flex-col gap-1">
-                <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Passkeys</span>
+                <span className="text-sm font-semibold leading-5 tracking-[-0.0224px] text-dash-text-strong">Passkeys</span>
                 <span className="text-sm leading-5 text-dash-text-faded">
                   Sign in faster and more securely with Touch ID, Windows Hello, or a security key.
                 </span>
@@ -618,7 +621,7 @@ export function SecurityForm({
                               className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
                             >
                               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                <span className="truncate text-sm font-medium text-dash-text-strong">
+                                <span className="truncate text-sm text-dash-text-strong">
                                   {pk.deviceName || "Unnamed passkey"}
                                 </span>
                                 <span className="text-xs text-dash-text-faded">
@@ -739,7 +742,7 @@ export function SecurityForm({
                 <img
                   src={setupData.qrCode}
                   alt="Two-factor authentication QR code"
-                  className="size-[200px] rounded-lg border border-dash-border bg-white p-2"
+                  className="size-[200px] rounded-[4px] border border-dash-border bg-white p-2"
                 />
 
                 <div className="flex w-full flex-col gap-2">
@@ -923,9 +926,7 @@ export function SecurityForm({
           title="Remove passkey"
           description={(() => {
             const name = passkeys.find((p) => p.id === stepUpPasskeyId)?.deviceName;
-            return name
-              ? `Enter your authenticator code to remove "${name}"`
-              : "Enter your authenticator code to remove this passkey";
+            return name ? `Enter your authenticator code to remove "${name}"` : "Enter your authenticator code to remove this passkey";
           })()}
         />
         <div className="flex flex-col items-center gap-4 px-6 py-6">

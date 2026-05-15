@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { MoreVertical, RefreshCw, AlertCircle, LifeBuoy, Minus, Plus, Pencil, ArrowRightLeft, Settings } from "lucide-react";
-import * as Dialog from "@radix-ui/react-dialog";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { MoreVertical, RefreshCw, AlertCircle, LifeBuoy, Pencil, ArrowRightLeft, Settings } from "lucide-react";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { FilterDropdown, type FilterOption } from "./filter-dropdown";
 import { SearchFilterBar } from "./search-filter-bar";
@@ -13,6 +13,13 @@ import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton
 import { WarningModal } from "./warning-modal";
 import { Dropdown } from "./dropdown";
 import { dashInputClassName } from "./dash-input";
+import type { Workspace } from "@/backend/workspaces";
+import { listWorkspacesServerFn } from "@/server/workspaces/actions";
+import { transferDomainWorkspaceServerFn } from "@/server/domains/actions";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
+import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 export interface Domain {
   id?: string;
@@ -96,77 +103,141 @@ function DomainActionsMenu({ items }: { items: DomainMenuItem[] }) {
 
 /* ─── Transfer Domain Modal ─── */
 
-const mockWorkspaces = [
-  { id: "personal", name: "Kemdirimakujuobi", type: "Personal" as const },
-  { id: "brimble-team", name: "Brimble Team", type: "Team" as const },
-];
+const PERSONAL_DESTINATION_ID = "__personal__";
 
 function TransferDomainModal({ open, onOpenChange, domain }: { open: boolean; onOpenChange: (open: boolean) => void; domain: Domain }) {
-  const [selectedWorkspace, setSelectedWorkspace] = useState("");
-  const [transferring, setTransferring] = useState(false);
+  const router = useRouter();
+  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
+  const currentWorkspaceSlug = useMemo(() => {
+    const params = new URLSearchParams(searchStr || "");
+    return params.get("workspace")?.trim() || undefined;
+  }, [searchStr]);
+  const sourceIsTeam = Boolean(currentWorkspaceSlug);
 
-  function handleTransfer() {
-    if (!selectedWorkspace) return;
-    setTransferring(true);
-    // TODO: wire to API
-    setTimeout(() => {
-      setTransferring(false);
+  const listWorkspaces = useServerFn(listWorkspacesServerFn as any) as () => Promise<{ items: Workspace[] }>;
+  const transferDomainWorkspace = useServerFn(transferDomainWorkspaceServerFn as any) as (args: {
+    data: { domainId: string; targetTeamId?: string | null; twoFactorToken?: string };
+  }) => Promise<{ success: true }>;
+  const { requestStepUp } = useStepUpTwoFactor();
+
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [destinationId, setDestinationId] = useState("");
+
+  const destinationOptions = useMemo(() => {
+    const options: Array<{ id: string; label: string }> = [];
+
+    if (sourceIsTeam) {
+      options.push({ id: PERSONAL_DESTINATION_ID, label: "Personal workspace" });
+    }
+
+    for (const ws of workspaces) {
+      if (!ws.id) continue;
+      if (ws.slug && ws.slug === currentWorkspaceSlug) continue;
+      const role = (ws.role ?? "").toLowerCase();
+      if (role !== "creator" && role !== "administrator") continue;
+      options.push({ id: ws.id, label: ws.name || ws.slug || ws.id });
+    }
+
+    return options;
+  }, [workspaces, currentWorkspaceSlug, sourceIsTeam]);
+
+  useEffect(() => {
+    if (!open) {
+      setDestinationId("");
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        setLoadingWorkspaces(true);
+        const response = await listWorkspaces();
+        if (cancelled) return;
+        setWorkspaces(Array.isArray(response?.items) ? response.items : []);
+      } catch (error) {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : "Failed to load workspaces");
+      } finally {
+        if (!cancelled) setLoadingWorkspaces(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, listWorkspaces]);
+
+  useEffect(() => {
+    if (!open || !destinationOptions.length) return;
+    const stillAvailable = destinationOptions.some((opt) => opt.id === destinationId);
+    if (!stillAvailable) {
+      setDestinationId(destinationOptions[0]?.id ?? "");
+    }
+  }, [open, destinationOptions, destinationId]);
+
+  async function handleTransfer() {
+    const domainId = domain.id?.trim();
+    if (!domainId) {
+      toast.error("Domain id is missing");
+      return;
+    }
+    if (!destinationId) {
+      toast.error("Please select a destination workspace");
+      return;
+    }
+
+    const targetTeamId = destinationId === PERSONAL_DESTINATION_ID ? null : destinationId;
+
+    try {
+      setTransferring(true);
+      await withStepUp(
+        (twoFactorToken) => transferDomainWorkspace({ data: { domainId, targetTeamId, twoFactorToken } }),
+        requestStepUp,
+      );
+      toast.success("Domain moved successfully");
       onOpenChange(false);
-    }, 2000);
+      await invalidateActiveMatches(router);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to transfer domain");
+    } finally {
+      setTransferring(false);
+    }
   }
 
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
-      <ModalHeader title="Transfer Domain" description={`Transfer ${domain.name} to another workspace`} />
+      <ModalHeader title="Transfer Domain" description={`Move ${domain.name} to another workspace`} />
       <div className="flex flex-col gap-4 px-6 pb-5 pt-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm leading-5 tracking-[-0.022px] text-dash-text-strong">Domain</label>
-          <div className="flex items-center gap-2 rounded-[6px] bg-dash-bg-elevated px-3 py-2.5">
-            <span className="text-sm text-dash-text-body">{domain.name}</span>
+          <div className="rounded-[6px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-3 py-2.5 text-sm text-dash-text-body">
+            {domain.name}
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm leading-5 tracking-[-0.022px] text-dash-text-strong">Destination workspace</label>
-          <div className="flex flex-col gap-1">
-            {mockWorkspaces.map((ws) => (
-              <button
-                key={ws.id}
-                onClick={() => setSelectedWorkspace(ws.id)}
-                className={`flex items-center gap-3 rounded-[6px] px-3 py-2.5 text-left transition-colors ${
-                  selectedWorkspace === ws.id ? "bg-[#4879f8]/10 ring-1 ring-[#4879f8]" : "bg-dash-bg-elevated hover:bg-dash-border-soft"
-                }`}
-              >
-                <div
-                  className="size-7 shrink-0 rounded-full"
-                  style={{
-                    background:
-                      ws.type === "Personal"
-                        ? "radial-gradient(circle at 62% 30%, #b8fce8, #91f2d5 25%, #6ae8c3 50%, #43deb0 75%, #1bd49d)"
-                        : "radial-gradient(circle at 62% 30%, #b8cffc, #94b6f8 25%, #6f9cf3 50%, #4b82ee 75%, #2769e9)",
-                  }}
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm text-dash-text-strong">{ws.name}</span>
-                  <span className="text-xs text-dash-text-faded">{ws.type}</span>
-                </div>
-                {selectedWorkspace === ws.id && (
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="ml-auto text-[#4879f8]">
-                    <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
+          <Dropdown
+            value={destinationId}
+            options={destinationOptions}
+            onChange={setDestinationId}
+            placeholder={loadingWorkspaces ? "Loading workspaces..." : "Select workspace..."}
+          />
+          {!loadingWorkspaces && destinationOptions.length === 0 ? (
+            <p className="text-xs leading-5 text-dash-text-faded">
+              No workspaces available. You must be a creator or administrator of the target team.
+            </p>
+          ) : null}
         </div>
         <p className="text-xs leading-[1.5] text-dash-text-faded">
-          Transferring a domain moves all DNS records and settings. The domain will no longer be accessible from this workspace.
+          DNS records and settings move with the domain. Access is granted to the destination workspace immediately.
         </p>
       </div>
       <ModalFooter>
         <ModalCancelButton />
         <ModalContinueButton
           onClick={handleTransfer}
-          disabled={!selectedWorkspace || transferring}
+          disabled={!destinationId || transferring}
           loading={transferring}
           loadingLabel="Transferring..."
         >
@@ -383,7 +454,6 @@ export function DomainList({
   searchQuery: searchQueryProp,
   onSearchQueryChange,
   searchLoading = false,
-  onAddDomain,
   onRefreshDomain,
   onConfigureDomain,
   onDeleteDomain,
@@ -394,7 +464,6 @@ export function DomainList({
   searchQuery?: string;
   onSearchQueryChange?: (value: string) => void;
   searchLoading?: boolean;
-  onAddDomain?: () => void;
   onRefreshDomain?: (domain: Domain) => Promise<void>;
   onConfigureDomain?: (input: {
     domain: Domain;
@@ -408,6 +477,7 @@ export function DomainList({
   const searchStr = useRouterState({
     select: (state) => state.location.searchStr,
   });
+  const { canEditWorkspace } = useWorkspaceRole();
   const [searchQueryInternal, setSearchQueryInternal] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [editingDomain, setEditingDomain] = useState<Domain | null>(null);
@@ -499,7 +569,8 @@ export function DomainList({
       onClick: () => setEditingDomain(domain),
     });
 
-    if (isCustom) {
+    const canTransferWorkspace = isCustom && !domain.purchased && !domain.projectId && canEditWorkspace;
+    if (canTransferWorkspace) {
       items.push({
         id: "transfer",
         label: "Transfer domain",

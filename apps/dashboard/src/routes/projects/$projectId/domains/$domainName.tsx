@@ -1,9 +1,7 @@
-import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { getDomainDetailsServerFn } from "@/server/domains/actions";
 import { DomainSettings } from "../../../../components/shared/domain-settings";
 import { mapDomainDetailsToDomainInfo } from "@/utils/domain-settings";
-
-const parentRoute = getRouteApi("/projects/$projectId");
 
 export const Route = createFileRoute("/projects/$projectId/domains/$domainName")({
   staleTime: 0,

@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { BackendApi } from "@/backend";
 import type { MarkAllSeenResponse, NotificationListResponse } from "@/backend/notifications";
-import { withTokenRefresh } from "@/server/shared/backend";
+import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 
 interface ScopeInput {
   workspace?: string;
@@ -9,13 +8,6 @@ interface ScopeInput {
 
 type ListInput = ScopeInput & { page?: number; limit?: number };
 type MarkSeenInput = ScopeInput & { notificationId: string };
-
-async function resolveTeamId(api: BackendApi, workspace: string | undefined): Promise<string | undefined> {
-  const slug = workspace?.trim().toLowerCase();
-  if (!slug) return undefined;
-  const teams = await api.workspaces.list();
-  return teams.items.find((item) => item.slug === slug)?.id;
-}
 
 export const listNotificationsServerFn = createServerFn({
   method: "POST",

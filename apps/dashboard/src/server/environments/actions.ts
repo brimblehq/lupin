@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 import config from "@/config";
-import { withTokenRefresh } from "@/server/shared/backend";
+import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 
 const isProduction = process.env.NODE_ENV === "production";
 const environmentPreferenceCookieBaseOptions = {
@@ -18,13 +18,7 @@ function buildEnvironmentPreferenceCookieName(workspace?: string) {
 }
 
 async function resolveWorkspaceTeamId(api: any, workspace?: string) {
-  const workspaceSlug = workspace?.trim().toLowerCase();
-  if (!workspaceSlug) {
-    return undefined;
-  }
-
-  const teams = await api.workspaces.list();
-  return teams.items.find((item) => item.slug === workspaceSlug)?.id;
+  return resolveTeamId(api, workspace);
 }
 
 export const listProjectEnvironmentsServerFn = createServerFn({

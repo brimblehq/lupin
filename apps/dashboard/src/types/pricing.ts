@@ -33,6 +33,9 @@ export interface PlanSpecs {
   concurrentBuilds: number;
   logRetention: number;
   supportLevel: string;
+  dbMaxCpu: number | null;
+  dbMaxMemory: number | null;
+  dbMaxStorage: number | null;
 }
 
 export interface MeteredRates {

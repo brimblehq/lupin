@@ -317,7 +317,7 @@ function PricingFaqs() {
             type="single"
             defaultValue="faq-0"
             collapsible
-            className="overflow-hidden rounded-lg border border-[rgba(152,157,164,0.3)] bg-brimble-surface shadow-[var(--shadow-big)] dark:border-white/10 dark:bg-[#1e2023]"
+            className="overflow-hidden rounded-[4px] border border-[rgba(152,157,164,0.3)] bg-brimble-surface shadow-[var(--shadow-big)] dark:border-white/10 dark:bg-[#1e2023]"
           >
             {siteConfig.pricing.faqs.map((faq, i) => (
               <AccordionItem key={i} value={`faq-${i}`} className="px-4">

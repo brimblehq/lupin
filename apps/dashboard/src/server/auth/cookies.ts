@@ -47,7 +47,7 @@ export function setServerAuthCookies(session: AuthSession) {
     });
   }
 
-  authLogger.info("setServerAuthCookies", {
+  authLogger.debug("setServerAuthCookies", {
     replacedAccessToken: Boolean(existingAccessToken && session.accessToken),
     previousAccessTokenFp: tokenFingerprint(existingAccessToken),
     nextAccessTokenFp: tokenFingerprint(session.accessToken),

@@ -1,5 +1,5 @@
-import { useWebHaptics } from "web-haptics/react";
-import { useEffect, useMemo, useCallback } from "react";
+import { WebHaptics } from "web-haptics";
+import { useEffect, useMemo } from "react";
 
 /**
  * Safari drops user-activation across `await` boundaries, so the library's
@@ -71,50 +71,57 @@ const PATTERNS = {
   buzz: { segments: [{ duration: 1000 }], options: { intensity: 1 } },
 } as const;
 
+let sharedHaptics: WebHaptics | null = null;
+function getSharedHaptics(): WebHaptics | null {
+  if (typeof window === "undefined") return null;
+  if (!sharedHaptics) {
+    sharedHaptics = new WebHaptics({ debug: true, showSwitch: false });
+  }
+  return sharedHaptics;
+}
+
+function fire(key: keyof typeof PATTERNS) {
+  if (!hapticsEnabled) return;
+  const haptics = getSharedHaptics();
+  if (!haptics) return;
+  const p = PATTERNS[key];
+  haptics.trigger(p.segments as unknown as any[], "options" in p ? (p as any).options : undefined);
+}
+
+const hapticsApi = {
+  success: () => fire("success"),
+  warning: () => fire("warning"),
+  error: () => fire("error"),
+  light: () => fire("light"),
+  medium: () => fire("medium"),
+  heavy: () => fire("heavy"),
+  soft: () => fire("soft"),
+  rigid: () => fire("rigid"),
+  selection: () => fire("selection"),
+  nudge: () => fire("nudge"),
+  buzz: () => fire("buzz"),
+};
+
+let warmListenersAttached = false;
+function attachWarmListeners() {
+  if (warmListenersAttached) return;
+  warmListenersAttached = true;
+
+  const handler = () => {
+    warmSafariAudio();
+    document.removeEventListener("click", handler, true);
+    document.removeEventListener("touchstart", handler, true);
+  };
+
+  document.addEventListener("click", handler, { capture: true, once: true });
+  document.addEventListener("touchstart", handler, { capture: true, once: true });
+}
+
 export function useHaptics() {
   useEffect(() => {
     if (safariAudioWarmed) return;
-
-    const handler = () => {
-      warmSafariAudio();
-      document.removeEventListener("click", handler, true);
-      document.removeEventListener("touchstart", handler, true);
-    };
-
-    document.addEventListener("click", handler, { capture: true, once: true });
-    document.addEventListener("touchstart", handler, {
-      capture: true,
-      once: true,
-    });
-
-    return () => {
-      document.removeEventListener("click", handler, true);
-      document.removeEventListener("touchstart", handler, true);
-    };
+    attachWarmListeners();
   }, []);
 
-  const { trigger } = useWebHaptics({
-    debug: true,
-    showSwitch: false,
-  });
-  return useMemo(() => {
-    const fire = (key: keyof typeof PATTERNS) => {
-      if (!hapticsEnabled) return;
-      const p = PATTERNS[key];
-      trigger(p.segments as unknown as any[], "options" in p ? (p as any).options : undefined);
-    };
-    return {
-      success: () => fire("success"),
-      warning: () => fire("warning"),
-      error: () => fire("error"),
-      light: () => fire("light"),
-      medium: () => fire("medium"),
-      heavy: () => fire("heavy"),
-      soft: () => fire("soft"),
-      rigid: () => fire("rigid"),
-      selection: () => fire("selection"),
-      nudge: () => fire("nudge"),
-      buzz: () => fire("buzz"),
-    };
-  }, [trigger]);
+  return useMemo(() => hapticsApi, []);
 }

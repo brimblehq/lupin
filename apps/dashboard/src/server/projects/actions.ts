@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { withTokenRefresh } from "@/server/shared/backend";
+import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 import { projectsLogger } from "@/server/shared/logger";
+import type { SetProjectPasswordProtectionPayload } from "./types";
 
 function assignFiniteNumber(target: Record<string, unknown>, key: string, value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -16,15 +17,7 @@ export const listHomeProjectsServerFn = createServerFn({
   const environmentId = payload?.environmentId?.trim();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.list({
       sort: "updatedAt",
@@ -62,15 +55,7 @@ export const listProjectsPageServerFn = createServerFn({
   }
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.list({
       q: query || undefined,
@@ -104,15 +89,7 @@ export const createProjectServerFn = createServerFn({
   }
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     const finalBody: Record<string, unknown> = {
       ...body,
@@ -252,15 +229,7 @@ export const createDatabaseProjectServerFn = createServerFn({
   const whitelistedIps = Array.isArray(payload?.whitelistedIps) ? payload!.whitelistedIps.map((ip) => ip.trim()).filter(Boolean) : [];
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.createDatabase({
       name,
@@ -333,15 +302,7 @@ export const redeployProjectServerFn = createServerFn({
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.redeploy(projectId, {
       teamId,
@@ -358,12 +319,14 @@ export const debugSuggestionsServerFn = createServerFn({
     | {
         projectId: string;
         logId: string;
+        messageId: string;
         message: string;
       }
     | undefined;
 
   const projectId = payload?.projectId?.trim();
   const logId = payload?.logId?.trim();
+  const messageId = payload?.messageId?.trim();
   const message = payload?.message;
 
   if (!projectId) {
@@ -372,11 +335,14 @@ export const debugSuggestionsServerFn = createServerFn({
   if (!logId) {
     throw new Error("Log ID is required");
   }
+  if (!messageId) {
+    throw new Error("Message ID is required");
+  }
   if (!message?.trim()) {
     throw new Error("Message is required");
   }
 
-  return withTokenRefresh((api) => api.projects.debugSuggestions(projectId, { logId, message }));
+  return withTokenRefresh((api) => api.projects.debugSuggestions(projectId, { logId, messageId, message }));
 });
 
 export const debugSuggestionsPrServerFn = createServerFn({
@@ -386,6 +352,7 @@ export const debugSuggestionsPrServerFn = createServerFn({
     | {
         projectId: string;
         logId: string;
+        messageId: string;
         message: string;
         debug?: {
           framework: unknown | null;
@@ -398,6 +365,7 @@ export const debugSuggestionsPrServerFn = createServerFn({
 
   const projectId = payload?.projectId?.trim();
   const logId = payload?.logId?.trim();
+  const messageId = payload?.messageId?.trim();
   const message = payload?.message;
 
   if (!projectId) {
@@ -406,6 +374,9 @@ export const debugSuggestionsPrServerFn = createServerFn({
   if (!logId) {
     throw new Error("Log ID is required");
   }
+  if (!messageId) {
+    throw new Error("Message ID is required");
+  }
   if (!message?.trim()) {
     throw new Error("Message is required");
   }
@@ -413,6 +384,7 @@ export const debugSuggestionsPrServerFn = createServerFn({
   return withTokenRefresh((api) =>
     api.projects.debugSuggestionsPr(projectId, {
       logId,
+      messageId,
       message,
       debug: (payload?.debug as never) ?? null,
     }),
@@ -440,6 +412,38 @@ export const transferProjectServerFn = createServerFn({
   }
 
   return withTokenRefresh((api) => api.projects.transfer(projectId, { teamId }));
+});
+
+export const setProjectPasswordProtectionServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as SetProjectPasswordProtectionPayload | undefined;
+
+  const projectId = payload?.projectId?.trim();
+  if (!projectId) {
+    throw new Error("Project ID is required");
+  }
+  if (typeof payload?.passwordEnabled !== "boolean") {
+    throw new Error("`passwordEnabled` is required");
+  }
+
+  let password: string | undefined;
+  if (payload.passwordEnabled) {
+    password = typeof payload.password === "string" ? payload.password : "";
+    if (password.length < 6) {
+      throw new Error("Password must be at least 6 characters");
+    }
+  }
+
+  return withTokenRefresh(async (api) => {
+    const workspaceSlug = payload?.workspace?.trim().toLowerCase();
+    const teamId = workspaceSlug ? await resolveTeamId(api, workspaceSlug) : undefined;
+    return api.projects.setPasswordProtection(projectId, {
+      teamId,
+      passwordEnabled: payload!.passwordEnabled!,
+      password,
+    });
+  });
 });
 
 export const saveProjectGeneralConfigServerFn = createServerFn({
@@ -517,15 +521,7 @@ export const saveProjectGeneralConfigServerFn = createServerFn({
   }
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     if (nameChanged) {
       await api.projects.redeploy(projectId, {
@@ -591,15 +587,7 @@ export const saveProjectBuildConfigServerFn = createServerFn({
   }
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.redeploy(projectId, {
       teamId,
@@ -626,15 +614,7 @@ export const backupDatabaseProjectServerFn = createServerFn({
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.databaseBackup(projectId, { teamId });
   });
@@ -658,15 +638,7 @@ export const refreshDatabaseProjectServerFn = createServerFn({
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.databaseRefresh(projectId, { teamId });
   });
@@ -683,6 +655,7 @@ export const updateDatabaseProjectConfigServerFn = createServerFn({
         password?: string;
         configurations?: Record<string, unknown> | null;
         whitelistedIps?: string[];
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -700,25 +673,20 @@ export const updateDatabaseProjectConfigServerFn = createServerFn({
 
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
-  return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
+  return withTokenRefresh(
+    async (api) => {
+      const teamId = await resolveTeamId(api, workspaceSlug);
 
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
-
-    return api.projects.updateDatabaseConfig(projectId, {
-      teamId,
-      name,
-      password,
-      configurations: payload?.configurations ?? null,
-      whitelistedIps: Array.isArray(payload?.whitelistedIps) ? payload.whitelistedIps : [],
-    });
-  });
+      return api.projects.updateDatabaseConfig(projectId, {
+        teamId,
+        name,
+        password,
+        configurations: payload?.configurations ?? null,
+        whitelistedIps: Array.isArray(payload?.whitelistedIps) ? payload.whitelistedIps : [],
+      });
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const decryptDatabaseConnectionUriServerFn = createServerFn({
@@ -772,15 +740,7 @@ export const moveProjectEnvironmentServerFn = createServerFn({
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.updateEnvironment(projectId, {
       teamId,
@@ -797,6 +757,7 @@ export const deleteProjectServerFn = createServerFn({
     | {
         projectId: string;
         workspace?: string;
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -807,20 +768,14 @@ export const deleteProjectServerFn = createServerFn({
 
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
-  return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
-
-    await api.projects.remove(projectId, { teamId });
-    return { success: true };
-  });
+  return withTokenRefresh(
+    async (api) => {
+      const teamId = await resolveTeamId(api, workspaceSlug);
+      await api.projects.remove(projectId, { teamId });
+      return { success: true };
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const linkRepoServerFn = createServerFn({
@@ -841,12 +796,7 @@ export const linkRepoServerFn = createServerFn({
   const workspaceSlug = payload.workspace?.trim().toLowerCase();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) teamId = match.id;
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.linkRepo(projectId, { repo: payload.repo, teamId });
   });
@@ -863,12 +813,7 @@ export const unlinkRepoServerFn = createServerFn({
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) teamId = match.id;
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     return api.projects.unlinkRepo(projectId, { teamId });
   });

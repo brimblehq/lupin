@@ -1,10 +1,13 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { Modal } from "./modal";
 import { GlossyButton } from "./glossy-button";
 import { Avatar } from "./avatar";
 import { Spinner } from "./spinner";
+import { useProfileDrawer } from "@/contexts/profile-drawer-context";
+import { ProfileTab } from "@/types/enums";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -20,6 +23,9 @@ interface TeamInviteModalProps {
   onDecline: () => void;
   loading?: boolean;
   loadingAction?: "accept" | "decline";
+  enforce2FA?: boolean;
+  /** null = still loading user's 2FA status; ignore the gate while loading. */
+  viewerHas2FA?: boolean | null;
 }
 
 export function TeamInviteModal({
@@ -34,7 +40,19 @@ export function TeamInviteModal({
   onDecline,
   loading = false,
   loadingAction,
+  enforce2FA = false,
+  viewerHas2FA = null,
 }: TeamInviteModalProps) {
+  const profileDrawer = useProfileDrawer();
+  const navigate = useNavigate();
+  const blockedByTwoFactor = enforce2FA && viewerHas2FA === false;
+
+  const handleSetUp2FA = async () => {
+    // Drop the workspace search param so the drawer's personal Security tab is reachable.
+    await navigate({ to: "/", search: {} });
+    profileDrawer.open(ProfileTab.Security);
+    onOpenChange(false);
+  };
   return (
     <Modal open={open} onOpenChange={onOpenChange} width={420}>
       {/* Confetti banner */}
@@ -93,8 +111,13 @@ export function TeamInviteModal({
           You've been invited to <span className="font-medium text-dash-text-strong">{workspaceName}</span> as a workspace{" "}
           {role || "member"}
         </Dialog.Description>
+        {blockedByTwoFactor && (
+          <div className="mt-3 rounded-[6px] border border-[#f5a623]/30 bg-[#f5a623]/5 px-3 py-2 text-xs leading-[1.5] text-[#a16207] dark:text-[#f5a623]">
+            This workspace requires two-factor authentication. Set up 2FA on your account before joining.
+          </div>
+        )}
         <a
-          href="https://docs.brimble.io/team-workspaces"
+          href="https://paper.brimble.io/team-workspaces"
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 inline-block text-xs text-dash-text-faded underline decoration-dash-border underline-offset-2 transition-colors hover:text-dash-text-strong"
@@ -124,16 +147,29 @@ export function TeamInviteModal({
             "Decline"
           )}
         </button>
-        <GlossyButton
-          fullWidth
-          onClick={onAccept}
-          className="flex-1"
-          disabled={loading}
-          loading={loading && loadingAction === "accept"}
-          loadingLabel="Accepting…"
-        >
-          Accept
-        </GlossyButton>
+        {blockedByTwoFactor ? (
+          <GlossyButton
+            fullWidth
+            onClick={() => {
+              void handleSetUp2FA();
+            }}
+            className="flex-1"
+            disabled={loading}
+          >
+            Set up 2FA
+          </GlossyButton>
+        ) : (
+          <GlossyButton
+            fullWidth
+            onClick={onAccept}
+            className="flex-1"
+            disabled={loading}
+            loading={loading && loadingAction === "accept"}
+            loadingLabel="Accepting…"
+          >
+            Accept
+          </GlossyButton>
+        )}
       </motion.div>
     </Modal>
   );

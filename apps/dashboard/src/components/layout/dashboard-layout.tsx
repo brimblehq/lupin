@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,17 +6,15 @@ import { motion, AnimatePresence } from "motion/react";
 import { Moon, Sun } from "lucide-react";
 import { Desktop } from "@phosphor-icons/react";
 import { cn } from "@brimble/ui";
-import { Sidebar, mainNav, moreNav } from "./sidebar";
+import { Sidebar } from "./sidebar";
+import { mainNav, moreNav } from "./sidebar-nav";
 import { Topbar } from "./topbar";
 import { Footer } from "./footer";
-import { CommandPalette } from "./command-palette";
+import { RouterProgressBar } from "./router-progress-bar";
 import { TooltipProvider } from "../shared/tooltip";
 import { Snackbar } from "../shared/snackbar";
-import { OnboardingChecklist } from "../shared/onboarding-checklist";
-import { WelcomeModal } from "../shared/welcome-modal";
 import { DashToaster } from "../shared/toaster";
-import { UserProfileDrawer } from "../shared/user-profile-drawer";
-import { ScoutBarProvider } from "../../contexts/scoutbar-context";
+import { ScoutBarProvider, useScoutBar } from "../../contexts/scoutbar-context";
 import { useTheme } from "../../hooks/use-theme";
 import { setHapticsEnabled } from "../../hooks/use-haptics";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
@@ -34,13 +32,41 @@ import { PlanTypeProvider } from "@/contexts/plan-type-context";
 import { WorkspaceRoleProvider } from "@/contexts/workspace-role-context";
 import { canWorkspaceRoleWrite, resolveCurrentWorkspaceRole } from "@/utils/workspace-role";
 import { ProfileDrawerProvider } from "@/contexts/profile-drawer-context";
+import { StepUpTwoFactorProvider } from "@/contexts/step-up-two-factor-context";
+import { isTeamTwoFactorSetupRequiredError } from "@/lib/auth/two-factor-step-up";
 import { DEFAULT_PRICING } from "@/utils/default-pricing";
 import { ProfileTab, Theme } from "../../types/enums";
 import { listTooltipMessagesServerFn } from "@/server/messages/actions";
 import { getSettingsSidebarSnapshotServerFn } from "@/server/settings/actions";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
+import { getTwoFactorStatusServerFn } from "@/server/auth/actions";
+import type { TwoFactorStatus } from "@/backend/auth/types";
 import { identifyPostHog, isPostHogEnabled } from "@/lib/posthog";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
+
+const CommandPalette = lazy(() => import("./command-palette").then((m) => ({ default: m.CommandPalette })));
+const UserProfileDrawer = lazy(() => import("../shared/user-profile-drawer").then((m) => ({ default: m.UserProfileDrawer })));
+const OnboardingChecklist = lazy(() => import("../shared/onboarding-checklist").then((m) => ({ default: m.OnboardingChecklist })));
+const WelcomeModal = lazy(() => import("../shared/welcome-modal").then((m) => ({ default: m.WelcomeModal })));
+const TeamTwoFactorRequiredModal = lazy(() =>
+  import("../shared/team-two-factor-required-modal").then((m) => ({ default: m.TeamTwoFactorRequiredModal })),
+);
+
+const WELCOME_MODAL_STORAGE_KEY = "brimble:welcome-modal-dismissed";
+
+function CommandPaletteSlot() {
+  const { isOpen } = useScoutBar();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    if (isOpen) setMounted(true);
+  }, [isOpen]);
+  if (!mounted) return null;
+  return (
+    <Suspense fallback={null}>
+      <CommandPalette />
+    </Suspense>
+  );
+}
 
 const dashboardQueryClient = new QueryClient({
   defaultOptions: {
@@ -202,6 +228,30 @@ function ProjectsTabSkeleton() {
   );
 }
 
+function NewProjectTabSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-[680px] animate-pulse">
+      <div className="mb-8">
+        <div className="mb-4 h-4 w-28 rounded bg-dash-border-soft/60" />
+        <div className="mb-2 h-7 w-40 rounded bg-dash-border-soft/70" />
+        <div className="h-3.5 w-full max-w-[420px] rounded bg-dash-border-soft/50" />
+      </div>
+
+      <div className="mb-4 h-4 w-56 rounded bg-dash-border-soft/60" />
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="min-h-[132px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30 p-5">
+            <div className="mb-3 h-5 w-5 rounded bg-dash-border-soft/50" />
+            <div className="h-3.5 w-36 rounded bg-dash-border-soft/60" />
+            <div className="mt-1.5 h-3 w-full max-w-[230px] rounded bg-dash-border-soft/45" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DomainsTabSkeleton() {
   return (
     <div className="max-w-[1000px] animate-pulse">
@@ -353,6 +403,10 @@ function ProjectDetailTabSkeleton() {
 }
 
 function RouteTransitionSkeleton({ pathname, fullWidth }: { pathname: string; fullWidth?: boolean }) {
+  if (/^\/projects\/new(?:\/|$)/.test(pathname)) {
+    return <NewProjectTabSkeleton />;
+  }
+
   if (/^\/projects\/[^/]+(?:\/|$)/.test(pathname) && !/^\/projects\/new(?:\/|$)/.test(pathname)) {
     return <ProjectDetailTabSkeleton />;
   }
@@ -608,7 +662,7 @@ export function DashboardLayout({
   });
   const navigate = useNavigate();
   const isAuthRoute = /^\/(login|signup)$/.test(layoutPathname) || /^\/(login|signup)$/.test(pathname);
-  const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace|sandboxes)?(\/|$)/;
+  const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace|teams|sandboxes)?(\/|$)/;
   const isCatchAll = layoutPathname !== "/" && !knownPrefixes.test(layoutPathname);
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const resolvedSearchStr = useRouterState({
@@ -644,6 +698,41 @@ export function DashboardLayout({
     const params = new URLSearchParams(searchStr || "");
     return params.get("workspace")?.trim() || undefined;
   }, [searchStr]);
+
+  const [twoFactorStatus, setTwoFactorStatus] = useState<TwoFactorStatus | null>(null);
+  const getTwoFactorStatus = useServerFn(getTwoFactorStatusServerFn as any) as () => Promise<TwoFactorStatus>;
+
+  useEffect(() => {
+    let cancelled = false;
+    void getTwoFactorStatus()
+      .then((status) => {
+        if (!cancelled) setTwoFactorStatus(status ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setTwoFactorStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getTwoFactorStatus]);
+
+  useEffect(() => {
+    if (!currentWorkspace) return;
+    const handle = (event: { type: string; query?: { state: { error: unknown } }; mutation?: { state: { error: unknown } } }) => {
+      const err = event.query?.state.error ?? event.mutation?.state.error;
+      if (isTeamTwoFactorSetupRequiredError(err)) {
+        setTwoFactorStatus((prev) =>
+          prev ? { ...prev, enabled: false } : { enabled: false, hasRecoveryCodes: false, recoveryCodesRemaining: 0 },
+        );
+      }
+    };
+    const unsubQ = dashboardQueryClient.getQueryCache().subscribe(handle as any);
+    const unsubM = dashboardQueryClient.getMutationCache().subscribe(handle as any);
+    return () => {
+      unsubQ();
+      unsubM();
+    };
+  }, [currentWorkspace]);
   const dashboardProjects =
     matchedProjects ?? matchedProjectSwitcherProjects ?? initialOnboardingProjects?.items ?? initialProjectSwitcherProjects?.items ?? [];
   const checklistProjects =
@@ -694,10 +783,50 @@ export function DashboardLayout({
   // Settings drawer — shared between sidebar & topbar
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileRequestedTab, setProfileRequestedTab] = useState<ProfileTab | undefined>(undefined);
+  const [profileEverOpened, setProfileEverOpened] = useState(false);
+
+  useEffect(() => {
+    if (profileOpen && !profileEverOpened) setProfileEverOpened(true);
+  }, [profileOpen, profileEverOpened]);
+
+  const prevProfileOpenRef = useRef(false);
+  useEffect(() => {
+    if (prevProfileOpenRef.current && !profileOpen) {
+      void getTwoFactorStatus()
+        .then((status) => setTwoFactorStatus(status ?? null))
+        .catch(() => {});
+    }
+    prevProfileOpenRef.current = profileOpen;
+  }, [profileOpen, getTwoFactorStatus]);
 
   const openProfileDrawer = useCallback((tab?: ProfileTab) => {
     setProfileRequestedTab(tab);
     setProfileOpen(true);
+  }, []);
+
+  const [shouldRenderWelcomeModal, setShouldRenderWelcomeModal] = useState(false);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(WELCOME_MODAL_STORAGE_KEY)) {
+        setShouldRenderWelcomeModal(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const [shouldRenderOnboardingChecklist, setShouldRenderOnboardingChecklist] = useState(false);
+  useEffect(() => {
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (w.requestIdleCallback) {
+      const handle = w.requestIdleCallback(() => setShouldRenderOnboardingChecklist(true), { timeout: 1500 });
+      return () => w.cancelIdleCallback?.(handle);
+    }
+    const handle = window.setTimeout(() => setShouldRenderOnboardingChecklist(true), 600);
+    return () => window.clearTimeout(handle);
   }, []);
 
   const getTooltipMessages = useServerFn(listTooltipMessagesServerFn as any) as (args: {
@@ -953,6 +1082,7 @@ export function DashboardLayout({
           <PlanTypeProvider value={planType}>
             <WorkspaceRoleProvider value={workspaceRoleValue}>
               <TooltipProvider>
+                <RouterProgressBar />
                 <DashToaster />
                 {children}
               </TooltipProvider>
@@ -971,162 +1101,197 @@ export function DashboardLayout({
             <ScoutBarProvider>
               <TooltipProvider>
                 <ProfileDrawerProvider onOpen={openProfileDrawer}>
-                  <DashToaster />
-                  <CommandPalette />
-                  <div className="flex h-dvh flex-col bg-dash-bg">
-                    <Topbar
-                      onSettingsClick={() => setProfileOpen(true)}
-                      onMobileNavToggle={() => setMobileNavOpen((v) => !v)}
-                      mobileNavOpen={mobileNavOpen}
-                      settingsSnapshot={activeSettingsSnapshot}
-                      userProfile={userProfile}
-                      workspaces={effectiveWorkspaces}
-                      workspaceTeamMembers={activeWorkspaceTeamMembers}
-                      projectSwitcherProjects={matchedProjectSwitcherProjects ?? initialProjectSwitcherProjects?.items ?? []}
-                    />
-                    {/* Mobile navigation dropdown */}
-                    <AnimatePresence>
-                      {mobileNavOpen && (
-                        <>
-                          <motion.div
-                            key="mobile-nav-backdrop"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="fixed inset-0 z-40 bg-black/40 md:hidden"
-                            onClick={closeMobileNav}
-                          />
-                          <motion.div
-                            key="mobile-nav-dropdown"
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{
-                              duration: 0.25,
-                              ease: [0.16, 1, 0.3, 1],
-                            }}
-                            className="relative z-50 overflow-hidden border-b border-dash-border-soft bg-dash-bg md:hidden"
-                          >
-                            <MobileNavMenu
-                              onSettingsClick={() => {
-                                setProfileOpen(true);
-                                closeMobileNav();
-                              }}
+                  <StepUpTwoFactorProvider>
+                    <RouterProgressBar />
+                    <DashToaster />
+                    <CommandPaletteSlot />
+                    <div className="flex h-dvh flex-col bg-dash-bg">
+                      <Topbar
+                        onSettingsClick={() => setProfileOpen(true)}
+                        onMobileNavToggle={() => setMobileNavOpen((v) => !v)}
+                        mobileNavOpen={mobileNavOpen}
+                        userProfile={userProfile}
+                        workspaces={effectiveWorkspaces}
+                        workspaceTeamMembers={activeWorkspaceTeamMembers}
+                        projectSwitcherProjects={matchedProjectSwitcherProjects ?? initialProjectSwitcherProjects?.items ?? []}
+                      />
+                      {/* Mobile navigation dropdown */}
+                      <AnimatePresence>
+                        {mobileNavOpen && (
+                          <>
+                            <motion.div
+                              key="mobile-nav-backdrop"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="fixed inset-0 z-40 bg-black/40 md:hidden"
+                              onClick={closeMobileNav}
                             />
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                    <AnimatePresence>
-                      {visibleSnackbars.map(({ key, msg }) => {
-                        const variant = mapSnackbarVariant(msg.level);
-                        const actionLabel = getSnackbarActionLabel(msg);
-                        const isPaymentMessage = msg.type === "payment";
-                        const dismissible = isSnackbarDismissible(msg);
+                            <motion.div
+                              key="mobile-nav-dropdown"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{
+                                duration: 0.25,
+                                ease: [0.16, 1, 0.3, 1],
+                              }}
+                              className="relative z-50 overflow-hidden border-b border-dash-border-soft bg-dash-bg md:hidden"
+                            >
+                              <MobileNavMenu
+                                onSettingsClick={() => {
+                                  setProfileOpen(true);
+                                  closeMobileNav();
+                                }}
+                              />
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {visibleSnackbars.map(({ key, msg }) => {
+                          const variant = mapSnackbarVariant(msg.level);
+                          const actionLabel = getSnackbarActionLabel(msg);
+                          const isPaymentMessage = msg.type === "payment";
+                          const dismissible = isSnackbarDismissible(msg);
 
-                        return (
-                          <Snackbar
-                            key={key}
-                            variant={variant}
-                            message={msg.message}
-                            action={
-                              actionLabel
-                                ? {
-                                    label: actionLabel,
-                                    onClick: () => {
-                                      if (isPaymentMessage) {
-                                        setProfileRequestedTab(ProfileTab.Billing);
-                                        setProfileOpen(true);
-                                        return;
-                                      }
+                          return (
+                            <Snackbar
+                              key={key}
+                              variant={variant}
+                              message={msg.message}
+                              action={
+                                actionLabel
+                                  ? {
+                                      label: actionLabel,
+                                      onClick: () => {
+                                        if (isPaymentMessage) {
+                                          setProfileRequestedTab(ProfileTab.Billing);
+                                          setProfileOpen(true);
+                                          return;
+                                        }
 
-                                      if (!msg.route) {
-                                        return;
-                                      }
+                                        if (!msg.route) {
+                                          return;
+                                        }
 
-                                      if (/^https?:\/\//.test(msg.route!)) {
-                                        window.location.href = msg.route!;
-                                        return;
-                                      }
+                                        if (/^https?:\/\//.test(msg.route!)) {
+                                          window.open(msg.route!, "_blank", "noopener,noreferrer");
+                                          return;
+                                        }
 
-                                      void navigate({
-                                        to: msg.route as any,
-                                        search: currentWorkspace
-                                          ? ({
-                                              workspace: currentWorkspace,
-                                            } as any)
-                                          : undefined,
+                                        void navigate({
+                                          to: msg.route as any,
+                                          search: currentWorkspace
+                                            ? ({
+                                                workspace: currentWorkspace,
+                                              } as any)
+                                            : undefined,
+                                        });
+                                      },
+                                    }
+                                  : undefined
+                              }
+                              onDismiss={
+                                dismissible
+                                  ? () => {
+                                      setDismissedSnackbarKeys((prev) => {
+                                        const next = new Set(prev);
+                                        next.add(key);
+                                        writeDismissedSnackbars(currentWorkspace, next);
+                                        return next;
                                       });
-                                    },
-                                  }
-                                : undefined
-                            }
-                            onDismiss={
-                              dismissible
-                                ? () => {
-                                    setDismissedSnackbarKeys((prev) => {
-                                      const next = new Set(prev);
-                                      next.add(key);
-                                      writeDismissedSnackbars(currentWorkspace, next);
-                                      return next;
-                                    });
-                                  }
-                                : undefined
-                            }
-                          />
-                        );
-                      })}
-                    </AnimatePresence>
+                                    }
+                                  : undefined
+                              }
+                            />
+                          );
+                        })}
+                      </AnimatePresence>
 
-                    {!shouldRenderDesktopSidebar ? (
-                      <main className="scrollbar-hidden flex flex-1 flex-col overflow-y-auto">
-                        <div className="mx-auto w-full max-w-screen-xl flex-1 px-4 md:px-0">
-                          {shouldShowRouteSkeleton ? (
-                            <div className="py-8">
-                              <RouteTransitionSkeleton pathname={pathname} fullWidth />
-                            </div>
-                          ) : (
-                            children
-                          )}
-                        </div>
-                        <Footer />
-                      </main>
-                    ) : (
-                      <div className="mx-auto flex w-full max-w-screen-xl flex-1 overflow-hidden">
-                        <div className="hidden md:flex">
-                          <Sidebar profileOpen={profileOpen} onProfileOpenChange={setProfileOpen} />
-                        </div>
-                        <main className="scrollbar-hidden flex min-h-0 flex-1 flex-col overflow-y-auto">
-                          <div className="flex-1 px-4 py-6 md:py-8 md:pl-10 md:pr-0">
-                            {shouldShowRouteSkeleton ? <RouteTransitionSkeleton pathname={pathname} /> : children}
+                      {!shouldRenderDesktopSidebar ? (
+                        <main className="scrollbar-hidden flex flex-1 flex-col overflow-y-auto">
+                          <div className="mx-auto w-full max-w-screen-xl flex-1 px-4 md:px-0">
+                            {shouldShowRouteSkeleton ? (
+                              <div className="py-8">
+                                <RouteTransitionSkeleton pathname={pathname} fullWidth />
+                              </div>
+                            ) : (
+                              children
+                            )}
                           </div>
                           <Footer />
                         </main>
-                      </div>
-                    )}
-                    <WelcomeModal />
-                    <OnboardingChecklist
-                      projects={checklistProjects}
-                      settingsSnapshot={activeSettingsSnapshot}
-                      isTeamWorkspace={isTeamWorkspace}
-                      teamDetails={activeWorkspaceTeamMembers}
-                    />
-                    <UserProfileDrawer
-                      initialWorkspaceTeamMembers={activeWorkspaceTeamMembers}
-                      open={profileOpen}
-                      onOpenChange={setProfileOpen}
-                      requestedTab={profileRequestedTab}
-                      initialSnapshot={activeSettingsSnapshot}
-                      initialPaymentMethods={initialPaymentMethods ?? null}
-                      initialInvoices={initialInvoices ?? null}
-                      initialActivityLogs={initialActivityLogs ?? null}
-                      initialSubscriptionStats={initialSubscriptionStats ?? null}
-                      initialUserOverview={initialUserOverview ?? null}
-                      initialProjectEnvironments={initialProjectEnvironments ?? null}
-                      projectCount={accountProjectCount}
-                    />
-                  </div>
+                      ) : (
+                        <div className="mx-auto flex w-full max-w-screen-xl flex-1 overflow-hidden">
+                          <div className="hidden md:flex">
+                            <Sidebar onProfileOpenChange={setProfileOpen} />
+                          </div>
+                          <main className="scrollbar-hidden flex min-h-0 flex-1 flex-col overflow-y-auto">
+                            <div className="flex-1 px-4 py-6 md:py-8 md:pl-10 md:pr-0">
+                              {shouldShowRouteSkeleton ? <RouteTransitionSkeleton pathname={pathname} /> : children}
+                            </div>
+                            <Footer />
+                          </main>
+                        </div>
+                      )}
+                      {shouldRenderWelcomeModal && (
+                        <Suspense fallback={null}>
+                          <WelcomeModal />
+                        </Suspense>
+                      )}
+                      {(() => {
+                        const viewerNeeds2FA =
+                          isKnownWorkspace && Boolean(activeWorkspaceTeamMembers?.enforce2FA) && twoFactorStatus?.enabled === false;
+                        if (!viewerNeeds2FA) return null;
+                        const team = effectiveWorkspaces.find((w) => w.slug === currentWorkspace);
+                        const workspaceName = team?.name || activeWorkspaceTeamMembers?.name || currentWorkspace || "this workspace";
+                        return (
+                          <Suspense fallback={null}>
+                            <TeamTwoFactorRequiredModal
+                              open
+                              onOpenChange={() => {
+                                /* non-dismissible — auto-closes when 2FA becomes enabled */
+                              }}
+                              workspaceName={workspaceName}
+                              workspaceAvatarUrl={team?.avatarUrl}
+                              userFirstName={userProfile?.firstName || undefined}
+                              userAvatarUrl={userProfile?.avatarUrl || undefined}
+                            />
+                          </Suspense>
+                        );
+                      })()}
+                      {shouldRenderOnboardingChecklist && (
+                        <Suspense fallback={null}>
+                          <OnboardingChecklist
+                            projects={checklistProjects}
+                            settingsSnapshot={activeSettingsSnapshot}
+                            isTeamWorkspace={isTeamWorkspace}
+                            teamDetails={activeWorkspaceTeamMembers}
+                          />
+                        </Suspense>
+                      )}
+                      {profileEverOpened && (
+                        <Suspense fallback={null}>
+                          <UserProfileDrawer
+                            initialWorkspaceTeamMembers={activeWorkspaceTeamMembers}
+                            open={profileOpen}
+                            onOpenChange={setProfileOpen}
+                            requestedTab={profileRequestedTab}
+                            initialSnapshot={activeSettingsSnapshot}
+                            initialPaymentMethods={initialPaymentMethods ?? null}
+                            initialInvoices={initialInvoices ?? null}
+                            initialActivityLogs={initialActivityLogs ?? null}
+                            initialSubscriptionStats={initialSubscriptionStats ?? null}
+                            initialUserOverview={initialUserOverview ?? null}
+                            initialProjectEnvironments={initialProjectEnvironments ?? null}
+                            projectCount={accountProjectCount}
+                          />
+                        </Suspense>
+                      )}
+                    </div>
+                  </StepUpTwoFactorProvider>
                 </ProfileDrawerProvider>
               </TooltipProvider>
             </ScoutBarProvider>

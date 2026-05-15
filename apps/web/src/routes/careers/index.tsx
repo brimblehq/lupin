@@ -5,7 +5,7 @@ import { ArrowUpRight } from "lucide-react";
 import { buildSeoHead } from "@/config/seo";
 import { Navbar } from "@/components/layout/navbar";
 import { Cta } from "@/components/sections/cta";
-import { careerRoles, type CareerRole } from "@/data/careers";
+import { listCareersServerFn, type CareerRole } from "@/server/careers/actions";
 
 export const Route = createFileRoute("/careers/")({
   head: () =>
@@ -15,16 +15,22 @@ export const Route = createFileRoute("/careers/")({
         "Help us build the cloud platform developers actually enjoy using. Open roles in product and engineering at Brimble.",
       path: "/careers",
     }),
+  staleTime: 60_000,
+  loader: async (): Promise<CareerRole[]> => {
+    return (listCareersServerFn as unknown as () => Promise<CareerRole[]>)();
+  },
   component: CareersPage,
 });
 
 function CareersPage() {
+  const roles = Route.useLoaderData();
+
   return (
     <div className="min-h-dvh bg-brimble-surface transition-colors duration-300">
       <Navbar />
       <main>
         <CareersHero />
-        <OpenRoles />
+        <OpenRoles roles={roles} />
         <Cta />
       </main>
     </div>
@@ -64,9 +70,41 @@ function CareersHero() {
 
 /* ─── Open Roles ─── */
 
-function OpenRoles() {
+function OpenRoles({ roles }: { roles: CareerRole[] }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-80px" });
+
+  if (roles.length === 0) {
+    return (
+      <section className="bg-brimble-surface transition-colors duration-300 px-6 py-10">
+        <div ref={ref} className="mx-auto flex max-w-[720px] flex-col gap-4">
+          <motion.p
+            className="font-mono text-xs uppercase tracking-[1.2px] text-brimble-black/50"
+            initial={{ opacity: 0, y: 12 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          >
+            Open roles · 0
+          </motion.p>
+          <motion.div
+            className="rounded-xl border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-8 text-center dark:border-white/10"
+            initial={{ opacity: 0, y: 16 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <p className="font-body text-base font-medium text-brimble-black">No open roles right now</p>
+            <p className="mt-1 font-body text-sm leading-[1.6] text-brimble-black/60">
+              Check back soon, or send a note to{" "}
+              <a href="mailto:hello@brimble.app" className="text-[#006fff] hover:underline">
+                hello@brimble.app
+              </a>{" "}
+              if you're excited about what we're building.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="bg-brimble-surface transition-colors duration-300 px-6 py-10">
@@ -77,11 +115,11 @@ function OpenRoles() {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          Open roles · {careerRoles.length}
+          Open roles · {roles.length}
         </motion.p>
 
         <div className="flex flex-col gap-4">
-          {careerRoles.map((role, i) => (
+          {roles.map((role, i) => (
             <motion.div
               key={role.slug}
               initial={{ opacity: 0, y: 24 }}
@@ -95,11 +133,20 @@ function OpenRoles() {
               <Link
                 to="/careers/$slug"
                 params={{ slug: role.slug }}
-                className="group flex flex-col gap-3 rounded-xl border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-6 transition-colors duration-200 hover:border-[rgba(152,157,164,0.5)] dark:border-white/10 dark:hover:border-white/20"
+                className={`group flex flex-col gap-3 rounded-xl border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-6 transition-colors duration-200 hover:border-[rgba(152,157,164,0.5)] dark:border-white/10 dark:hover:border-white/20 ${
+                  role.closed ? "opacity-60 hover:opacity-80" : ""
+                }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex flex-col gap-2">
-                    <h2 className="font-body text-base font-medium text-brimble-black">{role.title}</h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-body text-base font-medium text-brimble-black">{role.title}</h2>
+                      {role.closed && (
+                        <span className="inline-flex items-center rounded-full border border-[rgba(152,157,164,0.3)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[1.2px] text-brimble-black/50 dark:border-white/10">
+                          Closed
+                        </span>
+                      )}
+                    </div>
                     <RoleMeta role={role} />
                   </div>
                   <ArrowUpRight className="size-4 shrink-0 text-brimble-black/40 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-brimble-black" />
@@ -114,7 +161,7 @@ function OpenRoles() {
           className="mt-4 font-body text-sm leading-[1.6] text-brimble-black/50"
           initial={{ opacity: 0 }}
           animate={isInView ? { opacity: 1 } : {}}
-          transition={{ duration: 0.6, delay: 0.15 * careerRoles.length, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.6, delay: 0.15 * roles.length, ease: [0.16, 1, 0.3, 1] }}
         >
           Don't see the right fit? If you're excited about what we're building, send a note to{" "}
           <a href="mailto:hello@brimble.app" className="text-[#006fff] hover:underline">

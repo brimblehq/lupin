@@ -4,23 +4,13 @@ import type { BackendApi } from "@/backend";
 import type { DomainDetailsRecord, DomainRecord, PaginatedDomainsResponse } from "@/backend/domains";
 import type { PaginatedProjectsResponse } from "@/backend/projects";
 import config from "@/config";
-import { withTokenRefresh } from "@/server/shared/backend";
+import type { TransferDomainWorkspacePayload } from "./types";
+import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 import { domainsLogger, domainsDnsLogger } from "@/server/shared/logger";
 import { resolveEnvironmentId } from "@/utils/environment-selection";
 
 async function resolveTeamIdFromWorkspace(api: BackendApi, workspace?: string) {
-  const workspaceSlug = workspace?.trim().toLowerCase();
-  if (!workspaceSlug) {
-    return undefined;
-  }
-
-  const teams = await api.workspaces.list();
-  const match = teams.items.find((item) => item.slug === workspaceSlug);
-  if (match?.id) {
-    return match.id;
-  }
-
-  return undefined;
+  return resolveTeamId(api, workspace);
 }
 
 function buildEnvironmentPreferenceCookieName(workspace?: string) {
@@ -248,6 +238,28 @@ export const transferDomainServerFn = createServerFn({
   });
 });
 
+export const transferDomainWorkspaceServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as TransferDomainWorkspacePayload | undefined;
+
+  const domainId = payload?.domainId?.trim();
+  if (!domainId) {
+    throw new Error("Domain id is required");
+  }
+
+  const targetTeamId =
+    typeof payload?.targetTeamId === "string" && payload.targetTeamId.trim() ? payload.targetTeamId.trim() : null;
+
+  return withTokenRefresh(
+    async (api) => {
+      await api.domains.transferWorkspace({ domainId, targetTeamId });
+      return { success: true };
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
+});
+
 export const deleteDomainServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
@@ -256,6 +268,7 @@ export const deleteDomainServerFn = createServerFn({
         workspace?: string;
         domainId: string;
         projectId?: string;
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -264,21 +277,21 @@ export const deleteDomainServerFn = createServerFn({
     throw new Error("Domain id is required");
   }
 
-  let projectId: string | undefined;
-  if (typeof payload?.projectId === "string" && payload.projectId.trim()) {
-    projectId = payload.projectId.trim();
-  }
+  const projectId = payload?.projectId?.trim() || undefined;
 
-  return withTokenRefresh(async (api) => {
-    const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
-    await api.domains.remove({
-      domainId,
-      projectId,
-      teamId,
-    });
+  return withTokenRefresh(
+    async (api) => {
+      const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
+      await api.domains.remove({
+        domainId,
+        projectId,
+        teamId,
+      });
 
-    return { success: true };
-  });
+      return { success: true };
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
 });
 
 export const searchDomainSaleServerFn = createServerFn({
@@ -528,6 +541,7 @@ export const transferOutServerFn = createServerFn({
     | {
         workspace?: string;
         domainName: string;
+        twoFactorToken?: string;
       }
     | undefined;
 
@@ -536,9 +550,39 @@ export const transferOutServerFn = createServerFn({
     throw new Error("Domain name is required");
   }
 
+  return withTokenRefresh(
+    async (api) => {
+      const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
+      return api.domains.transferOut(domainName, teamId);
+    },
+    { stepUpToken: payload?.twoFactorToken },
+  );
+});
+
+export const setDomainNameserversServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        workspace?: string;
+        domainId: string;
+        nameservers: string[];
+      }
+    | undefined;
+
+  const domainId = payload?.domainId?.trim();
+  if (!domainId) {
+    throw new Error("Domain ID is required");
+  }
+
+  const nameservers = (payload?.nameservers ?? []).map((ns) => ns.trim()).filter(Boolean);
+  if (nameservers.length < 2) {
+    throw new Error("Provide at least 2 nameservers");
+  }
+
   return withTokenRefresh(async (api) => {
     const teamId = await resolveTeamIdFromWorkspace(api, payload?.workspace);
-    return api.domains.transferOut(domainName, teamId);
+    return api.domains.setNameservers({ domainId, nameservers, teamId });
   });
 });
 

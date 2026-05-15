@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { ActivityLogsResponse } from "@/backend/activity-logs";
-import { withTokenRefresh } from "@/server/shared/backend";
+import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 
 export const listActivityLogsServerFn = createServerFn({
   method: "GET",
@@ -16,14 +16,7 @@ export const listActivityLogsServerFn = createServerFn({
     | undefined;
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    const workspaceSlug = payload?.workspace?.trim().toLowerCase();
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      teamId = match?.id ?? undefined;
-    }
+    const teamId = await resolveTeamId(api, payload?.workspace);
 
     return api.activityLogs.list({
       teamId,

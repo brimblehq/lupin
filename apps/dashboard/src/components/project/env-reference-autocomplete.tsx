@@ -18,9 +18,7 @@ export interface ProjectVarOption {
   name: string;
 }
 
-export type AutocompleteSelection =
-  | { kind: "shared"; name: string }
-  | { kind: "project"; slug: string; name: string };
+export type AutocompleteSelection = { kind: "shared"; name: string } | { kind: "project"; slug: string; name: string };
 
 type Row = {
   kind: "shared-var" | "project" | "project-var";
@@ -272,11 +270,7 @@ export function EnvReferenceAutocomplete({
 }
 
 function GroupHeader({ label }: { label: string }) {
-  return (
-    <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-dash-text-extra-faded">
-      {label}
-    </div>
-  );
+  return <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-dash-text-extra-faded">{label}</div>;
 }
 
 const COLLAPSED_LIMIT = 9;
@@ -301,12 +295,11 @@ function RootList({
   }
   const visibleRows = expanded ? rows : rows.slice(0, COLLAPSED_LIMIT);
   const hiddenCount = rows.length - visibleRows.length;
-  let lastGroup: string | null = null;
   return (
     <>
       {visibleRows.map((row, index) => {
-        const showHeader = row.group === "shared" && row.group !== lastGroup;
-        lastGroup = row.group;
+        const previous = index > 0 ? visibleRows[index - 1] : null;
+        const showHeader = row.group === "shared" && previous?.group !== "shared";
         return (
           <div key={`${row.kind}:${row.label}:${index}`}>
             {showHeader && <GroupHeader label="Shared" />}
@@ -370,9 +363,7 @@ function ProjectDrillDown({
           <Spinner className="size-3.5" />
         </div>
       ) : rows.length === 0 ? (
-        <div className="px-3 py-2 text-sm text-dash-text-faded">
-          {hasAnyVars ? "No matches" : "No variables in this project"}
-        </div>
+        <div className="px-3 py-2 text-sm text-dash-text-faded">{hasAnyVars ? "No matches" : "No variables in this project"}</div>
       ) : (
         <>
           {visibleRows.map((row, index) => (

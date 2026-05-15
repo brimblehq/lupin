@@ -39,6 +39,9 @@ export const DEFAULT_PRICING: Pricing = {
       concurrentBuilds: 1,
       logRetention: 1,
       supportLevel: "community",
+      dbMaxCpu: 0.1,
+      dbMaxMemory: 0.25,
+      dbMaxStorage: 10,
     },
     hacker: {
       projectLimit: 10,
@@ -54,6 +57,9 @@ export const DEFAULT_PRICING: Pricing = {
       concurrentBuilds: 1,
       logRetention: 7,
       supportLevel: "email",
+      dbMaxCpu: null,
+      dbMaxMemory: null,
+      dbMaxStorage: null,
     },
     developer: {
       projectLimit: null,
@@ -69,6 +75,9 @@ export const DEFAULT_PRICING: Pricing = {
       concurrentBuilds: 3,
       logRetention: 14,
       supportLevel: "priority",
+      dbMaxCpu: null,
+      dbMaxMemory: null,
+      dbMaxStorage: null,
     },
     team: {
       projectLimit: null,
@@ -84,6 +93,9 @@ export const DEFAULT_PRICING: Pricing = {
       concurrentBuilds: 5,
       logRetention: 30,
       supportLevel: "dedicated",
+      dbMaxCpu: null,
+      dbMaxMemory: null,
+      dbMaxStorage: null,
     },
   },
 };

@@ -106,19 +106,7 @@ export function CommandPalette() {
     [personalName, workspaces?.items],
   );
 
-  const go = (pathname: string) => navigate({ to: withWorkspaceQuery({ pathname, searchStr }) as any });
-
-  // ⌘K / Ctrl+K to toggle
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setIsOpen(!isOpen);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, setIsOpen]);
+  const go = useCallback((pathname: string) => navigate({ to: withWorkspaceQuery({ pathname, searchStr }) as any }), [navigate, searchStr]);
 
   const prevIsOpen = useRef(false);
   useEffect(() => {
@@ -230,25 +218,25 @@ export function CommandPalette() {
     [haptics, setIsOpen],
   );
 
-  const openNewProject = () => {
+  const openNewProject = useCallback(() => {
     runAction(() => go("/projects/new"));
-  };
+  }, [go, runAction]);
 
-  const openNewDomain = () => {
+  const openNewDomain = useCallback(() => {
     runAction(() => go("/domains"));
-  };
+  }, [go, runAction]);
 
-  const openBuyDomain = () => {
+  const openBuyDomain = useCallback(() => {
     runAction(() => go("/domains/buy"));
-  };
+  }, [go, runAction]);
 
-  const openNewDatabase = () => {
+  const openNewDatabase = useCallback(() => {
     runAction(() => go("/projects/new"));
-  };
+  }, [go, runAction]);
 
-  const openNewTeam = () => {
+  const openNewTeam = useCallback(() => {
     runAction(() => navigate({ to: "/workspace/new" }));
-  };
+  }, [navigate, runAction]);
 
   const openProjectSearch = () => {
     haptics.selection();
@@ -282,23 +270,23 @@ export function CommandPalette() {
     setQuery("");
   };
 
-  const goBackView = () => {
+  const goBackView = useCallback(() => {
     if (pastViews.length === 0) return;
     const previous = pastViews[pastViews.length - 1];
     setPastViews(pastViews.slice(0, -1));
     setFutureViews([view, ...futureViews]);
     setView(previous);
     setQuery("");
-  };
+  }, [futureViews, pastViews, view]);
 
-  const goForwardView = () => {
+  const goForwardView = useCallback(() => {
     if (futureViews.length === 0) return;
     const [next, ...rest] = futureViews;
     setFutureViews(rest);
     setPastViews([...pastViews, view]);
     setView(next);
     setQuery("");
-  };
+  }, [futureViews, pastViews, view]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -319,7 +307,7 @@ export function CommandPalette() {
 
     document.addEventListener("keydown", handleArrowNavigation);
     return () => document.removeEventListener("keydown", handleArrowNavigation);
-  }, [isOpen, pastViews, futureViews, view]);
+  }, [futureViews, goBackView, goForwardView, isOpen, pastViews, view]);
 
   const shortcutBufferRef = useRef<{
     value: string;
@@ -418,7 +406,7 @@ export function CommandPalette() {
       document.removeEventListener("keydown", handleBadgeShortcuts);
       resetShortcutBuffer();
     };
-  }, [isOpen, openBuyDomain, openNewDatabase, openNewDomain, openNewProject, openNewTeam, query, view]);
+  }, [canWrite, isOpen, openBuyDomain, openNewDatabase, openNewDomain, openNewProject, openNewTeam, query, view]);
 
   const inputPlaceholder = (() => {
     if (view === PaletteView.ProjectSearch) return "Search projects...";
@@ -591,7 +579,7 @@ export function CommandPalette() {
                             </Command.Item>
                             <Command.Item
                               value="cli docs documentation"
-                              onSelect={() => runAction(() => window.open("https://docs.brimble.io", "_blank"))}
+                              onSelect={() => runAction(() => window.open("https://paper.brimble.io", "_blank"))}
                             >
                               <img src="/icons/scoutbar/desktop.svg" width="16" height="16" alt="" />
                               <span>CLI docs</span>
@@ -612,7 +600,7 @@ export function CommandPalette() {
                                     .then(() => {
                                       posthog.reset();
                                       invalidateSessionCache();
-                                      void navigate({ to: "/login" });
+                                      window.location.href = "/login";
                                     });
                                 })
                               }

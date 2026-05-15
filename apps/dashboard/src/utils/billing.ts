@@ -1,4 +1,22 @@
+import * as Yup from "yup";
 import type { PaymentMethod } from "@/backend/payments";
+
+export const CANCEL_COMMENT_MAX = 500;
+
+export type CancelSubscriptionFormValues = {
+  comment: string;
+};
+
+export const cancelSubscriptionInitialValues: CancelSubscriptionFormValues = {
+  comment: "",
+};
+
+export const cancelSubscriptionSchema = Yup.object({
+  comment: Yup.string()
+    .trim()
+    .required("Please tell us why you're cancelling")
+    .max(CANCEL_COMMENT_MAX, `Feedback must be ${CANCEL_COMMENT_MAX} characters or fewer`),
+});
 
 export function formatUsdMonthly(amount: number) {
   return `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
@@ -30,3 +48,4 @@ export function resolveCardSummary(method: PaymentMethod | undefined): CardSumma
     last4: source.last4 ?? "",
   };
 }
+

@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { Info, AlertTriangle, AlertCircle, X } from "lucide-react";
 import { cn } from "@brimble/ui";
 

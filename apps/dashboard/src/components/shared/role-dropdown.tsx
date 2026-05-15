@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 
-export const TEAM_ROLES: Array<{ value: string; label: string; description: string }> = [
+const TEAM_ROLES: Array<{ value: string; label: string; description: string }> = [
   { value: "Member", label: "Member", description: "Can access assigned environments and deploy" },
   { value: "Administrator", label: "Administrator", description: "Can manage members, environments, and settings" },
   { value: "Viewer", label: "Viewer", description: "Read-only access to assigned environments" },

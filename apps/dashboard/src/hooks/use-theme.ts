@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { updateSettingsThemeServerFn } from "@/server/settings/actions";
 import { Theme } from "../types/enums";
 
 const listeners = new Set<() => void>();
@@ -12,7 +14,7 @@ function emitThemeChange() {
 
 function getStoredThemeMode(): Theme {
   if (typeof window === "undefined") {
-    return Theme.System;
+    return Theme.Light;
   }
 
   try {
@@ -29,7 +31,15 @@ function getStoredThemeMode(): Theme {
     // no-op
   }
 
-  return Theme.System;
+  return Theme.Light;
+}
+
+function toThemeMode(value: unknown): Theme | undefined {
+  if (value === Theme.Light || value === Theme.Dark || value === Theme.System) {
+    return value;
+  }
+
+  return undefined;
 }
 
 function resolveEffectiveTheme(
@@ -73,7 +83,7 @@ function getSnapshot(): Theme {
 }
 
 function getServerSnapshot(): Theme {
-  return Theme.System;
+  return Theme.Light;
 }
 
 function subscribe(cb: () => void) {
@@ -101,42 +111,65 @@ function subscribe(cb: () => void) {
   };
 }
 
-export function useTheme() {
+export function useTheme(serverTheme?: Theme | "light" | "dark" | "system" | null) {
   const mode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const updateTheme = useServerFn(updateSettingsThemeServerFn as any) as (args: {
+    data: { theme: Theme };
+  }) => Promise<{ ok: true }>;
   const [hasHydrated, setHasHydrated] = useState(false);
   const theme = useMemo(() => resolveEffectiveTheme(mode, { allowSystemMatchMedia: hasHydrated }), [mode, hasHydrated]);
+
+  const persistTheme = useCallback(
+    (nextTheme: Theme) => {
+      void updateTheme({ data: { theme: nextTheme } }).catch(() => undefined);
+    },
+    [updateTheme],
+  );
 
   useEffect(() => {
     setHasHydrated(true);
   }, []);
 
   useEffect(() => {
-    applyTheme(mode);
-  }, [mode]);
+    const normalizedServerTheme = toThemeMode(serverTheme);
+    if (!normalizedServerTheme) {
+      return;
+    }
+    applyTheme(normalizedServerTheme);
+  }, [serverTheme]);
 
-  const setTheme = useCallback((t: Theme) => {
-    applyTheme(t);
-  }, []);
+  const setTheme = useCallback(
+    (nextTheme: Theme) => {
+      applyTheme(nextTheme);
+      persistTheme(nextTheme);
+    },
+    [persistTheme],
+  );
 
   const toggleTheme = useCallback(() => {
     const current = resolveEffectiveTheme(getStoredThemeMode());
-    applyTheme(current === Theme.Dark ? Theme.Light : Theme.Dark);
-  }, []);
+    const nextTheme = current === Theme.Dark ? Theme.Light : Theme.Dark;
+    applyTheme(nextTheme);
+    persistTheme(nextTheme);
+  }, [persistTheme]);
 
   const cycleTheme = useCallback(() => {
     const currentMode = getStoredThemeMode();
     if (currentMode === Theme.Light) {
       applyTheme(Theme.Dark);
+      persistTheme(Theme.Dark);
       return;
     }
 
     if (currentMode === Theme.Dark) {
       applyTheme(Theme.System);
+      persistTheme(Theme.System);
       return;
     }
 
     applyTheme(Theme.Light);
-  }, []);
+    persistTheme(Theme.Light);
+  }, [persistTheme]);
 
   return { theme, mode, setTheme, toggleTheme, cycleTheme };
 }

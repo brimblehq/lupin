@@ -18,11 +18,13 @@ export interface ListDeploymentRunLogsInput {
 export async function listDeploymentRunLogsFromSupabase(input: {
   supabaseUrl: string;
   supabaseKey: string;
+  accessToken?: string;
   tableName: string;
   filter: ListDeploymentRunLogsInput;
 }): Promise<RawDeploymentRunLogRow[]> {
   const supabaseUrl = input.supabaseUrl.trim();
   const supabaseKey = input.supabaseKey.trim();
+  const accessToken = input.accessToken?.trim() || supabaseKey;
   const tableName = input.tableName.trim();
   const logId = input.filter.logId.trim();
   const ownerId = input.filter.ownerId.trim();
@@ -64,7 +66,7 @@ export async function listDeploymentRunLogsFromSupabase(input: {
     headers: {
       Accept: "application/json",
       apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
+      Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
   });

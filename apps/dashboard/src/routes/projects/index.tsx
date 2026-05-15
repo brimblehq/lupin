@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createFileRoute, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
@@ -15,6 +15,7 @@ import { SearchFilterBar } from "../../components/shared/search-filter-bar";
 import { FilterDropdown, type FilterOption } from "../../components/shared/filter-dropdown";
 import { Modal, ModalHeader } from "../../components/shared/modal";
 import { GlossyButton } from "../../components/shared/glossy-button";
+import { ProjectsListPending } from "@/components/shared/route-pending";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { listProjectsPageServerFn } from "@/server/projects/actions";
 import {
@@ -39,6 +40,9 @@ import {
 } from "@/utils/workspace-route-search";
 import { useTagsStore } from "@/hooks/use-tags-store";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import config from "@/config";
+import type { ProjectsRouteLoaderData } from "./types";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const environmentFormSchema = Yup.object({
   name: Yup.string()
@@ -96,6 +100,7 @@ const PROJECT_STATUS_FILTER_OPTIONS: FilterOption[] = [
 export const Route = createFileRoute("/projects/")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
+  pendingComponent: ProjectsListPending,
   validateSearch: (search: Record<string, unknown>) => {
     const next: {
       page?: number;
@@ -139,7 +144,7 @@ export const Route = createFileRoute("/projects/")({
     status: parseTextSearchValue(search.status),
     environmentId: parseTextSearchValue(search.environmentId),
   }),
-  loader: async ({ deps }) => {
+  loader: async ({ deps }): Promise<ProjectsRouteLoaderData> => {
     const [environments, persistedEnvironmentId, frameworks] = await Promise.all([
       (listProjectEnvironmentsServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<ProjectEnvironment[]>)({
         data: { workspace: deps.workspace },
@@ -353,7 +358,7 @@ function EnvironmentManagerModal({
 
                   onEnvironmentListChange(environments.map((env) => (env._id === selectedEnvironment._id ? nextEnvironment : env)));
                   toast.success("Environment updated");
-                  router.invalidate();
+                  invalidateActiveMatches(router);
                 } else {
                   nextEnvironment = await createEnvironment({
                     data: {
@@ -366,7 +371,7 @@ function EnvironmentManagerModal({
                   onEnvironmentListChange([...environments, nextEnvironment]);
                   setSelectedEnvironmentId(nextEnvironment._id);
                   toast.success("Environment created");
-                  router.invalidate();
+                  invalidateActiveMatches(router);
                 }
               } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Failed to save environment");
@@ -461,7 +466,7 @@ function EnvironmentManagerModal({
 
                     setSelectedEnvironmentId(nextEnvironments[0]?._id ?? null);
                     toast.success("Environment deleted");
-                    router.invalidate();
+                    invalidateActiveMatches(router);
                   } catch (error) {
                     toast.error(error instanceof Error ? error.message : "Failed to delete environment");
                   } finally {
@@ -550,8 +555,9 @@ function ProjectCardSkeleton() {
 
 function ProjectsPage() {
   const navigate = useNavigate({ from: "/projects/" });
+  const router = useRouter();
   const search = Route.useSearch();
-  const loaderData = Route.useLoaderData();
+  const loaderData = Route.useLoaderData() as ProjectsRouteLoaderData;
   const { canWrite } = useWorkspaceRole();
   const [projects, setProjects] = useState(loaderData.projects);
   const [pagination, setPagination] = useState(loaderData.pagination);
@@ -572,8 +578,8 @@ function ProjectsPage() {
   const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
   const pendingPage = useRouterState({
     select: (s) => {
-      const pending = s.pendingLocation ?? s.location;
-      return parsePositivePageSearchValue((pending.search as Record<string, unknown>)?.page) ?? 1;
+      const activeSearch = (s.location.search ?? s.resolvedLocation?.search) as Record<string, unknown> | undefined;
+      return parsePositivePageSearchValue(activeSearch?.page) ?? 1;
     },
   });
 
@@ -607,6 +613,59 @@ function ProjectsPage() {
     setIsFilterChanging(false);
     setIsStatusFilterChanging(false);
   }, [loaderData]);
+
+  const visibleProjectIds = useMemo(() => projects.map((p) => p.id).filter((id): id is string => Boolean(id)), [projects]);
+  const visibleProjectIdsKey = visibleProjectIds.join(",");
+  useEffect(() => {
+    if (visibleProjectIds.length === 0) return;
+
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
+    let invalidateTimer: number | null = null;
+
+    const scheduleInvalidate = () => {
+      if (invalidateTimer !== null) return;
+      invalidateTimer = window.setTimeout(() => {
+        invalidateTimer = null;
+        void invalidateActiveMatches(router);
+      }, 750);
+    };
+
+    void (async () => {
+      const { Realtime } = await import("ably");
+      if (cancelled) return;
+
+      const clientId = visibleProjectIds[0];
+      const ably = new Realtime({
+        authUrl: `${config.apiUrl}/v1/ably/token?clientId=${clientId}`,
+        clientId,
+      });
+
+      const channels = visibleProjectIds.map((id) => {
+        const channel = ably.channels.get(id);
+        channel.subscribe((message) => {
+          if ((message.name ?? "").startsWith("deployment:")) {
+            scheduleInvalidate();
+          }
+        });
+        return channel;
+      });
+
+      cleanup = () => {
+        channels.forEach((channel) => channel.unsubscribe());
+        ably.close();
+      };
+    })();
+
+    return () => {
+      cancelled = true;
+      if (invalidateTimer !== null) {
+        window.clearTimeout(invalidateTimer);
+      }
+      cleanup?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleProjectIdsKey, router]);
 
   useEffect(() => {
     if (!isWorkspaceSwitching) {
@@ -706,7 +765,7 @@ function ProjectsPage() {
         // Keep previous project list if refresh fails.
       }
     })();
-  }, [refreshSignal, search.environmentId, effectiveEnvironmentId, search.page, search.q, search.status, search.type, search.workspace]);
+  }, [loaderData.frameworkLogos, refreshSignal, search.environmentId, effectiveEnvironmentId, search.page, search.q, search.status, search.type, search.workspace]);
 
   const filteredProjects = activeTagId ? projects.filter((p) => p.tags?.some((t) => t.id === activeTagId)) : projects;
   const hasSearchQuery = Boolean(search.q?.trim());

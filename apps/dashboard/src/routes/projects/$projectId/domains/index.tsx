@@ -8,6 +8,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { DomainList, type Domain } from "../../../../components/shared/domain-list";
 import { TabHeader } from "../../../../components/shared/tab-header";
+import { ProjectDomainsPending } from "@/components/shared/route-pending";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
 import { NumberPagination } from "../../../../components/shared/pagination";
 import { AddDomainModal, type DomainValidationError } from "../../../../components/shared/add-domain-modal";
 import { Route as RootRoute } from "@/routes/__root";
@@ -28,6 +31,7 @@ import { shouldShowProjectDomainsTab } from "@/utils/project-capabilities";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -94,6 +98,7 @@ export const Route = createFileRoute("/projects/$projectId/domains/")({
     return data;
   },
   component: ProjectDomainsPage,
+  pendingComponent: ProjectDomainsPending,
 });
 
 function validateDomain(url: string): DomainValidationError | null {
@@ -158,23 +163,6 @@ function ProjectDomainsPage() {
   const { settingsSnapshot } = (RootRoute.useLoaderData() ?? {}) as any;
   const { customDomain } = usePlanGate();
   const { canWrite } = useWorkspaceRole();
-  if (!shouldShowProjectDomainsTab(project)) {
-    return (
-      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
-        <TabHeader title="Project domains">Domains are not available for this project type.</TabHeader>
-      </div>
-    );
-  }
-
-  if (!customDomain) {
-    return (
-      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
-        <TabHeader title="Project domains">Connect your own domain to this project.</TabHeader>
-        <PlanUpgradePrompt feature="Custom Domains" description="Upgrade to connect your own domain to this project." />
-      </div>
-    );
-  }
-
   const { domains: domainsResult, projects } = Route.useLoaderData();
   const [addDomainOpen, setAddDomainOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(search.q ?? "");
@@ -209,8 +197,9 @@ function ProjectDomainsPage() {
     data: { workspace?: string; domainId: string; projectId: string };
   }) => Promise<{ success: boolean }>;
   const deleteDomain = useServerFn(deleteDomainServerFn as any) as (args: {
-    data: { workspace?: string; domainId: string; projectId?: string };
+    data: { workspace?: string; domainId: string; projectId?: string; twoFactorToken?: string };
   }) => Promise<{ success: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
 
   useEffect(() => {
     setRows(domainsResult.items.map((item) => mapDomainToRow(item, project.name)));
@@ -241,6 +230,23 @@ function ProjectDomainsPage() {
       window.clearTimeout(timeout);
     };
   }, [navigate, projectId, search, searchQuery]);
+
+  if (!shouldShowProjectDomainsTab(project)) {
+    return (
+      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
+        <TabHeader title="Project domains">Domains are not available for this project type.</TabHeader>
+      </div>
+    );
+  }
+
+  if (!customDomain) {
+    return (
+      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
+        <TabHeader title="Project domains">Connect your own domain to this project.</TabHeader>
+        <PlanUpgradePrompt feature="Custom Domains" description="Upgrade to connect your own domain to this project." />
+      </div>
+    );
+  }
 
   function handlePageChange(page: number) {
     if (page < 1 || page === domainsResult.currentPage || page > domainsResult.totalPages) {
@@ -288,7 +294,7 @@ function ProjectDomainsPage() {
       } else {
         toast.success("Domain status refreshed");
       }
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to refresh domain status");
     }
@@ -318,7 +324,7 @@ function ProjectDomainsPage() {
       });
       setRows((prev) => [mapDomainToRow(created, project.name), ...prev]);
       toast.success("Domain added successfully");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to add domain");
     }
@@ -399,7 +405,7 @@ function ProjectDomainsPage() {
     if (nextProjectId && nextProjectId !== project.id) {
       setRows((prev) => prev.filter((row) => row.id !== input.domain.id));
       toast.success("Domain moved to another project");
-      router.invalidate();
+      invalidateActiveMatches(router);
       return;
     }
 
@@ -418,7 +424,7 @@ function ProjectDomainsPage() {
     );
 
     toast.success("Domain settings updated");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   async function handleDeleteDomain(domain: Domain) {
@@ -426,17 +432,22 @@ function ProjectDomainsPage() {
       throw new Error("Domain id is missing");
     }
 
-    await deleteDomain({
-      data: {
-        workspace,
-        domainId: domain.id,
-        projectId: domain.projectId || project.id,
-      },
-    });
+    await withStepUp(
+      (twoFactorToken) =>
+        deleteDomain({
+          data: {
+            workspace,
+            domainId: domain.id!,
+            projectId: domain.projectId || project.id,
+            twoFactorToken,
+          },
+        }),
+      requestStepUp,
+    );
 
     setRows((prev) => prev.filter((row) => row.id !== domain.id));
     toast.success("Domain deleted successfully");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   return (
@@ -452,7 +463,6 @@ function ProjectDomainsPage() {
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         searchLoading={searchQuery.trim() !== (search.q?.trim() ?? "") || (isRouterLoading && (search.q?.trim() ?? "") !== "")}
-        onAddDomain={canWrite ? () => setAddDomainOpen(true) : undefined}
         onRefreshDomain={handleRefreshDomain}
         onConfigureDomain={canWrite ? handleConfigureDomain : undefined}
         onDeleteDomain={canWrite ? handleDeleteDomain : undefined}

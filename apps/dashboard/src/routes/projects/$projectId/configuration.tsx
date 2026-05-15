@@ -1,9 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { usePlanGate } from "@/hooks/use-plan-gate";
+import { ChangePlanModal } from "@/components/shared/change-plan-modal";
 import { IpWhitelist } from "@/components/shared/ip-whitelist";
 import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { GearSix, Hammer, Cpu, Warning, DatabaseIcon, MagnifyingGlass, GithubLogo, X, Info } from "@phosphor-icons/react";
+import {
+  GearSix,
+  Hammer,
+  Cpu,
+  Warning,
+  DatabaseIcon,
+  MagnifyingGlass,
+  GithubLogo,
+  X,
+  ArrowsClockwise,
+  Eye,
+  EyeSlash,
+} from "@phosphor-icons/react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
@@ -70,6 +84,13 @@ import { generalConfigSchema, databaseConfigSchema, resourcesConfigSchema } from
 import type { GeneralConfigValues, DatabaseConfigValues, ResourcesConfigValues } from "@/utils/configuration-schemas";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
 import { collectWatchPathEntries, deriveWatchPathSuggestions, type RootDirFetcher } from "@/utils/watch-path-suggestions";
+import { generateStrongPassword } from "@/utils/password";
+import { ProjectConfigurationPending } from "@/components/shared/route-pending";
+import { PasswordProtectionModal } from "@/components/project/password-protection-modal";
+import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
+import { withStepUp } from "@/lib/auth/two-factor-step-up";
+import { markProjectCacheStale } from "@/routes/projects/project-route-cache";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -213,6 +234,7 @@ export const Route = createFileRoute("/projects/$projectId/configuration")({
     return data;
   },
   component: ConfigurationPage,
+  pendingComponent: ProjectConfigurationPending,
 });
 
 /* ─── Constants ─── */
@@ -394,7 +416,7 @@ function EnvironmentSection({
                 setSelectedId(result.environmentId);
                 setInheritEnvVars(result.inheritEnvVars);
                 toast.success("Environment updated successfully");
-                await router.invalidate();
+                await invalidateActiveMatches(router);
               } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Failed to update environment");
               } finally {
@@ -475,7 +497,7 @@ function RepoSection({
 
   useEffect(() => {
     setLocalConnectedRepo(connectedRepo ?? null);
-  }, [project?.id]);
+  }, [connectedRepo]);
 
   const hasRepo = Boolean(localConnectedRepo?.fullName || localConnectedRepo?.name);
   const repoDisplay = localConnectedRepo?.fullName || localConnectedRepo?.name || "";
@@ -605,7 +627,7 @@ function RepoSection({
         setConnecting(null);
       }
     },
-    [linkRepo, project?.id, workspace, pickerProvider, haptics, onRepoChanged],
+    [linkRepo, project?.id, project?.repo, workspace, pickerProvider, haptics, onRepoChanged],
   );
 
   const handleDisconnect = useCallback(async () => {
@@ -618,7 +640,6 @@ function RepoSection({
       onRepoChanged();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to disconnect repository");
-    } finally {
     }
   }, [unlinkRepo, project?.id, workspace, haptics, onRepoChanged]);
 
@@ -635,19 +656,19 @@ function RepoSection({
   return (
     <>
       <div className="mb-4 rounded-[4px] border-[0.5px] border-dash-border">
-        <div className="flex items-center justify-between px-4 py-4">
-          <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <label className="text-sm font-medium text-dash-text-strong">Connected repository</label>
             {hasRepo ? (
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <img src="/icons/git-circle.svg" alt="" className="size-5 shrink-0" />
-                <span className="text-sm text-dash-text-body">{repoDisplay}</span>
+                <span className="truncate text-sm text-dash-text-body">{repoDisplay}</span>
               </div>
             ) : (
               <span className="text-sm text-dash-text-faded">No repository connected</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:flex-nowrap">
             {hasRepo && canWrite && (
               <GlossyButton variant="white" onClick={() => setConfirmOpen(true)}>
                 Disconnect
@@ -769,6 +790,10 @@ function GeneralSection({
   showMcpAuthControl,
   showBuildCacheControl,
   canWrite = true,
+  projectId,
+  workspace,
+  passwordEnabled,
+  onPasswordChanged,
 }: {
   initialValues: GeneralConfigValues;
   onSubmit: (values: GeneralConfigValues) => Promise<void>;
@@ -782,7 +807,12 @@ function GeneralSection({
   showMcpAuthControl: boolean;
   showBuildCacheControl: boolean;
   canWrite?: boolean;
+  projectId: string;
+  workspace?: string;
+  passwordEnabled: boolean;
+  onPasswordChanged: () => void | Promise<void>;
 }) {
+  const [passwordModalMode, setPasswordModalMode] = useState<"enable" | "disable" | "rotate" | null>(null);
   return (
     <Formik
       initialValues={initialValues}
@@ -795,6 +825,7 @@ function GeneralSection({
       enableReinitialize
     >
       {({ values, errors, touched, dirty, isSubmitting, handleSubmit, handleChange, handleBlur, setFieldValue }) => (
+        <>
         <form className="rounded-[4px] border-[0.5px] border-dash-border" onSubmit={handleSubmit}>
           {/* Row 1: Project name */}
           <div className="flex flex-col gap-1.5 px-4 py-4">
@@ -931,12 +962,51 @@ function GeneralSection({
             </>
           )}
 
+          <div className="flex flex-col gap-3 px-4 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-dash-text-strong">Password protection</span>
+                <span className="text-xs text-dash-text-faded">
+                  Require visitors to enter a password before they can access this project's domains.
+                </span>
+                {passwordEnabled && canWrite && (
+                  <button
+                    type="button"
+                    onClick={() => setPasswordModalMode("rotate")}
+                    className="self-start text-xs font-medium text-[#4879f8] transition-colors hover:text-[#3060d0]"
+                  >
+                    Change password
+                  </button>
+                )}
+              </div>
+              <ToggleSwitch
+                checked={passwordEnabled}
+                onChange={(next) => setPasswordModalMode(next ? "enable" : "disable")}
+                disabled={!canWrite}
+              />
+            </div>
+          </div>
+          <hr className="border-dash-border" />
+
           <div className="flex justify-end px-4 py-4">
             <GlossyButton type="submit" disabled={!canWrite || !dirty || isSubmitting} loading={isSubmitting} loadingLabel="Saving...">
               Save
             </GlossyButton>
           </div>
         </form>
+        {passwordModalMode !== null && (
+          <PasswordProtectionModal
+            open={passwordModalMode !== null}
+            onOpenChange={(open) => {
+              if (!open) setPasswordModalMode(null);
+            }}
+            mode={passwordModalMode}
+            projectId={projectId}
+            workspace={workspace}
+            onSuccess={onPasswordChanged}
+          />
+        )}
+        </>
       )}
     </Formik>
   );
@@ -983,20 +1053,10 @@ function BuildSection({
 
   useEffect(() => {
     setValues(initialValues);
-  }, [
-    initialValues.installCommand,
-    initialValues.buildCommand,
-    initialValues.startCommand,
-    initialValues.healthCheckPath,
-    initialValues.preStartCommand,
-    initialValues.dockerImage,
-    initialValues.outputDirectory,
-    initialValues.watchPaths,
-  ]);
+  }, [initialValues]);
 
   const watchPathsChanged =
-    values.watchPaths.length !== initialValues.watchPaths.length ||
-    values.watchPaths.some((p, i) => p !== initialValues.watchPaths[i]);
+    values.watchPaths.length !== initialValues.watchPaths.length || values.watchPaths.some((p, i) => p !== initialValues.watchPaths[i]);
 
   const dirty =
     values.installCommand !== initialValues.installCommand ||
@@ -1008,9 +1068,7 @@ function BuildSection({
     values.outputDirectory !== initialValues.outputDirectory ||
     watchPathsChanged;
 
-  const availableWatchPathOptions = watchPathSuggestions
-    .filter((p) => !values.watchPaths.includes(p))
-    .map((p) => ({ id: p, label: p }));
+  const availableWatchPathOptions = watchPathSuggestions.filter((p) => !values.watchPaths.includes(p)).map((p) => ({ id: p, label: p }));
 
   function addWatchPath(path: string) {
     const trimmed = path.trim();
@@ -1155,7 +1213,8 @@ function BuildSection({
           <div className="flex flex-col gap-1.5 px-4 py-4">
             <label className="text-sm font-medium text-dash-text-strong">Watch paths</label>
             <p className="text-xs text-dash-text-faded">
-              Only redeploy when changes land in one of these paths. Supports glob patterns like <code className="font-mono text-[11px]">/src/**</code>.
+              Only redeploy when changes land in one of these paths. Supports glob patterns like{" "}
+              <code className="font-mono text-[11px]">/src/**</code>.
             </p>
             {values.watchPaths.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-2">
@@ -1222,6 +1281,9 @@ function ResourcesSection({
   storageAlwaysOn = false,
   canSave = true,
   canWrite = true,
+  freePlanLocked = false,
+  freePlanStorageCap = null,
+  onUpgradeClick,
 }: {
   initialValues: ResourcesConfigValues;
   onSubmit?: (values: ResourcesConfigValues) => Promise<void>;
@@ -1231,7 +1293,19 @@ function ResourcesSection({
   storageAlwaysOn?: boolean;
   canSave?: boolean;
   canWrite?: boolean;
+  freePlanLocked?: boolean;
+  freePlanStorageCap?: number | null;
+  onUpgradeClick?: () => void;
 }) {
+  const lockedStorageId = freePlanLocked && freePlanStorageCap != null ? String(freePlanStorageCap) : null;
+  const gatedDiskSizes = useMemo(() => {
+    if (!lockedStorageId) return diskSizes;
+    return diskSizes.map((option) => ({
+      ...option,
+      disabled: option.id !== lockedStorageId,
+      asideText: option.id === lockedStorageId ? undefined : "Upgrade to access",
+    }));
+  }, [lockedStorageId]);
   return (
     <Formik
       initialValues={initialValues}
@@ -1257,7 +1331,7 @@ function ResourcesSection({
               max={8}
               step={0.5}
               unit=" vCPU"
-              disabled={!canWrite}
+              disabled={!canWrite || freePlanLocked}
             />
           </div>
 
@@ -1276,11 +1350,19 @@ function ResourcesSection({
                   max={12}
                   step={0.5}
                   hideValue
-                  disabled={!canWrite}
+                  disabled={!canWrite || freePlanLocked}
                 />
               </div>
               <span className="min-w-[52px] text-right text-sm font-medium text-dash-text-strong">{formatMemory(values.memoryValue)}</span>
             </div>
+            {freePlanLocked && (
+              <p className="text-xs text-dash-text-faded">
+                Compute and storage are fixed on the free plan.{" "}
+                <button type="button" onClick={onUpgradeClick} className="font-medium text-[#4879f8] hover:text-[#3060d0]">
+                  Upgrade for more
+                </button>
+              </p>
+            )}
           </div>
 
           <hr className="border-dash-border" />
@@ -1344,8 +1426,14 @@ function ResourcesSection({
                           <label className="mb-1.5 block text-xs text-dash-text-faded">Disk size</label>
                           <Dropdown
                             value={values.diskSize}
-                            options={diskSizes}
-                            onChange={(v) => setFieldValue("diskSize", v)}
+                            options={gatedDiskSizes}
+                            onChange={(v) => {
+                              if (lockedStorageId && v !== lockedStorageId) {
+                                onUpgradeClick?.();
+                                return;
+                              }
+                              setFieldValue("diskSize", v);
+                            }}
                             disabled={!canWrite}
                           />
                         </div>
@@ -1411,6 +1499,8 @@ function DatabaseConfigurationPanel({
   dbImageName?: string;
   canWrite?: boolean;
 }) {
+  const haptics = useHaptics();
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <Formik
       initialValues={initialValues}
@@ -1517,32 +1607,75 @@ function DatabaseConfigurationPanel({
             <div className="grid grid-cols-1 gap-4 px-4 py-4 md:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-dash-text-strong">Database password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={values.password}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Enter new password"
-                  readOnly={!canWrite}
-                  className={inputClass}
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={values.password}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="Enter new password"
+                    readOnly={!canWrite}
+                    className={`${inputClass} ${canWrite ? "pr-[72px]" : "pr-10"}`}
+                    autoComplete="new-password"
+                  />
+                  <div className="absolute inset-y-0 right-1.5 my-auto flex h-7 items-center gap-0.5">
+                    {canWrite && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const generated = generateStrongPassword();
+                          setFieldValue("password", generated);
+                          setFieldValue("confirmPassword", generated);
+                          setShowPassword(true);
+                          haptics.light();
+                        }}
+                        title="Generate a strong password"
+                        aria-label="Generate a strong password"
+                        className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                      >
+                        <ArrowsClockwise className="size-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      title={showPassword ? "Hide password" : "Show password"}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                      className="flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                    >
+                      {showPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
+                    </button>
+                  </div>
+                </div>
                 <p className="text-xs text-dash-text-faded">Set a new password for database connections.</p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-dash-text-strong">Confirm password</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={values.confirmPassword}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Re-enter password"
-                  readOnly={!canWrite}
-                  className={inputClass}
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={values.confirmPassword}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="Re-enter password"
+                    readOnly={!canWrite}
+                    className={`${inputClass} pr-10`}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    title={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute inset-y-0 right-2 my-auto flex size-7 items-center justify-center rounded-[4px] text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                  >
+                    {showPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
+                </div>
                 {passwordError && <p className="text-xs text-[#ef2f1f]">{errors.confirmPassword}</p>}
               </div>
             </div>
@@ -1579,8 +1712,9 @@ function DangerSection({
   const navigate = useNavigate();
   const router = useRouter();
   const deleteProject = useServerFn(deleteProjectServerFn as any) as (args: {
-    data: { projectId: string; workspace?: string };
+    data: { projectId: string; workspace?: string; twoFactorToken?: string };
   }) => Promise<{ success: boolean }>;
+  const { requestStepUp } = useStepUpTwoFactor();
 
   return (
     <>
@@ -1636,15 +1770,13 @@ function DangerSection({
           setDeleting(true);
           let deleted = false;
           try {
-            await deleteProject({
-              data: { projectId, workspace },
-            });
+            await withStepUp((twoFactorToken) => deleteProject({ data: { projectId, workspace, twoFactorToken } }), requestStepUp);
             toast.success("Project deleted successfully");
             deleted = true;
           } catch (error) {
             toast.error(error instanceof Error ? error.message : "Failed to delete project");
           } finally {
-            await router.invalidate();
+            await invalidateActiveMatches(router);
             setDeleting(false);
           }
 
@@ -1683,6 +1815,7 @@ function ConfigurationPage() {
   const params = Route.useParams();
   const navigate = useNavigate();
   const router = useRouter();
+  const { requestStepUp } = useStepUpTwoFactor();
   const saveGeneralConfig = useServerFn(saveProjectGeneralConfigServerFn as any) as (args: {
     data: {
       projectId: string;
@@ -1707,6 +1840,7 @@ function ConfigurationPage() {
       password: string;
       configurations?: Record<string, unknown> | null;
       whitelistedIps?: string[];
+      twoFactorToken?: string;
     };
   }) => Promise<{ message?: string }>;
   const saveBuildConfig = useServerFn(saveProjectBuildConfigServerFn as any) as (args: {
@@ -1931,6 +2065,9 @@ function ConfigurationPage() {
   })();
 
   const databaseProject = isDatabaseProject(project);
+  const { planKey, dbMaxStorage: planDbMaxStorage } = usePlanGate();
+  const dbResourcesFreeLocked = databaseProject && planKey === "free";
+  const [showDbUpgradeModal, setShowDbUpgradeModal] = useState(false);
   const sourceFieldsVisible = shouldShowBranchRootFrameworkFields(project);
   const noBuildFramework = isNoBuildFramework(project?.framework ?? "");
   const dockerSourceFieldsVisible = shouldShowDockerSourceFields(project);
@@ -2007,7 +2144,7 @@ function ConfigurationPage() {
         workspace,
       });
       toast.success("Configuration saved. Redeploy started.");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save configuration");
     }
@@ -2033,7 +2170,7 @@ function ConfigurationPage() {
         workspace,
       });
       toast.success("Build configuration saved. Redeploy started.");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save build configuration");
     }
@@ -2042,16 +2179,21 @@ function ConfigurationPage() {
   async function handleSubmitDatabase(values: DatabaseConfigValues) {
     const password = values.password.trim();
 
-    await saveDatabaseConfig({
-      data: {
-        projectId: project?.id || params.projectId,
-        workspace,
-        name: values.name.trim(),
-        password,
-        configurations: project?.specs ? ({ ...project.specs } as Record<string, unknown>) : null,
-        whitelistedIps: (values.whitelistIps ?? []).map((ip) => ip.value).filter(Boolean),
-      },
-    });
+    await withStepUp(
+      (twoFactorToken) =>
+        saveDatabaseConfig({
+          data: {
+            projectId: project?.id || params.projectId,
+            workspace,
+            name: values.name.trim(),
+            password,
+            configurations: project?.specs ? ({ ...project.specs } as Record<string, unknown>) : null,
+            whitelistedIps: (values.whitelistIps ?? []).map((ip) => ip.value).filter(Boolean),
+            twoFactorToken,
+          },
+        }),
+      requestStepUp,
+    );
 
     const nextProjectId = values.name.trim();
     if (nextProjectId && nextProjectId !== params.projectId) {
@@ -2067,7 +2209,7 @@ function ConfigurationPage() {
     }
 
     toast.success("Database configuration updated");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   async function handleSubmitResources(values: ResourcesConfigValues) {
@@ -2094,7 +2236,7 @@ function ConfigurationPage() {
         workspace,
       });
       toast.success("Resources updated. Redeploy started.");
-      router.invalidate();
+      invalidateActiveMatches(router);
       return;
     }
 
@@ -2121,14 +2263,14 @@ function ConfigurationPage() {
     });
 
     toast.success("Resources updated");
-    router.invalidate();
+    invalidateActiveMatches(router);
   }
 
   return (
     <div className="mx-auto flex max-w-[1000px] flex-col gap-4 px-4 py-8 sm:px-0">
       <TabHeader title="Configuration">
         {getConfigurationDescription(project)}{" "}
-        <a href="#" className="text-[#4879f8] underline">
+        <a href="https://paper.brimble.io" target="_blank" rel="noopener noreferrer" className="text-[#4879f8] underline">
           Learn more
         </a>
       </TabHeader>
@@ -2181,7 +2323,7 @@ function ConfigurationPage() {
                   />
                 ) : (
                   <>
-                    <RepoSection project={project} workspace={workspace} canWrite={canWrite} onRepoChanged={() => router.invalidate()} />
+                    <RepoSection project={project} workspace={workspace} canWrite={canWrite} onRepoChanged={() => invalidateActiveMatches(router)} />
                     <EnvironmentSection
                       projectId={project?.id || params.projectId}
                       currentEnvironmentId={project?.projectEnvironmentId}
@@ -2203,6 +2345,13 @@ function ConfigurationPage() {
                       showMcpAuthControl={mcpAuthToggleVisible}
                       showBuildCacheControl={buildCacheToggleVisible}
                       canWrite={canWrite}
+                      projectId={project?.id || params.projectId}
+                      workspace={workspace}
+                      passwordEnabled={Boolean(project?.passwordEnabled)}
+                      onPasswordChanged={() => {
+                        markProjectCacheStale();
+                        return invalidateActiveMatches(router);
+                      }}
                     />
                   </>
                 ))}
@@ -2230,6 +2379,9 @@ function ConfigurationPage() {
                   storageAlwaysOn={databaseProject}
                   canSave
                   canWrite={canWrite}
+                  freePlanLocked={dbResourcesFreeLocked}
+                  freePlanStorageCap={planDbMaxStorage}
+                  onUpgradeClick={() => setShowDbUpgradeModal(true)}
                 />
               )}
               {canWrite && activeSection === ConfigSection.Danger && (
@@ -2274,6 +2426,8 @@ function ConfigurationPage() {
           }}
         />
       )}
+
+      <ChangePlanModal open={showDbUpgradeModal} onOpenChange={setShowDbUpgradeModal} currentPlan={planKey} />
     </div>
   );
 }

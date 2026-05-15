@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createBackendApi } from "@/backend";
 import type { McpServerListResult, McpServerTemplate } from "@/backend/mcp";
 import serverConfig from "@/config/server";
-import { withTokenRefresh } from "@/server/shared/backend";
+import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 import { mcpLogger } from "@/server/shared/logger";
 
 function getPublicBackendApi() {
@@ -132,15 +132,7 @@ export const deployMcpTemplateServerFn = createServerFn({
   const workspaceSlug = payload?.workspace?.trim().toLowerCase();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
+    const teamId = await resolveTeamId(api, workspaceSlug);
 
     const body = {
       git: "github",

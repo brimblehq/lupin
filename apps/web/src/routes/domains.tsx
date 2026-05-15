@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, useInView } from "motion/react";
@@ -54,6 +54,8 @@ function normalizeQuery(raw: string): string {
 
 function DomainsHero() {
   const ref = useRef(null);
+  const resultsSectionRef = useRef<HTMLDivElement | null>(null);
+  const lastAutoScrolledDomainRef = useRef("");
   const isInView = useInView(ref, { once: true, margin: "-60px" });
   const searchDomains = useServerFn(searchDomainSaleServerFn as any) as (args: {
     data: { name: string; limit?: number };
@@ -66,6 +68,14 @@ function DomainsHero() {
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searching || error || !hasSearched || results.length === 0) return;
+    if (lastAutoScrolledDomainRef.current === searchedDomain) return;
+
+    resultsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    lastAutoScrolledDomainRef.current = searchedDomain;
+  }, [error, hasSearched, results.length, searchedDomain, searching]);
 
   async function handleSearch() {
     const name = normalizeQuery(query);
@@ -128,7 +138,7 @@ function DomainsHero() {
             }}
             onSubmit={handleSubmit}
           >
-            <div className="flex w-[532px] max-w-[90vw] items-center gap-2 rounded-lg border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-4 shadow-[var(--shadow-big)] dark:border-white/10 dark:bg-[#1e2023]">
+            <div className="flex w-[532px] max-w-[90vw] items-center gap-2 rounded-[4px] border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-4 shadow-[var(--shadow-big)] dark:border-white/10 dark:bg-[#1e2023]">
               <Search className="size-4 shrink-0 text-[rgba(152,157,164,0.6)]" />
               <div className="flex flex-1 items-baseline font-body font-medium">
                 <input
@@ -208,7 +218,7 @@ function DomainsHero() {
           {!searching && error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           {hasSearched && !searching && !error && (
-            <div className="flex flex-col gap-3">
+            <div ref={resultsSectionRef} className="flex flex-col gap-3">
               <p className="text-sm text-brimble-black/60 dark:text-white/65">
                 Showing results for <span className="font-medium text-brimble-black dark:text-white">{searchedQuery}</span>
               </p>
@@ -294,7 +304,7 @@ function DomainsFaqs() {
             type="single"
             defaultValue="faq-0"
             collapsible
-            className="overflow-hidden rounded-lg border border-[rgba(152,157,164,0.3)] bg-brimble-surface shadow-[var(--shadow-big)] dark:border-white/10 dark:bg-[#1e2023]"
+            className="overflow-hidden rounded-[4px] border border-[rgba(152,157,164,0.3)] bg-brimble-surface shadow-[var(--shadow-big)] dark:border-white/10 dark:bg-[#1e2023]"
           >
             {siteConfig.domains.faqs.map((faq, i) => (
               <AccordionItem key={i} value={`faq-${i}`} className="px-4">

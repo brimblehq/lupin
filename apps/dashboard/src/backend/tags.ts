@@ -32,11 +32,6 @@ function mapTag(raw: any): BackendTag {
   };
 }
 
-function shouldDebugTags(): boolean {
-  if (process.env.DEBUG_TAGS === "1") return true;
-  return process.env.NODE_ENV !== "production";
-}
-
 export function createTagsApi(client: ApiClient): TagsApi {
   const endpoint = "/core/v1/tags";
 

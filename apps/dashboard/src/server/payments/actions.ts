@@ -3,12 +3,13 @@ import type {
   AddPaymentMethodInput,
   CreateSubscriptionInput,
   SwapPlanInput,
+  CancelSubscriptionInput,
   PurchaseInput,
   UpdateSpendingLimitInput,
   UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
 } from "@/backend/payments";
-import { withTokenRefresh } from "@/server/shared/backend";
+import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 
 /* ── Queries ── */
 
@@ -49,34 +50,49 @@ export const getSubscriptionStatsServerFn = createServerFn({
   const payload = data as unknown as { workspace?: string } | undefined;
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-    const workspaceSlug = payload?.workspace?.trim().toLowerCase();
-    if (workspaceSlug) {
-      const teams = await api.workspaces.list();
-      const match = teams.items.find((item) => item.slug === workspaceSlug);
-      teamId = match?.id ?? undefined;
-    }
+    const teamId = await resolveTeamId(api, payload?.workspace);
     return api.payments.getSubscriptionStats(teamId);
   });
 });
 
 /* ── Mutations ── */
 
-export const createSetupIntentServerFn = createServerFn({
-  method: "POST",
-}).handler(async () => {
-  return withTokenRefresh(async (api) => {
-    return api.payments.createSetupIntent();
-  });
-});
-
 export const addPaymentMethodServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
   const input = data as unknown as AddPaymentMethodInput;
+  const paymentMethod = String(input?.payment_method ?? "").trim();
+  const returnUrl = String(input?.return_url ?? "").trim();
+
+  if (!paymentMethod) {
+    throw new Error("Payment method is required");
+  }
+
+  if (!returnUrl) {
+    throw new Error("Return URL is required");
+  }
 
   return withTokenRefresh(async (api) => {
-    return api.payments.addPaymentMethod(input);
+    return api.payments.addPaymentMethod({
+      payment_method: paymentMethod,
+      return_url: returnUrl,
+    });
+  });
+});
+
+export const confirmPaymentMethodServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as unknown as { setup_intent_id?: string } | undefined;
+  const setupIntentId = String(payload?.setup_intent_id ?? "").trim();
+
+  if (!setupIntentId) {
+    throw new Error("Setup intent ID is required");
+  }
+
+  return withTokenRefresh(async (api) => {
+    await api.payments.confirmPaymentMethod(setupIntentId);
+    return { ok: true } as const;
   });
 });
 
@@ -124,9 +140,18 @@ export const swapPlanServerFn = createServerFn({
 
 export const cancelSubscriptionServerFn = createServerFn({
   method: "POST",
-}).handler(async () => {
+}).handler(async ({ data }) => {
+  const input = data as unknown as CancelSubscriptionInput;
+  const comment = String(input?.comment ?? "").trim();
+  if (!comment) {
+    throw new Error("Please tell us why you're cancelling.");
+  }
+  if (comment.length > 500) {
+    throw new Error("Feedback must be 500 characters or fewer.");
+  }
+
   return withTokenRefresh(async (api) => {
-    await api.payments.cancelSubscription();
+    await api.payments.cancelSubscription({ comment });
     return { ok: true } as const;
   });
 });

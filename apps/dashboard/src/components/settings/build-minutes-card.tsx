@@ -145,7 +145,10 @@ function TopUpBuildMinutesModal({
     const firstDot = cleaned.indexOf(".");
     if (firstDot !== -1) {
       const head = cleaned.slice(0, firstDot + 1);
-      const tail = cleaned.slice(firstDot + 1).replace(/\./g, "").slice(0, 2);
+      const tail = cleaned
+        .slice(firstDot + 1)
+        .replace(/\./g, "")
+        .slice(0, 2);
       cleaned = head + tail;
     }
     return cleaned;
@@ -236,12 +239,7 @@ function TopUpBuildMinutesModal({
       <div className="flex flex-col gap-5 px-6 py-5">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm text-dash-text-body">Quick select</label>
-          <Dropdown
-            value={selectedPresetId}
-            options={presetOptions}
-            onChange={handlePresetSelect}
-            placeholder="Choose a preset amount"
-          />
+          <Dropdown value={selectedPresetId} options={presetOptions} onChange={handlePresetSelect} placeholder="Choose a preset amount" />
         </div>
 
         <div className="flex flex-col gap-1.5">

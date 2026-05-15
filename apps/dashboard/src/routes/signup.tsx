@@ -17,6 +17,13 @@ import {
 } from "../server/auth/actions";
 import { startOauthPopup, type OauthProvider } from "../lib/auth/oauth-popup";
 import { buildTwoFactorChallengeNavigation, extractTwoFactorChallenge } from "@/lib/auth/two-factor";
+import type {
+  FinalizeOauthSessionCaller,
+  LookupAuthCaller,
+  ResendAuthCodeCaller,
+  StartSignupCaller,
+  VerifyEmailCodeCaller,
+} from "./auth.types";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -260,11 +267,11 @@ function getNextUrl(): string {
 function SignupPage() {
   const haptics = useHaptics();
   const navigate = useNavigate();
-  const lookupAuth = useServerFn(lookupAuthServerFn);
-  const startSignup = useServerFn(startSignupServerFn);
-  const resendAuthCode = useServerFn(resendAuthCodeServerFn);
-  const verifyEmailCode = useServerFn(verifyEmailCodeServerFn);
-  const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn);
+  const lookupAuth = useServerFn(lookupAuthServerFn as any) as LookupAuthCaller;
+  const startSignup = useServerFn(startSignupServerFn as any) as StartSignupCaller;
+  const resendAuthCode = useServerFn(resendAuthCodeServerFn as any) as ResendAuthCodeCaller;
+  const verifyEmailCode = useServerFn(verifyEmailCodeServerFn as any) as VerifyEmailCodeCaller;
+  const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn as any) as FinalizeOauthSessionCaller;
   const [step, setStep] = useState<"details" | "otp">("details");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");

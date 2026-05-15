@@ -26,9 +26,14 @@ import appCss from "../styles.css?url";
 import marfaLatinWoff2 from "../assets/fonts/ABCMarfaVariableVF-latin.woff2?url";
 
 const GA_MEASUREMENT_ID = "G-T6EZL8YJW7";
+const CHATWOOT_ALLOWED_HOSTS = ["app.brimble.io", "brimble.io", "dev.brimble.app"] as const;
+const CHATWOOT_ALLOWED_HOSTS_LITERAL = JSON.stringify(CHATWOOT_ALLOWED_HOSTS);
 
 const chatwootBootstrapScript = `(function(d,t){
   try {
+    var allowedHosts=${CHATWOOT_ALLOWED_HOSTS_LITERAL};
+    var host=(window.location&&window.location.hostname?window.location.hostname:"").toLowerCase();
+    if (allowedHosts.indexOf(host)===-1) return;
     if (window.__brimbleChatwootBooted) return;
     window.__brimbleChatwootBooted = true;
     var BASE_URL="https://app.chatwoot.com";
@@ -66,13 +71,6 @@ const DEFAULT_ROOT_LOADER_DATA: RootLoaderData = {
   workspaces: { items: [] },
   pricing: DEFAULT_PRICING,
 };
-
-const globalDataCache: {
-  workspaces: ApiListResponse<Workspace> | null;
-  pricing: Pricing | null;
-  fetchedAt: number;
-} = { workspaces: null, pricing: null, fetchedAt: 0 };
-const GLOBAL_CACHE_TTL = 300_000;
 
 function createRootLoaderData(overrides: Partial<RootLoaderData> = {}): RootLoaderData {
   return {
@@ -119,8 +117,8 @@ export const Route = createRootRoute({
       },
     ],
   }),
-  beforeLoad: async ({ location }) => {
-    await enforceRouteAuth(location.pathname, location.searchStr);
+  beforeLoad: async ({ location, preload }) => {
+    await enforceRouteAuth(location.pathname, location.searchStr, { preload });
   },
   loader: (async ({ location, deps }: any) => {
     const isAuthRoute = /^\/(login|signup|2fa)$/.test(location.pathname);
@@ -138,14 +136,7 @@ export const Route = createRootRoute({
         workspace = rawWorkspace.trim();
       }
 
-      const hasGlobalCache = globalDataCache.fetchedAt > 0 && Date.now() - globalDataCache.fetchedAt < GLOBAL_CACHE_TTL;
-
-      let workspacesRequest: Promise<ApiListResponse<Workspace>>;
-      if (hasGlobalCache && globalDataCache.workspaces) {
-        workspacesRequest = Promise.resolve(globalDataCache.workspaces);
-      } else {
-        workspacesRequest = (listWorkspacesServerFn as unknown as () => Promise<ApiListResponse<Workspace>>)();
-      }
+      const workspacesRequest = (listWorkspacesServerFn as unknown as () => Promise<ApiListResponse<Workspace>>)();
 
       const userOverviewRequest = (async () => {
         let teamId: string | undefined;
@@ -165,35 +156,29 @@ export const Route = createRootRoute({
         });
       })();
 
-      const [settingsSnapshot, workspaces, onboardingProjects, pricingResult, tags, subscriptionStats, userOverview] = await Promise.allSettled([
+      const [settingsSnapshot, workspaces, userOverview] = await Promise.allSettled([
         (getSettingsSidebarSnapshotServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SettingsSidebarSnapshot>)({
           data: { workspace },
         }),
         workspacesRequest,
-        (listHomeProjectsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<ApiListResponse<Project>>)({
-          data: { workspace },
-        }),
-        hasGlobalCache && globalDataCache.pricing
-          ? Promise.resolve(globalDataCache.pricing)
-          : (getSubscriptionSpecsServerFn as unknown as () => Promise<Pricing>)(),
-        (listTagsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<BackendTag[]>)({
-          data: { workspace },
-        }),
-        (getSubscriptionStatsServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SubscriptionStats>)({
-          data: { workspace },
-        }),
         userOverviewRequest,
       ]);
 
-      if (workspaces.status === "fulfilled") {
-        globalDataCache.workspaces = workspaces.value;
-      }
-      if (pricingResult.status === "fulfilled") {
-        globalDataCache.pricing = pricingResult.value;
-      }
-      if (workspaces.status === "fulfilled" || pricingResult.status === "fulfilled") {
-        globalDataCache.fetchedAt = Date.now();
-      }
+      const [onboardingProjects, tags] = await Promise.allSettled([
+        (listHomeProjectsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<ApiListResponse<Project>>)({
+          data: { workspace },
+        }),
+        (listTagsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<BackendTag[]>)({
+          data: { workspace },
+        }),
+      ]);
+
+      const [pricingResult, subscriptionStats] = await Promise.allSettled([
+        (getSubscriptionSpecsServerFn as unknown as () => Promise<Pricing>)(),
+        (getSubscriptionStatsServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SubscriptionStats>)({
+          data: { workspace },
+        }),
+      ]);
 
       return createRootLoaderData({
         workspace,
@@ -242,7 +227,7 @@ gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
         )}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var d=document.documentElement;var t=localStorage.getItem('theme');var legacy=localStorage.getItem('brimble-theme');if(t!=='light'&&t!=='dark'&&t!=='system'){t=(legacy==='light'||legacy==='dark')?legacy:null}var sys=(t==='system'||(!t));var dark=t==='dark'||(sys&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()`,
+            __html: `(function(){try{var d=document.documentElement;var t=localStorage.getItem('theme');var legacy=localStorage.getItem('brimble-theme');if(t!=='light'&&t!=='dark'&&t!=='system'){t=(legacy==='light'||legacy==='dark')?legacy:'light'}var sys=(t==='system');var dark=t==='dark'||(sys&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()`,
           }}
         />
       </head>
@@ -256,14 +241,6 @@ gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
 }
 
 function RootComponent() {
-  useTheme();
-
-  useEffect(() => {
-    import("@/lib/client-geo").then((m) => m.getClientGeo());
-  }, []);
-
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-
   const {
     workspace: loaderWorkspace,
     settingsSnapshot,
@@ -275,6 +252,13 @@ function RootComponent() {
     userOverview,
     pricing,
   } = Route.useLoaderData() ?? ({} as any);
+  useTheme(settingsSnapshot?.profile?.theme);
+
+  useEffect(() => {
+    import("@/lib/client-geo").then((m) => m.getClientGeo());
+  }, []);
+
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspace = (() => {

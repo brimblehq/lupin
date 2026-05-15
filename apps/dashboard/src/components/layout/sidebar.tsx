@@ -9,54 +9,12 @@ import { useHaptics } from "@/hooks/use-haptics";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/feature-flags";
 import { isPostHogEnabled } from "@/lib/posthog";
-
-export const mainNav = [
-  { label: "Home", icon: "/icons/home.svg", href: "/", tourId: "home" },
-  { label: "Projects", icon: "/icons/project.svg", href: "/projects", tourId: "projects" },
-  {
-    label: "Domains",
-    icon: "/icons/domains.svg",
-    href: "/domains",
-    flag: FeatureFlags.ENABLE_DOMAINS,
-    tourId: "domains",
-  },
-  {
-    label: "Scaling",
-    icon: "/icons/scaling.svg",
-    href: "/scaling",
-    flag: FeatureFlags.ENABLE_AUTO_SCALING,
-    tourId: "scaling",
-  },
-  {
-    label: "Buckets",
-    icon: "/icons/bucket.svg",
-    href: "/buckets",
-    flag: FeatureFlags.ENABLE_BUCKETS,
-    comingSoon: true,
-  },
-  {
-    label: "Sandboxes",
-    icon: "/icons/sandbox.svg",
-    href: "/sandboxes",
-    flag: FeatureFlags.ENABLE_SANDBOX,
-  },
-];
-
-export const moreNav = [
-  {
-    label: "Documentation",
-    icon: "/icons/documentation.svg",
-    href: "https://docs.brimble.io",
-    external: true,
-    tourId: "docs",
-  },
-  { label: "Discover", icon: "/icons/discover.svg", href: "/addons", tourId: "discover" },
-];
+import { mainNav, moreNav } from "./sidebar-nav";
 
 const navItemBase =
   "flex items-center gap-2 rounded px-2 py-1.5 text-sm tracking-[-0.09px] transition-colors text-dash-text-faded dark:text-dash-text-strong";
 
-export function Sidebar({ profileOpen, onProfileOpenChange }: { profileOpen: boolean; onProfileOpenChange: (open: boolean) => void }) {
+export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: boolean) => void }) {
   const { theme, mode, cycleTheme } = useTheme();
   const haptics = useHaptics();
   const navigate = useNavigate();

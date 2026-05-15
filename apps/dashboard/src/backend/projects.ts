@@ -130,6 +130,7 @@ export interface DatabaseEngineOption {
   envs: Array<{ type?: string; value: string }>;
   isAvailable: boolean;
   isDefault: boolean;
+  free: boolean;
   hasPort?: boolean;
   port?: number;
   volumePath?: string;
@@ -214,13 +215,8 @@ export interface DebugSuggestionsResponse {
   suggestions: DebugSuggestions;
 }
 
-export type DebugPrStatus = "created" | "blocked";
-export type DebugPrBlockReason =
-  | "plan_disabled"
-  | "quota_exceeded"
-  | "unsupported_provider"
-  | "no_safe_changes"
-  | "generation_failed";
+export type DebugPrStatus = "created" | "queued" | "blocked";
+export type DebugPrBlockReason = "plan_disabled" | "quota_exceeded" | "unsupported_provider" | "no_safe_changes" | "generation_failed";
 
 export interface ProvidedDebugContext {
   framework: unknown | null;
@@ -245,6 +241,11 @@ export interface DebugPullRequest {
   changedFiles: string[];
 }
 
+export interface DebugPrJob {
+  id: string;
+  deduped: boolean;
+}
+
 export interface DebugSuggestionsPrResponse {
   model: string;
   status: DebugPrStatus;
@@ -256,8 +257,9 @@ export interface DebugSuggestionsPrResponse {
     envNames: string[];
     rootDir: unknown[];
     suggestions: DebugSuggestions;
-  };
+  } | null;
   pullRequest: DebugPullRequest | null;
+  job?: DebugPrJob | null;
 }
 
 export interface ProjectsApi {
@@ -273,18 +275,12 @@ export interface ProjectsApi {
       payload?: Record<string, unknown>;
     },
   ): Promise<{ id?: string; message?: string }>;
-  debugSuggestions(
-    projectId: string,
-    input: { logId: string; message: string },
-  ): Promise<DebugSuggestionsResponse>;
+  debugSuggestions(projectId: string, input: { logId: string; messageId: string; message: string }): Promise<DebugSuggestionsResponse>;
   debugSuggestionsPr(
     projectId: string,
-    input: { logId: string; message: string; debug?: ProvidedDebugContext | null },
+    input: { logId: string; messageId: string; message: string; debug?: ProvidedDebugContext | null },
   ): Promise<DebugSuggestionsPrResponse>;
-  transfer(
-    projectId: string,
-    input: { teamId: string },
-  ): Promise<{ id?: string; team?: string; environmentId?: string }>;
+  transfer(projectId: string, input: { teamId: string }): Promise<{ id?: string; team?: string; environmentId?: string }>;
   databaseBackup(projectId: string, input?: { teamId?: string }): Promise<{ message?: string }>;
   databaseRefresh(projectId: string, input?: { teamId?: string }): Promise<{ message?: string }>;
   updateDatabaseConfig(
@@ -315,6 +311,10 @@ export interface ProjectsApi {
     },
   ): Promise<{ message?: string }>;
   unlinkRepo(projectId: string, input?: { teamId?: string }): Promise<{ message?: string }>;
+  setPasswordProtection(
+    projectId: string,
+    input: { teamId?: string; passwordEnabled: boolean; password?: string },
+  ): Promise<{ id: string; passwordEnabled: boolean }>;
 }
 
 export interface PaginatedProjectsResponse extends ApiListResponse<Project> {
@@ -326,6 +326,7 @@ export interface PaginatedProjectsResponse extends ApiListResponse<Project> {
 
 const debugMessageSchema = Yup.object({
   logId: Yup.string().trim().required("Log ID is required"),
+  messageId: Yup.string().trim().required("Message ID is required"),
   message: Yup.string()
     .trim()
     .required("We need the log message to debug.")
@@ -434,7 +435,7 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
           const isDefault = pickBoolean(domainRecord, "default", "isDefault");
 
           return {
-            id: domainRecord.id ?? domainRecord._id,
+            id: pickString(domainRecord, "id", "_id"),
             name: String(domainRecord.name),
             isDefault,
             createdAt: asString(domainRecord.createdAt),
@@ -460,7 +461,7 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       const autoscalingGroupRecord = asRecord(row.autoscalingGroup) ?? {};
       autoscalingGroup = {
         ...autoscalingGroupRecord,
-        id: autoscalingGroupRecord._id ?? autoscalingGroupRecord.id,
+        id: pickString(autoscalingGroupRecord, "_id", "id"),
         name: asString(autoscalingGroupRecord.name),
       };
     }
@@ -470,7 +471,7 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       const dbImageRecord = asRecord(row.dbImage) ?? {};
       dbImage = {
         ...dbImageRecord,
-        id: dbImageRecord._id ?? dbImageRecord.id,
+        id: pickString(dbImageRecord, "_id", "id"),
         name: asString(dbImageRecord.name),
       };
     }
@@ -481,11 +482,11 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
     const maintenance = pickBoolean(row, "maintenance");
     const isPublicAccess = pickBoolean(row, "isPublicAccess", "publicAccess");
 
-    let specsRegion: Project["specs"]["region"] = null;
+    let specsRegion: NonNullable<Project["specs"]>["region"] = null;
     if (specsRegionRecord) {
       specsRegion = {
         ...specsRegionRecord,
-        id: specsRegionRecord._id ?? specsRegionRecord.id,
+        id: pickString(specsRegionRecord, "_id", "id"),
       };
     }
 
@@ -678,22 +679,16 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       };
     },
     async debugSuggestions(projectId, input) {
-      const { logId, message } = debugMessageSchema.validateSync(input);
+      const { logId, messageId, message } = debugMessageSchema.validateSync(input);
 
       const path = `${listEndpoint}/${encodeURIComponent(projectId)}/debug-suggestions`;
-      const fullUrl = `${config.gatewayUrl}${path}`;
-      const requestBody = { logId, message };
-      // eslint-disable-next-line no-console
-      console.log("[debug-suggestions] POST", fullUrl, "body:", requestBody);
+      const requestBody = { logId, messageId, message, debugModel: config.aiDebugModel };
 
       const response = await client.request<any>(path, {
         method: "POST",
         body: requestBody,
         timeout: 90_000,
       });
-
-      // eslint-disable-next-line no-console
-      console.log("[debug-suggestions] response:", JSON.stringify(response?.data ?? response, null, 2));
 
       const root = response?.data?.data ?? response?.data ?? response ?? {};
       const rootRecord = asRecord(root) ?? {};
@@ -715,29 +710,39 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       } satisfies DebugSuggestionsResponse;
     },
     async debugSuggestionsPr(projectId, input) {
-      const { logId, message } = debugMessageSchema.validateSync({ logId: input.logId, message: input.message });
+      const { logId, messageId, message } = debugMessageSchema.validateSync({
+        logId: input.logId,
+        messageId: input.messageId,
+        message: input.message,
+      });
 
-      const body: Record<string, unknown> = { logId, message };
+      const body: Record<string, unknown> = { logId, messageId, message, debugModel: config.aiDebugModel };
       if (input.debug) {
         body.debug = input.debug;
       }
 
-      const response = await client.request<any>(
-        `${listEndpoint}/${encodeURIComponent(projectId)}/debug-suggestions/pr`,
-        {
-          method: "POST",
-          body,
-          timeout: 180_000,
-        },
-      );
+      const path = `${listEndpoint}/${encodeURIComponent(projectId)}/debug-suggestions/pr`;
+
+      const response = await client.request<any>(path, {
+        method: "POST",
+        body,
+        timeout: 180_000,
+      });
 
       const root = response?.data?.data ?? response?.data ?? response ?? {};
       const rootRecord = asRecord(root) ?? {};
       const usageRecord = asRecord(rootRecord.usage) ?? {};
-      const debugRecord = asRecord(rootRecord.debug) ?? {};
+      const debugRecord = asRecord(rootRecord.debug);
       const pullRequestRecord = asRecord(rootRecord.pullRequest);
+      const jobRecord = asRecord(rootRecord.job);
 
-      const status: DebugPrStatus = rootRecord.status === "created" ? "created" : "blocked";
+      const statusRaw = String(rootRecord.status ?? "").toLowerCase();
+      let status: DebugPrStatus = "blocked";
+      if (statusRaw === "created") {
+        status = "created";
+      } else if (statusRaw === "queued") {
+        status = "queued";
+      }
 
       const reasonRaw = String(rootRecord.reason ?? "").toLowerCase();
       const allowedReasons: DebugPrBlockReason[] = [
@@ -771,19 +776,29 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
           }
         : null;
 
+      const job: DebugPrJob | null = jobRecord
+        ? {
+            id: pickString(jobRecord, "id") ?? "",
+            deduped: pickBoolean(jobRecord, "deduped") ?? false,
+          }
+        : null;
+
       return {
         model: pickString(rootRecord, "model") ?? "",
         status,
         reason,
         message: pickString(rootRecord, "message") ?? "",
         usage,
-        debug: {
-          framework: debugRecord.framework ?? null,
-          envNames: mapStringArray(debugRecord.envNames),
-          rootDir: Array.isArray(debugRecord.rootDir) ? debugRecord.rootDir : [],
-          suggestions: mapDebugSuggestionsObject(asRecord(debugRecord.suggestions) ?? {}),
-        },
+        debug: debugRecord
+          ? {
+              framework: debugRecord.framework ?? null,
+              envNames: mapStringArray(debugRecord.envNames),
+              rootDir: Array.isArray(debugRecord.rootDir) ? debugRecord.rootDir : [],
+              suggestions: mapDebugSuggestionsObject(asRecord(debugRecord.suggestions) ?? {}),
+            }
+          : null,
         pullRequest,
+        job,
       } satisfies DebugSuggestionsPrResponse;
     },
     async transfer(projectId, input) {
@@ -792,13 +807,10 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
         throw new Error("Team ID is required");
       }
 
-      const response = await client.request<any>(
-        `${listEndpoint}/transfer/${encodeURIComponent(projectId)}`,
-        {
-          method: "POST",
-          body: { teamId },
-        },
-      );
+      const response = await client.request<any>(`${listEndpoint}/transfer/${encodeURIComponent(projectId)}`, {
+        method: "POST",
+        body: { teamId },
+      });
 
       const root = response?.data?.data ?? response?.data ?? response ?? {};
       const rootRecord = asRecord(root) ?? {};
@@ -927,20 +939,14 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
             return null;
           }
 
-          const envs = Array.isArray(row.envs)
-            ? row.envs
-                .map((env) => {
-                  const envRow = asRecord(env) ?? {};
-                  const value = pickNonEmptyString(envRow, "value");
-                  if (!value) {
-                    return null;
-                  }
-                  return {
-                    type: pickNonEmptyString(envRow, "type"),
-                    value,
-                  };
-                })
-                .filter((env): env is { type?: string; value: string } => env !== null)
+          const envs: Array<{ type?: string; value: string }> = Array.isArray(row.envs)
+            ? row.envs.flatMap((env) => {
+                const envRow = asRecord(env) ?? {};
+                const value = pickNonEmptyString(envRow, "value");
+                if (!value) return [];
+                const type = pickNonEmptyString(envRow, "type");
+                return [type !== undefined ? { type, value } : { value }];
+              })
             : [];
 
           const recommendations = Array.isArray(row.recommendations)
@@ -959,7 +965,7 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
               })
             : [];
 
-          return {
+          const option: DatabaseEngineOption = {
             id,
             name,
             imageUrl: pickString(row, "image_url", "imageUrl"),
@@ -968,14 +974,16 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
             envs,
             isAvailable: pickBoolean(row, "is_available", "isAvailable") ?? true,
             isDefault: pickBoolean(row, "is_default", "isDefault") ?? false,
+            free: pickBoolean(row, "free") ?? false,
             hasPort: pickBoolean(row, "hasPort", "has_port"),
             port: pickNumber(row, "port"),
             volumePath: pickString(row, "volumePath", "volume_path"),
             protocol: pickString(row, "protocol"),
             recommendations,
-          } satisfies DatabaseEngineOption;
+          };
+          return option;
         })
-        .filter((item): item is DatabaseEngineOption => item !== null);
+        .filter((item: DatabaseEngineOption | null): item is DatabaseEngineOption => item !== null);
     },
     async createDatabase(input) {
       const response = await client.request<any>("/core/v1/projects/database", {
@@ -1042,6 +1050,22 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       });
       const root = response?.data?.data ?? response?.data ?? response ?? {};
       return { message: pickString(asRecord(root), "message") };
+    },
+    async setPasswordProtection(projectId, input) {
+      const body: Record<string, unknown> = { passwordEnabled: input.passwordEnabled };
+      if (input.teamId) body.teamId = input.teamId;
+      if (input.passwordEnabled && input.password) body.password = input.password;
+
+      const response = await client.request<any>(`${listEndpoint}/password-protect/${encodeURIComponent(projectId)}`, {
+        method: "PUT",
+        body,
+      });
+
+      const data = response?.data?.data ?? response?.data;
+      return {
+        id: data.id as string,
+        passwordEnabled: data.passwordEnabled as boolean,
+      };
     },
   };
 }

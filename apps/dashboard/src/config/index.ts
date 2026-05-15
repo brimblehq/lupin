@@ -17,7 +17,6 @@ export const config = {
   gatewayUrl,
   apiUrl: `${gatewayUrl}/core`,
   authApiUrl: `${gatewayUrl}/auth`,
-  dnsApiUrl: `${gatewayUrl}/dns`,
   paymentApiUrl: `${gatewayUrl}/payment/api`,
   logsSocketUrl: `${gatewayUrl}/core`,
   avatarUrl: readEnv("VITE_AVATAR_URL") ?? "https://api.dicebear.com/7.x",
@@ -25,9 +24,12 @@ export const config = {
   accessTokenCookie: "brimble_access_token",
   refreshTokenCookie: "brimble_refresh_token",
   environmentPreferenceCookiePrefix: "brimble_env_pref_",
-  supabaseUrl: readEnv("VITE_SUPABASE_URL") ?? "",
-  supabaseKey: readEnv("VITE_SUPABASE_KEY") ?? "",
+  supabaseUrl: readEnv("SUPABASE_URL") ?? readEnv("VITE_SUPABASE_URL") ?? "",
+  supabaseAnonKey: readEnv("SUPABASE_ANON_KEY") ?? "",
+  supabaseJwtPrivateKey: (readEnv("SUPABASE_JWT_PRIVATE_KEY") ?? "").replace(/\\n/g, "\n"),
+  supabaseJwtKid: readEnv("SUPABASE_JWT_KID") ?? "",
   supabaseTableName: readEnv("VITE_SUPABASE_TABLE_NAME") ?? "BRIMBLE_DEPLOYMENT_LOGS",
+  aiDebugModel: readEnv("VITE_AI_DEBUG_MODEL") ?? readEnv("AI_DEBUG_MODEL") ?? "gpt-5.1-codex-mini",
   stripePublishableKey: readEnv("VITE_STRIPE_KEY") ?? "",
 
   defaultPlanFreePrice: Number(readEnv("VITE_DEFAULT_PLAN_FREE_PRICE") ?? "0"),
@@ -42,9 +44,10 @@ export const config = {
   defaultOverageBandwidthPerGb: Number(readEnv("VITE_DEFAULT_OVERAGE_BANDWIDTH_PER_GB") ?? "0.25"),
   defaultOverageBuildMinutesPerMin: Number(readEnv("VITE_DEFAULT_OVERAGE_BUILD_MINUTES_PER_MIN") ?? "0.002"),
   buildMinutesTopUpPerDollar: Number(readEnv("VITE_BUILD_MINUTES_TOPUP_PER_DOLLAR") ?? "288"),
+  databaseFreeTrialDays: Number(readEnv("VITE_DB_FREE_TRIAL_DAYS") ?? "15"),
 
-  accessTokenTtl: Number(readEnv("VITE_ACCESS_TOKEN_TTL") ?? String(60 * 30)),
-  refreshTokenTtl: Number(readEnv("VITE_REFRESH_TOKEN_TTL") ?? String(60 * 60 * 24 * 14)),
+  accessTokenTtl: Number(readEnv("VITE_ACCESS_TOKEN_TTL") ?? String(60 * 60)),
+  refreshTokenTtl: Number(readEnv("VITE_REFRESH_TOKEN_TTL") ?? String(60 * 60 * 24)),
 
   turnstileSiteKey: readEnv("VITE_TURNSTILE_SITE_KEY") ?? "",
 

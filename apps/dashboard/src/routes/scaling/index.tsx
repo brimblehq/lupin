@@ -25,10 +25,13 @@ import { usePlanGate } from "@/hooks/use-plan-gate";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { PlanUpgradePrompt } from "../../components/shared/plan-upgrade-prompt";
+import { ScalingPending } from "@/components/shared/route-pending";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 export const Route = createFileRoute("/scaling/")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
+  pendingComponent: ScalingPending,
   validateSearch: (search: Record<string, unknown>) => workspaceLoaderDeps(search),
   loaderDeps: ({ search }) => workspaceLoaderDeps(search),
   loader: async ({ deps }) => {
@@ -51,8 +54,7 @@ export const Route = createFileRoute("/scaling/")({
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const inputClass =
-  `${dashInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
+const inputClass = `${dashInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
 
 type UiScalingGroup = {
   id: string;
@@ -139,17 +141,35 @@ function toFormValues(group?: UiScalingGroup | null): ScalingFormValues {
   };
 }
 
+function getThresholdCapColor(value: number): string {
+  if (value >= 85) return "#ff2200";
+  if (value >= 70) return "#ff5500";
+  if (value >= 50) return "#ff8c1a";
+  return "#ffa800";
+}
+
 function ThresholdBar({ label, value }: { label: string; value: number }) {
   const totalBlocks = 6;
   const filledBlocks = Math.round((value / 100) * totalBlocks);
+  const capColor = getThresholdCapColor(value);
 
   return (
     <div className="flex items-center gap-2">
       <span className="w-[28px] text-xs text-dash-text-faded">{label}</span>
       <div className="flex gap-[2px]">
-        {Array.from({ length: totalBlocks }).map((_, i) => (
-          <div key={i} className={`h-[8px] w-[6px] rounded-[1px] ${i < filledBlocks ? "bg-[#4879f8]" : "bg-dash-border"}`} />
-        ))}
+        {Array.from({ length: totalBlocks }).map((_, i) => {
+          if (i >= filledBlocks) {
+            return <div key={i} className="h-[8px] w-[6px] rounded-[1px] bg-dash-border" />;
+          }
+          const isTop = i === filledBlocks - 1;
+          return (
+            <div
+              key={i}
+              className="h-[8px] w-[6px] rounded-[1px]"
+              style={{ backgroundColor: isTop ? capColor : "#ff7a00" }}
+            />
+          );
+        })}
       </div>
       <span className="text-xs font-medium text-dash-text-body">{value}%</span>
     </div>
@@ -241,33 +261,6 @@ function ScalingGroupCard({
         </span>
       </div>
     </motion.div>
-  );
-}
-
-function ScalingCardSkeleton() {
-  return (
-    <div className="flex h-[164px] animate-pulse flex-col rounded-[4px] border-[0.5px] border-dash-border">
-      <div className="flex items-center justify-between px-3.5 pb-1 pt-3">
-        <div className="h-4 w-28 rounded bg-dash-bg-elevated" />
-        <div className="h-4 w-20 rounded bg-dash-bg-elevated" />
-      </div>
-      <div className="px-3.5 pb-3">
-        <div className="h-3 w-32 rounded bg-dash-bg-elevated" />
-      </div>
-      <div className="grid grid-cols-2 gap-3 px-3.5 pb-3">
-        <div className="space-y-2">
-          <div className="h-3 w-16 rounded bg-dash-bg-elevated" />
-          <div className="h-4 w-20 rounded bg-dash-bg-elevated" />
-          <div className="h-3 w-16 rounded bg-dash-bg-elevated" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-3 w-16 rounded bg-dash-bg-elevated" />
-          <div className="h-3 w-20 rounded bg-dash-bg-elevated" />
-          <div className="h-3 w-20 rounded bg-dash-bg-elevated" />
-        </div>
-      </div>
-      <div className="mt-auto h-10 border-t-[0.5px] border-dash-border px-3.5" />
-    </div>
   );
 }
 
@@ -427,9 +420,14 @@ function CreationForm({
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <DashButton variant="outline" onClick={onCancel} disabled={Boolean(isSubmitting)}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={Boolean(isSubmitting)}
+            className="px-2 text-sm font-medium text-dash-text-faded transition-colors hover:text-dash-text-strong disabled:pointer-events-none disabled:opacity-50"
+          >
             Cancel
-          </DashButton>
+          </button>
           <GlossyButton
             variant="blue"
             onClick={() => {
@@ -578,7 +576,7 @@ function ScalingPage() {
       } else {
         toast.success(`Created ${saved.name}`);
       }
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save scaling group");
     } finally {
@@ -618,7 +616,7 @@ function ScalingPage() {
       });
 
       toast.success(`${nextActive ? "Enabled" : "Disabled"} ${group.name}`);
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       setRows((prev) =>
         prev.map((row) => {
@@ -668,7 +666,7 @@ function ScalingPage() {
       setRows((prev) => prev.filter((row) => row.id !== target.id));
       setDeleteTarget(null);
       toast.success(`Deleted ${target.name}`);
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete scaling group");
       throw error;
@@ -735,7 +733,7 @@ function ScalingPage() {
       </AnimatePresence>
 
       {rows.length === 0 ? (
-        <EmptyState onCreateClick={handleNewGroup} canWrite={canWrite} />
+        formOpen ? null : <EmptyState onCreateClick={handleNewGroup} canWrite={canWrite} />
       ) : filtered.length === 0 ? (
         <div className="py-12 text-center text-sm text-dash-text-faded">No scaling groups match your search.</div>
       ) : (

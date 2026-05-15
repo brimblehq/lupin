@@ -7,10 +7,13 @@ import type {
   PaymentMethod,
   SetupIntentResult,
   AddPaymentMethodInput,
+  AddPaymentMethodResult,
   Subscription,
   SubscriptionStats,
+  SubscriptionMutationResult,
   CreateSubscriptionInput,
   SwapPlanInput,
+  CancelSubscriptionInput,
   InvoicePage,
   InvoicePaymentResult,
   PurchaseInput,
@@ -28,9 +31,18 @@ export type {
   PaymentMethodCard,
   SetupIntentResult,
   AddPaymentMethodInput,
+  AddPaymentMethodResult,
+  AddPaymentMethodPendingData,
+  AddPaymentMethodPendingResult,
+  AddPaymentMethodSuccessResult,
   Subscription,
+  SubscriptionPaymentPendingData,
+  SubscriptionMutationResult,
+  SubscriptionMutationPendingResult,
+  SubscriptionMutationSuccessResult,
   CreateSubscriptionInput,
   SwapPlanInput,
+  CancelSubscriptionInput,
   Invoice,
   InvoicePage,
   InvoicePaymentResult,
@@ -56,6 +68,30 @@ function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
+function mapPaymentConfirmationError(error: unknown, fallbackMessage: string): SubscriptionMutationResult {
+  if (!(error instanceof BackendApiError) || error.status !== 402) {
+    throw error;
+  }
+
+  const data = unwrapData<any>(error.details);
+  const paymentIntentId = String(data?.payment_intent_id ?? "").trim();
+  const clientSecret = typeof data?.client_secret === "string" ? data.client_secret.trim() || null : null;
+
+  if (!paymentIntentId || !clientSecret) {
+    throw error;
+  }
+
+  return {
+    status: "pending",
+    message: error.message || fallbackMessage,
+    data: {
+      requires_action: Boolean(data?.requires_action),
+      payment_intent_id: paymentIntentId,
+      client_secret: clientSecret,
+    },
+  };
+}
+
 export function createPaymentsApi(client: ApiClient): PaymentsApi {
   const base = config.paymentApiUrl;
   const clientWithConfig = client as BackendClient;
@@ -78,12 +114,56 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       return { client_secret: String(data?.client_secret ?? "") };
     },
 
-    async addPaymentMethod(input: AddPaymentMethodInput): Promise<PaymentMethod> {
-      const res = await client.request<any>(`${base}/payment/payment-method`, {
+    async addPaymentMethod(input: AddPaymentMethodInput): Promise<AddPaymentMethodResult> {
+      try {
+        const res = await client.request<any>(`${base}/payment/payment-method`, {
+          method: "POST",
+          body: {
+            payment_method: input.payment_method,
+            return_url: input.return_url,
+          },
+        });
+
+        const message = res?.message?.trim?.() || "Payment method added successfully";
+
+        return {
+          status: "success",
+          message,
+          data: null,
+        };
+      } catch (error) {
+        if (!(error instanceof BackendApiError) || error.status !== 402) {
+          throw error;
+        }
+
+        const payload = error.details as any;
+        const data = unwrapData<any>(payload);
+        const setupIntentId = String(data?.setup_intent_id ?? "").trim();
+        const clientSecret = String(data?.client_secret ?? "").trim();
+        const redirectUrl = String(data?.redirect_url ?? "").trim();
+
+        if (!setupIntentId || !clientSecret || !redirectUrl) {
+          throw new Error("Card confirmation is required, but payment confirmation details are missing.");
+        }
+
+        return {
+          status: "pending",
+          message: error.message || "Card requires 3D Secure confirmation",
+          data: {
+            requires_action: Boolean(data?.requires_action),
+            setup_intent_id: setupIntentId,
+            client_secret: clientSecret,
+            redirect_url: redirectUrl,
+          },
+        };
+      }
+    },
+
+    async confirmPaymentMethod(setupIntentId: string): Promise<void> {
+      await client.request(`${base}/payment/payment-method/confirm`, {
         method: "POST",
-        body: { payment_method: input.payment_method },
+        body: { setup_intent_id: setupIntentId },
       });
-      return unwrapData<PaymentMethod>(res);
     },
 
     async removePaymentMethod(id: string): Promise<void> {
@@ -124,30 +204,41 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
       }
     },
 
-    async createSubscription(input: CreateSubscriptionInput): Promise<Subscription> {
-      const res = await client.request<any>(`${base}/subscription/create`, {
-        method: "POST",
-        body: {
-          type: input.type,
-          accept_terms: input.accept_terms,
-          ...(input.payment_method ? { payment_method: input.payment_method } : {}),
-        },
-        headers: { "Idempotency-Key": generateIdempotencyKey() },
-      });
-      return unwrapData<Subscription>(res);
+    async createSubscription(input: CreateSubscriptionInput): Promise<SubscriptionMutationResult> {
+      try {
+        const res = await client.request<any>(`${base}/subscription/create`, {
+          method: "POST",
+          body: {
+            type: input.type,
+            accept_terms: input.accept_terms,
+            ...(input.payment_method ? { payment_method: input.payment_method } : {}),
+          },
+          headers: { "Idempotency-Key": generateIdempotencyKey() },
+        });
+        const message = res?.message?.trim?.() || "Subscription created successfully";
+        return { status: "success", message, data: unwrapData<Subscription>(res) ?? null };
+      } catch (error) {
+        return mapPaymentConfirmationError(error, "Subscription requires payment confirmation");
+      }
     },
 
-    async swapPlan(input: SwapPlanInput): Promise<Subscription> {
-      const res = await client.request<any>(`${base}/subscription/swap`, {
-        method: "POST",
-        body: { target_plan: input.target_plan },
-      });
-      return unwrapData<Subscription>(res);
+    async swapPlan(input: SwapPlanInput): Promise<SubscriptionMutationResult> {
+      try {
+        const res = await client.request<any>(`${base}/subscription/swap`, {
+          method: "POST",
+          body: { target_plan: input.target_plan },
+        });
+        const message = res?.message?.trim?.() || "Plan changed successfully";
+        return { status: "success", message, data: unwrapData<Subscription>(res) ?? null };
+      } catch (error) {
+        return mapPaymentConfirmationError(error, "Plan change requires payment confirmation");
+      }
     },
 
-    async cancelSubscription(): Promise<void> {
+    async cancelSubscription(input: CancelSubscriptionInput): Promise<void> {
       await client.request(`${base}/subscription/cancel`, {
         method: "POST",
+        body: { comment: input.comment },
       });
     },
 

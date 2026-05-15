@@ -23,6 +23,7 @@ interface LogAiDebugPanelProps {
   onOpenChange: (open: boolean) => void;
   projectId: string;
   logId: string;
+  messageId: string;
   message: string;
 }
 
@@ -69,22 +70,22 @@ function LevelChip({ label, palette }: { label: string; palette: ChipPalette }) 
   );
 }
 
-export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message }: LogAiDebugPanelProps) {
+export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, messageId, message }: LogAiDebugPanelProps) {
   const debugFn = useServerFn(debugSuggestionsServerFn as any) as (args: {
-    data: { projectId: string; logId: string; message: string };
+    data: { projectId: string; logId: string; messageId: string; message: string };
   }) => Promise<DebugSuggestionsResponse>;
   const prFn = useServerFn(debugSuggestionsPrServerFn as any) as (args: {
-    data: { projectId: string; logId: string; message: string; debug?: ProvidedDebugContext | null };
+    data: { projectId: string; logId: string; messageId: string; message: string; debug?: ProvidedDebugContext | null };
   }) => Promise<DebugSuggestionsPrResponse>;
   const queryClient = useQueryClient();
 
   const trimmedMessage = message.trim();
-  const enabled = open && Boolean(projectId && logId && trimmedMessage.length >= 5);
+  const enabled = open && Boolean(projectId && logId && messageId && trimmedMessage.length >= 5);
   const [copied, setCopied] = useState(false);
 
   const query = useQuery<DebugSuggestionsResponse>({
-    queryKey: ["debug-suggestions", projectId, logId, trimmedMessage],
-    queryFn: () => debugFn({ data: { projectId, logId, message: trimmedMessage } }),
+    queryKey: ["debug-suggestions", projectId, logId, messageId, trimmedMessage],
+    queryFn: () => debugFn({ data: { projectId, logId, messageId, message: trimmedMessage } }),
     enabled,
     staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
@@ -101,7 +102,7 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
             suggestions: query.data.suggestions,
           }
         : null;
-      return prFn({ data: { projectId, logId, message: trimmedMessage, debug } });
+      return prFn({ data: { projectId, logId, messageId, message: trimmedMessage, debug } });
     },
     onSuccess: (data) => {
       if (data.status === "created") {
@@ -117,16 +118,21 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
         onOpenChange(false);
         return;
       }
+      if (data.status === "queued") {
+        toast.success(data.message || "Auto-fix pull request generation queued successfully.");
+        onOpenChange(false);
+        return;
+      }
 
       switch (data.reason) {
         case "plan_disabled":
           toast.error(data.message || "AI debug isn't included on your current plan.");
           break;
         case "quota_exceeded":
-          toast.error("Daily AI debug limit reached.");
+          toast.error(data.message || "Daily AI debug limit reached.");
           break;
         case "unsupported_provider":
-          toast.error("This repository's git provider isn't supported for auto-fix PRs.");
+          toast.error(data.message || "This repository's git provider isn't supported for auto-fix PRs.");
           break;
         case "no_safe_changes":
           toast(data.message || "No safe automated fix found. Try the manual steps.");
@@ -150,12 +156,11 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
     if (!open || !query.error) {
       return;
     }
-    const errorMessage =
-      query.error instanceof Error ? query.error.message : "Unable to generate debug suggestions.";
+    const errorMessage = query.error instanceof Error ? query.error.message : "Unable to generate debug suggestions.";
     toast.error(errorMessage);
-    queryClient.removeQueries({ queryKey: ["debug-suggestions", projectId, logId, trimmedMessage] });
+    queryClient.removeQueries({ queryKey: ["debug-suggestions", projectId, logId, messageId, trimmedMessage] });
     onOpenChange(false);
-  }, [open, query.error, queryClient, projectId, logId, trimmedMessage, onOpenChange]);
+  }, [open, query.error, queryClient, projectId, logId, messageId, trimmedMessage, onOpenChange]);
 
   const usage = query.data?.usage;
   const remaining = usage ? Math.max(0, usage.limit - usage.count) : null;
@@ -163,11 +168,7 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
   const isLow = remaining !== null && remaining > 0 && remaining <= 2;
   const isExhausted = remaining !== null && remaining === 0;
 
-  const usageTone = isExhausted
-    ? "text-[#fc391e]"
-    : isLow
-      ? "text-[#b37a10] dark:text-[#ffb020]"
-      : "text-dash-text-faded";
+  const usageTone = isExhausted ? "text-[#fc391e]" : isLow ? "text-[#b37a10] dark:text-[#ffb020]" : "text-dash-text-faded";
 
   const canCopy = !!query.data && !limited;
 
@@ -191,9 +192,7 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
         <div className="flex items-start gap-2">
           <Sparkles className="mt-[3px] size-3.5 shrink-0 text-[#4879f8]" />
           <div className="flex flex-col gap-0.5">
-            <Dialog.Title className="text-base leading-[1.4] tracking-[-0.096px] text-dash-text-strong">
-              Debug with AI
-            </Dialog.Title>
+            <Dialog.Title className="text-base leading-[1.4] tracking-[-0.096px] text-dash-text-strong">Debug with AI</Dialog.Title>
             <Dialog.Description className="text-sm font-light leading-[1.3] text-dash-text-faded">
               Suggested fixes for this log line
             </Dialog.Description>
@@ -232,11 +231,7 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, message 
           <p className="text-xs text-dash-text-faded">Message is too short to debug.</p>
         ) : null}
 
-        {!limited && (
-          <p className="mt-4 text-[11px] leading-[1.4] text-dash-text-extra-faded">
-            Limit resets at midnight UTC.
-          </p>
-        )}
+        {!limited && <p className="mt-4 text-[11px] leading-[1.4] text-dash-text-extra-faded">Limit resets at midnight UTC.</p>}
       </div>
 
       {canCopy && (
@@ -270,9 +265,7 @@ function SuggestionsView({ data }: { data: DebugSuggestionsResponse }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {suggestions.summary && (
-        <p className="text-sm leading-[1.45] text-dash-text-strong">{suggestions.summary}</p>
-      )}
+      {suggestions.summary && <p className="text-sm leading-[1.45] text-dash-text-strong">{suggestions.summary}</p>}
 
       {suggestions.likelyCauses.length > 0 && (
         <Section title="Likely causes">
@@ -370,10 +363,7 @@ function ActionRow({ action }: { action: DebugAction }) {
       {action.files.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {action.files.map((file, index) => (
-            <code
-              key={index}
-              className="rounded bg-dash-bg-elevated px-1.5 py-0.5 font-logs text-[11px] text-dash-text-body"
-            >
+            <code key={index} className="rounded bg-dash-bg-elevated px-1.5 py-0.5 font-logs text-[11px] text-dash-text-body">
               {file}
             </code>
           ))}

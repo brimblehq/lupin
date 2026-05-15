@@ -9,6 +9,7 @@ import { useHaptics } from "@/hooks/use-haptics";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@brimble/ui";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { EnvironmentPending } from "@/components/shared/route-pending";
 import { GlossyButton } from "../../../components/shared/glossy-button";
 import { Tooltip, SimpleTooltip } from "@/components/shared/tooltip";
 import { Spinner } from "@/components/shared/spinner";
@@ -45,14 +46,12 @@ import {
 } from "@/utils/project-environment";
 import { isDatabaseProject as getIsDatabaseProject } from "@/utils/project-capabilities";
 import { markDeploymentHistoryForRefresh } from "@/utils/deployment-history-refresh";
-import {
-  hasReferenceTrigger,
-  highlightReferences,
-  type ReferenceValidationContext,
-} from "@/utils/env-references";
+import { hasReferenceTrigger, highlightReferences, type ReferenceValidationContext } from "@/utils/env-references";
 import type { ProjectOption, ProjectVarOption, SharedVarOption } from "@/components/project/env-reference-autocomplete";
 import { ReferenceHighlightInput } from "@/components/project/reference-highlight-input";
 import { ReferenceCountBadge, ReferenceWarnings } from "@/components/project/env-reference-widgets";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
+import { parseEnvPaste } from "@/utils/env-paste";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 const DEFAULT_TARGET = "PRODUCTION";
@@ -139,13 +138,12 @@ export const Route = createFileRoute("/projects/$projectId/environment")({
       targets: sortEnvironmentTargets(targets),
       initialEnvLevelVars: envLevelResult.vars,
       initialEnvLevelVarsKey:
-        sharedLayerEnabled && projectEnvironmentId && envLevelResult.loaded
-          ? `${projectEnvironmentId}:${workspace ?? ""}`
-          : null,
+        sharedLayerEnabled && projectEnvironmentId && envLevelResult.loaded ? `${projectEnvironmentId}:${workspace ?? ""}` : null,
     } satisfies LoaderData;
     return data;
   },
   component: EnvironmentPage,
+  pendingComponent: EnvironmentPending,
 });
 
 function createDraftId() {
@@ -1168,7 +1166,7 @@ function EnvironmentPage() {
       });
       markDeploymentHistoryForRefresh({ projectId, workspace });
       toast.success("Redeploy started");
-      router.invalidate();
+      invalidateActiveMatches(router);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to start redeploy");
     }
@@ -1180,6 +1178,17 @@ function EnvironmentPage() {
 
   function updateDraftRow(id: string, field: "name" | "value", nextValue: string) {
     setDraftRows((prev) => prev.map((row) => (row.id === id ? { ...row, [field]: nextValue } : row)));
+  }
+
+  function handleDraftPaste(rowId: string, event: React.ClipboardEvent<HTMLInputElement>) {
+    const parsed = parseEnvPaste(event.clipboardData.getData("text"));
+    if (!parsed) return;
+    event.preventDefault();
+    setDraftRows((prev) => {
+      const withoutCurrent = prev.filter((row) => row.id !== rowId || row.name || row.value);
+      const additions = parsed.map((p) => ({ id: createDraftId(), name: p.name, value: p.value, shared: false }));
+      return [...withoutCurrent, ...additions];
+    });
   }
 
   function toggleDraftShared(id: string) {
@@ -1598,6 +1607,7 @@ function EnvironmentPage() {
                                 type="text"
                                 value={row.name}
                                 onChange={(event) => updateDraftRow(row.id, "name", event.target.value)}
+                                onPaste={(event) => handleDraftPaste(row.id, event)}
                                 placeholder="APP_ENV"
                                 className="input-base input-focus h-[36px] min-w-0 flex-1 px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded"
                               />

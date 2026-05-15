@@ -8,6 +8,7 @@ import { ConnectedDomains } from "../components/overview/connected-domains";
 import { FeaturedIntegrations } from "../components/overview/featured-integrations";
 import { TeamInviteModal } from "../components/shared/team-invite-modal";
 import { OwnershipTransferModal } from "../components/shared/ownership-transfer-modal";
+import { HomePending } from "../components/shared/route-pending";
 import { listHomeProjectsServerFn } from "@/server/projects/actions";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import type { FrameworkOption } from "@/backend/frameworks";
@@ -21,6 +22,7 @@ import {
   acceptOwnershipTransferServerFn,
   denyOwnershipTransferServerFn,
 } from "@/server/teams/actions";
+import { getTwoFactorStatusServerFn } from "@/server/auth/actions";
 import { getActiveEnvironmentPreferenceServerFn, listProjectEnvironmentsServerFn } from "@/server/environments/actions";
 import type { ApiListResponse } from "@/backend";
 import type { Project as BackendProject } from "@/backend/projects";
@@ -37,6 +39,7 @@ import { mapMcpTemplateToAddon } from "@/utils/discover-mcp";
 import { resolveEnvironmentId } from "@/utils/environment-selection";
 import { workspaceLoaderDeps } from "@/utils/workspace-route-search";
 import { getRouteApi } from "@tanstack/react-router";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const rootRoute = getRouteApi("__root__");
 const EMPTY_PROJECTS: BackendProject[] = [];
@@ -92,49 +95,57 @@ export const Route = createFileRoute("/")({
       environments,
     });
 
-    const [projectsResult, overviewResult, bandwidthResult] = await Promise.allSettled([
-      (listHomeProjectsServerFn as unknown as (input: {
+    let projects = EMPTY_PROJECTS;
+    let overview = EMPTY_OVERVIEW;
+    let bandwidth = EMPTY_BANDWIDTH;
+
+    try {
+      const projectsResponse = await (listHomeProjectsServerFn as unknown as (input: {
         data: { workspace?: string; environmentId?: string };
       }) => Promise<ApiListResponse<BackendProject>>)({
         data: { workspace, environmentId },
-      }),
-      (getHomeOverviewServerFn as unknown as (input: {
+      });
+      projects = projectsResponse.items;
+    } catch (error) {
+      console.warn("[dashboard-home loader] failed to load projects", error);
+    }
+
+    try {
+      overview = await (getHomeOverviewServerFn as unknown as (input: {
         data: { workspace?: string; environmentId?: string };
       }) => Promise<OverviewSummary>)({
         data: { workspace, environmentId },
-      }),
-      (getHomeBandwidthServerFn as unknown as (input: {
+      });
+    } catch (error) {
+      console.warn("[dashboard-home loader] failed to load overview", error);
+    }
+
+    try {
+      bandwidth = await (getHomeBandwidthServerFn as unknown as (input: {
         data: { workspace?: string; environmentId?: string };
       }) => Promise<BandwidthSummary>)({
         data: { workspace, environmentId },
-      }),
-    ]);
+      });
+    } catch (error) {
+      console.warn("[dashboard-home loader] failed to load bandwidth", error);
+    }
 
     const frameworkLogoMap = new Map<string, string>();
     for (const fw of frameworksList) {
       if (fw.slug && fw.logo) frameworkLogoMap.set(fw.slug.toLowerCase(), fw.logo);
     }
 
-    if (projectsResult.status === "rejected") {
-      console.warn("[dashboard-home loader] failed to load projects", projectsResult.reason);
-    }
-    if (overviewResult.status === "rejected") {
-      console.warn("[dashboard-home loader] failed to load overview", overviewResult.reason);
-    }
-    if (bandwidthResult.status === "rejected") {
-      console.warn("[dashboard-home loader] failed to load bandwidth", bandwidthResult.reason);
-    }
-
     return {
-      projects: projectsResult.status === "fulfilled" ? projectsResult.value.items : EMPTY_PROJECTS,
-      overview: overviewResult.status === "fulfilled" ? overviewResult.value : EMPTY_OVERVIEW,
-      bandwidth: bandwidthResult.status === "fulfilled" ? bandwidthResult.value : EMPTY_BANDWIDTH,
+      projects,
+      overview,
+      bandwidth,
       featuredAddons: mcpTemplatesResult.servers.slice(0, 3).map(mapMcpTemplateToAddon),
       frameworkLogos: Object.fromEntries(frameworkLogoMap),
       workspace,
     };
   },
   component: DashboardHome,
+  pendingComponent: HomePending,
 });
 
 function DashboardHome() {
@@ -159,6 +170,7 @@ function DashboardHome() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteLoadingAction, setInviteLoadingAction] = useState<"accept" | "decline">();
   const [invitationData, setInvitationData] = useState<TeamInvitation | null>(null);
+  const [viewerHas2FA, setViewerHas2FA] = useState<boolean | null>(null);
   const [ownershipTransferOpen, setOwnershipTransferOpen] = useState(search.transferOwnership === "1");
   const [ownershipTransferLoading, setOwnershipTransferLoading] = useState(false);
   const [ownershipTransferLoadingAction, setOwnershipTransferLoadingAction] = useState<"accept" | "deny" | undefined>(undefined);
@@ -183,7 +195,22 @@ function DashboardHome() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceSlug, invitationData, isTeamWorkspace]);
+  }, [workspaceSlug, invitationData, isTeamWorkspace, navigate]);
+
+  useEffect(() => {
+    if (!invitationData?.team.enforce2FA || viewerHas2FA !== null) return;
+    let cancelled = false;
+    (getTwoFactorStatusServerFn as unknown as () => Promise<{ enabled: boolean }>)()
+      .then((status) => {
+        if (!cancelled) setViewerHas2FA(Boolean(status?.enabled));
+      })
+      .catch(() => {
+        if (!cancelled) setViewerHas2FA(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [invitationData?.team.enforce2FA, viewerHas2FA]);
 
   useEffect(() => {
     setOwnershipTransferOpen(search.transferOwnership === "1");
@@ -244,6 +271,8 @@ function DashboardHome() {
           workspaceAvatarUrl={invitationData.team.avatar ?? workspaceTeamMembers?.avatarUrl}
           loading={inviteLoading}
           loadingAction={inviteLoadingAction}
+          enforce2FA={Boolean(invitationData.team.enforce2FA)}
+          viewerHas2FA={viewerHas2FA}
           onAccept={async () => {
             const teamId = invitationData?.team.id;
             if (!teamId) return;
@@ -255,7 +284,7 @@ function DashboardHome() {
               });
               toast.success("Invitation accepted! Welcome to the team.");
               setInviteModalOpen(false);
-              await router.invalidate();
+              await invalidateActiveMatches(router);
             } catch (err: any) {
               toast.error(err?.message || "Failed to accept invitation");
             } finally {
@@ -319,7 +348,7 @@ function DashboardHome() {
                   ...(search.environmentId ? { environmentId: search.environmentId } : {}),
                 },
               });
-              await router.invalidate();
+              await invalidateActiveMatches(router);
             } catch (err: any) {
               const message = err?.message || "Failed to accept ownership transfer";
               if (/no pending ownership transfer found/i.test(message)) {
@@ -356,7 +385,7 @@ function DashboardHome() {
                   ...(search.environmentId ? { environmentId: search.environmentId } : {}),
                 },
               });
-              await router.invalidate();
+              await invalidateActiveMatches(router);
             } catch (err: any) {
               const message = err?.message || "Failed to deny ownership transfer";
               if (/no pending ownership transfer found/i.test(message)) {

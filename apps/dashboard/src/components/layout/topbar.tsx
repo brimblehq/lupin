@@ -14,9 +14,10 @@ import {
   ArrowRightLeft,
   Copy,
   Check,
+  Newspaper,
 } from "lucide-react";
 import { House, ShoppingBag, Desktop } from "@phosphor-icons/react";
-import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../../hooks/use-theme";
@@ -25,7 +26,6 @@ import { DashButton } from "../shared/dash-button";
 import { Spinner } from "../shared/spinner";
 import { Avatar } from "../shared/avatar";
 import { useScoutBar } from "../../contexts/scoutbar-context";
-import config from "@/config";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import type { Workspace } from "@/backend/workspaces";
@@ -47,6 +47,7 @@ import { Dropdown } from "../shared/dropdown";
 import { toTitleCase } from "@/utils/dashboard";
 import { Theme } from "@/types/enums";
 import { buildProjectSwitchUrl, buildWorkspaceSwitchUrl, setPendingDomainsAction, withWorkspaceQuery } from "@/utils/topbar-navigation";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 function getWorkspaceSearch(searchStr?: string) {
   const params = new URLSearchParams(searchStr || "");
@@ -293,11 +294,23 @@ function WorkspaceSwitcher({
     return team.name.toLowerCase().includes(text);
   });
 
+  const homeSearch = activeTeam?.slug ? { workspace: activeTeam.slug } : {};
+
   return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 text-sm font-medium text-dash-text-strong">
+    <div className="relative flex items-center gap-1" ref={ref}>
+      <Link
+        to="/"
+        search={homeSearch as any}
+        className="flex items-center gap-2 rounded-[4px] py-0.5 text-sm font-medium text-dash-text-strong transition-colors hover:text-dash-text-body"
+      >
         <Avatar src={activeAvatarSrc} fallbackSeed={activeAvatarSeed} alt="" className="size-6 rounded-full object-cover" />
         <span className="truncate max-w-[90px] sm:max-w-[180px]">{activeWorkspaceLabel}</span>
+      </Link>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-label="Switch workspace"
+        className="flex items-center rounded-[4px] p-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+      >
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}>
           <ChevronDown className="size-4 text-dash-text-strong" />
         </motion.span>
@@ -576,7 +589,9 @@ function EnvironmentDropdown({
     }
 
     const params = new URLSearchParams(searchStr || "");
+    const currentSearchString = params.toString();
     params.delete("environmentId");
+    const nextSearchString = params.toString();
     const search = Object.fromEntries(params.entries());
 
     await navigate({
@@ -584,7 +599,10 @@ function EnvironmentDropdown({
       search: Object.keys(search).length > 0 ? (search as any) : undefined,
       replace: true,
     });
-    await router.invalidate();
+
+    if (currentSearchString === nextSearchString) {
+      await invalidateActiveMatches(router);
+    }
   }
 
   async function handleCreateSubmit() {
@@ -802,22 +820,48 @@ function EnvironmentDropdown({
 
 /* ─── Notifications ─── */
 
-function levelIcon(level: NotificationLevel): { src: string; className?: string } {
-  if (level === "error") return { src: "/icons/error.svg", className: "invert dark:invert-0" };
-  if (level === "warning") return { src: "/icons/icons8-warning-shield.svg" };
+function levelIcon(level: NotificationLevel): { src: string; className?: string; style?: React.CSSProperties } {
+  if (level === "error")
+    return {
+      src: "/icons/error.svg",
+      style: {
+        filter: "brightness(0) saturate(100%) invert(33%) sepia(98%) saturate(2700%) hue-rotate(347deg) brightness(95%) contrast(95%)",
+      },
+    };
+  if (level === "warning")
+    return {
+      src: "/icons/icons8-warning-shield.svg",
+      style: { filter: "hue-rotate(-28deg) saturate(1.4)" },
+    };
+  if (level === "success")
+    return {
+      src: "/icons/success.svg",
+      style: {
+        filter: "brightness(0) saturate(100%) invert(57%) sepia(94%) saturate(420%) hue-rotate(101deg) brightness(95%) contrast(89%)",
+      },
+    };
   return { src: "/icons/info.svg", className: "invert dark:invert-0" };
 }
 
+const NOTIFICATIONS_PAGE_SIZE = 8;
+
 function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHaptics> }) {
   const [open, setOpen] = useState(false);
+  const [limit, setLimit] = useState(NOTIFICATIONS_PAGE_SIZE);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspaceSearch = getWorkspaceSearch(searchStr);
   const workspace = workspaceSearch?.workspace;
 
-  const { data, isLoading, refetch } = useNotifications({ workspace, limit: 8 });
+  useEffect(() => {
+    setLimit(NOTIFICATIONS_PAGE_SIZE);
+  }, [workspace]);
+
+  const { data, isLoading, isFetching, refetch } = useNotifications({ workspace, limit });
   const items = data?.items ?? [];
+  const total = data?.total ?? items.length;
+  const hasMore = items.length < total;
   const unreadCount = data?.unseenCount ?? 0;
   const markSeen = useMarkNotificationSeen(workspace);
   const markAllSeen = useMarkAllNotificationsSeen(workspace);
@@ -854,7 +898,7 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
     }
 
     if (/^https?:\/\//i.test(notification.route)) {
-      window.location.href = notification.route;
+      window.open(notification.route, "_blank", "noopener,noreferrer");
       return;
     }
 
@@ -908,7 +952,7 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
             </div>
 
             {/* List */}
-            <div className="max-h-[320px] overflow-y-auto">
+            <div className="scrollbar-subtle max-h-[320px] overflow-y-auto">
               {isLoading && items.length === 0 ? (
                 <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-dash-text-faded">
                   <LoaderCircle className="size-4 animate-spin" />
@@ -917,36 +961,50 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
               ) : items.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-dash-text-faded">No notifications</div>
               ) : (
-                items.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => handleNotificationClick(n)}
-                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated ${
-                      n.seen ? "" : "bg-[#4879f8]/[0.04] dark:bg-[#4879f8]/[0.06]"
-                    }`}
-                  >
-                    {(() => {
-                      const icon = levelIcon(n.level);
-                      return (
-                        <img
-                          src={icon.src}
-                          alt=""
-                          className={`mt-0.5 size-4 shrink-0 ${icon.className ?? ""} ${n.seen ? "opacity-60" : ""}`}
-                        />
-                      );
-                    })()}
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span
-                        className={`text-sm leading-[1.4] ${
-                          n.seen ? "font-light text-dash-text-faded" : "font-medium text-dash-text-strong"
-                        }`}
-                      >
-                        {n.message}
-                      </span>
-                      <span className="text-xs text-dash-text-extra-faded">{formatRelativeTime(n.createdAt)}</span>
-                    </div>
-                  </button>
-                ))
+                <>
+                  {items.map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => handleNotificationClick(n)}
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated ${
+                        n.seen ? "" : "bg-[#4879f8]/[0.04] dark:bg-[#4879f8]/[0.06]"
+                      }`}
+                    >
+                      {(() => {
+                        const icon = levelIcon(n.level);
+                        return (
+                          <img
+                            src={icon.src}
+                            alt=""
+                            style={icon.style}
+                            className={`mt-0.5 size-4 shrink-0 ${icon.className ?? ""} ${n.seen ? "opacity-60" : ""}`}
+                          />
+                        );
+                      })()}
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span
+                          className={`text-sm leading-[1.4] ${
+                            n.seen ? "font-light text-dash-text-faded" : "font-medium text-dash-text-strong"
+                          }`}
+                        >
+                          {n.message}
+                        </span>
+                        <span className="text-xs text-dash-text-extra-faded">{formatRelativeTime(n.createdAt)}</span>
+                      </div>
+                    </button>
+                  ))}
+                  {hasMore && (
+                    <button
+                      type="button"
+                      onClick={() => setLimit((l) => l + NOTIFICATIONS_PAGE_SIZE)}
+                      disabled={isFetching}
+                      className="flex w-full items-center justify-center gap-2 border-t-[0.5px] border-dash-border px-4 py-2.5 text-xs font-medium text-[#4879f8] transition-colors hover:bg-dash-bg-elevated hover:text-[#3a6ae6] disabled:opacity-60"
+                    >
+                      <span>Load more ({total - items.length} left)</span>
+                      {isFetching && <LoaderCircle className="size-3.5 animate-spin" />}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </motion.div>
@@ -1115,7 +1173,6 @@ export function Topbar({
   onSettingsClick,
   onMobileNavToggle,
   mobileNavOpen,
-  settingsSnapshot,
   userProfile,
   workspaces,
   projectSwitcherProjects,
@@ -1124,7 +1181,6 @@ export function Topbar({
   onSettingsClick: () => void;
   onMobileNavToggle?: () => void;
   mobileNavOpen?: boolean;
-  settingsSnapshot?: SettingsSidebarSnapshot | null;
   userProfile?: SettingsSidebarSnapshot["profile"] | null;
   workspaces?: Workspace[];
   projectSwitcherProjects?: Project[];
@@ -1176,6 +1232,15 @@ export function Topbar({
           </div>
           <div className="flex items-center gap-2 text-dash-text-faded md:gap-4">
             <NotificationsDropdown haptics={haptics} />
+            <a
+              href="https://www.brimble.io/changelog"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm transition-colors hover:text-dash-text-strong"
+            >
+              <Newspaper className="size-4" />
+              <span className="hidden md:inline">What's new ?</span>
+            </a>
             <a href="mailto:hello@brimble.app" className="flex items-center gap-1.5 text-sm hover:text-dash-text-strong transition-colors">
               <HelpCircle className="size-4" />
               <span className="hidden md:inline">Help</span>

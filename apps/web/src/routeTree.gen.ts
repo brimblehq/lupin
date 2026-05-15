@@ -15,6 +15,7 @@ import { Route as DomainsRouteImport } from './routes/domains'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LegalIndexRouteImport } from './routes/legal/index'
+import { Route as ChangelogIndexRouteImport } from './routes/changelog/index'
 import { Route as CareersIndexRouteImport } from './routes/careers/index'
 import { Route as LegalSlugRouteImport } from './routes/legal/$slug'
 import { Route as CareersSlugRouteImport } from './routes/careers/$slug'
@@ -49,6 +50,11 @@ const LegalIndexRoute = LegalIndexRouteImport.update({
   path: '/legal/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChangelogIndexRoute = ChangelogIndexRouteImport.update({
+  id: '/changelog/',
+  path: '/changelog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CareersIndexRoute = CareersIndexRouteImport.update({
   id: '/careers/',
   path: '/careers/',
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/careers/': typeof CareersIndexRoute
+  '/changelog/': typeof ChangelogIndexRoute
   '/legal/': typeof LegalIndexRoute
 }
 export interface FileRoutesByTo {
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/careers': typeof CareersIndexRoute
+  '/changelog': typeof ChangelogIndexRoute
   '/legal': typeof LegalIndexRoute
 }
 export interface FileRoutesById {
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/careers/': typeof CareersIndexRoute
+  '/changelog/': typeof ChangelogIndexRoute
   '/legal/': typeof LegalIndexRoute
 }
 export interface FileRouteTypes {
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/careers/$slug'
     | '/legal/$slug'
     | '/careers/'
+    | '/changelog/'
     | '/legal/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/careers/$slug'
     | '/legal/$slug'
     | '/careers'
+    | '/changelog'
     | '/legal'
   id:
     | '__root__'
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '/careers/$slug'
     | '/legal/$slug'
     | '/careers/'
+    | '/changelog/'
     | '/legal/'
   fileRoutesById: FileRoutesById
 }
@@ -144,6 +156,7 @@ export interface RootRouteChildren {
   CareersSlugRoute: typeof CareersSlugRoute
   LegalSlugRoute: typeof LegalSlugRoute
   CareersIndexRoute: typeof CareersIndexRoute
+  ChangelogIndexRoute: typeof ChangelogIndexRoute
   LegalIndexRoute: typeof LegalIndexRoute
 }
 
@@ -191,6 +204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LegalIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/changelog/': {
+      id: '/changelog/'
+      path: '/changelog'
+      fullPath: '/changelog/'
+      preLoaderRoute: typeof ChangelogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/careers/': {
       id: '/careers/'
       path: '/careers'
@@ -224,6 +244,7 @@ const rootRouteChildren: RootRouteChildren = {
   CareersSlugRoute: CareersSlugRoute,
   LegalSlugRoute: LegalSlugRoute,
   CareersIndexRoute: CareersIndexRoute,
+  ChangelogIndexRoute: ChangelogIndexRoute,
   LegalIndexRoute: LegalIndexRoute,
 }
 export const routeTree = rootRouteImport

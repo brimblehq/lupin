@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { BandwidthSummary } from "@/backend/bandwidth";
-import { withTokenRefresh } from "@/server/shared/backend";
+import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 
 export const getHomeBandwidthServerFn = createServerFn({
   method: "GET",
@@ -10,16 +10,7 @@ export const getHomeBandwidthServerFn = createServerFn({
   const environmentId = payload?.environmentId?.trim();
 
   return withTokenRefresh(async (api) => {
-    let teamId: string | undefined;
-
-    if (workspaceSlug) {
-      const workspaces = await api.workspaces.list();
-      const match = workspaces.items.find((item) => item.slug === workspaceSlug);
-      if (match?.id) {
-        teamId = match.id;
-      }
-    }
-
+    const teamId = await resolveTeamId(api, workspaceSlug);
     return api.bandwidth.get({ teamId, environmentId: environmentId || undefined }) as Promise<BandwidthSummary>;
   });
 });

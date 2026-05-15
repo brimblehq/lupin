@@ -1,0 +1,20 @@
+export type Phase3DeployInput = {
+  name: string;
+  regionId: string;
+  serviceType: string;
+  authEnabled: boolean;
+  branch?: string;
+  rootDirectory: string;
+  framework: string;
+  preStartCommand: string;
+  buildCommand: string;
+  startCommand: string;
+  outputDirectory: string;
+  installCommand: string;
+  envVars: Array<{ key: string; value: string }>;
+  cpu: number;
+  memory: number;
+  diskEnabled: boolean;
+  diskSizeGb?: number;
+  mountPath?: string;
+};

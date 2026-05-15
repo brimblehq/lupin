@@ -6,6 +6,7 @@ export type ProjectDeploymentLogsDrawerContextValue = {
   selectedDeployment: DeploymentLog | null;
   openDeploymentDrawer: (deployment: DeploymentLog) => void;
   closeDeploymentDrawer: () => void;
+  syncDeploymentInDrawer: (update: Partial<DeploymentLog> & { id: string }) => void;
 };
 
 export const ProjectDeploymentLogsDrawerContext = createContext<ProjectDeploymentLogsDrawerContextValue | null>(null);

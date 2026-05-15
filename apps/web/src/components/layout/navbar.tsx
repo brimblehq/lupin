@@ -76,7 +76,7 @@ export function Navbar() {
         >
           <button
             onClick={toggleTheme}
-            className="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-brimble-black transition-colors duration-150 hover:bg-brimble-air-gray dark:hover:bg-white/10"
+            className="inline-flex size-8 cursor-pointer items-center justify-center rounded-[4px] text-brimble-black transition-colors duration-150 hover:bg-brimble-air-gray dark:hover:bg-white/10"
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}

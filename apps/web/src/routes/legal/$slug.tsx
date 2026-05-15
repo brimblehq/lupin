@@ -123,7 +123,7 @@ function MobileNav({ activeSlug }: { activeSlug: string }) {
         Legal Documents
       </button>
       {open && (
-        <nav className="mt-3 flex flex-col gap-2 rounded-lg border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-4 dark:border-white/10">
+        <nav className="mt-3 flex flex-col gap-2 rounded-[4px] border border-[rgba(152,157,164,0.3)] bg-brimble-surface p-4 dark:border-white/10">
           {legalDocuments.map((doc) => (
             <Link
               key={doc.slug}

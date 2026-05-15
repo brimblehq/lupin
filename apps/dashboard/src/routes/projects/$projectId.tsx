@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ProjectSubnav } from "../../components/project/project-subnav";
 import { DeploymentLogsDrawer } from "../../components/shared/deployment-logs-drawer";
@@ -15,14 +15,29 @@ import {
   ProjectDeploymentLogsDrawerContext,
   type ProjectDeploymentLogsDrawerContextValue,
 } from "@/contexts/project-deployment-logs-drawer-context";
-import { Realtime } from "ably";
-import { getSupabaseClient } from "@/lib/supabase";
-import { mapDeploymentRunLogsToDrawerEntries, sortDeploymentDrawerEntries } from "@/utils/deployment-logs";
+import { sortDeploymentDrawerEntries } from "@/utils/deployment-logs";
 import { usePushNotification } from "@/hooks/use-push-notification";
 import config from "@/config";
+import type { ProjectDetailRouteProject } from "./project-detail.types";
+import { PROJECT_CACHE_TTL, markProjectCacheStale, projectCache } from "./project-route-cache";
+import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const SUCCESS_LOG_PATTERN = /site (is )?(live|running)\b/i;
 const FAILURE_LOG_PATTERN = /deployment failed|build failed|failed to deploy/i;
+
+const DEPLOYMENT_EVENT_NAMES: readonly string[] = ["deployment:started", "deployment:completed", "deployment:failed"];
+const DATABASE_EVENT_NAMES: readonly string[] = ["database:provisioned", "database:updated"];
+
+function toRouteProject(project: BackendProject): ProjectDetailRouteProject {
+  return project as unknown as ProjectDetailRouteProject;
+}
+
+function toRouteProjectList(response: ApiListResponse<BackendProject>): ApiListResponse<ProjectDetailRouteProject> {
+  return {
+    ...response,
+    items: response.items.map(toRouteProject),
+  };
+}
 
 function getDrawerEntryKey(entry: DeploymentDrawerLogEntry): string {
   const rawId = entry.rawId?.trim();
@@ -73,17 +88,10 @@ function mergeDeploymentDrawerEntries(
   return sortDeploymentDrawerEntries(next);
 }
 
-const projectCache = new Map<string, { data: BackendProject; fetchedAt: number }>();
-const PROJECT_CACHE_TTL = 300_000;
-
-function getProjectIdentityCandidates(project: BackendProject): string[] {
+function getProjectIdentityCandidates(project: Pick<ProjectDetailRouteProject, "slug" | "id" | "name">): string[] {
   return [project.slug, project.id, project.name]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .map((value) => value.trim().toLowerCase());
-}
-
-export function clearProjectCache() {
-  projectCache.clear();
 }
 
 export const Route = createFileRoute("/projects/$projectId")({
@@ -114,16 +122,15 @@ export const Route = createFileRoute("/projects/$projectId")({
     }
 
     try {
-      const project = await (
-        getProjectDetailsServerFn as unknown as (input: {
-          data: { projectId: string; workspace?: string };
-        }) => Promise<BackendProject>
+      const projectResponse = await (
+        getProjectDetailsServerFn as unknown as (input: { data: { projectId: string; workspace?: string } }) => Promise<BackendProject>
       )({
         data: {
           projectId: params.projectId,
           workspace,
         },
       });
+      const project = toRouteProject(projectResponse);
 
       projectCache.set(cacheKey, { data: project, fetchedAt: Date.now() });
 
@@ -145,9 +152,10 @@ export const Route = createFileRoute("/projects/$projectId")({
         )({
           data: { workspace },
         });
+        const routeProjects = toRouteProjectList(projects);
 
         const requestedProjectId = params.projectId.trim().toLowerCase();
-        const recoveredProject = projects.items.find((item) => getProjectIdentityCandidates(item).includes(requestedProjectId));
+        const recoveredProject = routeProjects.items.find((item) => getProjectIdentityCandidates(item).includes(requestedProjectId));
 
         if (recoveredProject) {
           console.warn("[project-route] recovered project from list after details fetch failed", {
@@ -175,8 +183,8 @@ export const Route = createFileRoute("/projects/$projectId")({
     const searchEnvironmentId = deps.environmentId;
     const hasExplicitEnvironment = hasExplicitEnvironmentSelection(searchEnvironmentId);
 
-    const project = (context as any).project as BackendProject;
-    const fallbackSwitcherProjects: ApiListResponse<BackendProject> = {
+    const project = (context as any).project as ProjectDetailRouteProject;
+    const fallbackSwitcherProjects: ApiListResponse<ProjectDetailRouteProject> = {
       items: [project],
       total: 1,
     };
@@ -204,9 +212,9 @@ export const Route = createFileRoute("/projects/$projectId")({
     const environments = environmentsResult.status === "fulfilled" ? environmentsResult.value : [];
     const persistedEnvironmentId = persistedEnvironmentResult.status === "fulfilled" ? persistedEnvironmentResult.value : null;
 
-    let projectSwitcherProjects = fallbackSwitcherProjects;
+    let projectSwitcherProjects: ApiListResponse<ProjectDetailRouteProject> = fallbackSwitcherProjects;
     if (allProjectsResult.status === "fulfilled") {
-      projectSwitcherProjects = allProjectsResult.value;
+      projectSwitcherProjects = toRouteProjectList(allProjectsResult.value);
     } else {
       console.warn("[project-route] listHomeProjects failed; falling back to current project", {
         projectId: params.projectId,
@@ -223,13 +231,14 @@ export const Route = createFileRoute("/projects/$projectId")({
 
     if (environmentId && environmentId !== searchEnvironmentId) {
       try {
-        projectSwitcherProjects = await (
+        const resolvedProjects = await (
           listHomeProjectsServerFn as unknown as (input: {
             data: { workspace?: string; environmentId?: string };
           }) => Promise<ApiListResponse<BackendProject>>
         )({
           data: { workspace, environmentId },
         });
+        projectSwitcherProjects = toRouteProjectList(resolvedProjects);
       } catch {
         console.warn("[project-route] listHomeProjects for resolved environment failed; keeping fallback data", {
           projectId: params.projectId,
@@ -273,6 +282,7 @@ function ProjectLayout() {
     };
   }) => Promise<{ entries: DeploymentDrawerLogEntry[] }>;
 
+  const router = useRouter();
   const { sendNotification } = usePushNotification(workspace);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState<DeploymentLog | null>(null);
@@ -368,70 +378,50 @@ function ProjectLayout() {
   useEffect(() => {
     if (!drawerOpen || !selectedDeployment) return;
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     const logId = selectedDeployment.id;
-    const channel = supabase
-      .channel(`deployment-logs-${logId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: config.supabaseTableName,
-        },
-        (payload) => {
-          const row = payload.new as any;
-          if (row.logId !== logId) return;
+    let cancelled = false;
+    const lastSeenKeys = new Set<string>();
 
-          const [entry] = mapDeploymentRunLogsToDrawerEntries([row]);
-          if (!entry) return;
+    const tick = async () => {
+      if (cancelled) return;
+      await fetchLogsForDeployment(selectedDeployment, {
+        revalidate: true,
+        silent: true,
+        merge: true,
+      });
+      if (cancelled) return;
 
-          // Fire push notification on terminal log messages
-          const msg = entry.message;
-          const env = selectedDeployment.environment || "Production";
-          const name = (project as BackendProject)?.name || projectId;
-          if (SUCCESS_LOG_PATTERN.test(msg)) {
-            sendNotification({
-              title: "Deployment Successful",
-              body: `${name} (${env}) deployed successfully.`,
-              onClick: () => window.focus(),
-            });
-          } else if (FAILURE_LOG_PATTERN.test(msg)) {
-            sendNotification({
-              title: "Deployment Failed",
-              body: `${name} (${env}) deployment failed.`,
-              onClick: () => window.focus(),
-            });
-          }
+      const list = drawerLogsByDeploymentIdRef.current[logId] ?? [];
+      const env = selectedDeployment.environment || "Production";
+      const name = (project as BackendProject)?.name || projectId;
 
-          setDrawerLogsByDeploymentId((prev) => {
-            const existingEntries = prev[logId] ?? [];
-            const nextEntries = mergeDeploymentDrawerEntries(existingEntries, [entry]);
-            if (nextEntries.length === existingEntries.length) {
-              return prev;
-            }
+      for (const entry of list) {
+        const key = getDrawerEntryKey(entry);
+        if (lastSeenKeys.has(key)) continue;
+        lastSeenKeys.add(key);
 
-            return {
-              ...prev,
-              [logId]: nextEntries,
-            };
+        const msg = entry.message;
+        if (SUCCESS_LOG_PATTERN.test(msg)) {
+          sendNotification({
+            title: "Deployment Successful",
+            body: `${name} (${env}) deployed successfully.`,
+            onClick: () => window.focus(),
           });
-        },
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          void fetchLogsForDeployment(selectedDeployment, {
-            revalidate: true,
-            silent: true,
-            merge: true,
+        } else if (FAILURE_LOG_PATTERN.test(msg)) {
+          sendNotification({
+            title: "Deployment Failed",
+            body: `${name} (${env}) deployment failed.`,
+            onClick: () => window.focus(),
           });
         }
-      });
+      }
+    };
 
+    void tick();
+    const id = setInterval(() => void tick(), 2000);
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      clearInterval(id);
     };
   }, [drawerOpen, selectedDeployment, sendNotification, project, projectId, fetchLogsForDeployment]);
 
@@ -453,39 +443,56 @@ function ProjectLayout() {
     };
   }, [drawerOpen, selectedDeployment, fetchLogsForDeployment]);
 
+  const backendProjectId = (project as BackendProject)?.id;
+
   useEffect(() => {
-    const backendProjectId = (project as BackendProject)?.id;
     if (!backendProjectId) return;
 
-    const ably = new Realtime({
-      authUrl: `${config.apiUrl}/v1/ably/token?clientId=${backendProjectId}`,
-      clientId: backendProjectId,
-    });
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
 
-    const channel = ably.channels.get(backendProjectId);
+    void (async () => {
+      const { Realtime } = await import("ably");
+      if (cancelled) return;
 
-    channel.subscribe((message) => {
-      const eventName = message.name ?? "";
-      if (
-        eventName === "deployment:started" ||
-        eventName === "deployment:completed" ||
-        eventName === "deployment:failed" ||
-        eventName.startsWith("deployment:")
-      ) {
-        window.dispatchEvent(
-          new CustomEvent("brimble:deployment-updated", {
-            detail: { projectId: backendProjectId, ...(message.data ?? {}) },
-          }),
-        );
-      }
-    });
+      const ably = new Realtime({
+        authUrl: `${config.apiUrl}/v1/ably/token?clientId=${backendProjectId}`,
+        clientId: backendProjectId,
+      });
+
+      const channel = ably.channels.get(backendProjectId);
+
+      channel.subscribe((message) => {
+        const eventName = message.name ?? "";
+
+        if (DEPLOYMENT_EVENT_NAMES.includes(eventName)) {
+          window.dispatchEvent(
+            new CustomEvent("brimble:deployment-updated", {
+              detail: { projectId: backendProjectId, ...(message.data ?? {}) },
+            }),
+          );
+        }
+
+        if (DATABASE_EVENT_NAMES.includes(eventName)) {
+          markProjectCacheStale();
+          void invalidateActiveMatches(router);
+        }
+      });
+
+      cleanup = () => {
+        try {
+          ably.close();
+        } catch {
+          // ignore
+        }
+      };
+    })();
 
     return () => {
-      try {
-        ably.close();
-      } catch {}
+      cancelled = true;
+      cleanup?.();
     };
-  }, [(project as BackendProject)?.id]);
+  }, [backendProjectId, router]);
 
   const openDeploymentDrawer = useCallback(
     (deployment: DeploymentLog) => {
@@ -505,14 +512,28 @@ function ProjectLayout() {
     setDrawerOpen(false);
   }, []);
 
+  const syncDeploymentInDrawer = useCallback((update: Partial<DeploymentLog> & { id: string }) => {
+    setSelectedDeployment((previous) => {
+      if (!previous || previous.id !== update.id) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        ...update,
+      };
+    });
+  }, []);
+
   const drawerContextValue = useMemo<ProjectDeploymentLogsDrawerContextValue>(
     () => ({
       drawerOpen,
       selectedDeployment,
       openDeploymentDrawer,
       closeDeploymentDrawer,
+      syncDeploymentInDrawer,
     }),
-    [closeDeploymentDrawer, drawerOpen, openDeploymentDrawer, selectedDeployment],
+    [closeDeploymentDrawer, drawerOpen, openDeploymentDrawer, selectedDeployment, syncDeploymentInDrawer],
   );
 
   return (
@@ -530,6 +551,7 @@ function ProjectLayout() {
             }}
             environment={selectedDeployment.environment || "Production"}
             status={drawerStatus}
+            deploymentStatus={selectedDeployment.status}
             logs={selectedDeploymentLogs}
             loading={drawerLogsLoading}
             emptyMessage={drawerLogsError || "No logs available for this deployment yet."}

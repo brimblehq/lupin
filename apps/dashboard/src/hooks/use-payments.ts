@@ -3,8 +3,8 @@ import {
   getPaymentMethodsServerFn,
   getSubscriptionServerFn,
   getPaymentInvoicesServerFn,
-  createSetupIntentServerFn,
   addPaymentMethodServerFn,
+  confirmPaymentMethodServerFn,
   removePaymentMethodServerFn,
   setDefaultPaymentMethodServerFn,
   createSubscriptionServerFn,
@@ -16,7 +16,7 @@ import {
   updateTeamSpendingLimitServerFn,
   getSpendingLimitStatusServerFn,
 } from "@/server/payments/actions";
-import type { PurchaseResult } from "@/backend/payments";
+import type { AddPaymentMethodResult, PurchaseResult, SubscriptionMutationResult } from "@/backend/payments";
 
 /* ── Query key factory ── */
 
@@ -34,7 +34,11 @@ const getInvoices = getPaymentInvoicesServerFn as unknown as (args: {
   data: { cursor?: string | null; per_page?: number; team_id?: string };
 }) => Promise<any>;
 
-const addMethod = addPaymentMethodServerFn as unknown as (args: { data: { payment_method: string } }) => Promise<any>;
+const addMethod = addPaymentMethodServerFn as unknown as (args: {
+  data: { payment_method: string; return_url: string };
+}) => Promise<AddPaymentMethodResult>;
+
+const confirmMethod = confirmPaymentMethodServerFn as unknown as (args: { data: { setup_intent_id: string } }) => Promise<any>;
 
 const removeMethod = removePaymentMethodServerFn as unknown as (args: { data: { payment_method_id: string } }) => Promise<any>;
 
@@ -42,9 +46,11 @@ const setDefault = setDefaultPaymentMethodServerFn as unknown as (args: { data: 
 
 const createSub = createSubscriptionServerFn as unknown as (args: {
   data: { type: string; payment_method?: string; accept_terms: boolean };
-}) => Promise<any>;
+}) => Promise<SubscriptionMutationResult>;
 
-const swap = swapPlanServerFn as unknown as (args: { data: { target_plan: string } }) => Promise<any>;
+const swap = swapPlanServerFn as unknown as (args: { data: { target_plan: string } }) => Promise<SubscriptionMutationResult>;
+
+const cancelSub = cancelSubscriptionServerFn as unknown as (args: { data: { comment: string } }) => Promise<{ ok: true }>;
 
 const purchase = purchaseServerFn as unknown as (args: {
   data: {
@@ -112,16 +118,20 @@ export function useSpendingLimitStatus(teamId?: string) {
 
 /* ── Mutations ── */
 
-export function useCreateSetupIntent() {
-  return useMutation({
-    mutationFn: () => createSetupIntentServerFn(),
-  });
-}
-
 export function useAddPaymentMethod() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (paymentMethodId: string) => addMethod({ data: { payment_method: paymentMethodId } }),
+    mutationFn: (input: { payment_method: string; return_url: string }) => addMethod({ data: input }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: paymentKeys.methods() });
+    },
+  });
+}
+
+export function useConfirmPaymentMethod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (setupIntentId: string) => confirmMethod({ data: { setup_intent_id: setupIntentId } }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: paymentKeys.methods() });
     },
@@ -172,7 +182,7 @@ export function useSwapPlan() {
 export function useCancelSubscription() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => cancelSubscriptionServerFn(),
+    mutationFn: (input: { comment: string }) => cancelSub({ data: input }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: paymentKeys.subscription() });
     },

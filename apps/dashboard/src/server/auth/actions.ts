@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import * as Yup from "yup";
 import { createBackendApi } from "@/backend";
 import type {
   AuthSession,
@@ -23,13 +24,21 @@ function getErrorMeta(error: any) {
 }
 
 export const requestLoginOtpServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
-  const { geo, ...rest } = data as LoginInput & { geo?: ClientGeoData };
+  const payload = data as (LoginInput & { geo?: ClientGeoData }) | undefined;
+  if (!payload?.email) {
+    throw new Error("Email is required");
+  }
+  const { geo, ...rest } = payload;
   await getServerBackendApi(geo).auth.login(rest);
   return { ok: true } as const;
 });
 
 export const startSignupServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
-  const { geo, ...rest } = data as SignupInput & { geo?: ClientGeoData };
+  const payload = data as (SignupInput & { geo?: ClientGeoData }) | undefined;
+  if (!payload?.email || !payload?.username) {
+    throw new Error("Email and username are required");
+  }
+  const { geo, ...rest } = payload;
   await getServerBackendApi(geo).auth.signup(rest);
   return { ok: true } as const;
 });
@@ -39,8 +48,21 @@ export const lookupAuthServerFn = createServerFn({ method: "POST" }).handler(asy
   return getServerBackendApi().auth.lookup(input);
 });
 
+export const checkUsernameAvailabilityServerFn = createServerFn({ method: "GET" }).handler(async ({ data }) => {
+  const payload = data as { username?: string } | undefined;
+  const username = payload?.username?.trim();
+  if (!username) {
+    throw new Error("Username is required");
+  }
+  return getServerBackendApi().auth.checkUsername(username);
+});
+
 export const resendAuthCodeServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
-  const { geo, ...rest } = data as LoginInput & { geo?: ClientGeoData };
+  const payload = data as (LoginInput & { geo?: ClientGeoData }) | undefined;
+  if (!payload?.email) {
+    throw new Error("Email is required");
+  }
+  const { geo, ...rest } = payload;
   await getServerBackendApi(geo).auth.resendCode(rest.email);
   return { ok: true } as const;
 });
@@ -161,20 +183,34 @@ export const regenerateTwoFactorRecoveryCodesServerFn = createServerFn({
   });
 });
 
+// 6-digit TOTP or 8-character recovery code, per the auth-service /2fa/step-up contract.
+const stepUpTwoFactorSchema = Yup.object({
+  code: Yup.string()
+    .trim()
+    .required("Enter a 6-digit code or 8-character recovery code")
+    .matches(/^(\d{6}|[A-Za-z0-9]{8})$/, "Enter a 6-digit code or 8-character recovery code"),
+  action: Yup.string().trim().required("Step-up action is required"),
+  resourceId: Yup.string().trim().required("Step-up resource is required"),
+});
+
+export const stepUpTwoFactorServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
+  const { code, action, resourceId } = stepUpTwoFactorSchema.validateSync(data, { stripUnknown: true });
+  return withTokenRefresh((api) => api.auth.stepUpTwoFactor({ code, action, resourceId }));
+});
+
 export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {
   const refreshToken = getServerRefreshToken();
-  authLogger.info("logout start", {
-    hasAccessToken: Boolean(getServerAccessToken()),
-    hasRefreshToken: Boolean(refreshToken),
-  });
+  clearServerAuthCookies();
 
-  await getServerBackendApi()
+  void getServerBackendApi()
     .auth.logout(refreshToken ?? undefined)
     .catch((error: any) => {
       authLogger.warn("logout endpoint failed", getErrorMeta(error));
     });
 
-  clearServerAuthCookies();
+  authLogger.info("logout cookies cleared", {
+    hadRefreshToken: Boolean(refreshToken),
+  });
   authLogger.info("logout complete");
   return { ok: true } as const;
 });
@@ -246,7 +282,6 @@ type RefreshSessionServerResult =
 export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler(async () => {
   const refreshToken = getServerRefreshToken();
   if (!refreshToken) {
-    authLogger.warn("refreshSession skipped: missing refresh token");
     return {
       status: "missing",
     } satisfies RefreshSessionServerResult;

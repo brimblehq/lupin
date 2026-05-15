@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { detectReferenceTrigger, highlightReferences } from "@/utils/env-references";
 import {
   EnvReferenceAutocomplete,
@@ -23,6 +23,7 @@ export interface ReferenceHighlightInputProps {
 
 export function ReferenceHighlightInput({ value, onChange, placeholder, masked, autocomplete }: ReferenceHighlightInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLInputElement | null>(null);
   const showOverlay = !masked && value.includes("{{");
 
   const [cursor, setCursor] = useState(0);
@@ -33,6 +34,11 @@ export function ReferenceHighlightInput({ value, onChange, placeholder, masked, 
     () => (autocomplete && !masked ? detectReferenceTrigger(value, cursor) : null),
     [autocomplete, masked, value, cursor],
   );
+
+  const setInputElement = useCallback((element: HTMLInputElement | null) => {
+    inputRef.current = element;
+    setAnchorEl(element);
+  }, []);
 
   useEffect(() => {
     setAutoOpen(Boolean(trigger));
@@ -72,7 +78,7 @@ export function ReferenceHighlightInput({ value, onChange, placeholder, masked, 
         />
       )}
       <input
-        ref={inputRef}
+        ref={setInputElement}
         type="text"
         autoComplete="off"
         value={value}
@@ -103,7 +109,7 @@ export function ReferenceHighlightInput({ value, onChange, placeholder, masked, 
       />
       {autocomplete && (
         <EnvReferenceAutocomplete
-          anchor={inputRef.current}
+          anchor={anchorEl}
           open={autoOpen}
           query={trigger?.query ?? ""}
           sharedVars={autocomplete.sharedVars}

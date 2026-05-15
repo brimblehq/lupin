@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Plus, Minus, X, Check, Info } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "../shared/modal";
@@ -89,13 +89,7 @@ function StepName({
     <div className="flex flex-col gap-4 px-6 py-5">
       <div className="flex flex-col gap-1.5">
         <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Workspace name</label>
-        <DashInput
-          type="text"
-          placeholder="My workspace"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          autoFocus
-        />
+        <DashInput type="text" placeholder="My workspace" value={name} onChange={(e) => handleNameChange(e.target.value)} autoFocus />
       </div>
       <div className="flex flex-col gap-1.5">
         <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Workspace URL</label>

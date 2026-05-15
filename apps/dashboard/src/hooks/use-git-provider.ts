@@ -115,7 +115,7 @@ export function useGitProvider({
     if (active && phase >= 2 && accounts.length === 0 && !accountsLoading) {
       void refreshAccounts({ silent: false });
     }
-  }, [active, phase]);
+  }, [active, phase, accounts.length, accountsLoading, refreshAccounts]);
 
   const loadRepos = useCallback(
     async (input: { installationId?: number | string; q?: string }) => {
@@ -153,7 +153,7 @@ export function useGitProvider({
     [api],
   );
 
-  function stopPolling() {
+  const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current !== null) {
       window.clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -163,7 +163,7 @@ export function useGitProvider({
       pollingTimeoutRef.current = null;
     }
     setConnectPolling(false);
-  }
+  }, []);
 
   const handleConnect = useCallback(async () => {
     setConnectError(null);
@@ -220,7 +220,7 @@ export function useGitProvider({
     } finally {
       setConnectOpening(false);
     }
-  }, [api, providerName, accounts, refreshAccounts]);
+  }, [api, providerName, accounts, refreshAccounts, stopPolling]);
 
   useEffect(() => {
     if (connectPolling && accountsSignature.length > 0 && accountsSignature !== pollingBaselineSignatureRef.current) {
@@ -230,7 +230,7 @@ export function useGitProvider({
         window.dispatchEvent(new Event("brimble:git-connection-changed"));
       }
     }
-  }, [accountsSignature, connectPolling, providerName]);
+  }, [accountsSignature, connectPolling, providerName, stopPolling]);
 
   const handleRepoSelect = useCallback(
     async (repo: GithubRepoListItem) => {
@@ -255,21 +255,17 @@ export function useGitProvider({
   );
 
   const reset = useCallback(() => {
+    stopPolling();
     setSelectedRepo(null);
     setRepos([]);
     setConnectError(null);
-  }, []);
+  }, [stopPolling]);
 
   useEffect(() => {
     return () => {
-      if (pollingIntervalRef.current !== null) {
-        window.clearInterval(pollingIntervalRef.current);
-      }
-      if (pollingTimeoutRef.current !== null) {
-        window.clearTimeout(pollingTimeoutRef.current);
-      }
+      stopPolling();
     };
-  }, []);
+  }, [stopPolling]);
 
   return {
     accounts,

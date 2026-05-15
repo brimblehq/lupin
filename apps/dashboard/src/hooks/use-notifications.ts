@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listNotificationsServerFn,
   markAllNotificationsSeenServerFn,
@@ -44,6 +44,9 @@ export function useNotifications({
     refetchOnReconnect: true,
     refetchOnWindowFocus: true,
     staleTime: 0,
+    // When `limit` changes (Load more), keep showing the previous page's items
+    // until the larger page arrives — prevents the list from blanking.
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -9,6 +9,7 @@ import { Pause, Play, Clock, MagnifyingGlass, CircleNotch, ArrowUp, ArrowDown } 
 import type { DateRange } from "react-day-picker";
 import { endOfDay, format, startOfDay, subDays, subHours } from "date-fns";
 import { TabHeader } from "../../../components/shared/tab-header";
+import { ProjectLogsPending } from "@/components/shared/route-pending";
 import { FilterDropdown, type FilterOption } from "../../../components/shared/filter-dropdown";
 import { SearchFilterBar } from "../../../components/shared/search-filter-bar";
 import { DateRangePicker } from "../../../components/shared/date-range-picker";
@@ -40,6 +41,7 @@ export const Route = createFileRoute("/projects/$projectId/logs")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
   component: LogsPage,
+  pendingComponent: ProjectLogsPending,
 });
 
 const parentRoute = getRouteApi("/projects/$projectId");
@@ -779,9 +781,7 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
               ) : (
                 <ApplicationLogsEmptyState
                   isConnecting={liveLogs.isConnecting}
-                  hasActiveFilters={
-                    searchQuery.trim().length > 0 || levelFilter !== "all" || hasAnyAppLogFilter(advancedFilters)
-                  }
+                  hasActiveFilters={searchQuery.trim().length > 0 || levelFilter !== "all" || hasAnyAppLogFilter(advancedFilters)}
                 />
               )}
             </div>
@@ -1454,7 +1454,7 @@ function LogsPage() {
         </TabHeader>
 
         {/* Tab switcher */}
-        <div className="flex overflow-clip rounded-lg border border-dash-border-soft shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
+        <div className="flex overflow-clip rounded-[4px] border border-dash-border-soft shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
           {!staticProject && (
             <button
               onClick={() => {

@@ -436,7 +436,7 @@ Web app additionally defines:
 - `rounded-[4px]` — DashButton, ModalCancelButton, ModalContinueButton, StatusChip
 - `rounded-[6px]` — input-base, date picker pills
 - `rounded-[8px]` — GlossyButton, command palette dialog
-- `rounded-lg` — Modal container
+- `rounded-[4px]` — Modal container
 - `rounded-full` — ToggleSwitch, StatusChip dots, pills
 
 ### 5.2 Shadow Tokens
@@ -808,7 +808,7 @@ ModalContinueButton: { onClick?: () => void | Promise<void>; disabled?: boolean;
 
 ```
 fixed left-1/2 top-1/2 z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden
-rounded-lg border-[0.5px] border-dash-border bg-dash-bg
+rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg
 shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)]
 dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]
 ```

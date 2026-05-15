@@ -60,7 +60,7 @@ export function InteractiveButton({ children, onClick }) {
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
-      className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+      className="px-4 py-2 bg-blue-600 text-white rounded-[4px]"
     >
       {children}
     </motion.button>
@@ -78,7 +78,7 @@ export function InteractiveButton({ children, onClick }) {
 function CardSkeleton() {
   return (
     <div className="animate-pulse">
-      <div className="h-48 bg-gray-200 rounded-lg" />
+      <div className="h-48 bg-gray-200 rounded-[4px]" />
       <div className="mt-4 h-4 bg-gray-200 rounded w-3/4" />
       <div className="mt-2 h-4 bg-gray-200 rounded w-1/2" />
     </div>

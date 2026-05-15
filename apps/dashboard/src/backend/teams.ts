@@ -30,6 +30,7 @@ export interface TeamMember {
   accepted?: boolean;
   avatarUrl?: string;
   isCreator?: boolean;
+  is2FACompliant?: boolean;
   permissions?: MemberPermission[];
   project_environments?: TeamMemberEnvironment[];
   invitedAt?: string;
@@ -50,6 +51,7 @@ export interface TeamDetails {
   totalMembers?: number;
   concurrentBuilds?: number;
   isCreator?: boolean;
+  enforce2FA?: boolean;
   subscriptionId?: string;
   subscriptionType?: string;
   subscriptionStatus?: string;
@@ -66,7 +68,7 @@ export interface TeamInvitation {
     avatar?: string;
     username?: string;
   };
-  team: { id: string; name: string; avatar?: string; description?: string };
+  team: { id: string; name: string; avatar?: string; description?: string; enforce2FA?: boolean };
 }
 
 export interface TeamOwnershipTransfer {
@@ -100,6 +102,7 @@ export interface TeamsApi {
   transferOwnership(teamId: string, newOwnerId: string): Promise<TeamOwnershipTransfer>;
   acceptOwnershipTransfer(teamId: string): Promise<TeamOwnershipTransfer>;
   denyOwnershipTransfer(teamId: string): Promise<TeamOwnershipTransfer>;
+  toggleTwoFactorEnforcement(teamId: string, enforce: boolean): Promise<{ id: string; enforce2FA: boolean }>;
 }
 
 function mapTeamMember(item: unknown): TeamMember | null {
@@ -126,6 +129,7 @@ function mapTeamMember(item: unknown): TeamMember | null {
       pickString(profileRow, "avatar", "avatarUrl", "avatar_url") ??
       pickString(userRow, "avatar", "avatarUrl", "avatar_url"),
     isCreator: pickBoolean(row, "isCreator") ?? asBoolean(row.creator),
+    is2FACompliant: pickBoolean(row, "is2FACompliant", "is_2fa_compliant"),
     permissions: Array.isArray(row.permissions)
       ? row.permissions
           .map((p: unknown): MemberPermission | null => {
@@ -196,6 +200,7 @@ export function createTeamsApi(client: ApiClient): TeamsApi {
         totalMembers: pickNumber(root, "totalMembers", "total_members"),
         concurrentBuilds: pickNumber(subscriptionSpecs, "concurrent_builds", "concurrentBuilds", "builds"),
         isCreator: pickBoolean(root, "isCreator"),
+        enforce2FA: pickBoolean(root, "enforce2FA", "enforce_2fa") ?? false,
         subscriptionId: pickString(asRecord(root.subscription), "_id", "id") ?? pickString(root, "subscriptionId", "subscription_id"),
         subscriptionType: pickString(subscriptionRow, "type", "plan_type", "planType") ?? undefined,
         subscriptionStatus: pickString(subscriptionRow, "stripe_status", "status") ?? undefined,
@@ -280,6 +285,7 @@ export function createTeamsApi(client: ApiClient): TeamsApi {
           name: pickString(teamRow, "name") ?? teamName,
           avatar: pickString(teamRow, "avatar", "avatarUrl"),
           description: pickString(teamRow, "description"),
+          enforce2FA: pickBoolean(teamRow, "enforce2FA", "enforce_2fa") ?? false,
         },
       } satisfies TeamInvitation;
     },
@@ -351,6 +357,19 @@ export function createTeamsApi(client: ApiClient): TeamsApi {
         createdAt: pickString(root, "createdAt", "created_at"),
         updatedAt: pickString(root, "updatedAt", "updated_at"),
       } satisfies TeamOwnershipTransfer;
+    },
+
+    async toggleTwoFactorEnforcement(teamId, enforce) {
+      const response = await client.request<any>(`/core/v1/teams/${encodeURIComponent(teamId)}/security/2fa`, {
+        method: "PATCH",
+        body: { enforce },
+      });
+
+      const root = asRecord(extractTeamRoot(response)) ?? {};
+      return {
+        id: String(asStringOrNumber(root.id) ?? asStringOrNumber(root._id) ?? teamId),
+        enforce2FA: pickBoolean(root, "enforce2FA", "enforce_2fa") ?? enforce,
+      };
     },
   };
 }

@@ -8,8 +8,6 @@ import type {
   DecryptSettingsApiKeyInput,
   SettingsInvoiceItem,
   SettingsInvoicePage,
-  SettingsPaymentCard,
-  SettingsPaymentProvider,
   SettingsPlan,
   SettingsSidebarSnapshot,
   SettingsSpendingStats,
@@ -41,6 +39,7 @@ export type {
   UpdateSettingsHapticsInput,
   UpdateSettingsNotificationsInput,
   UpdateSettingsProfileInput,
+  UpdateSettingsThemeInput,
   UpdateSettingsWebhooksInput,
 } from "./settings/types";
 
@@ -63,6 +62,11 @@ function mapProfile(payload: any): SettingsUserProfile {
   const username = String(data?.username ?? "");
   const email = String(data?.email ?? "");
   const id = String(data?._id ?? data?.id ?? "");
+  const rawTheme = String(data?.theme ?? "").trim().toLowerCase();
+  const theme =
+    rawTheme === "light" || rawTheme === "dark" || rawTheme === "system"
+      ? (rawTheme as SettingsUserProfile["theme"])
+      : undefined;
 
   return {
     id,
@@ -70,6 +74,7 @@ function mapProfile(payload: any): SettingsUserProfile {
     username,
     firstName,
     lastName,
+    theme,
     avatarUrl: data?.avatar,
     buildDisabled: Boolean(data?.build_disabled),
     buildDisabledBy: data?.build_disabled_by ?? null,
@@ -183,32 +188,6 @@ async function getCurrentPersonalPlanType(client: ApiClient, currentSubscription
   } catch {
     return undefined;
   }
-}
-
-function mapCards(payload: any): SettingsPaymentCard[] {
-  const data = unwrapData<any[]>(payload) ?? [];
-
-  return data.map((card) => ({
-    id: String(card?._id ?? card?.id ?? ""),
-    cardType: card?.card_type,
-    expMonth: card?.exp_month,
-    expYear: card?.exp_year,
-    last4: card?.last4,
-    preferred: Boolean(card?.preferred),
-    provider: card?.provider,
-  }));
-}
-
-function mapProviders(payload: any): SettingsPaymentProvider[] {
-  const data = unwrapData<any[]>(payload) ?? [];
-
-  return data.map((provider) => ({
-    name: String(provider?.name ?? ""),
-    enum: String(provider?.enum ?? ""),
-    logo: provider?.logo,
-    description: provider?.description,
-    features: Array.isArray(provider?.features) ? provider.features.map((feature: unknown) => String(feature)) : [],
-  }));
 }
 
 function mapSpendingStats(payload: any): SettingsSpendingStats {
@@ -398,6 +377,14 @@ export function createSettingsApi(client: ApiClient): SettingsApi {
 
       const refreshed = await client.request(endpoints.authUserMe, { method: "GET" });
       return mapProfile(refreshed);
+    },
+    async updateTheme(input) {
+      await client.request(endpoints.updateUser, {
+        method: "PUT",
+        body: {
+          theme: input.theme,
+        },
+      });
     },
     async requestEmailVerification(email) {
       await client.request(endpoints.requestEmailVerification, {
