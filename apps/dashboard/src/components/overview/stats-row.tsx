@@ -175,7 +175,9 @@ export function StatsRow({
                   strokeWidth={1}
                   fill="rgba(255,155,0,0.30)"
                   baseValue={0}
-                  isAnimationActive={false}
+                  isAnimationActive
+                  animationDuration={1100}
+                  animationEasing="ease-out"
                 />
               </AreaChart>
             </ResponsiveContainer>

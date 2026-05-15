@@ -34,24 +34,6 @@ function getStoredThemeMode(): Theme {
   return Theme.Light;
 }
 
-function hasStoredThemePreference(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  try {
-    const stored = window.localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY);
-    if (stored === Theme.Light || stored === Theme.Dark || stored === Theme.System) {
-      return true;
-    }
-
-    const legacyStored = window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
-    return legacyStored === Theme.Light || legacyStored === Theme.Dark;
-  } catch {
-    return false;
-  }
-}
-
 function toThemeMode(value: unknown): Theme | undefined {
   if (value === Theme.Light || value === Theme.Dark || value === Theme.System) {
     return value;
@@ -150,16 +132,11 @@ export function useTheme(serverTheme?: Theme | "light" | "dark" | "system" | nul
 
   useEffect(() => {
     const normalizedServerTheme = toThemeMode(serverTheme);
-    if (!normalizedServerTheme || hasStoredThemePreference()) {
+    if (!normalizedServerTheme) {
       return;
     }
-
     applyTheme(normalizedServerTheme);
   }, [serverTheme]);
-
-  useEffect(() => {
-    applyTheme(mode);
-  }, [mode]);
 
   const setTheme = useCallback(
     (nextTheme: Theme) => {

@@ -656,19 +656,19 @@ function RepoSection({
   return (
     <>
       <div className="mb-4 rounded-[4px] border-[0.5px] border-dash-border">
-        <div className="flex items-center justify-between px-4 py-4">
-          <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <label className="text-sm font-medium text-dash-text-strong">Connected repository</label>
             {hasRepo ? (
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <img src="/icons/git-circle.svg" alt="" className="size-5 shrink-0" />
-                <span className="text-sm text-dash-text-body">{repoDisplay}</span>
+                <span className="truncate text-sm text-dash-text-body">{repoDisplay}</span>
               </div>
             ) : (
               <span className="text-sm text-dash-text-faded">No repository connected</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:flex-nowrap">
             {hasRepo && canWrite && (
               <GlossyButton variant="white" onClick={() => setConfirmOpen(true)}>
                 Disconnect
@@ -2270,7 +2270,7 @@ function ConfigurationPage() {
     <div className="mx-auto flex max-w-[1000px] flex-col gap-4 px-4 py-8 sm:px-0">
       <TabHeader title="Configuration">
         {getConfigurationDescription(project)}{" "}
-        <a href="#" className="text-[#4879f8] underline">
+        <a href="https://paper.brimble.io" target="_blank" rel="noopener noreferrer" className="text-[#4879f8] underline">
           Learn more
         </a>
       </TabHeader>

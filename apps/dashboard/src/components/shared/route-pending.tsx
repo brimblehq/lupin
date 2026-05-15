@@ -62,7 +62,7 @@ export function RoutePending() {
 
 export function DefaultRoutePending() {
   const pathname = useRouterState({
-    select: (state) => state.location.pathname || state.resolvedLocation?.pathname || "/",
+    select: (state) => state.pendingLocation?.pathname || state.location.pathname || state.resolvedLocation?.pathname || "/",
   });
 
   if (/^\/projects\/new(?:\/|$)/.test(pathname)) {
@@ -71,6 +71,10 @@ export function DefaultRoutePending() {
 
   if (/^\/projects\/[^/]+(?:\/|$)/.test(pathname) && !/^\/projects\/new(?:\/|$)/.test(pathname)) {
     return <ProjectOverviewPending />;
+  }
+
+  if (pathname === "/projects" || pathname === "/projects/") {
+    return <ProjectsListPending />;
   }
 
   if (pathname === "/" || pathname.startsWith("/workspace")) {
@@ -203,6 +207,40 @@ export function HomePending() {
             <div key={i} className="min-h-[200px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30 animate-pulse" />
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function ProjectsListPending() {
+  return (
+    <div className="mx-auto w-full max-w-[1000px] py-8" aria-hidden="true">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
+          <div className={`mb-2 h-7 w-40 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+          <div className={`h-3.5 w-[320px] max-w-full rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+        </div>
+        <div className={`h-9 w-32 rounded-[4px] ${PULSE_BG_MEDIUM} animate-pulse`} />
+      </div>
+
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="h-9 min-w-0 flex-1 rounded-[4px] border border-dash-border bg-dash-bg-elevated/30 animate-pulse" />
+        <div className="h-9 w-full rounded-[4px] border border-dash-border bg-dash-bg-elevated/30 animate-pulse md:w-[180px]" />
+        <div className="h-9 w-full rounded-[4px] border border-dash-border bg-dash-bg-elevated/30 animate-pulse md:w-[170px]" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="rounded-[6px] border border-dash-border p-4">
+            <div className={`mb-3 h-4 w-40 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+            <div className={`mb-2 h-3.5 w-28 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            <div className={`mb-5 h-3.5 w-52 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            <div className="flex items-center justify-between">
+              <div className={`h-3.5 w-20 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+              <div className={`h-3.5 w-16 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

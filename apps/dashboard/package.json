@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite dev --port 3001",
     "build": "pnpm --filter @brimble/ui build && vite build",
+    "start": "vite preview --host",
     "preview": "vite preview --host",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "pnpm lint --fix"

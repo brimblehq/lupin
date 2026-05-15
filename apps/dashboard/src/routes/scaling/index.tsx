@@ -141,17 +141,35 @@ function toFormValues(group?: UiScalingGroup | null): ScalingFormValues {
   };
 }
 
+function getThresholdCapColor(value: number): string {
+  if (value >= 85) return "#ff2200";
+  if (value >= 70) return "#ff5500";
+  if (value >= 50) return "#ff8c1a";
+  return "#ffa800";
+}
+
 function ThresholdBar({ label, value }: { label: string; value: number }) {
   const totalBlocks = 6;
   const filledBlocks = Math.round((value / 100) * totalBlocks);
+  const capColor = getThresholdCapColor(value);
 
   return (
     <div className="flex items-center gap-2">
       <span className="w-[28px] text-xs text-dash-text-faded">{label}</span>
       <div className="flex gap-[2px]">
-        {Array.from({ length: totalBlocks }).map((_, i) => (
-          <div key={i} className={`h-[8px] w-[6px] rounded-[1px] ${i < filledBlocks ? "bg-[#4879f8]" : "bg-dash-border"}`} />
-        ))}
+        {Array.from({ length: totalBlocks }).map((_, i) => {
+          if (i >= filledBlocks) {
+            return <div key={i} className="h-[8px] w-[6px] rounded-[1px] bg-dash-border" />;
+          }
+          const isTop = i === filledBlocks - 1;
+          return (
+            <div
+              key={i}
+              className="h-[8px] w-[6px] rounded-[1px]"
+              style={{ backgroundColor: isTop ? capColor : "#ff7a00" }}
+            />
+          );
+        })}
       </div>
       <span className="text-xs font-medium text-dash-text-body">{value}%</span>
     </div>
@@ -402,9 +420,14 @@ function CreationForm({
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <DashButton variant="outline" onClick={onCancel} disabled={Boolean(isSubmitting)}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={Boolean(isSubmitting)}
+            className="px-2 text-sm font-medium text-dash-text-faded transition-colors hover:text-dash-text-strong disabled:pointer-events-none disabled:opacity-50"
+          >
             Cancel
-          </DashButton>
+          </button>
           <GlossyButton
             variant="blue"
             onClick={() => {

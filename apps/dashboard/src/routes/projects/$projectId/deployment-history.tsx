@@ -58,10 +58,17 @@ function normalizeMemberRole(member: TeamMember): string {
 
 const PAGE_LIMIT = 10;
 const PAGE_CACHE_TTL_MS = 15_000;
+const DEPLOYMENTS_REQUEST_TIMEOUT_MS = 15_000;
 
 type DeploymentsCacheEntry = {
   data: PaginatedDeploymentsResponse;
   fetchedAt: number;
+};
+
+type DeploymentHistoryLoaderData = {
+  deployments: PaginatedDeploymentsResponse;
+  workspace?: string;
+  timedOut: boolean;
 };
 
 type AblyLogEventPayload = {
@@ -93,6 +100,24 @@ function createEmptyDeployments(): PaginatedDeploymentsResponse {
   };
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 export const Route = createFileRoute("/projects/$projectId/deployment-history")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
@@ -102,29 +127,35 @@ export const Route = createFileRoute("/projects/$projectId/deployment-history")(
 
     const range = defaultDeploymentHistoryDateRange();
 
-    const result = await (
-      listDeploymentsServerFn as unknown as (input: {
-        data: {
-          projectId: string;
-          workspace?: string;
-          page?: number;
-          limit?: number;
-          start?: string;
-          end?: string;
-        };
-      }) => Promise<PaginatedDeploymentsResponse>
-    )({
-      data: {
-        projectId: project?.id || project?.name,
-        workspace,
-        page: 1,
-        limit: PAGE_LIMIT,
-        start: format(range.from!, "yyyy-MM-dd"),
-        end: format(range.to!, "yyyy-MM-dd"),
-      },
-    });
+    try {
+      const result = await withTimeout(
+        (listDeploymentsServerFn as unknown as (input: {
+          data: {
+            projectId: string;
+            workspace?: string;
+            page?: number;
+            limit?: number;
+            start?: string;
+            end?: string;
+          };
+        }) => Promise<PaginatedDeploymentsResponse>)({
+          data: {
+            projectId: project?.id || project?.name,
+            workspace,
+            page: 1,
+            limit: PAGE_LIMIT,
+            start: format(range.from!, "yyyy-MM-dd"),
+            end: format(range.to!, "yyyy-MM-dd"),
+          },
+        }),
+        DEPLOYMENTS_REQUEST_TIMEOUT_MS,
+        "Deployment history request timed out",
+      );
 
-    return { deployments: result, workspace };
+      return { deployments: result, workspace, timedOut: false } satisfies DeploymentHistoryLoaderData;
+    } catch {
+      return { deployments: createEmptyDeployments(), workspace, timedOut: true } satisfies DeploymentHistoryLoaderData;
+    }
   },
   component: DeploymentHistoryPage,
   pendingComponent: DeploymentHistoryPending,
@@ -702,8 +733,9 @@ function DeploymentSkeleton() {
 
 function DeploymentHistoryPage() {
   const { project, workspace } = parentRoute.useLoaderData() as any;
-  const loaderData = Route.useLoaderData();
+  const loaderData = Route.useLoaderData() as DeploymentHistoryLoaderData;
   const initialData = loaderData.deployments as PaginatedDeploymentsResponse;
+  const initialTimedOut = loaderData.timedOut;
   const { workspaceTeamMembers } = (RootRoute.useLoaderData() ?? {}) as {
     workspaceTeamMembers?: TeamDetails | null;
   };
@@ -782,7 +814,7 @@ function DeploymentHistoryPage() {
   );
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || initialTimedOut) {
       return;
     }
 
@@ -790,7 +822,7 @@ function DeploymentHistoryPage() {
       data: initialData,
       fetchedAt: Date.now(),
     });
-  }, [projectId, initialData, buildCacheKey]);
+  }, [projectId, initialData, buildCacheKey, initialTimedOut]);
 
   const fetchDeployments = useCallback(
     async (page: number, options?: { silent?: boolean; useCache?: boolean; force?: boolean }) => {
@@ -817,8 +849,8 @@ function DeploymentHistoryPage() {
       }
 
       try {
-        const result = await (
-          listDeploymentsServerFn as unknown as (input: {
+        const result = await withTimeout(
+          (listDeploymentsServerFn as unknown as (input: {
             data: {
               projectId: string;
               workspace?: string;
@@ -830,20 +862,22 @@ function DeploymentHistoryPage() {
               end?: string;
               search?: string;
             };
-          }) => Promise<PaginatedDeploymentsResponse>
-        )({
-          data: {
-            projectId,
-            workspace,
-            page,
-            limit: PAGE_LIMIT,
-            statuses: statusesParam,
-            environment: environmentParam,
-            start: startParam,
-            end: endParam,
-            search: searchParam,
-          },
-        });
+          }) => Promise<PaginatedDeploymentsResponse>)({
+            data: {
+              projectId,
+              workspace,
+              page,
+              limit: PAGE_LIMIT,
+              statuses: statusesParam,
+              environment: environmentParam,
+              start: startParam,
+              end: endParam,
+              search: searchParam,
+            },
+          }),
+          DEPLOYMENTS_REQUEST_TIMEOUT_MS,
+          "Deployment history request timed out",
+        );
 
         if (requestId !== latestRequestRef.current) {
           return;
@@ -950,6 +984,15 @@ function DeploymentHistoryPage() {
 
     void fetchDeployments(1, { force: true });
   }, [fetchDeployments, projectId, workspace]);
+
+  useEffect(() => {
+    if (!projectId || !initialTimedOut) {
+      return;
+    }
+
+    setFetching(true);
+    void fetchDeployments(1, { force: true });
+  }, [fetchDeployments, initialTimedOut, projectId]);
 
   // Re-fetch when filters change
   useEffect(() => {

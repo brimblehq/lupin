@@ -386,7 +386,7 @@ async function withTokenRefreshImpl<T>(fn: (api: BackendApi) => Promise<T>, opti
     const recentSession = getRecentRefreshSession(refreshToken);
     if (recentSession?.accessToken) {
       setServerAuthCookies(recentSession);
-      authLogger.info("withTokenRefresh using recent session before request", {
+      authLogger.debug("withTokenRefresh using recent session before request", {
         refreshTokenFp: tokenFingerprint(refreshToken),
         nextAccessTokenFp: tokenFingerprint(recentSession.accessToken),
         nextRefreshTokenFp: tokenFingerprint(recentSession.refreshToken),

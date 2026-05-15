@@ -375,7 +375,7 @@ function ProjectDetailPage() {
                   <img src="/icons/schedule.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Created on</span>
                 </div>
-                <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{createdOnText}</span>
+                <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{createdOnText}</span>
               </div>
               <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                 <div className="flex items-center gap-2">
@@ -386,11 +386,14 @@ function ProjectDetailPage() {
               </div>
               {!isDatabaseProject ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
-                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Status code</span>
+                  <div className="flex items-center gap-2">
+                    <img src="/icons/status.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+                    <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Status code</span>
+                  </div>
                   {typeof statusCode === "number" ? (
                     <span className="rounded-[4px] bg-[#13d282]/15 px-2 py-0.5 text-xs font-medium text-[#13d282]">{statusCode}</span>
                   ) : (
-                    <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">N/A</span>
+                    <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">N/A</span>
                   )}
                 </div>
               ) : null}
@@ -399,7 +402,7 @@ function ProjectDetailPage() {
                   <img src="/icons/region.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Region</span>
                 </div>
-                <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{regionText}</span>
+                <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{regionText}</span>
               </div>
               {showSitePasswordRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
@@ -407,19 +410,19 @@ function ProjectDetailPage() {
                     <img src="/icons/lock.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Site password enabled</span>
                   </div>
-                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{passwordEnabledText}</span>
+                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{passwordEnabledText}</span>
                 </div>
               ) : null}
               {showMcpAuthRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Authentication enabled</span>
-                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{project?.authEnabled ? "Yes" : "No"}</span>
+                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{project?.authEnabled ? "Yes" : "No"}</span>
                 </div>
               ) : null}
               {showBuildCacheRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Build cache enabled</span>
-                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{project?.buildCacheEnabled ? "Yes" : "No"}</span>
+                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{project?.buildCacheEnabled ? "Yes" : "No"}</span>
                 </div>
               ) : null}
               {showComputeSizeRow ? (
@@ -428,7 +431,7 @@ function ProjectDetailPage() {
                     <img src="/icons/cpu.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Compute size</span>
                   </div>
-                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{computeSizeText}</span>
+                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{computeSizeText}</span>
                 </div>
               ) : null}
               {isDatabaseProject ? (
@@ -437,7 +440,7 @@ function ProjectDetailPage() {
                     <img src="/icons/info.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Public access</span>
                   </div>
-                  <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{publicAccessText}</span>
+                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{publicAccessText}</span>
                 </div>
               ) : null}
               {showFrameworkRow ? (
@@ -456,7 +459,7 @@ function ProjectDetailPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm leading-[1.4] text-dash-text-strong">{frameworkLabel}</span>
+                    <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{frameworkLabel}</span>
                     {frameworkLogo ? (
                       frameworkLogo.trim().startsWith("<svg") || frameworkLogo.includes("<svg") ? (
                         <div
@@ -676,7 +679,7 @@ function ProjectDetailPage() {
                           href={`https://${domain.url}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="group/link inline-flex items-center gap-1 font-mono text-sm leading-5 text-dash-text-strong transition-colors hover:text-dash-text-body"
+                          className="group/link inline-flex items-center gap-1 font-mono text-[13px] leading-5 text-dash-text-strong transition-colors hover:text-dash-text-body"
                         >
                           <span className="group-hover/link:underline">{domain.url}</span>
                           <ArrowUpRight className="size-3 -translate-x-1 translate-y-0.5 opacity-0 transition-all duration-200 ease-out group-hover/link:translate-x-0 group-hover/link:translate-y-0 group-hover/link:opacity-100" />

@@ -15,6 +15,7 @@ import { SearchFilterBar } from "../../components/shared/search-filter-bar";
 import { FilterDropdown, type FilterOption } from "../../components/shared/filter-dropdown";
 import { Modal, ModalHeader } from "../../components/shared/modal";
 import { GlossyButton } from "../../components/shared/glossy-button";
+import { ProjectsListPending } from "@/components/shared/route-pending";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { listProjectsPageServerFn } from "@/server/projects/actions";
 import {
@@ -99,6 +100,7 @@ const PROJECT_STATUS_FILTER_OPTIONS: FilterOption[] = [
 export const Route = createFileRoute("/projects/")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
+  pendingComponent: ProjectsListPending,
   validateSearch: (search: Record<string, unknown>) => {
     const next: {
       page?: number;

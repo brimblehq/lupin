@@ -554,6 +554,7 @@ export function AddDomainModal({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 10 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto"
           >
             <div className="flex items-center gap-3 border-b-[0.5px] border-[#e5e5e5] px-6 py-3.5 dark:border-dash-border">
               <img src="/icons/folder-open.svg" alt="" className="size-4 shrink-0" />
