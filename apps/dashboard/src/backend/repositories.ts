@@ -35,6 +35,10 @@ export interface GithubInstallUrlResult {
   url: string;
 }
 
+export interface GithubConnectUrlResult {
+  url: string;
+}
+
 export interface GitlabConnectUrlResult {
   url: string;
 }
@@ -103,6 +107,7 @@ export interface RepositoryRootDirResult {
 
 export interface RepositoriesApi {
   getGithubInstallUrl(): Promise<GithubInstallUrlResult>;
+  getGithubConnectUrl(input?: { device?: string }): Promise<GithubConnectUrlResult>;
   getGitlabConnectUrl(input?: { device?: string }): Promise<GitlabConnectUrlResult>;
   listGithubAccounts(): Promise<GithubAccountsResult>;
   listGithubRepos(input?: { q?: string; page?: number; limit?: number; installationId?: number | string }): Promise<GithubRepoListResult>;
@@ -161,8 +166,30 @@ export function createRepositoriesApi(client: ApiClient): RepositoriesApi {
   return {
     async getGithubInstallUrl() {
       try {
+        const response = await client.request<any>("/auth/github/install-url", {
+          method: "GET",
+        });
+
+        const root = response?.data?.data ?? response?.data ?? response ?? {};
+        const row = asRecord(root);
+        const url = row ? pickString(row, "url") : undefined;
+
+        if (!url) {
+          throw new Error("We could not start GitHub installation right now. Please refresh and try again.");
+        }
+
+        return { url } satisfies GithubInstallUrlResult;
+      } catch (error) {
+        mapConnectError(error, "GitHub");
+      }
+    },
+    async getGithubConnectUrl(input) {
+      try {
         const response = await client.request<any>("/auth/github/connect-url", {
           method: "GET",
+          query: {
+            device: input?.device,
+          },
         });
 
         const root = response?.data?.data ?? response?.data ?? response ?? {};
@@ -173,7 +200,7 @@ export function createRepositoriesApi(client: ApiClient): RepositoriesApi {
           throw new Error("We could not start GitHub connection right now. Please refresh and try again.");
         }
 
-        return { url } satisfies GithubInstallUrlResult;
+        return { url } satisfies GithubConnectUrlResult;
       } catch (error) {
         mapConnectError(error, "GitHub");
       }

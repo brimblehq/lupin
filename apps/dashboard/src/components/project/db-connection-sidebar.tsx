@@ -247,7 +247,9 @@ function ActionButton({
   return (
     <button
       type="button"
-      onClick={() => onClick?.()}
+      onClick={() => {
+        void onClick?.();
+      }}
       disabled={disabled}
       title={disabled ? disabledHint : undefined}
       className={`flex items-center gap-2.5 border-b-[0.5px] border-dash-border-soft px-3.5 py-3 text-sm font-light text-dash-text-body transition-colors last:border-b-0 hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-40 ${

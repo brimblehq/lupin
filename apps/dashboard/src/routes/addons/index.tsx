@@ -136,7 +136,7 @@ function AddonsPage() {
         return;
       }
 
-      navigate({
+      void navigate({
         to: "/addons/",
         replace: true,
         search: buildAddonsSearch({
@@ -159,7 +159,7 @@ function AddonsPage() {
       return;
     }
 
-    navigate({
+    void navigate({
       to: "/addons/",
       search: buildAddonsSearch({
         category: nextCategory,

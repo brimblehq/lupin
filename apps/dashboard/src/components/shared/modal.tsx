@@ -147,7 +147,7 @@ export function ModalContinueButton({
     <button
       onClick={() => {
         if (!disabled && !loading) haptics.medium();
-        onClick?.();
+        void onClick?.();
       }}
       disabled={disabled || loading}
       className="flex items-center rounded-[4px] border border-[#232931] bg-gradient-to-b from-[#545459] via-[#45454b] to-[#2d2d32] px-4 py-[5px] text-sm font-medium text-white shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"

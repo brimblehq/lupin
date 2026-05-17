@@ -299,7 +299,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         action: {
           label: "View deployment",
           onClick: () => {
-            navigate({
+            void navigate({
               to: "/projects/$projectId/deployment-history",
               params: { projectId: actualProjectId },
               search: workspace ? ({ workspace } as any) : ({} as any),
@@ -312,7 +312,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         projectId: actualProjectId,
         workspace,
       });
-      invalidateActiveMatches(router);
+      void invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to redeploy project", {
         id: toastId,
@@ -345,7 +345,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         id: toastId,
         description: result?.message || "Backup has been queued.",
       });
-      invalidateActiveMatches(router);
+      void invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to initiate backup", {
         id: toastId,
@@ -378,7 +378,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         id: toastId,
         description: result?.message || "Updates should be visible shortly.",
       });
-      invalidateActiveMatches(router);
+      void invalidateActiveMatches(router);
     } catch (error: any) {
       toast.error("Failed to update database", {
         id: toastId,
@@ -563,7 +563,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
             </SimpleTooltip>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
+                void navigator.clipboard.writeText(window.location.href);
                 haptics.light();
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);

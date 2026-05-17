@@ -89,7 +89,7 @@ import {
 } from "@/server/teams/actions";
 import {
   getBitbucketConnectUrlServerFn,
-  getGithubInstallUrlServerFn,
+  getGithubConnectUrlServerFn,
   getGitlabConnectUrlServerFn,
   listBitbucketAccountsServerFn,
   listGithubAccountsServerFn,
@@ -1783,7 +1783,9 @@ export function UserProfileDrawer({
     data: { provider: string };
   }) => Promise<{ ok: true }>;
   const listGithubAccounts = useServerFn(listGithubAccountsServerFn);
-  const getGithubInstallUrl = useServerFn(getGithubInstallUrlServerFn as any) as () => Promise<{ url: string }>;
+  const getGithubConnectUrl = useServerFn(getGithubConnectUrlServerFn as any) as (args: {
+    data?: { device?: string };
+  }) => Promise<{ url: string }>;
   const getGitlabConnectUrl = useServerFn(getGitlabConnectUrlServerFn as any) as (args: {
     data?: { device?: string };
   }) => Promise<{ url: string }>;
@@ -2406,7 +2408,12 @@ export function UserProfileDrawer({
                   onConnectGitProvider={async (providerId) => {
                     try {
                       const connectFns: Record<string, () => Promise<{ url: string }>> = {
-                        github: () => getGithubInstallUrl(),
+                        github: () =>
+                          getGithubConnectUrl({
+                            data: {
+                              device: window.sessionStorage.getItem("brimble.oauth.device_id") ?? undefined,
+                            },
+                          }),
                         gitlab: () =>
                           getGitlabConnectUrl({
                             data: {

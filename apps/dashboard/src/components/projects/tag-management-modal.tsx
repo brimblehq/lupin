@@ -164,9 +164,11 @@ export function TagManagementModal({ open, onOpenChange }: TagManagementModalPro
                   type="text"
                   value={editingName}
                   onChange={(e) => setEditingName(e.target.value)}
-                  onBlur={() => handleRename(tag.id)}
+                  onBlur={() => {
+                    void handleRename(tag.id);
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleRename(tag.id);
+                    if (e.key === "Enter") void handleRename(tag.id);
                     if (e.key === "Escape") setEditingId(null);
                   }}
                   className="flex-1 rounded-[4px] bg-transparent px-1 text-sm text-dash-text-strong outline-none ring-1 ring-dash-border focus:ring-dash-text-faded"
@@ -189,10 +191,12 @@ export function TagManagementModal({ open, onOpenChange }: TagManagementModalPro
                   </button>
                   <button
                     disabled={deletingId === tag.id}
-                    onClick={async () => {
-                      setDeletingId(tag.id);
-                      await deleteTag(tag.id);
-                      setDeletingId(null);
+                    onClick={() => {
+                      void (async () => {
+                        setDeletingId(tag.id);
+                        await deleteTag(tag.id);
+                        setDeletingId(null);
+                      })();
                     }}
                     className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-100"
                   >
@@ -208,7 +212,14 @@ export function TagManagementModal({ open, onOpenChange }: TagManagementModalPro
 
             {/* Inline color picker — expands below the row */}
             <AnimatePresence>
-              {colorPickerId === tag.id && <InlineColorPicker color={tag.color} onChange={(c) => updateTagColor(tag.id, c)} />}
+              {colorPickerId === tag.id && (
+                <InlineColorPicker
+                  color={tag.color}
+                  onChange={(c) => {
+                    void updateTagColor(tag.id, c);
+                  }}
+                />
+              )}
             </AnimatePresence>
           </div>
         ))}
@@ -230,14 +241,16 @@ export function TagManagementModal({ open, onOpenChange }: TagManagementModalPro
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreate();
+                if (e.key === "Enter") void handleCreate();
               }}
               placeholder="New tag name..."
               className="flex-1 bg-transparent text-sm text-dash-text-strong outline-none placeholder:text-[#9ca3af]"
             />
             <GlossyButton
               variant="black"
-              onClick={handleCreate}
+              onClick={() => {
+                void handleCreate();
+              }}
               disabled={!newName.trim() || creating}
               className="h-[32px] shrink-0 px-3.5 text-xs"
             >

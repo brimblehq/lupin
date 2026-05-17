@@ -9,7 +9,7 @@ import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { useProfileDrawer } from "@/contexts/profile-drawer-context";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { ProfileTab } from "@/types/enums";
-import { getGithubInstallUrlServerFn, listGithubAccountsServerFn } from "@/server/repositories/actions";
+import { getGithubConnectUrlServerFn, listGithubAccountsServerFn } from "@/server/repositories/actions";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
 import { updateSettingsFollowedXServerFn } from "@/server/settings/actions";
 import type { Project } from "@/backend/projects";
@@ -124,7 +124,9 @@ export function OnboardingChecklist({
   const updateFollowedX = useServerFn(updateSettingsFollowedXServerFn as any) as (args: {
     data: { followed_x: boolean };
   }) => Promise<{ ok: true }>;
-  const getGithubInstallUrl = useServerFn(getGithubInstallUrlServerFn as any) as () => Promise<{ url: string }>;
+  const getGithubConnectUrl = useServerFn(getGithubConnectUrlServerFn as any) as (args: {
+    data?: { device?: string };
+  }) => Promise<{ url: string }>;
   const getTeamMembers = useServerFn(getWorkspaceTeamMembersServerFn as any) as (args: {
     data: { workspace: string };
   }) => Promise<TeamDetails>;
@@ -171,7 +173,9 @@ export function OnboardingChecklist({
         // Retry up to 2 times with a delay — the initial call can fail
         // if auth cookies haven't settled yet on page load.
         if (attempt < 2) {
-          retryTimeout = setTimeout(() => fetchGitStatus(attempt + 1), 1500);
+          retryTimeout = setTimeout(() => {
+            void fetchGitStatus(attempt + 1);
+          }, 1500);
         }
       }
     }
@@ -270,19 +274,23 @@ export function OnboardingChecklist({
         onConnectGit: () => {
           void (async () => {
             try {
-              const install = await getGithubInstallUrl();
-              const installUrl = install?.url?.trim();
-              if (!installUrl) {
-                throw new Error("Unable to get GitHub install link.");
+              const connect = await getGithubConnectUrl({
+                data: {
+                  device: window.sessionStorage.getItem("brimble.oauth.device_id") ?? undefined,
+                },
+              });
+              const connectUrl = connect?.url?.trim();
+              if (!connectUrl) {
+                throw new Error("Unable to get GitHub connection link.");
               }
 
-              const popup = window.open(installUrl, "_blank", "width=900,height=760");
+              const popup = window.open(connectUrl, "_blank", "width=900,height=760");
 
               if (!popup) {
                 throw new Error("Popup blocked. Please allow popups and try again.");
               }
             } catch (error) {
-              toast.error(error instanceof Error ? error.message : "Failed to open GitHub install page");
+              toast.error(error instanceof Error ? error.message : "Failed to open GitHub connection page");
             }
           })();
         },
@@ -298,7 +306,7 @@ export function OnboardingChecklist({
       hasFollowed,
       hasPaymentCard,
       hasTakenTour,
-      getGithubInstallUrl,
+      getGithubConnectUrl,
       isTeamWorkspace,
       hasTeamMembers,
       showInviteTeamMemberTask,
@@ -337,7 +345,7 @@ export function OnboardingChecklist({
         }
         window.open(task.action, "_blank", "noopener,noreferrer");
       } else if (task.action) {
-        navigate({
+        void navigate({
           to: withWorkspaceQuery({ pathname: task.action, searchStr }) as any,
         });
       }

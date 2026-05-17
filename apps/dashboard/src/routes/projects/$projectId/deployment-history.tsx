@@ -44,7 +44,8 @@ import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { usePushNotification } from "@/hooks/use-push-notification";
 import { Route as RootRoute } from "@/routes/__root";
 import type { TeamDetails, TeamMember } from "@/backend/teams";
-import config from "@/config";
+import { getProjectScopedAblyOptions } from "@/lib/ably-auth";
+import type { ListDeploymentsServerFnCaller } from "../project-detail.types";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -129,16 +130,7 @@ export const Route = createFileRoute("/projects/$projectId/deployment-history")(
 
     try {
       const result = await withTimeout(
-        (listDeploymentsServerFn as unknown as (input: {
-          data: {
-            projectId: string;
-            workspace?: string;
-            page?: number;
-            limit?: number;
-            start?: string;
-            end?: string;
-          };
-        }) => Promise<PaginatedDeploymentsResponse>)({
+        (listDeploymentsServerFn as unknown as ListDeploymentsServerFnCaller)({
           data: {
             projectId: project?.id || project?.name,
             workspace,
@@ -850,19 +842,7 @@ function DeploymentHistoryPage() {
 
       try {
         const result = await withTimeout(
-          (listDeploymentsServerFn as unknown as (input: {
-            data: {
-              projectId: string;
-              workspace?: string;
-              page?: number;
-              limit?: number;
-              statuses?: string;
-              environment?: string;
-              start?: string;
-              end?: string;
-              search?: string;
-            };
-          }) => Promise<PaginatedDeploymentsResponse>)({
+          (listDeploymentsServerFn as unknown as ListDeploymentsServerFnCaller)({
             data: {
               projectId,
               workspace,
@@ -1146,10 +1126,12 @@ function DeploymentHistoryPage() {
       const { Realtime } = await import("ably");
       if (cancelled) return;
 
-      const ably = new Realtime({
-        authUrl: `${config.apiUrl}/v1/ably/token?clientId=${projectId}`,
-        clientId: projectId,
-      });
+      const authOptions = await getProjectScopedAblyOptions([projectId]);
+      if (!authOptions || cancelled) {
+        return;
+      }
+
+      const ably = new Realtime(authOptions);
       const channel = ably.channels.get(projectId);
       channel.subscribe("log", handleLogEvent);
 

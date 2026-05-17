@@ -236,7 +236,7 @@ export function TagAssignmentPopover({
               onKeyDown={(e) => {
                 e.stopPropagation();
                 if (e.key === "Escape") onOpenChange(false);
-                if (e.key === "Enter") handleCreate();
+                if (e.key === "Enter") void handleCreate();
               }}
               placeholder={canWrite ? "Search or create..." : "Search tags..."}
               className="w-full bg-transparent text-sm text-dash-text-strong outline-none placeholder:text-[#9ca3af]"
@@ -254,7 +254,7 @@ export function TagAssignmentPopover({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleToggle(tag.id);
+                  void handleToggle(tag.id);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-dash-bg-elevated disabled:opacity-70"
               >
@@ -276,7 +276,7 @@ export function TagAssignmentPopover({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                handleCreate();
+                void handleCreate();
               }}
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-dash-text-faded transition-colors hover:bg-dash-bg-elevated disabled:opacity-70"
             >

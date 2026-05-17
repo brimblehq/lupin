@@ -106,7 +106,9 @@ export function DefaultErrorComponent({ error }: { error: Error }) {
       description={friendly.description}
       action={{
         label: "Try again",
-        onClick: () => invalidateActiveMatches(router),
+        onClick: () => {
+          void invalidateActiveMatches(router);
+        },
       }}
       secondaryAction={{
         label: "Back to dashboard",

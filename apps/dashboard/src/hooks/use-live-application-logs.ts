@@ -398,7 +398,7 @@ export function useLiveApplicationLogs(input: UseLiveApplicationLogsInput) {
     setIsConnecting(true);
     setError(null);
 
-    (async () => {
+    void (async () => {
       const shared = await getOrCreateSharedSocket();
       if (cancelled) {
         return;

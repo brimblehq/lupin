@@ -848,6 +848,7 @@ const NOTIFICATIONS_PAGE_SIZE = 8;
 function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHaptics> }) {
   const [open, setOpen] = useState(false);
   const [limit, setLimit] = useState(NOTIFICATIONS_PAGE_SIZE);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
@@ -908,6 +909,15 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
     });
   }
 
+  function handleCopyMessage(notification: NotificationItem) {
+    void navigator.clipboard.writeText(notification.message);
+    haptics?.light();
+    setCopiedId(notification.id);
+    window.setTimeout(() => {
+      setCopiedId((prev) => (prev === notification.id ? null : prev));
+    }, 1500);
+  }
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -962,37 +972,62 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
                 <div className="px-4 py-6 text-sm text-dash-text-faded">No notifications</div>
               ) : (
                 <>
-                  {items.map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => handleNotificationClick(n)}
-                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated ${
-                        n.seen ? "" : "bg-[#4879f8]/[0.04] dark:bg-[#4879f8]/[0.06]"
-                      }`}
-                    >
-                      {(() => {
-                        const icon = levelIcon(n.level);
-                        return (
-                          <img
-                            src={icon.src}
-                            alt=""
-                            style={icon.style}
-                            className={`mt-0.5 size-4 shrink-0 ${icon.className ?? ""} ${n.seen ? "opacity-60" : ""}`}
-                          />
-                        );
-                      })()}
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span
-                          className={`text-sm leading-[1.4] ${
-                            n.seen ? "font-light text-dash-text-faded" : "font-medium text-dash-text-strong"
-                          }`}
-                        >
-                          {n.message}
-                        </span>
-                        <span className="text-xs text-dash-text-extra-faded">{formatRelativeTime(n.createdAt)}</span>
+                  {items.map((n) => {
+                    const showCopy = n.level === "warning";
+                    const isCopied = copiedId === n.id;
+                    return (
+                      <div
+                        key={n.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleNotificationClick(n)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleNotificationClick(n);
+                          }
+                        }}
+                        className={`group flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-dash-bg-elevated ${
+                          n.seen ? "" : "bg-[#4879f8]/[0.04] dark:bg-[#4879f8]/[0.06]"
+                        }`}
+                      >
+                        {(() => {
+                          const icon = levelIcon(n.level);
+                          return (
+                            <img
+                              src={icon.src}
+                              alt=""
+                              style={icon.style}
+                              className={`mt-0.5 size-4 shrink-0 ${icon.className ?? ""} ${n.seen ? "opacity-60" : ""}`}
+                            />
+                          );
+                        })()}
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span
+                            className={`wrap-anywhere text-sm leading-[1.4] ${
+                              n.seen ? "font-light text-dash-text-faded" : "font-medium text-dash-text-strong"
+                            }`}
+                          >
+                            {n.message}
+                          </span>
+                          <span className="text-xs text-dash-text-extra-faded">{formatRelativeTime(n.createdAt)}</span>
+                        </div>
+                        {showCopy && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyMessage(n);
+                            }}
+                            aria-label={isCopied ? "Copied" : "Copy message"}
+                            className="mt-0.5 shrink-0 rounded-[4px] p-1 text-dash-text-extra-faded transition-colors hover:bg-dash-bg hover:text-dash-text-strong"
+                          >
+                            {isCopied ? <Check className="size-3.5 text-[#22c55e]" /> : <Copy className="size-3.5" />}
+                          </button>
+                        )}
                       </div>
-                    </button>
-                  ))}
+                    );
+                  })}
                   {hasMore && (
                     <button
                       type="button"

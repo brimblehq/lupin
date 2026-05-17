@@ -71,7 +71,7 @@ export async function enforceRouteAuth(pathname: string, search?: string, option
   const shouldRedirectToLogin =
     !session &&
     !isPublicRoute &&
-    (refreshStatus === "expired" || refreshStatus === "missing" || (!authCheckFailed && refreshStatus !== "error"));
+    (refreshStatus === "expired" || refreshStatus === "missing" || refreshStatus === "error" || authCheckFailed);
 
   if (shouldRedirectToLogin) {
     clearSessionCache();

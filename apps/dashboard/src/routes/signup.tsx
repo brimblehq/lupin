@@ -9,7 +9,6 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { AuthDivider, AuthField, AuthProviderButton, AuthSplitLayout, OtpInput } from "../components/auth/auth-split-layout";
 import {
-  finalizeOauthSessionServerFn,
   lookupAuthServerFn,
   resendAuthCodeServerFn,
   startSignupServerFn,
@@ -18,7 +17,6 @@ import {
 import { startOauthPopup, type OauthProvider } from "../lib/auth/oauth-popup";
 import { buildTwoFactorChallengeNavigation, extractTwoFactorChallenge } from "@/lib/auth/two-factor";
 import type {
-  FinalizeOauthSessionCaller,
   LookupAuthCaller,
   ResendAuthCodeCaller,
   StartSignupCaller,
@@ -267,11 +265,10 @@ function getNextUrl(): string {
 function SignupPage() {
   const haptics = useHaptics();
   const navigate = useNavigate();
-  const lookupAuth = useServerFn(lookupAuthServerFn as any) as LookupAuthCaller;
-  const startSignup = useServerFn(startSignupServerFn as any) as StartSignupCaller;
-  const resendAuthCode = useServerFn(resendAuthCodeServerFn as any) as ResendAuthCodeCaller;
-  const verifyEmailCode = useServerFn(verifyEmailCodeServerFn as any) as VerifyEmailCodeCaller;
-  const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn as any) as FinalizeOauthSessionCaller;
+  const lookupAuth = useServerFn(lookupAuthServerFn) as LookupAuthCaller;
+  const startSignup = useServerFn(startSignupServerFn) as StartSignupCaller;
+  const resendAuthCode = useServerFn(resendAuthCodeServerFn) as ResendAuthCodeCaller;
+  const verifyEmailCode = useServerFn(verifyEmailCodeServerFn) as VerifyEmailCodeCaller;
   const [step, setStep] = useState<"details" | "otp">("details");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -298,28 +295,7 @@ function SignupPage() {
         return;
       }
 
-      if (!data.access_token) {
-        throw new Error("OAuth response did not include an access token.");
-      }
-
-      const response = await finalizeOauthSession({
-        data: {
-          accessToken: data.access_token,
-          refreshToken: data.refresh_token,
-          user: {
-            id: data.id,
-            email: data.email,
-            username: data.username,
-            firstName: data.first_name,
-            lastName: data.last_name,
-            company: data.company,
-            onboarded: Boolean(data.onboard?.user),
-          },
-          geo: await getClientGeo(),
-        },
-      });
-
-      toast.success(`Welcome${response.user.firstName ? `, ${response.user.firstName}` : ""}`);
+      toast.success(`Welcome${data.user?.firstName ? `, ${data.user.firstName}` : ""}`);
       invalidateSessionCache();
       window.location.replace(getNextUrl());
       return;

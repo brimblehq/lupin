@@ -68,7 +68,7 @@ function CopyButton({ text }: { text: string }) {
   const haptics = useHaptics();
 
   function handleCopy() {
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
     haptics.light();
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -797,7 +797,9 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
                 ) : (
                   <button
                     type="button"
-                    onClick={handleOpenLinkProject}
+                    onClick={() => {
+                      void handleOpenLinkProject();
+                    }}
                     className="text-[#4879f8] underline-offset-2 transition-colors hover:underline"
                   >
                     Link to project
@@ -849,7 +851,9 @@ export function DomainSettings({ domain, backPath, workspace }: { domain: Domain
             <AlertCircle className="size-5 shrink-0 text-[#e89c30]" />
             <span className="text-sm text-dash-text-body">DNS is still propagating. This can take up to 48 hours.</span>
             <button
-              onClick={handleCheckDnsStatus}
+              onClick={() => {
+                void handleCheckDnsStatus();
+              }}
               disabled={refreshingStatus}
               className="ml-auto flex shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-2.5 py-1.5 text-xs font-medium text-dash-text-body transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-50"
             >

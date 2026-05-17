@@ -12,7 +12,6 @@ import { startOauthPopup } from "@/lib/auth/oauth-popup";
 import { buildTwoFactorChallengeUrl, extractTwoFactorChallenge } from "@/lib/auth/two-factor";
 import type { McpServerListResult, McpServerTemplate } from "@/backend/mcp";
 import type { GithubAccount, GithubAccountsResult } from "@/backend/repositories";
-import { finalizeOauthSessionServerFn } from "@/server/auth/actions";
 import { deployMcpTemplateServerFn, getMcpTemplateServerFn, listMcpTemplatesServerFn } from "@/server/mcp/actions";
 import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import { mapMcpTemplateToAddon, mapMcpTemplateToAddonDetail } from "@/utils/discover-mcp";
@@ -135,13 +134,6 @@ function AddonDetailPage() {
   const [deploying, setDeploying] = useState(false);
   const [authEnabled, setAuthEnabled] = useState(true);
   const listGithubAccounts = useServerFn(listGithubAccountsServerFn as any) as () => Promise<GithubAccountsResult>;
-  const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn as any) as (args: {
-    data: {
-      accessToken: string;
-      refreshToken?: string;
-      user?: Record<string, unknown>;
-    };
-  }) => Promise<{ ok: true }>;
   const deployMcpTemplate = useServerFn(deployMcpTemplateServerFn as any) as (args: {
     data: {
       workspace?: string;
@@ -181,26 +173,6 @@ function AddonDetailPage() {
       window.location.assign(buildTwoFactorChallengeUrl(challenge, { next: nextPath }));
       throw new Error(TWO_FACTOR_REDIRECT_SIGNAL);
     }
-
-    if (!oauth.access_token) {
-      throw new Error("OAuth response did not include an access token.");
-    }
-
-    await finalizeOauthSession({
-      data: {
-        accessToken: oauth.access_token,
-        refreshToken: oauth.refresh_token,
-        user: {
-          id: oauth.id,
-          email: oauth.email,
-          username: oauth.username,
-          firstName: oauth.first_name,
-          lastName: oauth.last_name,
-          company: oauth.company,
-          onboarded: Boolean(oauth.onboard?.user),
-        },
-      },
-    });
 
     result = await listGithubAccounts();
     return result.accounts;

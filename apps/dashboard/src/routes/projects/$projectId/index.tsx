@@ -6,7 +6,7 @@ import { StatusChip } from "../../../components/shared/status-chip";
 import { getProjectScreenshotServerFn } from "@/server/projects/actions";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import { listDeploymentsServerFn } from "@/server/deployments/actions";
-import type { DeploymentLog, PaginatedDeploymentsResponse } from "@/backend/deployments";
+import type { DeploymentLog } from "@/backend/deployments";
 import type { FrameworkOption } from "@/backend/frameworks";
 import { useHaptics } from "@/hooks/use-haptics";
 import { useProjectDeploymentLogsDrawer } from "@/contexts/project-deployment-logs-drawer-context";
@@ -25,6 +25,7 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { WarningModal } from "@/components/shared/warning-modal";
 import { ProjectOverviewPending } from "@/components/shared/route-pending";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
+import type { ListDeploymentsServerFnCaller } from "../project-detail.types";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -52,16 +53,7 @@ export const Route = createFileRoute("/projects/$projectId/")({
 
     const [deploymentsResult, screenshotResult, frameworksResult] = await Promise.allSettled([
       project?.id
-        ? (
-            listDeploymentsServerFn as unknown as (input: {
-              data: {
-                projectId: string;
-                workspace?: string;
-                page?: number;
-                limit?: number;
-              };
-            }) => Promise<PaginatedDeploymentsResponse>
-          )({
+        ? (listDeploymentsServerFn as unknown as ListDeploymentsServerFnCaller)({
             data: { projectId: project.id, workspace, page: 1, limit: 5 },
           })
         : Promise.resolve(null),

@@ -40,7 +40,7 @@ import {
 } from "@/utils/workspace-route-search";
 import { useTagsStore } from "@/hooks/use-tags-store";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
-import config from "@/config";
+import { getProjectScopedAblyOptions } from "@/lib/ably-auth";
 import type { ProjectsRouteLoaderData } from "./types";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
@@ -635,11 +635,12 @@ function ProjectsPage() {
       const { Realtime } = await import("ably");
       if (cancelled) return;
 
-      const clientId = visibleProjectIds[0];
-      const ably = new Realtime({
-        authUrl: `${config.apiUrl}/v1/ably/token?clientId=${clientId}`,
-        clientId,
-      });
+      const authOptions = await getProjectScopedAblyOptions(visibleProjectIds);
+      if (!authOptions || cancelled) {
+        return;
+      }
+
+      const ably = new Realtime(authOptions);
 
       const channels = visibleProjectIds.map((id) => {
         const channel = ably.channels.get(id);

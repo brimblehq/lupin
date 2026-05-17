@@ -6,7 +6,7 @@ export function useInvalidate() {
   const router = useRouter();
 
   return useCallback(() => {
-    invalidateActiveMatches(router);
+    void invalidateActiveMatches(router);
   }, [router]);
 }
 
@@ -16,7 +16,7 @@ export function useInvalidatingServerFn<TArgs extends { data?: unknown }, TResul
   return useCallback(
     async (args: TArgs): Promise<TResult> => {
       const result = await serverFn(args);
-      invalidateActiveMatches(router);
+      void invalidateActiveMatches(router);
       return result;
     },
     [router, serverFn],

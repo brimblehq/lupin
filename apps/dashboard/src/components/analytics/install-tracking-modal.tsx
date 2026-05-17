@@ -158,7 +158,9 @@ export function InstallTrackingModal({
             <code className="flex-1 truncate font-mono text-xs text-dash-text-body">{siteId}</code>
             <button
               type="button"
-              onClick={handleCopySiteId}
+              onClick={() => {
+                void handleCopySiteId();
+              }}
               className="shrink-0 text-dash-text-faded transition-colors hover:text-dash-text-strong"
               aria-label="Copy site ID"
             >
@@ -206,7 +208,9 @@ export function InstallTrackingModal({
           </pre>
           <button
             type="button"
-            onClick={handleCopySnippet}
+            onClick={() => {
+              void handleCopySnippet();
+            }}
             className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-[3px] border-[0.5px] border-dash-border bg-dash-bg px-2 py-1 text-[11px] font-medium text-dash-text-faded transition-colors hover:text-dash-text-strong"
           >
             {copied ? (

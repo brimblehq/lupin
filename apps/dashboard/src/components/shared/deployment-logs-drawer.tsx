@@ -277,7 +277,7 @@ export function DeploymentLogsDrawer({
       return;
     }
     const text = `[${log.timestamp}] ${log.message}`;
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
     haptics.light();
     setCopiedRowIndex(index);
     window.setTimeout(() => {
@@ -290,7 +290,7 @@ export function DeploymentLogsDrawer({
       return;
     }
     const text = logs.map((l) => `[${l.timestamp}] ${l.message}`).join("\n");
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
     haptics.light();
     setCopiedAll(true);
     window.setTimeout(() => setCopiedAll(false), 1500);
@@ -390,22 +390,24 @@ export function DeploymentLogsDrawer({
                     <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">{copiedAll ? "Copied" : "Copy all"}</span>
                   </button>
                   <button
-                    onClick={async () => {
-                      if (projectId && deploymentId) {
-                        try {
-                          const result = await downloadFromApi({
-                            data: { projectId, logId: deploymentId, workspace },
-                          });
-                          const filename = result.filename.endsWith(".log")
-                            ? result.filename
-                            : `${result.filename.replace(/\.\w+$/, "")}.log`;
-                          triggerFileDownload(result.content, filename);
-                          return;
-                        } catch {
-                          // fall through to client-side download
+                    onClick={() => {
+                      void (async () => {
+                        if (projectId && deploymentId) {
+                          try {
+                            const result = await downloadFromApi({
+                              data: { projectId, logId: deploymentId, workspace },
+                            });
+                            const filename = result.filename.endsWith(".log")
+                              ? result.filename
+                              : `${result.filename.replace(/\.\w+$/, "")}.log`;
+                            triggerFileDownload(result.content, filename);
+                            return;
+                          } catch {
+                            // fall through to client-side download
+                          }
                         }
-                      }
-                      downloadLogsClientFallback(logs);
+                        downloadLogsClientFallback(logs);
+                      })();
                     }}
                     className="flex items-center gap-1.5 rounded px-1 py-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated sm:gap-2 sm:px-0.5"
                   >

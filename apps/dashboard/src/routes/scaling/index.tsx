@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { Search, Plus, Pencil } from "lucide-react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { PageHeader } from "../../components/shared/page-header";
-import { DashButton } from "../../components/shared/dash-button";
 import { GlossyButton } from "../../components/shared/glossy-button";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { RangeSlider } from "../../components/shared/range-slider";

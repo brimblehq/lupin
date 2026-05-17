@@ -17,7 +17,7 @@ import {
 } from "@/contexts/project-deployment-logs-drawer-context";
 import { sortDeploymentDrawerEntries } from "@/utils/deployment-logs";
 import { usePushNotification } from "@/hooks/use-push-notification";
-import config from "@/config";
+import { getProjectScopedAblyOptions } from "@/lib/ably-auth";
 import type { ProjectDetailRouteProject } from "./project-detail.types";
 import { PROJECT_CACHE_TTL, markProjectCacheStale, projectCache } from "./project-route-cache";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
@@ -455,14 +455,16 @@ function ProjectLayout() {
       const { Realtime } = await import("ably");
       if (cancelled) return;
 
-      const ably = new Realtime({
-        authUrl: `${config.apiUrl}/v1/ably/token?clientId=${backendProjectId}`,
-        clientId: backendProjectId,
-      });
+      const authOptions = await getProjectScopedAblyOptions([backendProjectId]);
+      if (!authOptions || cancelled) {
+        return;
+      }
+
+      const ably = new Realtime(authOptions);
 
       const channel = ably.channels.get(backendProjectId);
 
-      channel.subscribe((message) => {
+      void channel.subscribe((message) => {
         const eventName = message.name ?? "";
 
         if (DEPLOYMENT_EVENT_NAMES.includes(eventName)) {

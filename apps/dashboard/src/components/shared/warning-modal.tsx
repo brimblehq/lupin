@@ -67,17 +67,19 @@ export function WarningModal({
           disabled={confirmDisabled || submitting}
           loading={submitting}
           loadingLabel={confirmLoadingLabel || `${confirmLabel}...`}
-          onClick={async () => {
-            try {
-              haptics.heavy();
-              setSubmitting(true);
-              await onConfirm();
-              if (closeOnConfirm) {
-                onOpenChange(false);
+          onClick={() => {
+            void (async () => {
+              try {
+                haptics.heavy();
+                setSubmitting(true);
+                await onConfirm();
+                if (closeOnConfirm) {
+                  onOpenChange(false);
+                }
+              } finally {
+                setSubmitting(false);
               }
-            } finally {
-              setSubmitting(false);
-            }
+            })();
           }}
           className="flex-1"
         >

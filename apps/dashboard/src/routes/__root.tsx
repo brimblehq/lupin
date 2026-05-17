@@ -255,7 +255,7 @@ function RootComponent() {
   useTheme(settingsSnapshot?.profile?.theme);
 
   useEffect(() => {
-    import("@/lib/client-geo").then((m) => m.getClientGeo());
+    void import("@/lib/client-geo").then((m) => m.getClientGeo());
   }, []);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });

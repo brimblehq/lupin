@@ -4,6 +4,7 @@ import type {
   BitbucketConnectUrlResult,
   BitbucketRepoListResult,
   GithubAccountsResult,
+  GithubConnectUrlResult,
   GithubInstallUrlResult,
   GithubRepoListResult,
   GitlabAccountsResult,
@@ -40,6 +41,17 @@ export const getGithubInstallUrlServerFn = createServerFn({
   method: "GET",
 }).handler(async () => {
   return withTokenRefresh((api) => api.repositories.getGithubInstallUrl()) as Promise<GithubInstallUrlResult>;
+});
+
+export const getGithubConnectUrlServerFn = createServerFn({
+  method: "GET",
+}).handler(async ({ data }) => {
+  const payload = data as { device?: string } | undefined;
+  return withTokenRefresh((api) =>
+    api.repositories.getGithubConnectUrl({
+      device: payload?.device?.trim() || undefined,
+    }),
+  ) as Promise<GithubConnectUrlResult>;
 });
 
 export const getGitlabConnectUrlServerFn = createServerFn({

@@ -557,7 +557,7 @@ export function DomainList({
         label: "Manage DNS",
         icon: <Settings className="size-3.5" />,
         onClick: () => {
-          navigate({ to: domainDetailsPath as string });
+          void navigate({ to: domainDetailsPath as string });
         },
       });
     }

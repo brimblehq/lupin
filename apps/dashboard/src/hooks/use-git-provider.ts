@@ -112,10 +112,10 @@ export function useGitProvider({
   );
 
   useEffect(() => {
-    if (active && phase >= 2 && accounts.length === 0 && !accountsLoading) {
+    if (active && phase >= 2 && !accountsChecked && !accountsLoading) {
       void refreshAccounts({ silent: false });
     }
-  }, [active, phase, accounts.length, accountsLoading, refreshAccounts]);
+  }, [active, phase, accountsChecked, accountsLoading, refreshAccounts]);
 
   const loadRepos = useCallback(
     async (input: { installationId?: number | string; q?: string }) => {

@@ -23,7 +23,7 @@ function warmSafariAudio() {
     src.start();
     src.onended = () => {
       src.disconnect();
-      ctx.close();
+      void ctx.close();
     };
   });
 }
@@ -85,7 +85,7 @@ function fire(key: keyof typeof PATTERNS) {
   const haptics = getSharedHaptics();
   if (!haptics) return;
   const p = PATTERNS[key];
-  haptics.trigger(p.segments as unknown as any[], "options" in p ? (p as any).options : undefined);
+  void haptics.trigger(p.segments as unknown as any[], "options" in p ? (p as any).options : undefined);
 }
 
 const hapticsApi = {

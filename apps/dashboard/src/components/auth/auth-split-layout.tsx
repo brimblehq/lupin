@@ -184,6 +184,7 @@ export function AuthField({
   placeholder,
   value,
   onChange,
+  onBlur,
   autoFocus,
   maxLength,
   inputMode,
@@ -198,6 +199,7 @@ export function AuthField({
   placeholder?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   autoFocus?: boolean;
   maxLength?: number;
   inputMode?: "email" | "numeric" | "text";
@@ -218,6 +220,7 @@ export function AuthField({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
         autoFocus={autoFocus}
         maxLength={maxLength}
         inputMode={inputMode}

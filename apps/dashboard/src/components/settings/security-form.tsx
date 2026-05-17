@@ -466,7 +466,9 @@ export function SecurityForm({
               </button>
             </div>
             <button
-              onClick={() => onChangeEmail?.(email)}
+              onClick={() => {
+                void onChangeEmail?.(email);
+              }}
               className="shrink-0 text-sm font-medium tracking-[-0.0224px] text-dash-text-strong transition-colors hover:text-dash-text-body"
             >
               Change

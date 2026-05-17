@@ -9,7 +9,6 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { AuthDivider, AuthField, AuthProviderButton, AuthSplitLayout, OtpInput } from "../components/auth/auth-split-layout";
 import {
-  finalizeOauthSessionServerFn,
   getPasskeyAuthOptionsServerFn,
   requestLoginOtpServerFn,
   resendAuthCodeServerFn,
@@ -19,7 +18,6 @@ import {
 import { usePasskeyFeature } from "@/hooks/use-passkey-feature";
 import type { OauthProvider } from "../lib/auth/oauth-popup";
 import type {
-  FinalizeOauthSessionCaller,
   GetPasskeyAuthOptionsCaller,
   RequestLoginOtpCaller,
   ResendAuthCodeCaller,
@@ -81,6 +79,7 @@ function EmailStep({
   email,
   emailError,
   onEmailChange,
+  onEmailBlur,
   onSubmit,
   loading,
   onGithub,
@@ -96,6 +95,7 @@ function EmailStep({
   email: string;
   emailError?: string;
   onEmailChange: (v: string) => void;
+  onEmailBlur: () => void;
   onSubmit: () => void;
   loading: boolean;
   onGithub: () => void;
@@ -108,8 +108,6 @@ function EmailStep({
   onPasskey: () => void;
   passkeyLoading: boolean;
 }) {
-  const isEmailValid = !validateEmailInput(email);
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -167,6 +165,7 @@ function EmailStep({
           value={email}
           error={emailError}
           onChange={(e) => onEmailChange(e.target.value)}
+          onBlur={onEmailBlur}
           autoFocus
           inputMode="email"
           autoComplete="off"
@@ -174,7 +173,7 @@ function EmailStep({
 
         <button
           type="submit"
-          disabled={!isEmailValid || loading}
+          disabled={loading}
           className="relative flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#006fff] text-sm font-semibold text-white shadow-[0_1px_2px_rgba(0,80,200,0.3)] transition-all hover:bg-[#0060e0] disabled:opacity-40 disabled:hover:bg-[#006fff]"
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : "Continue with email"}
@@ -393,12 +392,11 @@ function saveLastAuthMethod(method: AuthMethod) {
 function LoginPage() {
   const haptics = useHaptics();
   const navigate = useNavigate();
-  const requestLoginOtp = useServerFn(requestLoginOtpServerFn as any) as RequestLoginOtpCaller;
-  const resendAuthCode = useServerFn(resendAuthCodeServerFn as any) as ResendAuthCodeCaller;
-  const verifyEmailCode = useServerFn(verifyEmailCodeServerFn as any) as VerifyEmailCodeCaller;
-  const finalizeOauthSession = useServerFn(finalizeOauthSessionServerFn as any) as FinalizeOauthSessionCaller;
-  const getPasskeyAuthOptions = useServerFn(getPasskeyAuthOptionsServerFn as any) as GetPasskeyAuthOptionsCaller;
-  const verifyPasskeyAuth = useServerFn(verifyPasskeyAuthServerFn as any) as VerifyPasskeyAuthCaller;
+  const requestLoginOtp = useServerFn(requestLoginOtpServerFn) as RequestLoginOtpCaller;
+  const resendAuthCode = useServerFn(resendAuthCodeServerFn) as ResendAuthCodeCaller;
+  const verifyEmailCode = useServerFn(verifyEmailCodeServerFn) as VerifyEmailCodeCaller;
+  const getPasskeyAuthOptions = useServerFn(getPasskeyAuthOptionsServerFn) as GetPasskeyAuthOptionsCaller;
+  const verifyPasskeyAuth = useServerFn(verifyPasskeyAuthServerFn) as VerifyPasskeyAuthCaller;
   const passkeyFeature = usePasskeyFeature();
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const autofillStartedRef = useRef(false);
@@ -452,29 +450,8 @@ function LoginPage() {
         return;
       }
 
-      if (!data.access_token) {
-        throw new Error("OAuth response did not include an access token.");
-      }
-
-      const response = await finalizeOauthSession({
-        data: {
-          accessToken: data.access_token,
-          refreshToken: data.refresh_token,
-          user: {
-            id: data.id,
-            email: data.email,
-            username: data.username,
-            firstName: data.first_name,
-            lastName: data.last_name,
-            company: data.company,
-            onboarded: Boolean(data.onboard?.user),
-          },
-          geo: await getClientGeo(),
-        },
-      });
-
       saveLastAuthMethod(provider);
-      toast.success(`Welcome back${response.user.firstName ? `, ${response.user.firstName}` : ""}`);
+      toast.success(`Welcome back${data.user?.firstName ? `, ${data.user.firstName}` : ""}`);
       invalidateSessionCache();
       window.location.replace(getNextUrl());
       return;
@@ -686,6 +663,14 @@ function LoginPage() {
               setEmail(next);
               if (emailError) {
                 setEmailError(null);
+              }
+            }}
+            onEmailBlur={() => {
+              const trimmed = email.trim();
+              if (!trimmed) return;
+              const validationError = validateEmailInput(email);
+              if (validationError) {
+                setEmailError(validationError);
               }
             }}
             onSubmit={handleSendOtp}
