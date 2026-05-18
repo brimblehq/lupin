@@ -9,6 +9,7 @@ import {
   Plus,
   Globe,
   Users,
+  Box,
   Menu,
   X,
   ArrowRightLeft,
@@ -1051,6 +1052,7 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
 
 const defaultCreateMenuItems = [
   { label: "Create project", icon: Plus },
+  { label: "Create sandbox", icon: Box },
   { label: "Register domain", icon: Globe },
   { label: "New workspace", icon: Users },
 ];
@@ -1091,18 +1093,18 @@ function CreateDropdown() {
       window.dispatchEvent(new CustomEvent("brimble:add-domain"));
     } else if (isDomainsPage) {
       setPendingDomainsAction("add-domain");
-      navigate({
+      void navigate({
         to: withWorkspaceQuery({
           pathname: "/domains",
           searchStr,
-        }) as any,
+        }),
       });
     } else {
-      navigate({
+      void navigate({
         to: withWorkspaceQuery({
           pathname: "/projects/new",
           searchStr,
-        }) as any,
+        }),
       });
     }
   }
@@ -1111,40 +1113,47 @@ function CreateDropdown() {
     haptics.light();
     setOpen(false);
     if (label === "Buy domain") {
-      navigate({
+      void navigate({
         to: withWorkspaceQuery({
           pathname: "/domains/buy",
           searchStr,
-        }) as any,
+        }),
       });
     } else if (label === "Transfer in") {
       if (isDomainsListPage) {
         window.dispatchEvent(new CustomEvent("brimble:transfer-in"));
       } else {
         setPendingDomainsAction("transfer-in");
-        navigate({
+        void navigate({
           to: withWorkspaceQuery({
             pathname: "/domains",
             searchStr,
-          }) as any,
+          }),
         });
       }
     } else if (label === "Create project") {
-      navigate({
+      void navigate({
         to: withWorkspaceQuery({
           pathname: "/projects/new",
           searchStr,
-        }) as any,
+        }),
+      });
+    } else if (label === "Create sandbox") {
+      void navigate({
+        to: withWorkspaceQuery({
+          pathname: "/sandboxes/new",
+          searchStr,
+        }),
       });
     } else if (label === "Register domain") {
-      navigate({
+      void navigate({
         to: withWorkspaceQuery({
           pathname: "/domains/buy",
           searchStr,
-        }) as any,
+        }),
       });
     } else if (label === "New workspace") {
-      navigate({ to: "/workspace/new" });
+      void navigate({ to: "/workspace/new" });
     }
   }
 

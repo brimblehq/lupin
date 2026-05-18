@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { Cube } from "@phosphor-icons/react";
-import { PageHeader } from "@/components/shared/page-header";
 import { SearchFilterBar } from "@/components/shared/search-filter-bar";
 import { FilterDropdown, type FilterOption } from "@/components/shared/filter-dropdown";
 import { CreateSandboxCard } from "@/components/sandboxes/create-sandbox-card";
@@ -53,13 +52,7 @@ function SandboxesListPage() {
   }
 
   return (
-    <div className="max-w-[1000px]">
-      <PageHeader title="Sandboxes" image="/icons/sandbox.svg">
-        Spin up isolated AI sandboxes to run code, agents, and experiments. Configure resources, attach storage, and interact with them in real time.
-      </PageHeader>
-
-      <hr className="border-dash-border-soft mb-8 -mx-4 md:-mx-10" />
-
+    <>
       <div className="mb-4">
         <SearchFilterBar
           value={query}
@@ -113,6 +106,6 @@ function SandboxesListPage() {
           if (!open) setActive(null);
         }}
       />
-    </div>
+    </>
   );
 }

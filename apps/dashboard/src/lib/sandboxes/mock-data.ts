@@ -53,6 +53,14 @@ export const DESTROY_TIMEOUTS: { id: string; label: string; minutes: number }[] 
   { id: "90d", label: "90 days", minutes: 129600 },
 ];
 
+export const SNAPSHOT_FREQUENCIES: { id: string; label: string }[] = [
+  { id: "manual", label: "Manual only" },
+  { id: "hourly", label: "Every hour" },
+  { id: "6h", label: "Every 6 hours" },
+  { id: "daily", label: "Every day" },
+  { id: "weekly", label: "Every week" },
+];
+
 export const MOCK_SANDBOXES: Sandbox[] = [
   {
     id: "sbx_01H8X9Y2Z",

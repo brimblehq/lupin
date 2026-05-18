@@ -27,6 +27,8 @@ import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as DomainsIndexRouteImport } from './routes/domains/index'
 import { Route as AddonsIndexRouteImport } from './routes/addons/index'
 import { Route as WorkspaceNewRouteImport } from './routes/workspace/new'
+import { Route as SandboxesVolumesRouteImport } from './routes/sandboxes/volumes'
+import { Route as SandboxesSnapshotsRouteImport } from './routes/sandboxes/snapshots'
 import { Route as SandboxesNewRouteImport } from './routes/sandboxes/new'
 import { Route as ProjectsNewRouteImport } from './routes/projects/new'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
@@ -136,6 +138,16 @@ const WorkspaceNewRoute = WorkspaceNewRouteImport.update({
   id: '/workspace/new',
   path: '/workspace/new',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SandboxesVolumesRoute = SandboxesVolumesRouteImport.update({
+  id: '/volumes',
+  path: '/volumes',
+  getParentRoute: () => SandboxesRoute,
+} as any)
+const SandboxesSnapshotsRoute = SandboxesSnapshotsRouteImport.update({
+  id: '/snapshots',
+  path: '/snapshots',
+  getParentRoute: () => SandboxesRoute,
 } as any)
 const SandboxesNewRoute = SandboxesNewRouteImport.update({
   id: '/new',
@@ -261,6 +273,8 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/new': typeof ProjectsNewRoute
   '/sandboxes/new': typeof SandboxesNewRoute
+  '/sandboxes/snapshots': typeof SandboxesSnapshotsRoute
+  '/sandboxes/volumes': typeof SandboxesVolumesRoute
   '/workspace/new': typeof WorkspaceNewRoute
   '/addons/': typeof AddonsIndexRoute
   '/domains/': typeof DomainsIndexRoute
@@ -294,6 +308,8 @@ export interface FileRoutesByTo {
   '/domains/buy': typeof DomainsBuyRoute
   '/projects/new': typeof ProjectsNewRoute
   '/sandboxes/new': typeof SandboxesNewRoute
+  '/sandboxes/snapshots': typeof SandboxesSnapshotsRoute
+  '/sandboxes/volumes': typeof SandboxesVolumesRoute
   '/workspace/new': typeof WorkspaceNewRoute
   '/addons': typeof AddonsIndexRoute
   '/domains': typeof DomainsIndexRoute
@@ -333,6 +349,8 @@ export interface FileRoutesById {
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/new': typeof ProjectsNewRoute
   '/sandboxes/new': typeof SandboxesNewRoute
+  '/sandboxes/snapshots': typeof SandboxesSnapshotsRoute
+  '/sandboxes/volumes': typeof SandboxesVolumesRoute
   '/workspace/new': typeof WorkspaceNewRoute
   '/addons/': typeof AddonsIndexRoute
   '/domains/': typeof DomainsIndexRoute
@@ -374,6 +392,8 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects/new'
     | '/sandboxes/new'
+    | '/sandboxes/snapshots'
+    | '/sandboxes/volumes'
     | '/workspace/new'
     | '/addons/'
     | '/domains/'
@@ -407,6 +427,8 @@ export interface FileRouteTypes {
     | '/domains/buy'
     | '/projects/new'
     | '/sandboxes/new'
+    | '/sandboxes/snapshots'
+    | '/sandboxes/volumes'
     | '/workspace/new'
     | '/addons'
     | '/domains'
@@ -445,6 +467,8 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects/new'
     | '/sandboxes/new'
+    | '/sandboxes/snapshots'
+    | '/sandboxes/volumes'
     | '/workspace/new'
     | '/addons/'
     | '/domains/'
@@ -612,6 +636,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/workspace/new'
       preLoaderRoute: typeof WorkspaceNewRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/sandboxes/volumes': {
+      id: '/sandboxes/volumes'
+      path: '/volumes'
+      fullPath: '/sandboxes/volumes'
+      preLoaderRoute: typeof SandboxesVolumesRouteImport
+      parentRoute: typeof SandboxesRoute
+    }
+    '/sandboxes/snapshots': {
+      id: '/sandboxes/snapshots'
+      path: '/snapshots'
+      fullPath: '/sandboxes/snapshots'
+      preLoaderRoute: typeof SandboxesSnapshotsRouteImport
+      parentRoute: typeof SandboxesRoute
     }
     '/sandboxes/new': {
       id: '/sandboxes/new'
@@ -838,11 +876,15 @@ const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
 
 interface SandboxesRouteChildren {
   SandboxesNewRoute: typeof SandboxesNewRoute
+  SandboxesSnapshotsRoute: typeof SandboxesSnapshotsRoute
+  SandboxesVolumesRoute: typeof SandboxesVolumesRoute
   SandboxesIndexRoute: typeof SandboxesIndexRoute
 }
 
 const SandboxesRouteChildren: SandboxesRouteChildren = {
   SandboxesNewRoute: SandboxesNewRoute,
+  SandboxesSnapshotsRoute: SandboxesSnapshotsRoute,
+  SandboxesVolumesRoute: SandboxesVolumesRoute,
   SandboxesIndexRoute: SandboxesIndexRoute,
 }
 

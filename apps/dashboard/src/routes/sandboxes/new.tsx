@@ -3,8 +3,9 @@ import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/re
 import { useServerFn } from "@tanstack/react-start";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { ArrowLeft, Plus, X } from "lucide-react";
-import { DashButton } from "@/components/shared/dash-button";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft, ChevronDown, ChevronUp, Plus, X } from "lucide-react";
+import { GlossyButton } from "@/components/shared/glossy-button";
 import { DashInput, dashInputClassName } from "@/components/shared/dash-input";
 import { Dropdown } from "@/components/shared/dropdown";
 import { ToggleSwitch } from "@/components/shared/toggle-switch";
@@ -13,7 +14,8 @@ import { DiskSizeSelect } from "@/components/shared/disk-size-select";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
-import { DESTROY_TIMEOUTS, IDLE_TIMEOUTS, SANDBOX_TEMPLATES } from "@/lib/sandboxes/mock-data";
+import { DESTROY_TIMEOUTS, IDLE_TIMEOUTS, SANDBOX_TEMPLATES, SNAPSHOT_FREQUENCIES } from "@/lib/sandboxes/mock-data";
+import { MOCK_VOLUMES } from "@/lib/sandboxes/volumes-mock-data";
 import { listRegionsServerFn } from "@/server/regions/actions";
 import type { Region } from "@/backend/regions";
 
@@ -23,19 +25,22 @@ export const Route = createFileRoute("/sandboxes/new")({
 
 interface SandboxFormValues {
   name: string;
-  description: string;
   template: string;
   region: string;
   cpu: number;
   memoryGb: number;
+  persistentDiskEnabled: boolean;
   diskSize: string;
   autoStop: boolean;
   idleTimeoutId: string;
   autoDestroy: boolean;
   destroyTimeoutId: string;
   oneShot: boolean;
+  snapshotsEnabled: boolean;
+  snapshotFrequencyId: string;
   blockOutbound: boolean;
   envVars: { key: string; value: string }[];
+  mountedVolumes: { volumeId: string; mountPath: string }[];
 }
 
 type RegionOption = { id: string; label: string; isDefault: boolean };
@@ -55,35 +60,40 @@ const sandboxFormSchema = Yup.object({
     .max(48, "Name should be less than 49 characters")
     .matches(/^[a-zA-Z][a-zA-Z0-9 _-]*$/, "Letters, numbers, spaces, hyphens, and underscores only")
     .required("Sandbox name is required"),
-  description: Yup.string().trim().max(160, "Keep descriptions under 160 characters"),
   template: Yup.string().required("Template is required"),
   region: Yup.string().required("Region is required"),
   cpu: Yup.number().min(0.25).max(8).required(),
   memoryGb: Yup.number().min(0.5).max(16).required(),
-  diskSize: Yup.string().required(),
+  persistentDiskEnabled: Yup.boolean(),
+  diskSize: Yup.string(),
   autoStop: Yup.boolean(),
   idleTimeoutId: Yup.string(),
   autoDestroy: Yup.boolean(),
   destroyTimeoutId: Yup.string(),
   oneShot: Yup.boolean(),
+  snapshotsEnabled: Yup.boolean(),
+  snapshotFrequencyId: Yup.string(),
   blockOutbound: Yup.boolean(),
 });
 
 const initialValues: SandboxFormValues = {
   name: "",
-  description: "",
   template: SANDBOX_TEMPLATES[0]?.id ?? "",
   region: "",
   cpu: 1,
   memoryGb: 2,
+  persistentDiskEnabled: false,
   diskSize: "10",
   autoStop: true,
   idleTimeoutId: "30m",
   autoDestroy: false,
   destroyTimeoutId: "30d",
   oneShot: false,
+  snapshotsEnabled: false,
+  snapshotFrequencyId: "daily",
   blockOutbound: false,
   envVars: [],
+  mountedVolumes: [],
 };
 
 function NewSandboxPage() {
@@ -100,6 +110,7 @@ function NewSandboxPage() {
   const haptics = useHaptics();
   const [submitting, setSubmitting] = useState(false);
   const [regionOptions, setRegionOptions] = useState<RegionOption[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const formik = useFormik<SandboxFormValues>({
     initialValues,
@@ -174,6 +185,43 @@ function NewSandboxPage() {
     );
   }
 
+  const mountableVolumes = MOCK_VOLUMES.filter((v) => v.status !== "DELETING");
+  const usedVolumeIds = new Set(values.mountedVolumes.map((m) => m.volumeId));
+  const firstAvailableVolume = mountableVolumes.find((v) => !usedVolumeIds.has(v.id));
+
+  function addVolumeMount() {
+    if (!firstAvailableVolume) return;
+    haptics.selection();
+    void setFieldValue("mountedVolumes", [
+      ...values.mountedVolumes,
+      { volumeId: firstAvailableVolume.id, mountPath: `/mnt/${firstAvailableVolume.name}` },
+    ]);
+  }
+
+  function updateVolumeMount(index: number, field: "volumeId" | "mountPath", next: string) {
+    const draft = values.mountedVolumes.map((entry, i) => {
+      if (i !== index) return entry;
+      if (field === "volumeId") {
+        const picked = mountableVolumes.find((v) => v.id === next);
+        return {
+          ...entry,
+          volumeId: next,
+          mountPath: picked ? `/mnt/${picked.name}` : entry.mountPath,
+        };
+      }
+      return { ...entry, mountPath: next };
+    });
+    void setFieldValue("mountedVolumes", draft);
+  }
+
+  function removeVolumeMount(index: number) {
+    haptics.selection();
+    void setFieldValue(
+      "mountedVolumes",
+      values.mountedVolumes.filter((_, i) => i !== index),
+    );
+  }
+
   return (
     <div className="px-6 py-8">
       <div className="mx-auto max-w-[680px]">
@@ -201,18 +249,6 @@ function NewSandboxPage() {
                 onBlur={handleBlur}
                 placeholder="research-agent"
                 autoFocus
-              />
-            </Field>
-
-            <Field label="Description" hint="Optional · helps teammates know what this sandbox is for.">
-              <textarea
-                name="description"
-                value={values.description}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                placeholder="A short summary of this sandbox's purpose."
-                rows={3}
-                className={`${dashInputClassName} resize-none`}
               />
             </Field>
           </Section>
@@ -263,7 +299,95 @@ function NewSandboxPage() {
               />
             </Field>
 
-            <DiskSizeSelect label="Persistent disk" value={values.diskSize} onChange={(id) => void setFieldValue("diskSize", id)} />
+            <ToggleRow
+              title="Persistent disk"
+              description="Attach disk storage that survives across sandbox restarts. Recommended for big workloads or datasets that need to stick around."
+              checked={values.persistentDiskEnabled}
+              onChange={(next) => void setFieldValue("persistentDiskEnabled", next)}
+            />
+            {values.persistentDiskEnabled ? (
+              <DiskSizeSelect label="Disk size" value={values.diskSize} onChange={(id) => void setFieldValue("diskSize", id)} />
+            ) : null}
+          </Section>
+
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setShowAdvanced((v) => !v);
+              }}
+              className="flex items-center gap-1.5 text-sm text-dash-text-faded transition-colors hover:text-dash-text-strong"
+            >
+              {showAdvanced ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+              {showAdvanced ? "Hide advanced configuration" : "Show advanced configuration"}
+            </button>
+          </div>
+
+          <AnimatePresence initial={false}>
+            {showAdvanced ? (
+              <motion.div
+                key="advanced"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                style={{ overflow: "hidden" }}
+              >
+              <Divider />
+
+              <Section title="Volumes" description="Mount existing persistent volumes onto this sandbox.">
+            {values.mountedVolumes.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                {values.mountedVolumes.map((entry, i) => {
+                  const dropdownOptions = mountableVolumes
+                    .filter((v) => v.id === entry.volumeId || !values.mountedVolumes.some((m) => m.volumeId === v.id))
+                    .map((v) => ({ id: v.id, label: `${v.name} (${v.sizeGb} GB)` }));
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <Dropdown
+                          value={entry.volumeId}
+                          options={dropdownOptions}
+                          onChange={(id) => updateVolumeMount(i, "volumeId", id)}
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="/mnt/path"
+                        value={entry.mountPath}
+                        onChange={(event) => updateVolumeMount(i, "mountPath", event.target.value)}
+                        className={`${dashInputClassName} flex-1 font-family-mono text-[13px]`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeVolumeMount(i)}
+                        aria-label="Remove volume"
+                        className="flex size-7 shrink-0 items-center justify-center rounded-[6px] text-dash-text-faded transition-colors hover:text-dash-text-strong"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+            {firstAvailableVolume ? (
+              <button
+                type="button"
+                onClick={addVolumeMount}
+                className="flex items-center gap-1.5 self-start text-sm text-[#4879f8] transition-colors hover:text-[#3a6ae6]"
+              >
+                <Plus className="size-3.5" />
+                Mount volume
+              </button>
+            ) : (
+              <p className="text-xs text-dash-text-faded">
+                {mountableVolumes.length === 0
+                  ? "You don't have any volumes yet. Create one from the Volumes tab to mount it here."
+                  : "All available volumes are already mounted."}
+              </p>
+            )}
           </Section>
 
           <Divider />
@@ -352,6 +476,33 @@ function NewSandboxPage() {
 
           <Divider />
 
+          <Section title="Snapshots" description="Capture point-in-time copies of this sandbox's disk.">
+            <ToggleRow
+              title="Enable snapshots"
+              description="Save restorable snapshots of this sandbox on a schedule or on demand."
+              checked={values.snapshotsEnabled}
+              onChange={(next) => void setFieldValue("snapshotsEnabled", next)}
+            />
+            {values.snapshotsEnabled ? (
+              <Field
+                label="Snapshot schedule"
+                hint={
+                  values.snapshotFrequencyId === "manual"
+                    ? "Snapshots will only run when you trigger them from the sandbox page."
+                    : "You can still trigger a snapshot manually at any time."
+                }
+              >
+                <Dropdown
+                  value={values.snapshotFrequencyId}
+                  options={SNAPSHOT_FREQUENCIES.map((entry) => ({ id: entry.id, label: entry.label }))}
+                  onChange={(id) => void setFieldValue("snapshotFrequencyId", id)}
+                />
+              </Field>
+            ) : null}
+          </Section>
+
+          <Divider />
+
           <Section title="Network" description="Lock down how this sandbox is reached.">
             <ToggleRow
               title="Block outbound network"
@@ -360,6 +511,9 @@ function NewSandboxPage() {
               onChange={(next) => void setFieldValue("blockOutbound", next)}
             />
           </Section>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
 
           <div className="mt-8 flex items-center justify-end gap-3">
             <Link
@@ -368,9 +522,9 @@ function NewSandboxPage() {
             >
               Cancel
             </Link>
-            <DashButton variant="primary" type="submit" disabled={submitting}>
-              {submitting ? "Creating…" : "Create sandbox"}
-            </DashButton>
+            <GlossyButton type="submit" disabled={submitting} loading={submitting} loadingLabel="Creating…">
+              Create sandbox
+            </GlossyButton>
           </div>
         </form>
       </div>

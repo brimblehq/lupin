@@ -27,9 +27,9 @@ const chipVariants: Record<ChipVariant, { bg: string; border: string }> = {
 
 function getVariant(status: string): ChipVariant {
   const s = status.toUpperCase();
-  if (s === "READY" || s === "ACTIVE") return ChipVariant.Green;
+  if (s === "READY" || s === "ACTIVE" || s === "ATTACHED") return ChipVariant.Green;
   if (s === "FAILED") return ChipVariant.Red;
-  if (s === "BUILDING" || s === "INPROGRESS" || s === "PENDING" || s === "QUEUED") return ChipVariant.Orange;
+  if (s === "BUILDING" || s === "INPROGRESS" || s === "PENDING" || s === "QUEUED" || s === "CREATING") return ChipVariant.Orange;
   return ChipVariant.Gray;
 }
 
