@@ -97,6 +97,31 @@ const PROJECT_STATUS_FILTER_OPTIONS: FilterOption[] = [
   { label: "Payment Due", value: "PAYMENT DUE", dot: "#ef4444" },
 ];
 
+function hasEnvironmentAccessDeniedError(error: unknown): boolean {
+  const record = (error ?? null) as { message?: unknown; details?: unknown; data?: unknown } | null;
+  const texts: string[] = [];
+
+  if (typeof record?.message === "string") {
+    texts.push(record.message);
+  }
+
+  if (record?.details && typeof record.details === "object") {
+    const detailsRecord = record.details as { message?: unknown };
+    if (typeof detailsRecord.message === "string") {
+      texts.push(detailsRecord.message);
+    }
+  }
+
+  if (record?.data && typeof record.data === "object") {
+    const dataRecord = record.data as { message?: unknown };
+    if (typeof dataRecord.message === "string") {
+      texts.push(dataRecord.message);
+    }
+  }
+
+  return texts.some((text) => text.toLowerCase().includes("you do not have access to this environment"));
+}
+
 export const Route = createFileRoute("/projects/")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
@@ -148,7 +173,7 @@ export const Route = createFileRoute("/projects/")({
     const [environments, persistedEnvironmentId, frameworks] = await Promise.all([
       (listProjectEnvironmentsServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<ProjectEnvironment[]>)({
         data: { workspace: deps.workspace },
-      }),
+      }).catch(() => [] as ProjectEnvironment[]),
       (getActiveEnvironmentPreferenceServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<string | null>)({
         data: { workspace: deps.workspace },
       }).catch(() => null),
@@ -160,8 +185,8 @@ export const Route = createFileRoute("/projects/")({
       environments,
     });
 
-    const result = await (
-      listProjectsPageServerFn as unknown as (input: {
+    const loadProjects = async (environmentId?: string) =>
+      (listProjectsPageServerFn as unknown as (input: {
         data: {
           page?: number;
           workspace?: string;
@@ -170,17 +195,32 @@ export const Route = createFileRoute("/projects/")({
           status?: string;
           environmentId?: string;
         };
-      }) => Promise<PaginatedProjectsResponse>
-    )({
-      data: {
-        page: deps.page,
-        workspace: deps.workspace,
-        q: deps.q,
-        serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
-        status: deps.status && deps.status !== "all" ? deps.status : undefined,
-        environmentId: resolvedEnvironmentId,
-      },
-    });
+      }) => Promise<PaginatedProjectsResponse>)({
+        data: {
+          page: deps.page,
+          workspace: deps.workspace,
+          q: deps.q,
+          serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
+          status: deps.status && deps.status !== "all" ? deps.status : undefined,
+          environmentId,
+        },
+      });
+
+    let requestedEnvironmentAccessDenied = false;
+    let effectiveResolvedEnvironmentId = resolvedEnvironmentId;
+    let result: PaginatedProjectsResponse;
+
+    try {
+      result = await loadProjects(resolvedEnvironmentId);
+    } catch (error) {
+      const canRetryWithoutEnvironment = Boolean(resolvedEnvironmentId && hasEnvironmentAccessDeniedError(error));
+      if (!canRetryWithoutEnvironment) {
+        throw error;
+      }
+      requestedEnvironmentAccessDenied = true;
+      effectiveResolvedEnvironmentId = undefined;
+      result = await loadProjects(undefined);
+    }
 
     const frameworkLogoMap = new Map<string, string>();
     for (const fw of frameworks) {
@@ -194,12 +234,13 @@ export const Route = createFileRoute("/projects/")({
       pagination: {
         currentPage: result.currentPage,
         totalPages: result.totalPages,
-        total: result.total,
+        total: result.total ?? 0,
         overallTotalProjects: result.overallTotalProjects,
       },
       workspace: deps.workspace,
       environmentId: deps.environmentId,
-      resolvedEnvironmentId,
+      resolvedEnvironmentId: effectiveResolvedEnvironmentId,
+      requestedEnvironmentAccessDenied,
     };
   },
   component: ProjectsPage,
@@ -569,9 +610,15 @@ function ProjectsPage() {
   const [isStatusFilterChanging, setIsStatusFilterChanging] = useState(false);
   const activeProjectType = search.type ?? "all";
   const activeStatus = search.status ?? "all";
-  const activeEnvironmentId = search.environmentId ?? loaderData.resolvedEnvironmentId ?? "all";
-  const effectiveEnvironmentId =
-    search.environmentId && search.environmentId !== "all" ? search.environmentId : loaderData.resolvedEnvironmentId;
+  const requestedEnvironmentAccessDenied = Boolean(loaderData.requestedEnvironmentAccessDenied);
+  let activeEnvironmentId = search.environmentId ?? loaderData.resolvedEnvironmentId ?? "all";
+  if (requestedEnvironmentAccessDenied) {
+    activeEnvironmentId = loaderData.resolvedEnvironmentId ?? "all";
+  }
+  let effectiveEnvironmentId = loaderData.resolvedEnvironmentId;
+  if (!requestedEnvironmentAccessDenied && search.environmentId && search.environmentId !== "all") {
+    effectiveEnvironmentId = search.environmentId;
+  }
   const requestedWorkspace = search.workspace?.trim().toLowerCase() || undefined;
   const loadedWorkspace = loaderData.workspace?.trim().toLowerCase() || undefined;
   const isWorkspaceSwitching = requestedWorkspace !== loadedWorkspace;
@@ -605,6 +652,35 @@ function ProjectsPage() {
       environmentId: next.environmentId,
     };
   }
+
+  useEffect(() => {
+    if (!requestedEnvironmentAccessDenied || !search.environmentId) {
+      return;
+    }
+
+    toast.error("You do not have access to that environment. Showing projects from environments you can access.");
+    navigate({
+      to: "/projects",
+      replace: true,
+      search: buildProjectsSearch({
+        workspace: search.workspace,
+        q: search.q,
+        type: search.type,
+        status: search.status,
+        environmentId: undefined,
+        page: search.page,
+      }),
+    });
+  }, [
+    navigate,
+    requestedEnvironmentAccessDenied,
+    search.environmentId,
+    search.page,
+    search.q,
+    search.status,
+    search.type,
+    search.workspace,
+  ]);
 
   useEffect(() => {
     setProjects(loaderData.projects);
@@ -759,7 +835,7 @@ function ProjectsPage() {
         setPagination({
           currentPage: result.currentPage,
           totalPages: result.totalPages,
-          total: result.total,
+          total: result.total ?? 0,
           overallTotalProjects: result.overallTotalProjects,
         });
       } catch {

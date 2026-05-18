@@ -14,4 +14,5 @@ export interface ProjectsRouteLoaderData {
   workspace?: string;
   environmentId?: string;
   resolvedEnvironmentId?: string;
+  requestedEnvironmentAccessDenied?: boolean;
 }

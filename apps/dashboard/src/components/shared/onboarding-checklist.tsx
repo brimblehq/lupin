@@ -9,7 +9,7 @@ import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { useProfileDrawer } from "@/contexts/profile-drawer-context";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { ProfileTab } from "@/types/enums";
-import { getGithubConnectUrlServerFn, listGithubAccountsServerFn } from "@/server/repositories/actions";
+import { getGithubInstallUrlServerFn, listGithubAccountsServerFn } from "@/server/repositories/actions";
 import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
 import { updateSettingsFollowedXServerFn } from "@/server/settings/actions";
 import type { Project } from "@/backend/projects";
@@ -124,9 +124,7 @@ export function OnboardingChecklist({
   const updateFollowedX = useServerFn(updateSettingsFollowedXServerFn as any) as (args: {
     data: { followed_x: boolean };
   }) => Promise<{ ok: true }>;
-  const getGithubConnectUrl = useServerFn(getGithubConnectUrlServerFn as any) as (args: {
-    data?: { device?: string };
-  }) => Promise<{ url: string }>;
+  const getGithubInstallUrl = useServerFn(getGithubInstallUrlServerFn as any) as () => Promise<{ url: string }>;
   const getTeamMembers = useServerFn(getWorkspaceTeamMembersServerFn as any) as (args: {
     data: { workspace: string };
   }) => Promise<TeamDetails>;
@@ -274,11 +272,7 @@ export function OnboardingChecklist({
         onConnectGit: () => {
           void (async () => {
             try {
-              const connect = await getGithubConnectUrl({
-                data: {
-                  device: window.sessionStorage.getItem("brimble.oauth.device_id") ?? undefined,
-                },
-              });
+              const connect = await getGithubInstallUrl();
               const connectUrl = connect?.url?.trim();
               if (!connectUrl) {
                 throw new Error("Unable to get GitHub connection link.");
@@ -306,7 +300,7 @@ export function OnboardingChecklist({
       hasFollowed,
       hasPaymentCard,
       hasTakenTour,
-      getGithubConnectUrl,
+      getGithubInstallUrl,
       isTeamWorkspace,
       hasTeamMembers,
       showInviteTeamMemberTask,
