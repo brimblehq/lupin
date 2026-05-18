@@ -51,7 +51,7 @@ import { ServiceType, FrameworkApplicationType } from "@brimble/models/dist/enum
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import { listRegionsServerFn } from "@/server/regions/actions";
 import {
-  getGithubConnectUrlServerFn,
+  getGithubInstallUrlServerFn,
   getBitbucketConnectUrlServerFn,
   getBitbucketRepoServerFn,
   listBitbucketAccountsServerFn,
@@ -2728,9 +2728,7 @@ function NewProjectPage() {
   const listGithubAccounts = useServerFn(listGithubAccountsServerFn as any) as () => Promise<
     GithubAccount[] | { accounts?: GithubAccount[] }
   >;
-  const getGithubConnectUrl = useServerFn(getGithubConnectUrlServerFn as any) as (args: {
-    data?: { device?: string };
-  }) => Promise<{ url: string }>;
+  const getGithubInstallUrl = useServerFn(getGithubInstallUrlServerFn as any) as () => Promise<{ url: string }>;
   const listGithubRepos = useServerFn(listGithubReposServerFn as any) as (args: {
     data?: {
       q?: string;
@@ -2856,7 +2854,7 @@ function NewProjectPage() {
     providerId: "github",
     api: {
       listAccounts: listGithubAccounts,
-      getConnectUrl: getGithubConnectUrl,
+      getConnectUrl: () => getGithubInstallUrl(),
       listRepos: listGithubRepos,
       getRepo: getGithubRepo,
     },
