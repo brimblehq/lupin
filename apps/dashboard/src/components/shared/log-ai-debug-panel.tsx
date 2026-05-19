@@ -58,6 +58,8 @@ const priorityPalette: Record<DebugPriority, ChipPalette> = {
   low: grayChip,
 };
 
+export const LOG_AI_DEBUG_MAX_MESSAGE_LENGTH = 5000;
+
 function LevelChip({ label, palette }: { label: string; palette: ChipPalette }) {
   return (
     <div
@@ -80,7 +82,8 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, messageI
   const queryClient = useQueryClient();
 
   const trimmedMessage = message.trim();
-  const enabled = open && Boolean(projectId && logId && messageId && trimmedMessage.length >= 5);
+  const messageTooLong = trimmedMessage.length > LOG_AI_DEBUG_MAX_MESSAGE_LENGTH;
+  const enabled = open && !messageTooLong && Boolean(projectId && logId && messageId && trimmedMessage.length >= 5);
   const [copied, setCopied] = useState(false);
 
   const query = useQuery<DebugSuggestionsResponse>({
@@ -225,6 +228,8 @@ export function LogAiDebugPanel({ open, onOpenChange, projectId, logId, messageI
           <p className="text-sm leading-[1.45] text-dash-text-body">
             Daily AI debug limit reached. Resets at midnight UTC. Upgrade your plan for more daily debugs.
           </p>
+        ) : messageTooLong ? (
+          <p className="text-xs text-dash-text-faded">This log line is too long for quick fix.</p>
         ) : query.data ? (
           <SuggestionsView data={query.data} />
         ) : !enabled ? (

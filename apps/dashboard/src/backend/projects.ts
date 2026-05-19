@@ -331,7 +331,7 @@ const debugMessageSchema = Yup.object({
     .trim()
     .required("We need the log message to debug.")
     .min(5, "This log line is too short to debug.")
-    .max(10000, "This log line is too long to debug — try a shorter snippet."),
+    .max(5000, "This log line is too long for quick fix."),
 });
 
 function mapStringArray(value: unknown): string[] {

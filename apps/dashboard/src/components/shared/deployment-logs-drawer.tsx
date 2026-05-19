@@ -20,7 +20,7 @@ import { useHaptics } from "@/hooks/use-haptics";
 import type { DeploymentDrawerLogEntry } from "@/utils/deployment-logs";
 import { BUILD_PHASE_LABEL, summarizePhases } from "@/utils/deployment-logs";
 import { downloadDeploymentLogsServerFn } from "@/server/deployments/actions";
-import { LogAiDebugPanel } from "@/components/shared/log-ai-debug-panel";
+import { LogAiDebugPanel, LOG_AI_DEBUG_MAX_MESSAGE_LENGTH } from "@/components/shared/log-ai-debug-panel";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 
 interface DeploymentLogsDrawerProps {
@@ -497,6 +497,7 @@ export function DeploymentLogsDrawer({
                       const showDebugAction =
                         aiDebugEnabled &&
                         !isSection &&
+                        log.message.trim().length <= LOG_AI_DEBUG_MAX_MESSAGE_LENGTH &&
                         (detailTone === "error" || detailTone === "warning") &&
                         Boolean(projectId && deploymentId && log.messageId);
                       const debugDisabled = showDebugAction && buildInProgress;
