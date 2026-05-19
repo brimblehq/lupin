@@ -3,7 +3,11 @@ import { Drawer } from "vaul";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, ChevronRight, GitBranch, Loader2 } from "lucide-react";
 import type { RepositoryDirectoryEntry, RepositoryFrameworkDefaults } from "@/backend/repositories";
-import { getGithubRootDirServerFn, getGitlabRootDirServerFn } from "@/server/repositories/actions";
+import {
+  getBitbucketRootDirServerFn,
+  getGithubRootDirServerFn,
+  getGitlabRootDirServerFn,
+} from "@/server/repositories/actions";
 
 const HTTP_STATUS_PREFIX = /^\[HTTP (\d{3})\]\s*/;
 
@@ -271,7 +275,14 @@ export function RootDirectoryDrawer({
 
   const getGithubRootDir = useServerFn(getGithubRootDirServerFn as any) as RootDirFn;
   const getGitlabRootDir = useServerFn(getGitlabRootDirServerFn as any) as RootDirFn;
-  const getRootDir = provider === "gitlab" ? getGitlabRootDir : getGithubRootDir;
+  const getBitbucketRootDir = useServerFn(getBitbucketRootDirServerFn as any) as RootDirFn;
+  const rootDirLoaders = {
+    github: getGithubRootDir,
+    gitlab: getGitlabRootDir,
+    bitbucket: getBitbucketRootDir,
+  };
+  const getRootDir = rootDirLoaders[provider];
+  const providerLabel = provider === "gitlab" ? "GitLab" : provider === "bitbucket" ? "Bitbucket" : "GitHub";
 
   const [currentPath, setCurrentPath] = useState<string>(selectedPath || "./");
   const [selectedNodePath, setSelectedNodePath] = useState<string>(selectedPath || "./");
@@ -435,7 +446,7 @@ export function RootDirectoryDrawer({
             <path d="M6 9v3a3 3 0 0 0 3 3" />
           </svg>
         </div>
-        <span className="text-sm font-medium text-dash-text-strong">{provider === "gitlab" ? "GitLab" : "GitHub"}</span>
+        <span className="text-sm font-medium text-dash-text-strong">{providerLabel}</span>
       </div>
 
       <button
