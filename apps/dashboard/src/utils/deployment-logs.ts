@@ -30,6 +30,7 @@ export interface DeploymentDrawerLogEntry {
   timestampMs?: number | null;
   status?: DeploymentDrawerLogSectionStatus;
   phase?: BuildPhase;
+  securityData?: any;
 }
 
 interface SectionRule {
@@ -143,7 +144,19 @@ export function mapDeploymentRunLogsToDrawerEntries(rows: RawDeploymentRunLogRow
     }
 
     const parsedLine = tryParseEmbeddedLogLine(rawContent);
-    const message = parsedLine.message;
+    let message = parsedLine.message;
+    let securityData: any = undefined;
+
+    const securityDataKey = "__BRIMBLE_SEC_SCAN_DATA__=";
+    if (message.includes(securityDataKey)) {
+      const parts = message.split(securityDataKey);
+      message = parts[0].trim();
+      try {
+        securityData = JSON.parse(parts[1]);
+      } catch (e) {
+        // ignore parse error
+      }
+    }
 
     const classification = classifyLogMessage(message);
     const timestampValue = parsedLine.embeddedTimestamp ?? row.timestamp ?? row.timeStamp;
@@ -158,6 +171,7 @@ export function mapDeploymentRunLogsToDrawerEntries(rows: RawDeploymentRunLogRow
       timestampMs: parseTimestampMs(timestampValue),
       status: classification.status,
       phase: detectPhase(message),
+      securityData,
     });
   }
 
