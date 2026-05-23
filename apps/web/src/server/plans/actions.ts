@@ -24,7 +24,6 @@ interface PlanConfiguration {
   memory: number;
   storage: number;
   cpu: number;
-  tokens: number;
   custom_domain: boolean;
   analytics: boolean;
   multi_region: boolean;
@@ -35,6 +34,12 @@ interface PlanConfiguration {
   slack_support: boolean;
   can_deploy_all_applications: boolean;
   unlimited_projects: boolean;
+  sandbox_enabled: boolean;
+  sandbox_max_count: number;
+  sandbox_max_vcpu: number;
+  sandbox_max_memory_gb: number;
+  sandbox_cpu_hours_included: number;
+  sandbox_memory_gb_hours_included: number;
 }
 
 function readEnv(key: string): string | undefined {
@@ -69,7 +74,6 @@ function parseConfiguration(raw: any): PlanConfiguration {
     memory: num(c.memory),
     storage: num(c.storage),
     cpu: num(c.cpu),
-    tokens: num(c.tokens),
     custom_domain: Boolean(c.custom_domain),
     analytics: Boolean(c.analytics),
     multi_region: Boolean(c.multi_region),
@@ -80,13 +84,13 @@ function parseConfiguration(raw: any): PlanConfiguration {
     slack_support: Boolean(c.slack_support),
     can_deploy_all_applications: Boolean(c.can_deploy_all_applications),
     unlimited_projects: Boolean(c.unlimited_projects),
+    sandbox_enabled: Boolean(c.sandbox_enabled),
+    sandbox_max_count: num(c.sandbox_max_count),
+    sandbox_max_vcpu: num(c.sandbox_max_vcpu),
+    sandbox_max_memory_gb: num(c.sandbox_max_memory_gb),
+    sandbox_cpu_hours_included: num(c.sandbox_cpu_hours_included),
+    sandbox_memory_gb_hours_included: num(c.sandbox_memory_gb_hours_included),
   };
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
-  return `${n}`;
 }
 
 function buildFeatures(config: PlanConfiguration, previous: { name: string; configuration: PlanConfiguration } | null): string[] {
@@ -137,7 +141,18 @@ function buildFeatures(config: PlanConfiguration, previous: { name: string; conf
   if (improved(config.bandwidth, prev?.bandwidth)) features.push(`${config.bandwidth} GB Bandwidth`);
   if (improved(config.storage, prev?.storage)) features.push(`${config.storage} GB Storage`);
   if (improved(config.log_retention, prev?.log_retention)) features.push(`${config.log_retention}-day Log Retention`);
-  if (improved(config.tokens, prev?.tokens)) features.push(`Free ${formatTokens(config.tokens)} A.I Model Tokens`);
+
+  if (config.sandbox_enabled) {
+    if (improved(config.sandbox_max_count, prev?.sandbox_max_count)) {
+      features.push(`${config.sandbox_max_count} Concurrent Sandbox${config.sandbox_max_count === 1 ? "" : "es"}`);
+    }
+    if (improved(config.sandbox_max_vcpu, prev?.sandbox_max_vcpu) || improved(config.sandbox_max_memory_gb, prev?.sandbox_max_memory_gb)) {
+      features.push(`Up to ${config.sandbox_max_vcpu} vCPU / ${config.sandbox_max_memory_gb} GB Sandboxes`);
+    }
+    if (improved(config.sandbox_cpu_hours_included, prev?.sandbox_cpu_hours_included) || improved(config.sandbox_memory_gb_hours_included, prev?.sandbox_memory_gb_hours_included)) {
+      features.push(`${config.sandbox_cpu_hours_included} Sandbox CPU + ${config.sandbox_memory_gb_hours_included} GB-hrs Included`);
+    }
+  }
 
   return features;
 }

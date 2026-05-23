@@ -10,7 +10,7 @@ import { getUserOverviewServerFn } from "@/server/overview/actions";
 import type { UserOverview } from "@/backend/user-overview";
 import { usePricing } from "@/contexts/pricing-context";
 import { ArrowSquareOut, CreditCard, PencilSimple } from "@phosphor-icons/react";
-import { Check, Copy, Plus, Star, X } from "lucide-react";
+import { Check, ChevronDown, Copy, Plus, Star, X } from "lucide-react";
 import { FolderTrashIcon } from "../shared/folder-trash-icon";
 import { PaymentProvider } from "@/providers/payment-provider";
 import { GlossyButton } from "../shared/glossy-button";
@@ -25,6 +25,7 @@ import { BuildMinutesCard } from "./build-minutes-card";
 import {
   usePaymentMethods,
   useSubscription,
+  useSubscriptionStats,
   useInvoices,
   useAddPaymentMethod,
   useConfirmPaymentMethod,
@@ -140,6 +141,9 @@ function BillingFormInner({
     ...(canUseInitialUserOverview && initialUserOverview ? { initialData: initialUserOverview } : {}),
   });
   const { data: subscription } = useSubscription();
+  const { data: subscriptionStats } = useSubscriptionStats(teamId, initialSubscriptionStats ?? undefined);
+  const effectiveSubscriptionStats = subscriptionStats ?? initialSubscriptionStats ?? null;
+  const usageBreakdown = effectiveSubscriptionStats?.usage_breakdown;
   const { data: spendingLimitStatus } = useSpendingLimitStatus(teamId);
   const { data: invoices } = useInvoices(invoiceCursor, teamId, initialInvoices);
   const payInvoiceMutation = usePayInvoice();
@@ -288,7 +292,7 @@ function BillingFormInner({
       <PaymentFailureBanner daysSinceFailure={daysSinceFailure} />
 
       {/* ── Forecasted bill ── */}
-      <BillForecast stats={initialSubscriptionStats} hasOpenInvoice={invoices?.items?.some((inv) => inv.status === "open") ?? false} />
+      <BillForecast stats={effectiveSubscriptionStats} hasOpenInvoice={invoices?.items?.some((inv) => inv.status === "open") ?? false} />
 
       {/* ── Usage / Bill estimate ── */}
       <UsageSection spendingLimit={savedSpendingLimit} usage={currentUsage} />
@@ -298,15 +302,13 @@ function BillingFormInner({
         usedMinutes={userOverview?.buildMinutes.used ?? 0}
         includedMinutes={userOverview?.buildMinutes.included ?? 0}
         creditMinutes={userOverview?.buildMinutes.purchased ?? 0}
-        resetDate={userOverview?.buildMinutes.nextResetAt ?? (teamId ? null : (initialSubscriptionStats?.next_payment_date ?? null))}
+        resetDate={userOverview?.buildMinutes.nextResetAt ?? (teamId ? null : (effectiveSubscriptionStats?.next_payment_date ?? null))}
         teamId={teamId}
         initialPaymentMethods={initialPaymentMethods}
       />
 
       {/* ── Usage breakdown (per-resource) ── */}
-      {initialSubscriptionStats?.usage_breakdown && (
-        <UsageBreakdown breakdown={initialSubscriptionStats.usage_breakdown} planName={currentPlan} planAmount={activePlanPrice} />
-      )}
+      {usageBreakdown && <UsageBreakdown breakdown={usageBreakdown} planName={currentPlan} planAmount={activePlanPrice} />}
 
       {!hidePaymentMethods && (
         <>
@@ -639,91 +641,163 @@ function UsageBar({
 
 /* ── Usage breakdown (per-resource) ── */
 
-const USAGE_RESOURCES: ReadonlyArray<{
-  key: keyof Omit<UsageBreakdownData, "metered_total" | "compute">;
+type UsageResource = {
+  key: keyof Omit<UsageBreakdownData, "metered_total">;
   label: string;
   iconSrc: string;
-  // API returns `quantity` in milli-GB-months for cpu/memory/storage and milli-GB for bandwidth.
-  // factor converts raw quantity → displayed unit.
-  factor: number;
+  // API returns every `quantity` in milli-units; divide by 1000 for the displayed value.
   unit: string;
   tooltip: string;
-}> = [
+};
+
+// All quantities arrive as milli-units, so the display value is always quantity / 1000.
+const QUANTITY_FACTOR = 0.001;
+
+const USAGE_GROUPS: ReadonlyArray<{ label: string; resources: ReadonlyArray<UsageResource> }> = [
   {
-    key: "cpu",
-    label: "CPU",
-    iconSrc: "/icons/cpu.svg",
-    factor: 0.72,
-    unit: "GB-hrs",
-    tooltip: "vCPU usage beyond your plan's included amount. 1 GB-hr = 1 vCPU running for 1 hour.",
+    label: "Projects",
+    resources: [
+      {
+        key: "cpu",
+        label: "CPU",
+        iconSrc: "/icons/cpu.svg",
+        unit: "GB-month",
+        tooltip: "Project vCPU usage beyond your plan's included amount.",
+      },
+      {
+        key: "memory",
+        label: "Memory",
+        iconSrc: "/icons/memory.svg",
+        unit: "GB-month",
+        tooltip: "Project memory usage beyond your plan's included amount.",
+      },
+      {
+        key: "bandwidth",
+        label: "Bandwidth",
+        iconSrc: "/icons/outgoing-data.svg",
+        unit: "GB",
+        tooltip: "Outbound (egress) bandwidth beyond your plan's included amount.",
+      },
+    ],
   },
   {
-    key: "memory",
-    label: "Memory",
-    iconSrc: "/icons/memory.svg",
-    factor: 0.72,
-    unit: "GB-hrs",
-    tooltip: "RAM usage beyond your plan's included amount. 1 GB-hr = 1 GB of memory running for 1 hour.",
-  },
-  {
-    key: "storage",
-    label: "Storage",
-    iconSrc: "/icons/disk.svg",
-    factor: 0.72,
-    unit: "GB-hrs",
-    tooltip: "Disk storage beyond your plan's included amount. 1 GB-hr = 1 GB stored for 1 hour.",
-  },
-  {
-    key: "bandwidth",
-    label: "Bandwidth",
-    iconSrc: "/icons/outgoing-data.svg",
-    factor: 0.001,
-    unit: "GB",
-    tooltip: "Outbound bandwidth beyond your plan's included amount.",
+    label: "Sandboxes",
+    resources: [
+      {
+        key: "sandbox_cpu",
+        label: "Sandbox CPU",
+        iconSrc: "/icons/cpu.svg",
+        unit: "vCPU-hours",
+        tooltip: "Sandbox vCPU usage beyond your included allowance.",
+      },
+      {
+        key: "sandbox_memory",
+        label: "Sandbox memory",
+        iconSrc: "/icons/memory.svg",
+        unit: "GB-hours",
+        tooltip: "Sandbox memory usage beyond your included allowance.",
+      },
+      {
+        key: "sandbox_snapshot_storage",
+        label: "Snapshot storage",
+        iconSrc: "/icons/disk.svg",
+        unit: "GB-month",
+        tooltip: "Storage held by sandbox snapshots beyond your included allowance.",
+      },
+      {
+        key: "volume_storage",
+        label: "Volume storage",
+        iconSrc: "/icons/database.svg",
+        unit: "GB-month",
+        tooltip: "Persistent volume storage attached to sandboxes beyond your included allowance.",
+      },
+    ],
   },
 ];
 
-const quantityFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const quantityFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
-function UsageBreakdown({ breakdown, planName, planAmount }: { breakdown: UsageBreakdownData; planName: string; planAmount: number }) {
+function UsageResourceRow({
+  resource,
+  meta,
+}: {
+  resource: UsageBreakdownData[keyof Omit<UsageBreakdownData, "metered_total">];
+  meta: UsageResource;
+}) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-[2px]">
-        <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">Usage breakdown</p>
-        <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">Metered charges for the current period</p>
-      </div>
-
-      <div className="flex flex-col">
-        {USAGE_RESOURCES.map(({ key, label, iconSrc, factor, unit, tooltip }) => {
-          const resource = breakdown[key];
-          return (
-            <SimpleTooltip key={key} content={tooltip}>
-              <div className="flex cursor-default items-center justify-between rounded-md px-1 py-2 -mx-1 transition-colors hover:bg-dash-bg-elevated">
-                <div className="flex items-center gap-2.5">
-                  <img src={iconSrc} alt="" className="size-4 invert dark:invert-0" />
-                  <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">{label}</span>
-                </div>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-xs tabular-nums text-dash-text-faded">
-                    {quantityFormatter.format(resource.quantity * factor)} {unit}
-                  </span>
-                  <span className="text-sm tabular-nums text-dash-text-strong">${resource.amount.toFixed(2)}</span>
-                </div>
-              </div>
-            </SimpleTooltip>
-          );
-        })}
-
-        <div className="my-1 border-t border-dash-border-soft" />
-
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center gap-2.5">
-            <img src="/icons/renew.svg" alt="" className="size-4 invert dark:invert-0" />
-            <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">{planName} plan</span>
-          </div>
-          <span className="text-sm tabular-nums text-dash-text-strong">${planAmount.toFixed(2)}/mo</span>
+    <SimpleTooltip content={meta.tooltip}>
+      <div className="flex cursor-default items-center justify-between rounded-md px-1 py-2 -mx-1 transition-colors hover:bg-dash-bg-elevated">
+        <div className="flex items-center gap-2.5">
+          <img src={meta.iconSrc} alt="" className="size-4 invert dark:invert-0" />
+          <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">{meta.label}</span>
+        </div>
+        <div className="flex items-baseline gap-3">
+          <span className="text-xs tabular-nums text-dash-text-faded">
+            {quantityFormatter.format(resource.quantity * QUANTITY_FACTOR)} {meta.unit}
+          </span>
+          <span className="text-sm tabular-nums text-dash-text-strong">${resource.amount.toFixed(2)}</span>
         </div>
       </div>
+    </SimpleTooltip>
+  );
+}
+
+function UsageBreakdown({ breakdown, planName, planAmount }: { breakdown: UsageBreakdownData; planName: string; planAmount: number }) {
+  const [open, setOpen] = useState(true);
+  const meteredTotal = breakdown.metered_total ?? 0;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="group flex items-center justify-between gap-3 text-left"
+      >
+        <div className="flex flex-col gap-[2px]">
+          <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">Usage breakdown</p>
+          <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-faded">Metered charges for the current period</p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm tabular-nums text-dash-text-strong">${meteredTotal.toFixed(2)}</span>
+          <ChevronDown
+            className={cn("size-4 text-dash-text-faded transition-transform duration-200", open && "rotate-180")}
+            aria-hidden="true"
+          />
+        </div>
+      </button>
+
+      {open && (
+        <motion.div
+          className="flex flex-col gap-3"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {USAGE_GROUPS.map((group) => {
+            const rows = group.resources.filter((meta) => breakdown[meta.key]);
+            if (rows.length === 0) return null;
+            return (
+              <div key={group.label} className="flex flex-col">
+                <span className="px-1 py-1 text-xs font-medium uppercase tracking-[0.4px] text-dash-text-faded">{group.label}</span>
+                {rows.map((meta) => (
+                  <UsageResourceRow key={meta.key} resource={breakdown[meta.key]} meta={meta} />
+                ))}
+              </div>
+            );
+          })}
+
+          <div className="border-t border-dash-border-soft" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <img src="/icons/renew.svg" alt="" className="size-4 invert dark:invert-0" />
+              <span className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">{planName} plan</span>
+            </div>
+            <span className="text-sm tabular-nums text-dash-text-strong">${planAmount.toFixed(2)}/mo</span>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

@@ -3,47 +3,11 @@ import { Check, Copy } from "lucide-react";
 import { Modal, ModalHeader } from "@/components/shared/modal";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
+import { tokenizeCode } from "@/lib/syntax-highlight";
 import type { AnalyticsSnippets, AnalyticsSnippet, AnalyticsSnippetLanguage } from "@/backend/analytics";
-
-const HIGHLIGHT_RE = new RegExp(
-  [
-    "(?<comment>//[^\\n]*|/\\*[\\s\\S]*?\\*/|<!--[\\s\\S]*?-->)",
-    "(?<string>\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|`(?:[^`\\\\]|\\\\.)*`)",
-    "(?<tag></?[A-Za-z][\\w-]*|/?>)",
-    "(?<attr>[A-Za-z][\\w-]*(?==))",
-    "(?<keyword>\\b(?:import|from|export|default|function|const|let|var|return|if|else|for|while|new|null|true|false|undefined|typeof|async|await|class|extends|this|super|try|catch|finally|throw|setup|onMounted)\\b)",
-    "(?<number>\\b\\d+\\b)",
-    "(?<ident>[A-Za-z_$][\\w$]*)",
-  ].join("|"),
-  "g",
-);
-
-const TOKEN_CLASS: Record<string, string> = {
-  comment: "italic text-dash-text-extra-faded",
-  string: "text-[#0e7c66] dark:text-[#5eead4]",
-  tag: "text-[#b4366b] dark:text-[#f9a8d4]",
-  attr: "text-[#9a5b00] dark:text-[#fcd34d]",
-  keyword: "text-[#7c3aed] dark:text-[#c4b5fd]",
-  number: "text-[#9a5b00] dark:text-[#fcd34d]",
-  ident: "",
-};
 
 function formatSnippet(code: string): string {
   return code.replace(/<\/script>\s*<script/g, "</script>\n\n<script");
-}
-
-function highlight(code: string) {
-  const out: { text: string; cls: string }[] = [];
-  let last = 0;
-  for (const m of code.matchAll(HIGHLIGHT_RE)) {
-    const start = m.index ?? 0;
-    if (start > last) out.push({ text: code.slice(last, start), cls: "" });
-    const type = Object.keys(m.groups ?? {}).find((k) => m.groups?.[k] != null) ?? "";
-    out.push({ text: m[0], cls: TOKEN_CLASS[type] ?? "" });
-    last = start + m[0].length;
-  }
-  if (last < code.length) out.push({ text: code.slice(last), cls: "" });
-  return out;
 }
 
 const FRAMEWORK_ORDER: (keyof AnalyticsSnippets)[] = ["html", "react", "nextjsApp", "nextjsPages", "vue", "nuxt", "svelte"];
@@ -201,7 +165,7 @@ export function InstallTrackingModal({
         <div className="relative">
           <pre className="max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated p-4 pr-14 font-mono text-[11px] leading-[1.7] text-dash-text-body">
             <code>
-              {highlight(code).map((tok, i) => (
+              {tokenizeCode(code).map((tok, i) => (
                 <Fragment key={i}>{tok.cls ? <span className={tok.cls}>{tok.text}</span> : tok.text}</Fragment>
               ))}
             </code>

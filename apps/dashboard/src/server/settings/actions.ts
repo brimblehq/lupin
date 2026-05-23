@@ -147,15 +147,20 @@ export const createSettingsApiKeyServerFn = createServerFn({
 
 export const resetSettingsApiKeyServerFn = createServerFn({
   method: "POST",
-}).handler(async () => {
-  return withTokenRefresh((api) => api.settings.resetApiKey());
+}).handler(async ({ data }) => {
+  const input = data as { twoFactorToken?: string } | undefined;
+  return withTokenRefresh((api) => api.settings.resetApiKey(), {
+    stepUpToken: input?.twoFactorToken,
+  });
 });
 
 export const decryptSettingsApiKeyServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
-  const input = data as unknown as { encryptedApiKey: string };
-  return withTokenRefresh((api) => api.settings.decryptApiKey(input));
+  const input = data as unknown as { encryptedApiKey: string; twoFactorToken?: string };
+  return withTokenRefresh((api) => api.settings.decryptApiKey({ encryptedApiKey: input.encryptedApiKey }), {
+    stepUpToken: input.twoFactorToken,
+  });
 });
 
 export const testSettingsWebhookServerFn = createServerFn({

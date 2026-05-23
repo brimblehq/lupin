@@ -84,6 +84,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
       status?: string;
       connectionUri?: string;
       log?: { id?: string; message?: string };
+      volume?: { id: string; name: string; sizeGB: number } | null;
     };
   };
   const pathname = useRouterState({
@@ -660,7 +661,11 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete this project?"
-        description={`This action cannot be undone. All deployments, domains, and environment variables associated with this project will be permanently deleted.`}
+        description={
+          project?.volume
+            ? `This action cannot be undone. All deployments, domains, and environment variables associated with this project will be permanently deleted. The attached volume "${project.volume.name}" will be detached but not deleted — manage it from Storage.`
+            : `This action cannot be undone. All deployments, domains, and environment variables associated with this project will be permanently deleted.`
+        }
         confirmLabel="Delete project"
         cancelLabel="Cancel"
         confirmDisabled={confirmName !== projectName}

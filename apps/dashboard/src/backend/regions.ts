@@ -10,11 +10,11 @@ export interface Region {
   enabled: boolean;
   isPaid: boolean;
   default: boolean;
-  type: "web" | "database" | "both";
+  type: "web" | "database" | "sandbox" | "both";
 }
 
 export interface ListRegionsInput {
-  type?: "web" | "database";
+  type?: "web" | "database" | "sandbox";
   enabled?: boolean;
   teamId?: string;
 }
@@ -49,7 +49,7 @@ function mapRegion(raw: any): Region | null {
     enabled: Boolean(raw.enabled ?? true),
     isPaid: Boolean(raw.is_paid ?? raw.isPaid ?? false),
     default: Boolean(raw.default),
-    type: raw.type === "web" || raw.type === "database" ? raw.type : "both",
+    type: raw.type === "web" || raw.type === "database" || raw.type === "sandbox" ? raw.type : "both",
   };
 }
 

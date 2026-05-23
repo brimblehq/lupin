@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { ExternalLink, Copy, Check, ArrowUpRight, Terminal } from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
@@ -424,6 +425,20 @@ function ProjectDetailPage() {
                     <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Compute size</span>
                   </div>
                   <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{computeSizeText}</span>
+                </div>
+              ) : null}
+              {project?.volume ? (
+                <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
+                  <div className="flex items-center gap-2">
+                    <img src="/icons/storage.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+                    <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Persistent volume</span>
+                  </div>
+                  <Link
+                    to={withWorkspaceQuery({ pathname: "/volumes", searchStr: `?focus=${project.volume.id}` }) as any}
+                    className="font-mono text-[13px] leading-[1.4] text-dash-text-strong transition-colors hover:text-[#4879f8]"
+                  >
+                    {project.volume.name} · {project.volume.sizeGB} GB
+                  </Link>
                 </div>
               ) : null}
               {isDatabaseProject ? (

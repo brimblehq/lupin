@@ -52,6 +52,33 @@ export function consumePendingDomainsAction(): PendingDomainsAction | null {
   return null;
 }
 
+const PENDING_VOLUMES_ACTION_KEY = "brimble:pending-volumes-action";
+
+export type PendingVolumesAction = "create-volume";
+
+export function setPendingVolumesAction(action: PendingVolumesAction): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(PENDING_VOLUMES_ACTION_KEY, action);
+}
+
+export function consumePendingVolumesAction(): PendingVolumesAction | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const action = window.sessionStorage.getItem(PENDING_VOLUMES_ACTION_KEY);
+  if (action === "create-volume") {
+    window.sessionStorage.removeItem(PENDING_VOLUMES_ACTION_KEY);
+    return action;
+  }
+
+  window.sessionStorage.removeItem(PENDING_VOLUMES_ACTION_KEY);
+  return null;
+}
+
 export function getWorkspaceSearch(input: { searchStr?: string }): string {
   const params = new URLSearchParams(input.searchStr || "");
   const workspace = params.get("workspace")?.trim();

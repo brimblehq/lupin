@@ -65,6 +65,10 @@ export function DefaultRoutePending() {
     select: (state) => state.pendingLocation?.pathname || state.location.pathname || state.resolvedLocation?.pathname || "/",
   });
 
+  if (/^\/(login|signup|2fa|passkey-recovery|reset-password)(\/|$)/.test(pathname)) {
+    return null;
+  }
+
   if (/^\/projects\/new(?:\/|$)/.test(pathname)) {
     return <NewProjectPending />;
   }
@@ -239,6 +243,34 @@ export function ProjectsListPending() {
               <div className={`h-3.5 w-20 rounded ${PULSE_BG_WEAK} animate-pulse`} />
               <div className={`h-3.5 w-16 rounded ${PULSE_BG_WEAK} animate-pulse`} />
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function VolumesPending() {
+  return (
+    <div className="mx-auto w-full max-w-[1000px] py-8" aria-hidden="true">
+      <div className="mb-6">
+        <div className={`mb-2 h-7 w-28 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+        <div className={`h-3.5 w-full max-w-[520px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+      </div>
+
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-9 min-w-0 flex-1 animate-pulse rounded-[4px] border border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-9 w-[180px] animate-pulse rounded-[4px] border border-dash-border bg-dash-bg-elevated/30" />
+      </div>
+
+      <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex h-[52px] items-center justify-between border-b-[0.5px] border-dash-border px-3 last:border-b-0">
+            <div className="flex items-center gap-2">
+              <div className={`size-4 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+              <div className={`h-3 w-32 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+            </div>
+            <div className={`h-3 w-16 rounded ${PULSE_BG_WEAK} animate-pulse`} />
           </div>
         ))}
       </div>

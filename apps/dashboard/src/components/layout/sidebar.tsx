@@ -12,7 +12,7 @@ import { isPostHogEnabled } from "@/lib/posthog";
 import { mainNav, moreNav } from "./sidebar-nav";
 
 const navItemBase =
-  "flex items-center gap-2 rounded px-2 py-1.5 text-sm tracking-[-0.09px] transition-colors text-dash-text-faded dark:text-dash-text-strong";
+  "flex items-center gap-2 whitespace-nowrap rounded px-2 py-1.5 text-sm tracking-[-0.09px] transition-colors text-dash-text-faded dark:text-dash-text-strong";
 
 export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: boolean) => void }) {
   const { theme, mode, cycleTheme } = useTheme();
@@ -77,7 +77,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
                       alt=""
                       className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
                     />
-                    {item.label}
+                    <span className="min-w-0 truncate">{item.label}</span>
                     <span className="ml-auto rounded-full bg-dash-bg-elevated px-1.5 py-px text-[10px] font-medium text-dash-text-extra-faded">
                       Soon
                     </span>
@@ -109,7 +109,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
                     alt=""
                     className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
                   />
-                  {item.label}
+                  <span className="min-w-0 truncate">{item.label}</span>
                 </button>
               );
             })}
@@ -137,7 +137,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
                         alt=""
                         className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
                       />
-                      {item.label}
+                      <span className="min-w-0 truncate">{item.label}</span>
                     </a>
                   );
                 }
@@ -168,7 +168,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
                       alt=""
                       className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
                     />
-                    {item.label}
+                    <span className="min-w-0 truncate">{item.label}</span>
                   </button>
                 );
               })}

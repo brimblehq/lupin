@@ -1,7 +1,40 @@
 import { createServerFn } from "@tanstack/react-start";
+import * as Yup from "yup";
 import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 import { projectsLogger } from "@/server/shared/logger";
+import { MOUNT_PATH_ERROR, MOUNT_PATH_PATTERN, MOUNT_PATH_ROOT_ERROR } from "@/lib/mount-path";
 import type { SetProjectPasswordProtectionPayload } from "./types";
+
+const persistentStorageSchema = Yup.object({
+  diskSize: Yup.number().integer().min(10).max(150),
+  volumeId: Yup.string().trim(),
+  mountPath: Yup.string().trim().test("mount-path-format", "", function (value) {
+    if (!value) return true;
+    if (!MOUNT_PATH_PATTERN.test(value)) return this.createError({ message: MOUNT_PATH_ERROR });
+    if (value === "/") return this.createError({ message: MOUNT_PATH_ROOT_ERROR });
+    return true;
+  }),
+}).test("project-mount-path", "", function (value) {
+  if (!value) return true;
+
+  const hasDisk = value.diskSize !== undefined && value.diskSize !== null;
+  const hasVolume = Boolean(value.volumeId);
+  const hasMount = Boolean(value.mountPath?.trim());
+
+  if (hasDisk && hasVolume) {
+    return this.createError({ message: "diskSize cannot be combined with volumeId" });
+  }
+
+  if ((hasDisk || hasVolume) && !hasMount) {
+    return this.createError({ message: "mountPath is required when using persistent storage" });
+  }
+
+  if (hasMount && !hasDisk && !hasVolume) {
+    return this.createError({ message: "mountPath requires diskSize or volumeId" });
+  }
+
+  return true;
+});
 
 function assignFiniteNumber(target: Record<string, unknown>, key: string, value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -87,6 +120,15 @@ export const createProjectServerFn = createServerFn({
   if (typeof body.name !== "string" || !body.name.trim()) {
     throw new Error("Project name is required");
   }
+
+  persistentStorageSchema.validateSync(
+    {
+      diskSize: body.diskSize,
+      volumeId: body.volumeId,
+      mountPath: body.mountPath,
+    },
+    { abortEarly: true },
+  );
 
   return withTokenRefresh(async (api) => {
     const teamId = await resolveTeamId(api, workspaceSlug);

@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
+import { MOUNT_PATH_ERROR, MOUNT_PATH_PATTERN, MOUNT_PATH_ROOT_ERROR } from "@/lib/mount-path";
 import {
   ArrowLeft,
   Search,
@@ -36,6 +37,8 @@ import { Dropdown } from "../../components/shared/dropdown";
 import { SimpleTooltip } from "../../components/shared/tooltip";
 import { DiskSizeSelect } from "../../components/shared/disk-size-select";
 import { diskSizes } from "../../components/shared/disk-size-options";
+import { VolumePicker } from "@/components/volumes/volume-picker";
+import { VolumeType } from "@/backend/volumes";
 import { RootDirectoryTrigger } from "../../components/shared/root-directory-trigger";
 import { AccessDenied } from "../../components/shared/access-denied";
 import { accessDeniedForbidden } from "../../components/shared/access-denied-presets";
@@ -298,6 +301,7 @@ function formatCpu(val: number): string {
   if (val < 1) return `${val} vCPU (Shared)`;
   return `${val} vCPU`;
 }
+
 
 function formatMemory(gb: number): string {
   return `${gb} GB`;
@@ -1063,6 +1067,8 @@ function Phase2DbEngine({
     cpu: number;
     memory: number;
     storage: number;
+    useExistingVolume: boolean;
+    volumeId?: string;
     whitelistedIps: string[];
     environments: Array<{ name: string; value: string }>;
   }) => void | Promise<void>;
@@ -1366,11 +1372,15 @@ function Phase3DatabaseConfigure({
     cpu: number;
     memory: number;
     storage: number;
+    useExistingVolume: boolean;
+    volumeId?: string;
     whitelistedIps: string[];
     environments: Array<{ name: string; value: string }>;
   }) => void | Promise<void>;
 }) {
   const [dbName, setDbName] = useState(`${engine.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-db-${generateMockCredential(4)}`);
+  const [dbUseExistingVolume, setDbUseExistingVolume] = useState(false);
+  const [dbVolumeId, setDbVolumeId] = useState("");
   const [region, setRegion] = useState(regionOptions[0]?.id ?? "");
   // Compute defaults to the lowest tier — users opt in to more via the
   // sliders or the "Apply recommended" button below the engine summary.
@@ -1620,18 +1630,47 @@ function Phase3DatabaseConfigure({
             disabled={isFreePlan}
             disabledReason="Compute controls are locked on the Free plan. Upgrade your plan to customize memory."
           />
-          <DiskSizeSelect
-            label="Storage"
-            value={dbDiskSize}
-            onChange={(nextId) => {
-              if (lockedStorageId && nextId !== lockedStorageId) {
-                setShowUpgradeModal(true);
-                return;
-              }
-              setDbDiskSize(nextId);
-            }}
-            options={storageOptions}
-          />
+          <div className="flex flex-col gap-2">
+            {dbUseExistingVolume ? (
+              <>
+                <VolumePicker
+                  value={dbVolumeId}
+                  onChange={setDbVolumeId}
+                  regionId={region}
+                  volumeType={VolumeType.Database}
+                />
+                <button
+                  type="button"
+                  onClick={() => setDbUseExistingVolume(false)}
+                  className="self-start text-xs font-medium text-[#4879f8] transition-colors hover:text-[#3c6ce7]"
+                >
+                  ← Create a new volume instead
+                </button>
+              </>
+            ) : (
+              <>
+                <DiskSizeSelect
+                  label="Storage"
+                  value={dbDiskSize}
+                  onChange={(nextId) => {
+                    if (lockedStorageId && nextId !== lockedStorageId) {
+                      setShowUpgradeModal(true);
+                      return;
+                    }
+                    setDbDiskSize(nextId);
+                  }}
+                  options={storageOptions}
+                />
+                <button
+                  type="button"
+                  onClick={() => setDbUseExistingVolume(true)}
+                  className="self-start text-xs font-medium text-[#4879f8] transition-colors hover:text-[#3c6ce7]"
+                >
+                  Or attach an existing volume →
+                </button>
+              </>
+            )}
+          </div>
           {isFreePlan && (
             <p className="text-xs text-dash-text-faded">
               Compute and storage are fixed on the free plan.{" "}
@@ -1804,6 +1843,8 @@ function Phase3DatabaseConfigure({
               cpu: effectiveCpu,
               memory: effectiveMemory,
               storage: effectiveStorage,
+              useExistingVolume: dbUseExistingVolume,
+              volumeId: dbUseExistingVolume ? dbVolumeId : undefined,
               whitelistedIps: publicAccess ? ["0.0.0.0/0"] : whitelistIps.map((ip) => ip.value.trim()).filter(Boolean),
               environments: envDrafts.map((row) => ({
                 name: row.key,
@@ -1892,6 +1933,11 @@ function Phase3Configure({
   const [branch, setBranch] = useState(branchOptions?.[0] ?? "main");
   const [rootDir, setRootDir] = useState("./");
   const [rootDirDrawerOpen, setRootDirDrawerOpen] = useState(false);
+  const [diskEnabled, setDiskEnabled] = useState(false);
+  const [useExistingVolume, setUseExistingVolume] = useState(false);
+  const [diskSize, setDiskSize] = useState("10");
+  const [mountPath, setMountPath] = useState("/mnt/data");
+  const [volumeId, setVolumeId] = useState("");
   const isGit = isGitSource(sourceType);
   const { planKey, projectLimit } = usePlanGate();
   const pricing = usePricing();
@@ -1907,12 +1953,42 @@ function Phase3Configure({
           .matches(/^[a-z-]+$/, "Project name can only contain lowercase letters and hyphens."),
         region: Yup.string().required("Please select a region."),
         limitReached: Yup.boolean().oneOf([false], "You have reached your project limit. Upgrade your plan to create more."),
+        diskEnabled: Yup.boolean(),
+        useExistingVolume: Yup.boolean(),
+        diskSize: Yup.string(),
+        volumeId: Yup.string(),
+        mountPath: Yup.string().test("mount-path-format", "", function (value) {
+          if (!value) return true;
+          if (!MOUNT_PATH_PATTERN.test(value)) return this.createError({ message: MOUNT_PATH_ERROR });
+          if (value === "/") return this.createError({ message: MOUNT_PATH_ROOT_ERROR });
+          return true;
+        }),
+      }).test("storage-rule", "", function (value) {
+        if (!value?.diskEnabled) return true;
+
+        const hasMount = Boolean(value.mountPath?.trim());
+        if (!hasMount) {
+          return this.createError({ path: "mountPath", message: "mountPath is required when using persistent storage" });
+        }
+
+        if (value.useExistingVolume) {
+          if (!value.volumeId?.trim()) {
+            return this.createError({ path: "volumeId", message: "Select a volume to attach" });
+          }
+          return true;
+        }
+
+        if (!value.diskSize?.trim()) {
+          return this.createError({ path: "diskSize", message: "Select a disk size" });
+        }
+
+        return true;
       }),
     [],
   );
 
   const deployFormik = useFormik({
-    initialValues: { projectName, region, limitReached },
+    initialValues: { projectName, region, limitReached, diskEnabled, useExistingVolume, diskSize, mountPath, volumeId },
     enableReinitialize: true,
     validateOnMount: true,
     validationSchema: deployValidationSchema,
@@ -1921,6 +1997,7 @@ function Phase3Configure({
 
   const projectNameError = projectName.trim() && deployFormik.errors.projectName ? deployFormik.errors.projectName : null;
   const hasProjectNameError = projectNameError !== null;
+  const mountPathError = diskEnabled && mountPath.trim() ? deployFormik.errors.mountPath : null;
   const canSubmit = deployFormik.isValid;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const nextPlanName = useMemo(() => {
@@ -1989,9 +2066,6 @@ function Phase3Configure({
   const [memIdx, setMemIdx] = useState(0);
   const effectiveCpu = cpuSteps[Math.min(cpuIdx, cpuSteps.length - 1)] ?? cpuSteps[0];
   const effectiveMemory = memorySteps[Math.min(memIdx, memorySteps.length - 1)] ?? memorySteps[0];
-  const [diskEnabled, setDiskEnabled] = useState(false);
-  const [diskSize, setDiskSize] = useState("10");
-  const [mountPath, setMountPath] = useState("/mnt/data");
   const [serviceTypeManuallySelected, setServiceTypeManuallySelected] = useState(false);
   const [serviceType, setServiceType] = useState<string>(() => getLegacyServiceType(sourceType, defaultFrameworkId));
   const [mcpAuthEnabled, setMcpAuthEnabled] = useState(false);
@@ -2159,8 +2233,10 @@ function Phase3Configure({
       cpu: effectiveCpu,
       memory: effectiveMemory,
       diskEnabled,
-      diskSizeGb: diskEnabled ? Number(diskSize) : undefined,
+      useExistingVolume: diskEnabled && useExistingVolume,
+      diskSizeGb: diskEnabled && !useExistingVolume ? Number(diskSize) : undefined,
       mountPath: diskEnabled ? mountPath.trim() : undefined,
+      volumeId: diskEnabled && useExistingVolume ? volumeId : undefined,
     };
   }
 
@@ -2449,7 +2525,7 @@ function Phase3Configure({
           <button onClick={() => setEnvExpanded(!envExpanded)} className="flex w-full items-start justify-between gap-4 text-sm">
             <div className="flex flex-col gap-[2px] text-left">
               <span className="font-medium text-dash-text-strong">Secrets</span>
-              <span className="text-xs text-dash-text-faded">Stored securely on Brimble and injected at runtime.</span>
+              <span className="text-xs text-dash-text-faded">Stored securely on Brimble and injected on sandbox.</span>
             </div>
             <span className="flex shrink-0 items-center gap-2 pt-0.5 text-xs text-dash-text-faded">
               {envVars.length} secret{envVars.length !== 1 ? "s" : ""}
@@ -2539,31 +2615,76 @@ function Phase3Configure({
                   exit={{ overflow: "hidden", opacity: 0, height: 0 }}
                   transition={{ duration: 0.2, ease }}
                 >
-                  <div className="mt-4 flex flex-col gap-4">
-                    <div className="grid grid-cols-1 gap-3 px-px pb-px sm:grid-cols-2">
-                      <DiskSizeSelect value={diskSize} onChange={setDiskSize} />
-                      <div>
-                        <label className="mb-1.5 block text-xs text-dash-text-faded">Mount path</label>
-                        <input
-                          type="text"
-                          value={mountPath}
-                          onChange={(e) => setMountPath(e.target.value)}
-                          placeholder="/mnt/data"
-                          className={`${inputClass} font-family-mono text-[13px]`}
-                        />
-                      </div>
-                    </div>
+                  <div className="mt-4 flex flex-col gap-3">
+                    {useExistingVolume ? (
+                      <>
+                        <div className="grid grid-cols-1 gap-3 px-px pb-px sm:grid-cols-2">
+                          <div>
+                            <label className="mb-1.5 block text-xs text-dash-text-faded">Volume</label>
+                            <VolumePicker
+                              value={volumeId}
+                              onChange={setVolumeId}
+                              regionId={region}
+                              volumeType={VolumeType.Web}
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1.5 block text-xs text-dash-text-faded">Mount path</label>
+                            <input
+                              type="text"
+                              value={mountPath}
+                              onChange={(e) => setMountPath(e.target.value)}
+                              placeholder="/mnt/data"
+                              className={`${inputClass} font-family-mono text-[13px]`}
+                            />
+                            {mountPathError ? <p className="mt-1 text-xs text-[#fc391e]">{mountPathError}</p> : null}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setUseExistingVolume(false)}
+                          className="self-start text-xs font-medium text-[#4879f8] transition-colors hover:text-[#3c6ce7]"
+                        >
+                          ← Create a new volume instead
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 gap-3 px-px pb-px sm:grid-cols-2">
+                          <DiskSizeSelect value={diskSize} onChange={setDiskSize} />
+                          <div>
+                            <label className="mb-1.5 block text-xs text-dash-text-faded">Mount path</label>
+                            <input
+                              type="text"
+                              value={mountPath}
+                              onChange={(e) => setMountPath(e.target.value)}
+                              placeholder="/mnt/data"
+                              className={`${inputClass} font-family-mono text-[13px]`}
+                            />
+                            {mountPathError ? <p className="mt-1 text-xs text-[#fc391e]">{mountPathError}</p> : null}
+                          </div>
+                        </div>
 
-                    <div className="rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
-                      <p className="text-xs leading-relaxed text-dash-text-body">
-                        <span className="font-medium text-dash-text-strong">$0.25/GB per month.</span> Data persists across container
-                        restarts and deployments. The volume mounts at{" "}
-                        <code className="rounded bg-dash-bg-elevated px-1 py-0.5 font-family-mono text-[11px] text-dash-text-strong">
-                          {mountPath || "/mnt/data"}
-                        </code>{" "}
-                        inside your container.
-                      </p>
-                    </div>
+                        <div className="rounded-[4px] bg-[#f59e0b]/[0.06] px-3 py-2.5 dark:bg-[#f59e0b]/[0.08]">
+                          <p className="text-xs leading-relaxed text-dash-text-body">
+                            <span className="font-medium text-dash-text-strong">$0.25/GB per month.</span> Data persists across container
+                            restarts and deployments. The volume mounts at{" "}
+                            <code className="rounded bg-dash-bg-elevated px-1 py-0.5 font-family-mono text-[11px] text-dash-text-strong">
+                              {mountPath || "/mnt/data"}
+                            </code>{" "}
+                            inside your container.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setUseExistingVolume(true)}
+                          className="self-start text-xs font-medium text-[#4879f8] transition-colors hover:text-[#3c6ce7]"
+                        >
+                          Or attach an existing volume →
+                        </button>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -3202,12 +3323,12 @@ function NewProjectPage() {
       return false;
     }
 
-    if (input.diskEnabled && input.mountPath && input.diskSizeGb) {
-      payload.volumeMount = input.mountPath;
+    if (input.diskEnabled && input.useExistingVolume && input.volumeId) {
+      payload.volumeId = input.volumeId;
+      payload.mountPath = input.mountPath;
+    } else if (input.diskEnabled && input.mountPath && input.diskSizeGb) {
       payload.diskSize = input.diskSizeGb;
-    } else {
-      payload.volumeMount = "";
-      payload.diskSize = 10;
+      payload.mountPath = input.mountPath;
     }
     payload.deploy = deploy;
 
@@ -3278,6 +3399,8 @@ function NewProjectPage() {
     cpu: number;
     memory: number;
     storage: number;
+    useExistingVolume: boolean;
+    volumeId?: string;
     whitelistedIps: string[];
     environments: Array<{ name: string; value: string }>;
   }) {
@@ -3286,6 +3409,13 @@ function NewProjectPage() {
       toast.error("Database name is required.");
       return;
     }
+
+    if (input.useExistingVolume && !input.volumeId) {
+      toast.error("Pick a volume to attach.");
+      return;
+    }
+
+    const useExisting = input.useExistingVolume;
 
     try {
       setProvisioningDatabase(true);
@@ -3297,9 +3427,10 @@ function NewProjectPage() {
           configurations: {
             cpu: input.cpu,
             memory: input.memory,
-            storage: input.storage,
+            ...(useExisting ? {} : { storage: input.storage }),
             region: input.regionId,
           },
+          ...(useExisting ? { volumeId: input.volumeId } : {}),
           whitelistedIps: input.whitelistedIps,
           environments: input.environments,
         },

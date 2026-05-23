@@ -1,4 +1,5 @@
 import { createActivityLogsApi, type ActivityLogsApi } from "./activity-logs";
+import { createAblyApi, type AblyApi } from "./ably";
 import { createAnalyticsApi, type AnalyticsApi } from "./analytics";
 import { createAuthApi, type AuthApi } from "./auth";
 import { createBandwidthApi, type BandwidthApi } from "./bandwidth";
@@ -17,14 +18,17 @@ import { createPaymentsApi, type PaymentsApi } from "./payments";
 import { createUserOverviewApi, type UserOverviewApi } from "./user-overview";
 import { createProjectsApi, type ProjectsApi } from "./projects";
 import { createRepositoriesApi, type RepositoriesApi } from "./repositories";
+import { createSandboxesApi, type SandboxesApi } from "./sandboxes";
 import { createSettingsApi, type SettingsApi } from "./settings";
 import { createTeamsApi, type TeamsApi } from "./teams";
 import { createRegionsApi, type RegionsApi } from "./regions";
 import { createScalingApi, type ScalingApi } from "./scaling";
 import { createTagsApi, type TagsApi } from "./tags";
+import { createVolumesApi, type VolumesApi } from "./volumes";
 import { createWorkspacesApi, type WorkspacesApi } from "./workspaces";
 
 export * from "./activity-logs";
+export * from "./ably";
 export * from "./analytics";
 export * from "./auth";
 export * from "./bandwidth";
@@ -45,11 +49,13 @@ export * from "./user-overview";
 export * from "./projects";
 export * from "./regions";
 export * from "./repositories";
+export * from "./sandboxes";
 export * from "./settings";
 export * from "./scaling";
 export * from "./tags";
 export * from "./teams";
 export * from "./types";
+export * from "./volumes";
 export * from "./workspaces";
 
 export interface BackendApi {
@@ -57,6 +63,7 @@ export interface BackendApi {
   activityLogs: ActivityLogsApi;
   analytics: AnalyticsApi;
   auth: AuthApi;
+  ably: AblyApi;
   bandwidth: BandwidthApi;
   projects: ProjectsApi;
   repositories: RepositoriesApi;
@@ -76,8 +83,10 @@ export interface BackendApi {
   settings: SettingsApi;
   teams: TeamsApi;
   regions: RegionsApi;
+  sandboxes: SandboxesApi;
   scaling: ScalingApi;
   tags: TagsApi;
+  volumes: VolumesApi;
 }
 
 export function createBackendApi(config: BackendClientConfig): BackendApi {
@@ -86,6 +95,7 @@ export function createBackendApi(config: BackendClientConfig): BackendApi {
   return {
     client,
     activityLogs: createActivityLogsApi(client),
+    ably: createAblyApi(client),
     analytics: createAnalyticsApi(client),
     auth: createAuthApi(client),
     bandwidth: createBandwidthApi(client),
@@ -107,7 +117,9 @@ export function createBackendApi(config: BackendClientConfig): BackendApi {
     settings: createSettingsApi(client),
     teams: createTeamsApi(client),
     regions: createRegionsApi(client),
+    sandboxes: createSandboxesApi(client),
     scaling: createScalingApi(client),
     tags: createTagsApi(client),
+    volumes: createVolumesApi(client),
   };
 }

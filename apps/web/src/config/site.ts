@@ -1,15 +1,33 @@
 export const siteConfig = {
   name: "Brimble",
   description: "Ship faster with Brimble: the all-in-one platform to deploy, scale, and manage every part of your stack.",
-  navLinks: [
+  navGroups: [
+    {
+      label: "Products",
+      items: [
+        { label: "Sandboxes", href: "/sandboxes", description: "Isolated, ephemeral compute on demand." },
+        { label: "Domains", href: "/domains", description: "Buy and manage custom domains." },
+      ],
+    },
+    {
+      label: "Resources",
+      items: [
+        { label: "FAQ", href: "/faq", description: "Common questions, short answers." },
+        { label: "Changelog", href: "/changelog", description: "What's new this week." },
+        { label: "Docs", href: "https://paper.brimble.io", description: "Guides and API reference.", external: true },
+      ],
+    },
+    {
+      label: "Company",
+      items: [
+        { label: "Careers", href: "/careers", description: "Open roles at Brimble." },
+        { label: "About", href: "/legal", description: "Who we are, what we're building." },
+      ],
+    },
+  ],
+  navStandalone: [
     { label: "Pricing", href: "/pricing" },
-    { label: "Domains", href: "/domains" },
-    { label: "Careers", href: "/careers" },
-    { label: "Changelog", href: "/changelog" },
-    { label: "FAQ", href: "/faq" },
-    { label: "Docs", href: "https://paper.brimble.io" },
-    { label: "Status", href: "https://status.brimble.io", status: true },
-    // { label: "Talk to Founder", href: "https://cal.com/brimble/15min" },
+    { label: "Status", href: "https://status.brimble.io", status: true, external: true },
   ],
   socials: {
     heading: "Follow Brimble",
@@ -262,6 +280,41 @@ export const siteConfig = {
           {
             title: "Can I still choose specific models?",
             description: "Yes. You have full control over which AI models to use. Our gateway supports all major providers and models.",
+          },
+        ],
+      },
+      {
+        label: "SANDBOXES",
+        items: [
+          {
+            title: "What are Brimble Sandboxes?",
+            description:
+              "Sandboxes are isolated, throwaway environments you spin up with one API call. Run AI-generated code, untrusted scripts, or one-off jobs in them — without anything touching your own machine or your production apps.",
+          },
+          {
+            title: "Is it safe to run untrusted code in a sandbox?",
+            description:
+              "Yes. Each sandbox is walled off from your machine and from every other sandbox, and runs on a separate pool of servers from your deployed projects. If you're running something you don't trust, you can also cut off its internet access entirely at create time.",
+          },
+          {
+            title: "Which languages and runtimes are supported?",
+            description:
+              "Pick a template when you create a sandbox: Python, Node, Bun, Deno, or a plain Ubuntu shell. There are also ready-to-run presets for AI coding agents like Claude Code, Codex, OpenCode, and Droid.",
+          },
+          {
+            title: "Can I pause a sandbox and come back to it later?",
+            description:
+              "Yes. Pausing a sandbox stops compute billing while keeping your files and installed packages in place. Resume it whenever you like and everything is exactly where you left it.",
+          },
+          {
+            title: "What are snapshots?",
+            description:
+              "A snapshot is a saved copy of a sandbox's files and installed packages. Restore it into a fresh sandbox in seconds — handy for sharing a ready-made setup with a teammate, skipping repeated installs, or spinning up many identical sandboxes at once.",
+          },
+          {
+            title: "How does sandbox pricing work?",
+            description:
+              "You pay for what a sandbox actually uses — CPU and memory while it's running, plus any snapshot or volume storage you choose to keep. Paused sandboxes don't cost any compute.",
           },
         ],
       },

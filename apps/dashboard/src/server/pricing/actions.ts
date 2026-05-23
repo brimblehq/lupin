@@ -99,12 +99,30 @@ function normalizePlanSpecs(raw: any, defaults?: PlanSpecs): PlanSpecs {
     return Number.isFinite(parsed) ? parsed : (fallback ?? null);
   };
 
+  const sandbox = raw?.sandbox;
+  const sandboxConcurrentLimit = Number(sandbox?.concurrent_limit ?? 0);
+  const sandboxCpuHoursIncluded = Number(sandbox?.cpu_hours_included ?? 0);
+  const sandboxMemoryGbHoursIncluded = Number(sandbox?.memory_gb_hours_included ?? 0);
+  const sandboxMaxRuntimeMinutes = Number(sandbox?.max_runtime_minutes ?? 0);
+  const sandboxMaxVcpuPerSandbox = Number(sandbox?.max_vcpu_per_sandbox ?? 0);
+  const sandboxMaxMemoryGbPerSandbox = Number(sandbox?.max_memory_gb_per_sandbox ?? 0);
+  const sandboxEnabledFlag = toBool(sandbox?.enabled, defaults?.sandboxEnabled ?? false);
+  const sandboxEnabledByLimits =
+    sandboxConcurrentLimit > 0 ||
+    sandboxCpuHoursIncluded > 0 ||
+    sandboxMemoryGbHoursIncluded > 0 ||
+    sandboxMaxRuntimeMinutes > 0 ||
+    sandboxMaxVcpuPerSandbox > 0 ||
+    sandboxMaxMemoryGbPerSandbox > 0;
+
   return {
     projectLimit: raw?.project_limit === -1 || raw?.project_limit === "unlimited" ? null : Number(raw?.project_limit ?? 3),
     webhookEnabled: toBool(raw?.webhook_enabled),
     customDomain: toBool(raw?.custom_domain),
     deployPrivateOrganization: toBool(raw?.deploy_private_organization),
     autoscalingEnabled: toBool(raw?.autoscaling_enabled),
+    sandboxEnabled: sandboxEnabledFlag || sandboxEnabledByLimits,
+    sandboxMaxCount: Number(sandbox?.sandbox_max_count ?? defaults?.sandboxMaxCount ?? 0),
     analytics: toBool(raw?.analytics),
     pullRequestPreview: toBool(raw?.pull_request_preview),
     buildMinutes: Number(raw?.build_minutes ?? 0),

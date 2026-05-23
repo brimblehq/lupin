@@ -208,6 +208,43 @@ Why:
 
 Reach for hand-rolled checks only for trivial single-field guards (`if (!id) throw` is fine).
 
+## 17. No unnecessary fallbacks
+
+Fallbacks for cases that cannot happen are not "safe defaults" — they are bloat. Each one adds a line a future reader has to mentally execute, hides bugs by silently coercing them into wrong-but-plausible data, and lies to the type system about what the contract actually is.
+
+Do not write a fallback when:
+
+- The type already guarantees the value exists (`user.name ?? "Unknown"` on a `name: string` field).
+- The value comes from a schema that already validated it.
+- The "fallback" branch would only fire in a state your code path cannot produce.
+- You are guarding a function's own return value against a possibility its signature rules out.
+
+```ts
+// Bad — Volume.name is `string`, the ?? branch is dead code
+<span>{volume.name ?? "Untitled volume"}</span>
+
+// Bad — schema already required `email`; the fallback is theatre
+const email = parsed.email || "no-email@unknown.local";
+
+// Bad — wrapping a guaranteed-sync call to "protect" callers
+try {
+  return formatRelativeTime(date);
+} catch {
+  return "recently";
+}
+```
+
+```ts
+// Good — trust the type, let real bugs surface
+<span>{volume.name}</span>
+const { email } = schema.validateSync(payload);
+return formatRelativeTime(date);
+```
+
+Legitimate fallbacks: parsing untrusted input, optional fields the type explicitly marks as `T | undefined`, network responses where partial data is documented behaviour. Outside those, delete the fallback.
+
+A fallback you can't explain in one sentence — "this fires when X happens, and the right user-facing behaviour is Y" — is a fallback that shouldn't exist.
+
 ---
 
 ## Summary

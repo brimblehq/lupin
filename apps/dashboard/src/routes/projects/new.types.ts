@@ -15,6 +15,8 @@ export type Phase3DeployInput = {
   cpu: number;
   memory: number;
   diskEnabled: boolean;
+  useExistingVolume: boolean;
   diskSizeGb?: number;
   mountPath?: string;
+  volumeId?: string;
 };

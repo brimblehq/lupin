@@ -72,6 +72,8 @@ const DEFAULT_ROOT_LOADER_DATA: RootLoaderData = {
   pricing: DEFAULT_PRICING,
 };
 
+const GLOBAL_ROOT_DATA_ROUTE_PATTERN = /^\/(projects|domains|addons|scaling|workspace|teams|volumes)(\/|$)/;
+
 function createRootLoaderData(overrides: Partial<RootLoaderData> = {}): RootLoaderData {
   return {
     ...DEFAULT_ROOT_LOADER_DATA,
@@ -122,18 +124,38 @@ export const Route = createRootRoute({
   },
   loader: (async ({ location, deps }: any) => {
     const isAuthRoute = /^\/(login|signup|2fa)$/.test(location.pathname);
-    const knownPrefixes = /^\/(login|signup|2fa|projects|domains|addons|scaling|workspace|teams)?(\/|$)/;
+    const knownPrefixes = /^\/(login|signup|2fa|projects|domains|addons|scaling|workspace|teams|sandboxes|volumes)?(\/|$)/;
     const isCatchAll = location.pathname !== "/" && !knownPrefixes.test(location.pathname);
+    const shouldLoadGlobalRootData = location.pathname === "/" || GLOBAL_ROOT_DATA_ROUTE_PATTERN.test(location.pathname);
+
+    const rawWorkspace = deps.workspace;
+    let workspace: string | undefined;
+    if (rawWorkspace && typeof rawWorkspace === "string" && rawWorkspace.trim()) {
+      workspace = rawWorkspace.trim();
+    }
 
     if (isAuthRoute || isCatchAll) {
-      return createRootLoaderData();
+      return createRootLoaderData({
+        workspace,
+        tags: [],
+      });
     }
 
     try {
-      const rawWorkspace = deps.workspace;
-      let workspace: string | undefined;
-      if (rawWorkspace && typeof rawWorkspace === "string" && rawWorkspace.trim()) {
-        workspace = rawWorkspace.trim();
+      if (!shouldLoadGlobalRootData) {
+        const [settingsSnapshot, workspaces] = await Promise.allSettled([
+          (getSettingsSidebarSnapshotServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SettingsSidebarSnapshot>)({
+            data: { workspace },
+          }),
+          (listWorkspacesServerFn as unknown as () => Promise<ApiListResponse<Workspace>>)(),
+        ]);
+
+        return createRootLoaderData({
+          workspace,
+          settingsSnapshot: settingsSnapshot.status === "fulfilled" ? settingsSnapshot.value : undefined,
+          workspaces: workspaces.status === "fulfilled" ? workspaces.value : DEFAULT_ROOT_LOADER_DATA.workspaces,
+          tags: [],
+        });
       }
 
       const workspacesRequest = (listWorkspacesServerFn as unknown as () => Promise<ApiListResponse<Workspace>>)();

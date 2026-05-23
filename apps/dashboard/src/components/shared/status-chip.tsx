@@ -25,12 +25,49 @@ const chipVariants: Record<ChipVariant, { bg: string; border: string }> = {
   },
 };
 
+enum ChipStatus {
+  Ready = "READY",
+  Active = "ACTIVE",
+  Attached = "ATTACHED",
+  Succeeded = "SUCCEEDED",
+  Failed = "FAILED",
+  Destroyed = "DESTROYED",
+  Paused = "PAUSED",
+  Pausing = "PAUSING",
+  Resuming = "RESUMING",
+  Starting = "STARTING",
+  Building = "BUILDING",
+  InProgress = "INPROGRESS",
+  Pending = "PENDING",
+  Queued = "QUEUED",
+  Creating = "CREATING",
+  Running = "RUNNING",
+}
+
 function getVariant(status: string): ChipVariant {
-  const s = status.toUpperCase();
-  if (s === "READY" || s === "ACTIVE") return ChipVariant.Green;
-  if (s === "FAILED") return ChipVariant.Red;
-  if (s === "BUILDING" || s === "INPROGRESS" || s === "PENDING" || s === "QUEUED") return ChipVariant.Orange;
-  return ChipVariant.Gray;
+  switch (status.toUpperCase() as ChipStatus) {
+    case ChipStatus.Ready:
+    case ChipStatus.Active:
+    case ChipStatus.Attached:
+    case ChipStatus.Succeeded:
+      return ChipVariant.Green;
+    case ChipStatus.Failed:
+    case ChipStatus.Destroyed:
+      return ChipVariant.Red;
+    case ChipStatus.Paused:
+    case ChipStatus.Pausing:
+    case ChipStatus.Resuming:
+    case ChipStatus.Starting:
+    case ChipStatus.Building:
+    case ChipStatus.InProgress:
+    case ChipStatus.Pending:
+    case ChipStatus.Queued:
+    case ChipStatus.Creating:
+    case ChipStatus.Running:
+      return ChipVariant.Orange;
+    default:
+      return ChipVariant.Gray;
+  }
 }
 
 export function StatusChip({ status, className }: StatusChipProps) {

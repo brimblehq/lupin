@@ -16,6 +16,8 @@ export function toKbps(value: number | null | undefined): number {
   return value / 1024;
 }
 
+export const timeIntervals = ["Last 1 Hour", "Last 6 Hours", "Last 24 Hours", "Last 7 Days", "Last 30 Days"] as const;
+
 export function hoursAgoForInterval(interval: string): number {
   if (interval === "Last 1 Hour") return 1;
   if (interval === "Last 6 Hours") return 6;
