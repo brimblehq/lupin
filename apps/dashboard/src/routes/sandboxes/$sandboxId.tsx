@@ -25,9 +25,7 @@ export const Route = createFileRoute("/sandboxes/$sandboxId")({
 
     try {
       const sandbox = await (
-        getSandboxServerFn as unknown as (input: {
-          data: { sandboxId: string; workspace?: string };
-        }) => Promise<SandboxResponse>
+        getSandboxServerFn as unknown as (input: { data: { sandboxId: string; workspace?: string } }) => Promise<SandboxResponse>
       )({
         data: { sandboxId: params.sandboxId, workspace },
       });
@@ -52,9 +50,7 @@ function SandboxDetailLayout() {
   const icon = getTemplateIcon(sandbox.template);
 
   const [status, setStatus] = useState<SandboxStatus>(sandbox.status);
-  const [hasMountedTerminalPanel, setHasMountedTerminalPanel] = useState(
-    isTerminalRoute && sandbox.status === SandboxStatus.Ready,
-  );
+  const [hasMountedTerminalPanel, setHasMountedTerminalPanel] = useState(isTerminalRoute && sandbox.status === SandboxStatus.Ready);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -155,7 +151,7 @@ function SandboxDetailLayout() {
 
       <div className="mb-6 flex items-start gap-3">
         {icon ? (
-          <img src={icon} alt="" className="size-10 shrink-0 object-contain" />
+          <img src={icon.src} alt="" className={`size-10 shrink-0 object-contain ${icon.shouldInvert ? "dark:invert" : ""}`} />
         ) : (
           <span className="flex size-10 shrink-0 items-center justify-center rounded-[4px] bg-dash-bg-elevated text-sm font-semibold uppercase text-dash-text-faded">
             {sandbox.name.charAt(0)}
@@ -192,9 +188,7 @@ function SandboxDetailLayout() {
             <div className="flex flex-col gap-4">
               <TabHeader title="Terminal">Interactive shell into your sandbox.</TabHeader>
               <div className="flex flex-col items-center justify-center gap-2 rounded-[4px] border-[0.5px] border-dashed border-dash-border-soft py-16">
-                <p className="text-sm text-dash-text-faded">
-                  Terminal is available when the sandbox is ready (current status: {status}).
-                </p>
+                <p className="text-sm text-dash-text-faded">Terminal is available when the sandbox is ready (current status: {status}).</p>
               </div>
             </div>
           )}

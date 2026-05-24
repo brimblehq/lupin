@@ -459,6 +459,24 @@ code {
   background-color: rgba(255, 255, 255, 0.24) !important;
 }
 
+/* Sandbox terminal must not inherit dashboard body typography metrics.
+   Inherited letter-spacing/line-height can cause cursor/text jitter in xterm. */
+.sandbox-terminal-host .xterm,
+.sandbox-terminal-host .xterm * {
+  letter-spacing: 0 !important;
+}
+
+.sandbox-terminal-host .xterm {
+  line-height: normal;
+  text-rendering: optimizeSpeed;
+  font-kerning: none;
+}
+
+/* xterm uses this hidden textarea for input/IME. Keep browser caret invisible. */
+.sandbox-terminal-host .xterm .xterm-helper-textarea {
+  caret-color: transparent !important;
+}
+
 /* ─── Date range picker ─── */
 
 /* Each month: 296px, 12px padding, 8px row gap */

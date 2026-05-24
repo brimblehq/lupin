@@ -451,7 +451,7 @@ function buildStarterSnippet(sandbox: SandboxResponse): string {
     `  region: "${region}",`,
     `});`,
     ``,
-    `const result = await sandbox.exec("echo 'Hello, world!'");`,
+    `const result = await sandbox.exec({ cmd: "echo 'Hello, world!'" });`,
     `console.log(result.stdout);`,
   ].join("\n");
 }

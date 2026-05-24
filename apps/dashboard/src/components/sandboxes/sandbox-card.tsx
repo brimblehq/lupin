@@ -101,7 +101,9 @@ export function SandboxCard({ sandbox, regionLabel }: SandboxCardProps) {
               {(() => {
                 const icon = getTemplateIcon(sandbox.template);
                 if (icon) {
-                  return <img src={icon} alt="" className="size-5 shrink-0 object-contain" />;
+                  return (
+                    <img src={icon.src} alt="" className={`size-5 shrink-0 object-contain ${icon.shouldInvert ? "dark:invert" : ""}`} />
+                  );
                 }
                 return (
                   <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-dash-bg-elevated text-[10px] font-semibold uppercase text-dash-text-faded">

@@ -546,7 +546,7 @@ export function SandboxTerminal({ sandbox, isVisible = true }: SandboxTerminalPr
   return (
     <div className="flex h-[min(70vh,640px)] min-h-[420px] flex-col overflow-hidden rounded-[4px] border-[0.5px] border-dash-border bg-[#1a1c1e]">
       <div className="flex-1 min-h-0 p-3">
-        <div ref={hostRef} className="h-full w-full" />
+        <div ref={hostRef} className="sandbox-terminal-host h-full w-full" />
       </div>
     </div>
   );
