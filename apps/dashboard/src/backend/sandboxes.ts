@@ -349,6 +349,7 @@ export function createSandboxesApi(client: ApiClient): SandboxesApi {
           page: input?.page,
           limit: input?.limit,
           teamId: input?.teamId,
+          search: input?.search,
         },
       });
 

@@ -77,6 +77,7 @@ export interface ListSandboxesInput {
   page?: number;
   limit?: number;
   teamId?: string;
+  search?: string;
 }
 
 export interface PaginatedSandboxesResponse {

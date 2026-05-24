@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@brimble/ui";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -69,9 +69,16 @@ export function SandboxSubnav({ sandbox, status, onStatusChange }: SandboxSubnav
   const [snapshotModalOpen, setSnapshotModalOpen] = useState(false);
 
   const isDestroyed = status === SandboxStatus.Destroyed;
+  const destroyInFlight = destroyRequested && !isDestroyed;
   const canUpload = status === SandboxStatus.Ready;
   const canSnapshot = status === SandboxStatus.Ready;
-  const destroyDisabled = destroyRequested;
+  const destroyDisabled = destroyInFlight;
+
+  useEffect(() => {
+    if (isDestroyed && destroyRequested) {
+      setDestroyRequested(false);
+    }
+  }, [isDestroyed, destroyRequested]);
 
   function handlePauseClick() {
     haptics.selection();
@@ -174,7 +181,7 @@ export function SandboxSubnav({ sandbox, status, onStatusChange }: SandboxSubnav
         ) : null}
         <SimpleTooltip
           content={
-            destroyRequested
+            destroyInFlight
               ? "Destroy in progress…"
               : isDestroyed
                 ? "Permanently destroy sandbox"

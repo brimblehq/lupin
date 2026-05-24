@@ -16,7 +16,7 @@ import { buildRegionLabel } from "@/lib/regions/format";
 import { listRegionsServerFn } from "@/server/regions/actions";
 import { listSandboxesServerFn } from "@/server/sandboxes/actions";
 import { usePlanGate } from "@/hooks/use-plan-gate";
-import { parsePositivePageSearchValue, parseWorkspaceSearchValue, workspacePageLoaderDeps } from "@/utils/workspace-route-search";
+import { parsePositivePageSearchValue, parseTextSearchValue, parseWorkspaceSearchValue } from "@/utils/workspace-route-search";
 
 const SANDBOXES_PAGE_LIMIT = 9;
 
@@ -24,24 +24,31 @@ export const Route = createFileRoute("/sandboxes/")({
   staleTime: 0,
   preloadStaleTime: 0,
   validateSearch: (search: Record<string, unknown>) => {
-    const next: { page?: number; workspace?: string } = {};
+    const next: { page?: number; workspace?: string; search?: string } = {};
     const workspace = parseWorkspaceSearchValue(search.workspace);
     const page = parsePositivePageSearchValue(search.page);
+    const searchQuery = parseTextSearchValue(search.search);
     if (workspace) next.workspace = workspace;
     if (page) next.page = page;
+    if (searchQuery) next.search = searchQuery;
     return next;
   },
-  loaderDeps: ({ search }) => workspacePageLoaderDeps(search),
+  loaderDeps: ({ search }) => ({
+    page: parsePositivePageSearchValue(search.page) ?? 1,
+    workspace: parseWorkspaceSearchValue(search.workspace),
+    search: parseTextSearchValue(search.search),
+  }),
   loader: async ({ deps }) => {
     const workspace = deps.workspace;
+    const search = deps.search;
 
     const [sandboxesResult, regions] = await Promise.all([
       (
         listSandboxesServerFn as unknown as (input: {
-          data: { page?: number; limit?: number; workspace?: string };
+          data: { page?: number; limit?: number; search?: string; workspace?: string };
         }) => Promise<PaginatedSandboxesResponse>
       )({
-        data: { page: deps.page, limit: SANDBOXES_PAGE_LIMIT, workspace },
+        data: { page: deps.page, limit: SANDBOXES_PAGE_LIMIT, ...(search ? { search } : {}), workspace },
       }),
       (listRegionsServerFn as unknown as (input: { data: { type: "sandbox"; enabled: boolean; workspace?: string } }) => Promise<Region[]>)(
         {
@@ -59,6 +66,7 @@ export const Route = createFileRoute("/sandboxes/")({
 
     return {
       workspace,
+      search,
       sandboxes: sandboxesResult.items,
       regionLabels,
       pagination: {
@@ -89,7 +97,6 @@ function SandboxesListPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/sandboxes/" });
   const workspace = loaderData.workspace;
-  const currentPage = loaderData.pagination.currentPage;
 
   const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
   const pendingPage = useRouterState({
@@ -102,7 +109,9 @@ function SandboxesListPage() {
   const listSandboxes = useServerFn(listSandboxesServerFn);
   const { sandboxMaxCount } = usePlanGate();
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(loaderData.search ?? "");
+  const [activeSearch, setActiveSearch] = useState(loaderData.search ?? "");
+  const [isSearching, setIsSearching] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sandboxes, setSandboxes] = useState<SandboxResponse[]>(loaderData.sandboxes);
   const [regionLabels, setRegionLabels] = useState<Record<string, string>>(loaderData.regionLabels);
@@ -115,7 +124,51 @@ function SandboxesListPage() {
     setSandboxes(loaderData.sandboxes);
     setRegionLabels(loaderData.regionLabels);
     setPagination(loaderData.pagination);
-  }, [loaderData.pagination, loaderData.regionLabels, loaderData.sandboxes]);
+    setActiveSearch(loaderData.search ?? "");
+    setQuery(loaderData.search ?? "");
+  }, [loaderData.pagination, loaderData.regionLabels, loaderData.sandboxes, loaderData.search]);
+
+  useEffect(() => {
+    let active = true;
+    const timeout = window.setTimeout(() => {
+      const trimmedQuery = query.trim();
+      if (trimmedQuery === activeSearch) {
+        return;
+      }
+
+      setIsSearching(true);
+
+      void listSandboxes({
+        data: {
+          page: 1,
+          limit: SANDBOXES_PAGE_LIMIT,
+          ...(trimmedQuery ? { search: trimmedQuery } : {}),
+          workspace,
+        },
+      })
+        .then((sandboxResult) => {
+          if (!active) {
+            return;
+          }
+          setSandboxes(sandboxResult.items);
+          setPagination({ currentPage: sandboxResult.currentPage, totalPages: sandboxResult.totalPages });
+          setActiveSearch(trimmedQuery);
+        })
+        .catch(() => {
+          // keep current rows visible on search failure
+        })
+        .finally(() => {
+          if (active) {
+            setIsSearching(false);
+          }
+        });
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [activeSearch, listSandboxes, query, workspace]);
 
   useEffect(() => {
     let active = true;
@@ -126,7 +179,14 @@ function SandboxesListPage() {
       }
 
       try {
-        const sandboxResult = await listSandboxes({ data: { page: currentPage, limit: SANDBOXES_PAGE_LIMIT, workspace } });
+        const sandboxResult = await listSandboxes({
+          data: {
+            page: pagination.currentPage,
+            limit: SANDBOXES_PAGE_LIMIT,
+            ...(activeSearch ? { search: activeSearch } : {}),
+            workspace,
+          },
+        });
         if (!active) {
           return;
         }
@@ -161,7 +221,7 @@ function SandboxesListPage() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onFocus);
     };
-  }, [currentPage, listSandboxes, workspace]);
+  }, [activeSearch, listSandboxes, pagination.currentPage, workspace]);
 
   function handlePageChange(nextPage: number) {
     if (nextPage < 1 || nextPage === pagination.currentPage || nextPage > pagination.totalPages) {
@@ -172,34 +232,24 @@ function SandboxesListPage() {
       to: "/sandboxes",
       search: {
         ...(search.workspace ? { workspace: search.workspace } : {}),
+        ...(activeSearch ? { search: activeSearch } : {}),
         ...(nextPage > 1 ? { page: nextPage } : {}),
       },
     });
   }
 
   const filtered = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
     return sandboxes.filter((sandbox) => {
       if (statusFilter !== "all" && sandbox.status !== statusFilter) {
         return false;
       }
-
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      const name = sandbox.name;
-      const template = sandbox.template.toLowerCase();
-      const region = (regionLabels[sandbox.region] ?? sandbox.region).toLowerCase();
-
-      return name.toLowerCase().includes(normalizedQuery) || template.includes(normalizedQuery) || region.includes(normalizedQuery);
+      return true;
     });
-  }, [query, regionLabels, sandboxes, statusFilter]);
+  }, [sandboxes, statusFilter]);
 
   let emptyMessage = "No sandboxes yet — spin one up to get started.";
-  if (query.trim()) {
-    emptyMessage = `No sandboxes found for "${query.trim()}".`;
+  if (activeSearch) {
+    emptyMessage = `No sandboxes found for "${activeSearch}".`;
   } else if (statusFilter !== "all") {
     emptyMessage = "No sandboxes match this status.";
   }
@@ -211,6 +261,7 @@ function SandboxesListPage() {
           value={query}
           onChange={setQuery}
           placeholder="Search sandboxes"
+          loading={isSearching}
           rightSlot={
             <FilterDropdown
               value={statusFilter}

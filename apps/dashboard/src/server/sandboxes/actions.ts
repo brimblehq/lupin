@@ -114,6 +114,7 @@ const getSandboxSchema = Yup.object({
 const listSandboxesSchema = Yup.object({
   page: Yup.number().integer().min(1),
   limit: Yup.number().integer().min(1).max(100),
+  search: Yup.string().trim().min(1).max(100),
   workspace: Yup.string().trim(),
   teamId: Yup.string().trim(),
 });
@@ -179,7 +180,7 @@ const getAblyTokenSchema = Yup.object({
 
 type CreateSandboxPayload = CreateSandboxInput & { workspace?: string };
 type GetSandboxPayload = { sandboxId: string; workspace?: string; teamId?: string };
-type ListSandboxesPayload = { page?: number; limit?: number; workspace?: string; teamId?: string };
+type ListSandboxesPayload = { page?: number; limit?: number; search?: string; workspace?: string; teamId?: string };
 type ListSnapshotsPayload = { page?: number; limit?: number; workspace?: string; teamId?: string };
 type AblyTokenScope = "user" | "sandbox";
 type GetAblyTokenPayload = { scope: AblyTokenScope; sandboxId?: string; sandboxIds?: string[] };
@@ -252,6 +253,7 @@ export const listSandboxesServerFn = createServerFn({
     return api.sandboxes.list({
       page: payload.page ?? 1,
       limit: payload.limit ?? 15,
+      ...(payload.search ? { search: payload.search } : {}),
       teamId,
     });
   });
