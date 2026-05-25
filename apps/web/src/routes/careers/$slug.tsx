@@ -219,7 +219,7 @@ function SidebarNav({ roles, activeSlug }: { roles: CareerRole[]; activeSlug: st
             params={{ slug: role.slug }}
             className={`font-body text-sm transition-colors duration-150 ${
               role.slug === activeSlug ? "font-medium text-brimble-black" : "text-brimble-black/40 hover:text-brimble-black/60"
-            }`}
+            } ${role.closed ? "line-through" : ""}`}
           >
             {role.title}
           </Link>
@@ -250,7 +250,7 @@ function MobileNav({ roles, activeSlug }: { roles: CareerRole[]; activeSlug: str
               onClick={() => setOpen(false)}
               className={`font-body text-sm transition-colors duration-150 ${
                 role.slug === activeSlug ? "font-medium text-brimble-black" : "text-brimble-black/40 hover:text-brimble-black/60"
-              }`}
+              } ${role.closed ? "line-through" : ""}`}
             >
               {role.title}
             </Link>

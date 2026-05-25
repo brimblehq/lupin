@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
 import { Link2Off, MoreVertical, Trash2 } from "lucide-react";
 import { StatusChip } from "@/components/shared/status-chip";
@@ -89,20 +90,32 @@ function VolumeActionsMenu({
   onDeleteRequest: (volume: VolumeResponse) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     function handleClick(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-label="Volume actions"
@@ -110,33 +123,40 @@ function VolumeActionsMenu({
       >
         <MoreVertical className="size-4" />
       </button>
-      {open ? (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[200px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_rgba(0,0,0,0.08)]">
-          <button
-            type="button"
-            disabled
-            title="Detach by destroying the attached sandbox."
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-dash-text-body transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Link2Off className="size-3.5" />
-            Detach
-          </button>
-          <hr className="my-1 border-dash-border-soft" />
-          <button
-            type="button"
-            disabled={isAttached}
-            title={isAttached ? "Detach by destroying the attached sandbox first." : undefined}
-            onClick={() => {
-              setOpen(false);
-              onDeleteRequest(volume);
-            }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-500 transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-          >
-            <Trash2 className="size-3.5" />
-            Delete
-          </button>
-        </div>
-      ) : null}
-    </div>
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              style={{ position: "fixed", top: position.top, right: position.right }}
+              className="z-50 w-[200px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_rgba(0,0,0,0.08)]"
+            >
+              <button
+                type="button"
+                disabled
+                title="Detach by destroying the attached sandbox."
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-dash-text-body transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Link2Off className="size-3.5" />
+                Detach
+              </button>
+              <hr className="my-1 border-dash-border-soft" />
+              <button
+                type="button"
+                disabled={isAttached}
+                title={isAttached ? "Detach by destroying the attached sandbox first." : undefined}
+                onClick={() => {
+                  setOpen(false);
+                  onDeleteRequest(volume);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-500 transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+              >
+                <Trash2 className="size-3.5" />
+                Delete
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
