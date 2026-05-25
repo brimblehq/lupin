@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
+import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import * as Yup from "yup";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
@@ -40,6 +41,8 @@ interface VolumesSearch {
   tab?: TabKey;
   page?: number;
   snapshotsPage?: number;
+  q?: string;
+  snapshotQ?: string;
 }
 
 const volumesSearchSchema = Yup.object({
@@ -51,6 +54,8 @@ const volumesSearchSchema = Yup.object({
   tab: Yup.mixed<TabKey>().oneOf(["volumes", "snapshots"]),
   page: Yup.number().integer().min(1),
   snapshotsPage: Yup.number().integer().min(1),
+  q: Yup.string().trim(),
+  snapshotQ: Yup.string().trim(),
 });
 
 type StatusFilter = "all" | "attached" | "detached";
@@ -75,11 +80,7 @@ export const Route = createFileRoute("/volumes/")({
   preloadStaleTime: 300_000,
   validateSearch: (search: Record<string, unknown>): VolumesSearch =>
     volumesSearchSchema.validateSync(search, { stripUnknown: true }) as VolumesSearch,
-  loaderDeps: ({ search }) => ({
-    ...workspaceLoaderDeps(search),
-    page: search.page ?? 1,
-    snapshotsPage: search.snapshotsPage ?? 1,
-  }),
+  loaderDeps: ({ search }) => workspaceLoaderDeps(search),
   loader: async ({ deps }) => {
     const workspace = deps.workspace;
 
@@ -87,7 +88,7 @@ export const Route = createFileRoute("/volumes/")({
       (listVolumesServerFn as unknown as (input: {
         data: { workspace?: string; page?: number; limit?: number };
       }) => Promise<PaginatedVolumesResponse>)({
-        data: { workspace, page: deps.page, limit: VOLUMES_PAGE_SIZE },
+        data: { workspace, page: 1, limit: VOLUMES_PAGE_SIZE },
       }),
       (listRegionsServerFn as unknown as (input: { data: { type: "sandbox"; enabled: boolean; workspace?: string } }) => Promise<Region[]>)({
         data: { type: "sandbox", enabled: true, workspace },
@@ -95,7 +96,7 @@ export const Route = createFileRoute("/volumes/")({
       (listSandboxSnapshotsServerFn as unknown as (input: {
         data: { workspace?: string; page?: number; limit?: number };
       }) => Promise<PaginatedSnapshotsResponse>)({
-        data: { workspace, page: deps.snapshotsPage, limit: SNAPSHOTS_PAGE_SIZE },
+        data: { workspace, page: 1, limit: SNAPSHOTS_PAGE_SIZE },
       }),
     ]);
 
@@ -112,17 +113,28 @@ export const Route = createFileRoute("/volumes/")({
 function VolumesListPage() {
   const loaderData = Route.useLoaderData();
   const search = Route.useSearch();
-  const navigate = useNavigate();
   const haptics = useHaptics();
   const workspace = loaderData.workspace;
-  const activeTab: TabKey = search.tab ?? "volumes";
+  const [{ tab, page, snapshotsPage, q, snapshotQ, focus }, setSearchParams] = useQueryStates(
+    {
+      tab: parseAsStringLiteral(["volumes", "snapshots"]).withDefault("volumes"),
+      page: parseAsInteger.withDefault(1),
+      snapshotsPage: parseAsInteger.withDefault(1),
+      q: parseAsString.withDefault(""),
+      snapshotQ: parseAsString.withDefault(""),
+      focus: parseAsString.withDefault(""),
+    },
+    {
+      history: "replace",
+      clearOnDefault: true,
+    },
+  );
+  const activeTab: TabKey = tab;
 
   const listVolumes = useServerFn(listVolumesServerFn);
   const listSnapshots = useServerFn(listSandboxSnapshotsServerFn);
 
-  const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [snapshotQuery, setSnapshotQuery] = useState("");
   const [snapshotStatusFilter, setSnapshotStatusFilter] = useState<SnapshotStatusFilter>("all");
   const [volumes, setVolumes] = useState<VolumeResponse[]>(loaderData.volumesPage.items);
   const [volumesTotalPages, setVolumesTotalPages] = useState<number>(loaderData.volumesPage.totalPages);
@@ -134,33 +146,22 @@ function VolumesListPage() {
   const [deleteSnapshotTarget, setDeleteSnapshotTarget] = useState<SnapshotResponse | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-
-  const volumesPage = search.page ?? 1;
-  const snapshotsPage = search.snapshotsPage ?? 1;
+  const volumesPage = page;
 
   function switchTab(next: TabKey) {
     if (next === activeTab) return;
     haptics.selection();
-    void navigate({
-      search: (prev: VolumesSearch) => ({ ...prev, tab: next === "volumes" ? undefined : next }),
-      replace: true,
-    });
+    void setSearchParams({ tab: next });
   }
 
   function handleVolumesPageChange(nextPage: number) {
     if (nextPage < 1 || nextPage === volumesPage || nextPage > volumesTotalPages) return;
-    void navigate({
-      to: "/volumes",
-      search: { ...search, page: nextPage === 1 ? undefined : nextPage } as VolumesSearch,
-    });
+    void setSearchParams({ page: nextPage });
   }
 
   function handleSnapshotsPageChange(nextPage: number) {
     if (nextPage < 1 || nextPage === snapshotsPage || nextPage > snapshotsTotalPages) return;
-    void navigate({
-      to: "/volumes",
-      search: { ...search, snapshotsPage: nextPage === 1 ? undefined : nextPage } as VolumesSearch,
-    });
+    void setSearchParams({ snapshotsPage: nextPage });
   }
 
   useEffect(() => {
@@ -182,23 +183,17 @@ function VolumesListPage() {
   }, [search.create]);
 
   useEffect(() => {
-    if (!search.focus) return;
-    const element = rowRefs.current.get(search.focus);
+    if (!focus) return;
+    const element = rowRefs.current.get(focus);
     if (!element) return;
     element.scrollIntoView({ block: "center", behavior: "smooth" });
-    setHighlightedId(search.focus);
+    setHighlightedId(focus);
     const timer = window.setTimeout(() => {
       setHighlightedId(null);
-      void navigate({
-        search: (prev: VolumesSearch) => {
-          const { focus: _focus, ...rest } = prev;
-          return rest;
-        },
-        replace: true,
-      });
+      void setSearchParams({ focus: "" });
     }, FOCUS_HIGHLIGHT_MS);
     return () => window.clearTimeout(timer);
-  }, [search.focus, navigate, volumes]);
+  }, [focus, setSearchParams, volumes]);
 
   useEffect(() => {
     let active = true;
@@ -219,6 +214,8 @@ function VolumesListPage() {
         // polling failures are non-blocking; keep cached rows visible
       }
     };
+
+    void poll();
 
     const interval = window.setInterval(() => {
       void poll();
@@ -245,6 +242,8 @@ function VolumesListPage() {
       }
     };
 
+    void poll();
+
     const interval = window.setInterval(() => {
       void poll();
     }, 30_000);
@@ -256,16 +255,16 @@ function VolumesListPage() {
   }, [listSnapshots, workspace, snapshotsPage]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const normalizedQuery = q.trim().toLowerCase();
     return volumes.filter((volume) => {
       const isAttached = Boolean(volume.attachedSandboxId || volume.attachedProjectId);
       if (statusFilter === "attached" && !isAttached) return false;
       if (statusFilter === "detached" && isAttached) return false;
-      if (!q) return true;
+      if (!normalizedQuery) return true;
       const regionName = volume.region?.name?.toLowerCase() ?? "";
-      return volume.name.toLowerCase().includes(q) || regionName.includes(q);
+      return volume.name.toLowerCase().includes(normalizedQuery) || regionName.includes(normalizedQuery);
     });
-  }, [query, statusFilter, volumes]);
+  }, [q, statusFilter, volumes]);
 
   const handleCreated = useCallback((volume: VolumeResponse) => {
     setVolumes((prev) => [volume, ...prev.filter((existing) => existing.id !== volume.id)]);
@@ -277,15 +276,15 @@ function VolumesListPage() {
   }, []);
 
   const filteredSnapshots = useMemo(() => {
-    const q = snapshotQuery.trim().toLowerCase();
+    const normalizedQuery = snapshotQ.trim().toLowerCase();
     return snapshots
       .filter((snapshot) => {
         if (snapshotStatusFilter !== "all" && snapshot.status !== snapshotStatusFilter) return false;
-        if (!q) return true;
-        return snapshot.name.toLowerCase().includes(q) || snapshot.sourceTemplate.toLowerCase().includes(q);
+        if (!normalizedQuery) return true;
+        return snapshot.name.toLowerCase().includes(normalizedQuery) || snapshot.sourceTemplate.toLowerCase().includes(normalizedQuery);
       })
       .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-  }, [snapshots, snapshotQuery, snapshotStatusFilter]);
+  }, [snapshots, snapshotQ, snapshotStatusFilter]);
 
   const handleSnapshotDeleted = useCallback((snapshotId: string) => {
     setSnapshots((prev) => prev.filter((snapshot) => snapshot.id !== snapshotId));
@@ -296,15 +295,15 @@ function VolumesListPage() {
   const snapshotsEmpty = snapshots.length === 0;
 
   let emptyMessage = "No volumes match your filters.";
-  if (query.trim()) {
-    emptyMessage = `No volumes found for "${query.trim()}".`;
+  if (q.trim()) {
+    emptyMessage = `No volumes found for "${q.trim()}".`;
   } else if (statusFilter !== "all") {
     emptyMessage = "No volumes match this status.";
   }
 
   let snapshotsEmptyMessage = "No snapshots match your filters.";
-  if (snapshotQuery.trim()) {
-    snapshotsEmptyMessage = `No snapshots found for "${snapshotQuery.trim()}".`;
+  if (snapshotQ.trim()) {
+    snapshotsEmptyMessage = `No snapshots found for "${snapshotQ.trim()}".`;
   } else if (snapshotStatusFilter !== "all") {
     snapshotsEmptyMessage = "No snapshots match this status.";
   }
@@ -334,8 +333,10 @@ function VolumesListPage() {
         <>
           <div className="mb-4">
             <SearchFilterBar
-              value={query}
-              onChange={setQuery}
+              value={q}
+              onChange={(value) => {
+                void setSearchParams({ q: value, page: 1 });
+              }}
               placeholder="Search volumes"
               rightSlot={
                 <FilterDropdown
@@ -367,7 +368,7 @@ function VolumesListPage() {
           ) : (
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={`${query}:${statusFilter}`}
+                key={`${q}:${statusFilter}`}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
@@ -414,8 +415,10 @@ function VolumesListPage() {
         <>
           <div className="mb-4">
             <SearchFilterBar
-              value={snapshotQuery}
-              onChange={setSnapshotQuery}
+              value={snapshotQ}
+              onChange={(value) => {
+                void setSearchParams({ snapshotQ: value, snapshotsPage: 1 });
+              }}
               placeholder="Search snapshots"
               rightSlot={
                 <FilterDropdown
@@ -439,7 +442,7 @@ function VolumesListPage() {
           ) : (
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={`${snapshotQuery}:${snapshotStatusFilter}`}
+                key={`${snapshotQ}:${snapshotStatusFilter}`}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}

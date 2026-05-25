@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { createFileRoute, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
+import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { FolderOpen } from "@phosphor-icons/react";
 import { Formik, Form as FormikForm } from "formik";
 import * as Yup from "yup";
@@ -130,14 +131,12 @@ export const Route = createFileRoute("/projects/")({
     const next: {
       page?: number;
       workspace?: string;
-      q?: string;
       type?: string;
       status?: string;
       environmentId?: string;
     } = {};
     const page = parsePositivePageSearchValue(search.page);
     const workspace = parseWorkspaceSearchValue(search.workspace);
-    const q = parseTextSearchValue(search.q);
     const type = parseTextSearchValue(search.type);
     const status = parseTextSearchValue(search.status);
     const environmentId = parseTextSearchValue(search.environmentId);
@@ -146,9 +145,6 @@ export const Route = createFileRoute("/projects/")({
     }
     if (workspace) {
       next.workspace = workspace;
-    }
-    if (q) {
-      next.q = q;
     }
     if (type) {
       next.type = type;
@@ -164,7 +160,6 @@ export const Route = createFileRoute("/projects/")({
   },
   loaderDeps: ({ search }) => ({
     ...workspacePageLoaderDeps(search),
-    q: parseTextSearchValue(search.q),
     type: parseTextSearchValue(search.type),
     status: parseTextSearchValue(search.status),
     environmentId: parseTextSearchValue(search.environmentId),
@@ -190,7 +185,6 @@ export const Route = createFileRoute("/projects/")({
         data: {
           page?: number;
           workspace?: string;
-          q?: string;
           serviceType?: string;
           status?: string;
           environmentId?: string;
@@ -199,7 +193,6 @@ export const Route = createFileRoute("/projects/")({
         data: {
           page: deps.page,
           workspace: deps.workspace,
-          q: deps.q,
           serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
           status: deps.status && deps.status !== "all" ? deps.status : undefined,
           environmentId,
@@ -605,9 +598,31 @@ function ProjectsPage() {
   const [environments, setEnvironments] = useState(loaderData.environments);
   const [environmentModalOpen, setEnvironmentModalOpen] = useState(false);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState(search.q ?? "");
+  const [{ q, page }, setSearchParams] = useQueryStates(
+    {
+      q: parseAsString.withDefault(""),
+      page: parseAsInteger.withDefault(1),
+    },
+    {
+      history: "replace",
+      clearOnDefault: true,
+    },
+  );
+  const [searchQuery, setSearchQuery] = useState(q);
   const [isFilterChanging, setIsFilterChanging] = useState(false);
   const [isStatusFilterChanging, setIsStatusFilterChanging] = useState(false);
+  const [isProjectsLoading, setIsProjectsLoading] = useState(false);
+  const [loadingPage, setLoadingPage] = useState<number | null>(null);
+  const listProjectsPage = useServerFn(listProjectsPageServerFn as any) as (input: {
+    data: {
+      page?: number;
+      workspace?: string;
+      q?: string;
+      serviceType?: string;
+      status?: string;
+      environmentId?: string;
+    };
+  }) => Promise<PaginatedProjectsResponse>;
   const activeProjectType = search.type ?? "all";
   const activeStatus = search.status ?? "all";
   const requestedEnvironmentAccessDenied = Boolean(loaderData.requestedEnvironmentAccessDenied);
@@ -622,13 +637,6 @@ function ProjectsPage() {
   const requestedWorkspace = search.workspace?.trim().toLowerCase() || undefined;
   const loadedWorkspace = loaderData.workspace?.trim().toLowerCase() || undefined;
   const isWorkspaceSwitching = requestedWorkspace !== loadedWorkspace;
-  const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
-  const pendingPage = useRouterState({
-    select: (s) => {
-      const activeSearch = (s.location.search ?? s.resolvedLocation?.search) as Record<string, unknown> | undefined;
-      return parsePositivePageSearchValue(activeSearch?.page) ?? 1;
-    },
-  });
 
   const refreshSignal = useTagsStore((s) => s._refreshSignal);
   const tags = useTagsStore((s) => s.tags);
@@ -664,22 +672,22 @@ function ProjectsPage() {
       replace: true,
       search: buildProjectsSearch({
         workspace: search.workspace,
-        q: search.q,
+        q: q || undefined,
         type: search.type,
         status: search.status,
         environmentId: undefined,
-        page: search.page,
+        page: page > 1 ? page : undefined,
       }),
     });
   }, [
     navigate,
     requestedEnvironmentAccessDenied,
     search.environmentId,
-    search.page,
-    search.q,
+    page,
     search.status,
     search.type,
     search.workspace,
+    q,
   ]);
 
   useEffect(() => {
@@ -752,17 +760,17 @@ function ProjectsPage() {
     setProjects([]);
     setPagination((prev) => ({
       ...prev,
-      currentPage: search.page ?? 1,
+      currentPage: page,
       total: 0,
       overallTotalProjects: 0,
     }));
     setIsFilterChanging(false);
     setIsStatusFilterChanging(false);
-  }, [isWorkspaceSwitching, search.page]);
+  }, [isWorkspaceSwitching, page]);
 
   useEffect(() => {
-    setSearchQuery(search.q ?? "");
-  }, [search.q]);
+    setSearchQuery(q);
+  }, [q]);
 
   useEffect(() => {
     if (prevWorkspace.current === search.workspace) return;
@@ -779,29 +787,73 @@ function ProjectsPage() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      const nextQ = searchQuery.trim() || undefined;
-      if ((search.q ?? undefined) === nextQ) {
+      const nextQ = searchQuery.trim();
+      if (q === nextQ) {
         return;
       }
 
-      navigate({
-        to: "/projects",
-        replace: true,
-        search: buildProjectsSearch({
-          workspace: search.workspace,
-          q: nextQ,
-          type: search.type,
-          status: search.status,
-          environmentId: search.environmentId,
-          page: undefined,
-        }),
+      void setSearchParams({
+        q: nextQ,
+        page: 1,
       });
     }, 300);
 
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [navigate, search, search.q, searchQuery]);
+  }, [q, searchQuery, setSearchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const nextPage = page > 0 ? page : 1;
+    const nextQuery = q.trim() || undefined;
+    const nextEnvironmentId =
+      effectiveEnvironmentId && effectiveEnvironmentId !== "all" ? effectiveEnvironmentId : undefined;
+
+    setIsProjectsLoading(true);
+    setLoadingPage(nextPage);
+
+    void listProjectsPage({
+      data: {
+        page: nextPage === 1 ? undefined : nextPage,
+        workspace: search.workspace,
+        q: nextQuery,
+        serviceType: search.type && search.type !== "all" ? search.type : undefined,
+        status: search.status && search.status !== "all" ? search.status : undefined,
+        environmentId: nextEnvironmentId,
+      },
+    })
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        const fwMap = new Map(Object.entries(loaderData.frameworkLogos ?? {}));
+        setProjects(result.items.map((project) => mapBackendProject(project, fwMap)));
+        setPagination({
+          currentPage: result.currentPage,
+          totalPages: result.totalPages,
+          total: result.total ?? 0,
+          overallTotalProjects: result.overallTotalProjects,
+        });
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        toast.error("Unable to load projects");
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+        setIsProjectsLoading(false);
+        setLoadingPage(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveEnvironmentId, listProjectsPage, loaderData.frameworkLogos, page, q, search.status, search.type, search.workspace]);
 
   useEffect(() => {
     if (prevSignal.current === refreshSignal) return;
@@ -822,9 +874,9 @@ function ProjectsPage() {
           }) => Promise<PaginatedProjectsResponse>
         )({
           data: {
-            page: search.page,
+            page: page > 1 ? page : undefined,
             workspace: search.workspace,
-            q: search.q,
+            q: q || undefined,
             serviceType: search.type && search.type !== "all" ? search.type : undefined,
             status: search.status && search.status !== "all" ? search.status : undefined,
             environmentId: effectiveEnvironmentId,
@@ -842,19 +894,19 @@ function ProjectsPage() {
         // Keep previous project list if refresh fails.
       }
     })();
-  }, [loaderData.frameworkLogos, refreshSignal, search.environmentId, effectiveEnvironmentId, search.page, search.q, search.status, search.type, search.workspace]);
+  }, [loaderData.frameworkLogos, refreshSignal, search.environmentId, effectiveEnvironmentId, page, q, search.status, search.type, search.workspace]);
 
   const filteredProjects = activeTagId ? projects.filter((p) => p.tags?.some((t) => t.id === activeTagId)) : projects;
-  const hasSearchQuery = Boolean(search.q?.trim());
-  const settledSearchQuery = search.q?.trim() ?? "";
+  const hasSearchQuery = Boolean(q.trim());
+  const settledSearchQuery = q.trim();
   const pendingSearchQuery = searchQuery.trim();
   const isSearchSettling = pendingSearchQuery !== settledSearchQuery;
   const isEnvironmentSwitching = (search.environmentId ?? undefined) !== (loaderData.environmentId ?? undefined);
-  const showSkeletons = isWorkspaceSwitching || isEnvironmentSwitching || isFilterChanging || isStatusFilterChanging;
+  const showSkeletons = isWorkspaceSwitching || isEnvironmentSwitching || isFilterChanging || isStatusFilterChanging || isProjectsLoading;
 
   let emptyStateMessage = "No projects found.";
-  if (hasSearchQuery && search.q) {
-    emptyStateMessage = `No projects found for "${search.q}".`;
+  if (hasSearchQuery && q) {
+    emptyStateMessage = `No projects found for "${q}".`;
   } else if (activeTagId) {
     emptyStateMessage = "No projects match this tag.";
   }
@@ -864,17 +916,7 @@ function ProjectsPage() {
       return;
     }
 
-    navigate({
-      to: "/projects",
-      search: buildProjectsSearch({
-        workspace: search.workspace,
-        q: search.q,
-        type: search.type,
-        status: search.status,
-        environmentId: search.environmentId,
-        page: page === 1 ? undefined : page,
-      }),
-    });
+    void setSearchParams({ page });
   }
 
   function handleProjectTagsChange(projectId: string | undefined, nextTags: Project["tags"]) {
@@ -912,7 +954,7 @@ function ProjectsPage() {
                     to: "/projects",
                     search: buildProjectsSearch({
                       workspace: search.workspace,
-                      q: search.q,
+                      q: q || undefined,
                       type: search.type,
                       status: nextStatus,
                       page: undefined,
@@ -936,7 +978,7 @@ function ProjectsPage() {
                     to: "/projects",
                     search: buildProjectsSearch({
                       workspace: search.workspace,
-                      q: search.q,
+                      q: q || undefined,
                       type: nextType,
                       status: search.status,
                       environmentId: search.environmentId,
@@ -976,7 +1018,7 @@ function ProjectsPage() {
           </motion.div>
         ) : (
           <motion.div
-            key={`${search.q ?? ""}:${activeTagId ?? "all"}:${activeStatus}:${activeEnvironmentId}:${pagination.currentPage}`}
+            key={`${q}:${activeTagId ?? "all"}:${activeStatus}:${activeEnvironmentId}:${pagination.currentPage}`}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -1005,8 +1047,8 @@ function ProjectsPage() {
           currentPage={pagination.currentPage}
           totalPages={pagination.totalPages}
           onPageChange={handlePageChange}
-          isLoading={isRouterLoading}
-          loadingPage={isRouterLoading ? pendingPage : null}
+          isLoading={isProjectsLoading}
+          loadingPage={loadingPage}
         />
       </div>
 
@@ -1023,7 +1065,7 @@ function ProjectsPage() {
             to: "/projects",
             search: buildProjectsSearch({
               workspace: search.workspace,
-              q: search.q,
+              q: q || undefined,
               type: search.type,
               status: search.status,
               environmentId,

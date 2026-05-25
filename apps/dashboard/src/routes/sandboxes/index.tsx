@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
+import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { Cube } from "@phosphor-icons/react";
 import { SandboxStatus } from "@/backend/sandboxes";
 import type { PaginatedSandboxesResponse, SandboxResponse } from "@/backend/sandboxes";
@@ -34,13 +35,10 @@ export const Route = createFileRoute("/sandboxes/")({
     return next;
   },
   loaderDeps: ({ search }) => ({
-    page: parsePositivePageSearchValue(search.page) ?? 1,
     workspace: parseWorkspaceSearchValue(search.workspace),
-    search: parseTextSearchValue(search.search),
   }),
   loader: async ({ deps }) => {
     const workspace = deps.workspace;
-    const search = deps.search;
 
     const [sandboxesResult, regions] = await Promise.all([
       (
@@ -48,7 +46,7 @@ export const Route = createFileRoute("/sandboxes/")({
           data: { page?: number; limit?: number; search?: string; workspace?: string };
         }) => Promise<PaginatedSandboxesResponse>
       )({
-        data: { page: deps.page, limit: SANDBOXES_PAGE_LIMIT, ...(search ? { search } : {}), workspace },
+        data: { page: 1, limit: SANDBOXES_PAGE_LIMIT, workspace },
       }),
       (listRegionsServerFn as unknown as (input: { data: { type: "sandbox"; enabled: boolean; workspace?: string } }) => Promise<Region[]>)(
         {
@@ -66,7 +64,6 @@ export const Route = createFileRoute("/sandboxes/")({
 
     return {
       workspace,
-      search,
       sandboxes: sandboxesResult.items,
       regionLabels,
       pagination: {
@@ -94,24 +91,25 @@ const SANDBOX_LIST_REFRESH_INTERVAL_MS = 30_000;
 
 function SandboxesListPage() {
   const loaderData = Route.useLoaderData();
-  const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/sandboxes/" });
   const workspace = loaderData.workspace;
-
-  const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
-  const pendingPage = useRouterState({
-    select: (s) => {
-      const activeSearch = (s.location.search ?? s.resolvedLocation?.search) as Record<string, unknown> | undefined;
-      return parsePositivePageSearchValue(activeSearch?.page) ?? 1;
+  const [{ search: searchQuery, page }, setSearchParams] = useQueryStates(
+    {
+      search: parseAsString.withDefault(""),
+      page: parseAsInteger.withDefault(1),
     },
-  });
+    {
+      history: "replace",
+      clearOnDefault: true,
+    },
+  );
 
   const listSandboxes = useServerFn(listSandboxesServerFn);
   const { sandboxMaxCount } = usePlanGate();
 
-  const [query, setQuery] = useState(loaderData.search ?? "");
-  const [activeSearch, setActiveSearch] = useState(loaderData.search ?? "");
+  const [query, setQuery] = useState(searchQuery);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSandboxesLoading, setIsSandboxesLoading] = useState(false);
+  const [loadingPage, setLoadingPage] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sandboxes, setSandboxes] = useState<SandboxResponse[]>(loaderData.sandboxes);
   const [regionLabels, setRegionLabels] = useState<Record<string, string>>(loaderData.regionLabels);
@@ -124,51 +122,70 @@ function SandboxesListPage() {
     setSandboxes(loaderData.sandboxes);
     setRegionLabels(loaderData.regionLabels);
     setPagination(loaderData.pagination);
-    setActiveSearch(loaderData.search ?? "");
-    setQuery(loaderData.search ?? "");
-  }, [loaderData.pagination, loaderData.regionLabels, loaderData.sandboxes, loaderData.search]);
+  }, [loaderData.pagination, loaderData.regionLabels, loaderData.sandboxes]);
 
   useEffect(() => {
-    let active = true;
+    setQuery(searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
       const trimmedQuery = query.trim();
-      if (trimmedQuery === activeSearch) {
+      if (trimmedQuery === searchQuery) {
         return;
       }
 
       setIsSearching(true);
-
-      void listSandboxes({
-        data: {
-          page: 1,
-          limit: SANDBOXES_PAGE_LIMIT,
-          ...(trimmedQuery ? { search: trimmedQuery } : {}),
-          workspace,
-        },
-      })
-        .then((sandboxResult) => {
-          if (!active) {
-            return;
-          }
-          setSandboxes(sandboxResult.items);
-          setPagination({ currentPage: sandboxResult.currentPage, totalPages: sandboxResult.totalPages });
-          setActiveSearch(trimmedQuery);
-        })
-        .catch(() => {
-          // keep current rows visible on search failure
-        })
-        .finally(() => {
-          if (active) {
-            setIsSearching(false);
-          }
-        });
+      void setSearchParams({ search: trimmedQuery, page: 1 });
     }, 300);
 
     return () => {
-      active = false;
       window.clearTimeout(timeout);
     };
-  }, [activeSearch, listSandboxes, query, workspace]);
+  }, [query, searchQuery, setSearchParams]);
+
+  useEffect(() => {
+    let active = true;
+    const nextPage = page > 0 ? page : 1;
+    const nextSearch = searchQuery.trim();
+
+    setIsSandboxesLoading(true);
+    setLoadingPage(nextPage);
+
+    void listSandboxes({
+      data: {
+        page: nextPage,
+        limit: SANDBOXES_PAGE_LIMIT,
+        ...(nextSearch ? { search: nextSearch } : {}),
+        workspace,
+      },
+    })
+      .then((sandboxResult) => {
+        if (!active) {
+          return;
+        }
+        setSandboxes(sandboxResult.items);
+        setPagination({ currentPage: sandboxResult.currentPage, totalPages: sandboxResult.totalPages });
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+        // keep current rows visible on search failure
+      })
+      .finally(() => {
+        if (!active) {
+          return;
+        }
+        setIsSearching(false);
+        setIsSandboxesLoading(false);
+        setLoadingPage(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [listSandboxes, page, searchQuery, workspace]);
 
   useEffect(() => {
     let active = true;
@@ -181,9 +198,9 @@ function SandboxesListPage() {
       try {
         const sandboxResult = await listSandboxes({
           data: {
-            page: pagination.currentPage,
+            page,
             limit: SANDBOXES_PAGE_LIMIT,
-            ...(activeSearch ? { search: activeSearch } : {}),
+            ...(searchQuery ? { search: searchQuery } : {}),
             workspace,
           },
         });
@@ -221,21 +238,14 @@ function SandboxesListPage() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onFocus);
     };
-  }, [activeSearch, listSandboxes, pagination.currentPage, workspace]);
+  }, [listSandboxes, page, searchQuery, workspace]);
 
   function handlePageChange(nextPage: number) {
     if (nextPage < 1 || nextPage === pagination.currentPage || nextPage > pagination.totalPages) {
       return;
     }
-
-    void navigate({
-      to: "/sandboxes",
-      search: {
-        ...(search.workspace ? { workspace: search.workspace } : {}),
-        ...(activeSearch ? { search: activeSearch } : {}),
-        ...(nextPage > 1 ? { page: nextPage } : {}),
-      },
-    });
+    setLoadingPage(nextPage);
+    void setSearchParams({ page: nextPage });
   }
 
   const filtered = useMemo(() => {
@@ -248,8 +258,8 @@ function SandboxesListPage() {
   }, [sandboxes, statusFilter]);
 
   let emptyMessage = "No sandboxes yet — spin one up to get started.";
-  if (activeSearch) {
-    emptyMessage = `No sandboxes found for "${activeSearch}".`;
+  if (searchQuery) {
+    emptyMessage = `No sandboxes found for "${searchQuery}".`;
   } else if (statusFilter !== "all") {
     emptyMessage = "No sandboxes match this status.";
   }
@@ -261,7 +271,7 @@ function SandboxesListPage() {
           value={query}
           onChange={setQuery}
           placeholder="Search sandboxes"
-          loading={isSearching}
+          loading={isSearching || isSandboxesLoading}
           rightSlot={
             <FilterDropdown
               value={statusFilter}
@@ -288,7 +298,7 @@ function SandboxesListPage() {
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
-          key={`${query}:${statusFilter}`}
+          key={`${searchQuery}:${statusFilter}`}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
@@ -316,8 +326,8 @@ function SandboxesListPage() {
           currentPage={pagination.currentPage}
           totalPages={pagination.totalPages}
           onPageChange={handlePageChange}
-          isLoading={isRouterLoading}
-          loadingPage={isRouterLoading ? pendingPage : null}
+          isLoading={isSandboxesLoading}
+          loadingPage={loadingPage}
         />
       </div>
 

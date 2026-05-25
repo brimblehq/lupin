@@ -22,7 +22,7 @@ import {
   updateDomainServerFn,
 } from "@/server/domains/actions";
 import { formatRelativeTime } from "@/utils/dashboard";
-import { consumePendingDomainsAction, getWorkspaceFromSearch } from "@/utils/topbar-navigation";
+import { consumePendingDomainsAction } from "@/utils/topbar-navigation";
 import {
   parsePositivePageSearchValue,
   parseTextSearchValue,
@@ -80,6 +80,7 @@ export const Route = createFileRoute("/domains/")({
 
     return {
       workspace,
+      q: deps.q,
       domains: domainsResult,
       projects: projectsResult.items.map((project) => ({
         id: project.id,
@@ -149,23 +150,27 @@ function mapDomainToRow(domain: DomainRecord): Domain {
 function DomainsPage() {
   const { canWrite } = useWorkspaceRole();
   const router = useRouter();
-  const search = Route.useSearch();
-  const { domains: domainsResult, projects, workspace } = Route.useLoaderData();
+  const { domains: initialDomainsResult, projects, workspace, q: initialSearch } = Route.useLoaderData();
   const { settingsSnapshot } = RootRoute.useLoaderData() ?? ({} as any);
-  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
-  const workspaceFromUrl = getWorkspaceFromSearch({ searchStr });
-  const [addDomainOpen, setAddDomainOpen] = useState(false);
-  const [addDomainStep, setAddDomainStep] = useState<DomainStep | undefined>();
-  const [searchQuery, setSearchQuery] = useState(search.q ?? "");
-  const [rows, setRows] = useState<Domain[]>(() => domainsResult.items.map((item) => mapDomainToRow(item)));
-  const navigate = useNavigate({ from: "/domains/" });
+  const search = Route.useSearch();
   const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
   const pendingPage = useRouterState({
     select: (s) => {
-      const pending = s.pendingLocation ?? s.location;
-      return parsePositivePageSearchValue((pending.search as Record<string, unknown>)?.page) ?? 1;
+      const activeSearch = (s.location.search ?? s.resolvedLocation?.search) as Record<string, unknown> | undefined;
+      return parsePositivePageSearchValue(activeSearch?.page) ?? 1;
     },
   });
+  const [addDomainOpen, setAddDomainOpen] = useState(false);
+  const [addDomainStep, setAddDomainStep] = useState<DomainStep | undefined>();
+  const [domainsResult, setDomainsResult] = useState<PaginatedDomainsResponse>(initialDomainsResult);
+  const [rows, setRows] = useState<Domain[]>(() => initialDomainsResult.items.map((item) => mapDomainToRow(item)));
+  const [query, setQuery] = useState(initialSearch ?? "");
+  const [activeSearch, setActiveSearch] = useState(initialSearch ?? "");
+  const [isSearching, setIsSearching] = useState(false);
+  const navigate = useNavigate({ from: "/domains/" });
+  const listDomainsPage = useServerFn(listDomainsPageServerFn as any) as (args: {
+    data: { page?: number; workspace?: string; q?: string };
+  }) => Promise<PaginatedDomainsResponse>;
   const refreshDomainStatus = useServerFn(refreshDomainStatusServerFn as any) as (args: {
     data: { workspace?: string; domainName: string };
   }) => Promise<DomainRecord | null>;
@@ -190,44 +195,53 @@ function DomainsPage() {
     data: { workspace?: string; domainId: string; projectId?: string };
   }) => Promise<{ success: boolean }>;
 
-  const buildDomainsSearch = useCallback(
-    (next: { page?: number; q?: string }) => ({
-      page: next.page,
-      workspace: workspaceFromUrl,
-      q: next.q,
-    }),
-    [workspaceFromUrl],
-  );
+  useEffect(() => {
+    setDomainsResult(initialDomainsResult);
+    setRows(initialDomainsResult.items.map((item) => mapDomainToRow(item)));
+    setActiveSearch(initialSearch ?? "");
+    setQuery(initialSearch ?? "");
+  }, [initialDomainsResult, initialSearch]);
 
   useEffect(() => {
-    setRows(domainsResult.items.map((item) => mapDomainToRow(item)));
-  }, [domainsResult.items]);
-
-  useEffect(() => {
-    setSearchQuery(search.q ?? "");
-  }, [search.q]);
-
-  useEffect(() => {
+    let active = true;
     const timeout = window.setTimeout(() => {
-      const nextQ = searchQuery.trim() || undefined;
-      if ((search.q ?? undefined) === nextQ) {
+      const trimmedQuery = query.trim();
+      if (trimmedQuery === activeSearch) {
         return;
       }
 
-      navigate({
-        to: "/domains/",
-        replace: true,
-        search: buildDomainsSearch({
-          q: nextQ,
-          page: undefined,
-        }),
-      });
+      setIsSearching(true);
+
+      void listDomainsPage({
+        data: {
+          workspace,
+          q: trimmedQuery || undefined,
+        },
+      })
+        .then((result) => {
+          if (!active) {
+            return;
+          }
+
+          setDomainsResult(result);
+          setRows(result.items.map((item) => mapDomainToRow(item)));
+          setActiveSearch(trimmedQuery);
+        })
+        .catch(() => {
+          // keep current rows visible on search failure
+        })
+        .finally(() => {
+          if (active) {
+            setIsSearching(false);
+          }
+        });
     }, 300);
 
     return () => {
+      active = false;
       window.clearTimeout(timeout);
     };
-  }, [buildDomainsSearch, navigate, search, search.q, searchQuery]);
+  }, [activeSearch, listDomainsPage, query, workspace]);
 
   const openAddDomain = useCallback((step?: DomainStep) => {
     setAddDomainStep(step);
@@ -307,21 +321,18 @@ function DomainsPage() {
     }
   }, [canWrite, openAddDomain]);
 
-  const settledSearchQuery = search.q?.trim() ?? "";
-  const pendingSearchQuery = searchQuery.trim();
-  const isSearchSettling = pendingSearchQuery !== settledSearchQuery;
-
-  function handlePageChange(page: number) {
-    if (page < 1 || page === domainsResult.currentPage || page > domainsResult.totalPages) {
+  function handlePageChange(nextPage: number) {
+    if (nextPage < 1 || nextPage === domainsResult.currentPage || nextPage > domainsResult.totalPages) {
       return;
     }
 
-    navigate({
-      to: "/domains/",
-      search: buildDomainsSearch({
-        q: search.q,
-        page: page === 1 ? undefined : page,
-      }),
+    void navigate({
+      to: "/domains",
+      search: {
+        ...(search.workspace ? { workspace: search.workspace } : {}),
+        ...(activeSearch ? { q: activeSearch } : {}),
+        ...(nextPage > 1 ? { page: nextPage } : {}),
+      },
     });
   }
 
@@ -490,9 +501,9 @@ function DomainsPage() {
         domains={rows}
         basePath="/domains"
         projects={projects}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        searchLoading={isSearchSettling}
+        searchQuery={query}
+        onSearchQueryChange={setQuery}
+        searchLoading={isSearching}
         onRefreshDomain={handleRefreshDomain}
         onConfigureDomain={canWrite ? handleConfigureDomain : undefined}
         onDeleteDomain={canWrite ? handleDeleteDomain : undefined}
