@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { LoaderCircle } from "lucide-react";
+import { debounce, parseAsInteger, parseAsString, useQueryStates } from "nuqs";
+import { hapticToast as toast } from "@/utils/haptic-toast";
 import { SearchFilterBar } from "../../components/shared/search-filter-bar";
 import { DashButton } from "../../components/shared/dash-button";
 import { AddonCard } from "../../components/shared/addon-card";
@@ -12,6 +15,7 @@ import { listMcpTemplatesServerFn, listMcpCategoriesServerFn } from "@/server/mc
 import type { McpServerListResult } from "@/backend/mcp";
 import { parsePositivePageSearchValue, parseTextSearchValue } from "@/utils/workspace-route-search";
 import { useHaptics } from "@/hooks/use-haptics";
+import { AddonsPending } from "@/components/shared/route-pending";
 
 const ADDONS_PAGE_SIZE = 18;
 
@@ -29,15 +33,7 @@ export const Route = createFileRoute("/addons/")({
     if (q) next.q = q;
     return next;
   },
-  loaderDeps: ({ search }) => ({
-    page: parsePositivePageSearchValue(search.page) ?? 1,
-    category: parseTextSearchValue(search.category),
-    q: parseTextSearchValue(search.q),
-  }),
-  loader: async ({ deps }) => {
-    const page = deps.page;
-    const offset = (page - 1) * ADDONS_PAGE_SIZE;
-
+  loader: async () => {
     const [result, categories] = await Promise.all([
       (
         listMcpTemplatesServerFn as unknown as (input: {
@@ -45,10 +41,8 @@ export const Route = createFileRoute("/addons/")({
         }) => Promise<McpServerListResult>
       )({
         data: {
-          query: deps.q,
           limit: ADDONS_PAGE_SIZE,
-          offset,
-          category: deps.category,
+          offset: 0,
         },
       }),
       (listMcpCategoriesServerFn as unknown as () => Promise<string[]>)().catch(() => [] as string[]),
@@ -58,9 +52,10 @@ export const Route = createFileRoute("/addons/")({
     const total = result.pagination.total ?? addons.length;
     const totalPages = Math.max(1, Math.ceil(total / ADDONS_PAGE_SIZE));
 
-    return { addons, total, page, totalPages, categories };
+    return { addons, total, page: 1, totalPages, categories };
   },
   component: AddonsPage,
+  pendingComponent: AddonsPending,
 });
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -83,74 +78,105 @@ function AddonGrid({ items, delayOffset = 0 }: { items: DiscoverAddon[]; delayOf
 }
 
 function AddonsPage() {
-  const navigate = useNavigate({ from: "/addons/" });
   const haptics = useHaptics();
-  const routeSearch = Route.useSearch();
-  const [searchQuery, setSearchQuery] = useState(routeSearch.q ?? "");
+  const [{ q: searchQuery, page, category }, setSearchParams] = useQueryStates(
+    {
+      q: parseAsString.withDefault(""),
+      page: parseAsInteger.withDefault(1),
+      category: parseAsString.withDefault(""),
+    },
+    {
+      history: "replace",
+      clearOnDefault: true,
+    },
+  );
   const loaderData = Route.useLoaderData();
-  const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
-  const pendingSearch = useRouterState({
-    select: (s) => {
-      const pending = s.pendingLocation ?? s.location;
-      const pendingSearchRow = pending.search as Record<string, unknown>;
-      return {
-        q: parseTextSearchValue(pendingSearchRow.q),
-        category: parseTextSearchValue(pendingSearchRow.category),
-      };
-    },
+  const [addonData, setAddonData] = useState<{
+    addons: DiscoverAddon[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }>({
+    addons: loaderData.addons,
+    total: loaderData.total,
+    page: loaderData.page,
+    totalPages: loaderData.totalPages,
   });
-  const pendingPage = useRouterState({
-    select: (s) => {
-      const pending = s.pendingLocation ?? s.location;
-      return parsePositivePageSearchValue((pending.search as Record<string, unknown>)?.page) ?? 1;
-    },
-  });
+  const [isLoadingAddons, setIsLoadingAddons] = useState(false);
+  const [loadingPage, setLoadingPage] = useState<number | null>(null);
+  const listMcpTemplates = useServerFn(listMcpTemplatesServerFn as any) as (input: {
+    data?: { query?: string; limit?: number; offset?: number; category?: string };
+  }) => Promise<McpServerListResult>;
 
-  const activeCategory = routeSearch.category ?? undefined;
-  const displayAddons = loaderData.addons;
-  const displayTotal = loaderData.total;
-  const settledSearchQuery = routeSearch.q?.trim() ?? "";
-  const pendingSearchQuery = searchQuery.trim();
-  const isSearchSettling = pendingSearchQuery !== settledSearchQuery;
-  const isSearchOrCategoryLoading =
-    isRouterLoading &&
-    ((pendingSearch.q ?? undefined) !== (routeSearch.q ?? undefined) ||
-      (pendingSearch.category ?? undefined) !== (routeSearch.category ?? undefined));
-
-  function buildAddonsSearch(next: { page?: number; category?: string; q?: string }) {
-    return {
-      page: next.page,
-      category: next.category,
-      q: next.q,
-    };
-  }
+  const activeCategory = category.trim() ? category.trim() : undefined;
+  const displayAddons = addonData.addons;
+  const displayTotal = addonData.total;
+  const isSearchSettling = isLoadingAddons;
+  const showBlockingLoader = isLoadingAddons && displayAddons.length === 0;
 
   useEffect(() => {
-    setSearchQuery(routeSearch.q ?? "");
-  }, [routeSearch.q]);
+    setAddonData({
+      addons: loaderData.addons,
+      total: loaderData.total,
+      page: loaderData.page,
+      totalPages: loaderData.totalPages,
+    });
+  }, [loaderData.addons, loaderData.page, loaderData.total, loaderData.totalPages]);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      const nextQ = searchQuery.trim() || undefined;
-      if ((routeSearch.q ?? undefined) === nextQ) {
-        return;
-      }
+    let cancelled = false;
+    const nextPage = page > 0 ? page : 1;
+    const query = searchQuery.trim() || undefined;
+    const nextCategory = activeCategory;
+    const offset = (nextPage - 1) * ADDONS_PAGE_SIZE;
 
-      void navigate({
-        to: "/addons/",
-        replace: true,
-        search: buildAddonsSearch({
-          category: routeSearch.category,
-          q: nextQ,
-          page: undefined,
-        }),
+    setIsLoadingAddons(true);
+    setLoadingPage(nextPage);
+
+    void listMcpTemplates({
+      data: {
+        query,
+        limit: ADDONS_PAGE_SIZE,
+        offset,
+        category: nextCategory,
+      },
+    })
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        const addons = result.servers.map(mapMcpTemplateToAddon);
+        const total = result.pagination.total ?? addons.length;
+        const totalPages = Math.max(1, Math.ceil(total / ADDONS_PAGE_SIZE));
+
+        setAddonData({
+          addons,
+          total,
+          page: nextPage,
+          totalPages,
+        });
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+
+        toast.error("Unable to load MCP servers");
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setIsLoadingAddons(false);
+        setLoadingPage(null);
       });
-    }, 300);
 
     return () => {
-      window.clearTimeout(timeout);
+      cancelled = true;
     };
-  }, [navigate, routeSearch.category, routeSearch.q, searchQuery]);
+  }, [activeCategory, listMcpTemplates, page, searchQuery]);
 
   function selectCategory(cat?: string) {
     haptics.selection();
@@ -159,13 +185,9 @@ function AddonsPage() {
       return;
     }
 
-    void navigate({
-      to: "/addons/",
-      search: buildAddonsSearch({
-        category: nextCategory,
-        q: routeSearch.q,
-        page: undefined,
-      }),
+    void setSearchParams({
+      category: nextCategory || "",
+      page: 1,
     });
   }
 
@@ -222,12 +244,27 @@ function AddonsPage() {
       )}
 
       <div className="mt-4">
-        <SearchFilterBar value={searchQuery} onChange={setSearchQuery} placeholder="Search MCP servers..." loading={isSearchSettling} />
+        <SearchFilterBar
+          value={searchQuery}
+          onChange={(nextSearchQuery) => {
+            void setSearchParams(
+              {
+                q: nextSearchQuery,
+                page: 1,
+              },
+              {
+                limitUrlUpdates: debounce(300),
+              },
+            );
+          }}
+          placeholder="Search MCP servers..."
+          loading={isSearchSettling}
+        />
       </div>
 
       <div className="mt-6">
         <AnimatePresence mode="wait">
-          {isSearchOrCategoryLoading ? (
+          {showBlockingLoader ? (
             <motion.div
               key="loading"
               initial={{ opacity: 0 }}
@@ -241,28 +278,23 @@ function AddonsPage() {
             </motion.div>
           ) : displayAddons.length ? (
             <motion.div
-              key={`grid-${activeCategory ?? "all"}-${routeSearch.q ?? ""}-${loaderData.page}`}
+              key={`grid-${activeCategory ?? "all"}-${searchQuery}-${addonData.page}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
               <AddonGrid items={displayAddons} />
-              {loaderData.totalPages > 1 && (
+              {addonData.totalPages > 1 && (
                 <div className="mt-6 flex justify-end">
                   <NumberPagination
-                    currentPage={loaderData.page}
-                    totalPages={loaderData.totalPages}
-                    isLoading={isRouterLoading}
-                    loadingPage={isRouterLoading ? pendingPage : null}
+                    currentPage={addonData.page}
+                    totalPages={addonData.totalPages}
+                    isLoading={isLoadingAddons && !showBlockingLoader}
+                    loadingPage={loadingPage}
                     onPageChange={(nextPage) => {
-                      navigate({
-                        to: "/addons/",
-                        search: buildAddonsSearch({
-                          category: routeSearch.category,
-                          q: routeSearch.q,
-                          page: nextPage === 1 ? undefined : nextPage,
-                        }),
+                      void setSearchParams({
+                        page: nextPage,
                       });
                     }}
                   />

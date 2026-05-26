@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Github, ArrowLeft, Loader2, Fingerprint } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { invalidateSessionCache } from "../lib/auth-guards";
+import { logAuthFlow, warnAuthFlow } from "@/lib/auth-flow-logger";
 import { getClientGeo } from "@/lib/client-geo";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -427,6 +428,7 @@ function LoginPage() {
     }
 
     sessionExpiredToastShownRef.current = true;
+    warnAuthFlow("login page loaded with session-expired reason");
     toast.error("Session Expired");
   }, []);
 
@@ -435,6 +437,7 @@ function LoginPage() {
       return;
     }
     haptics.selection();
+    logAuthFlow("oauth sign-in started", { provider });
 
     setOauthLoadingProvider(provider);
 
@@ -446,16 +449,28 @@ function LoginPage() {
         const nav = twoFactor.buildTwoFactorChallengeNavigation(challenge, {
           next: getNextUrl(),
         });
+        logAuthFlow("oauth sign-in requires two-factor challenge", {
+          provider,
+          hasNext: Boolean(getNextUrl()),
+        });
         navigate({ to: "/2fa", search: nav.search, hash: nav.hash });
         return;
       }
 
       saveLastAuthMethod(provider);
+      logAuthFlow("oauth sign-in successful", {
+        provider,
+        redirectTo: getNextUrl(),
+      });
       toast.success(`Welcome back${data.user?.firstName ? `, ${data.user.firstName}` : ""}`);
       invalidateSessionCache();
       window.location.replace(getNextUrl());
       return;
     } catch (error) {
+      warnAuthFlow("oauth sign-in failed", {
+        provider,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
       toast.error(getFriendlyAuthError(error, "OAuth sign in failed"));
       setOauthLoadingProvider(null);
     }
@@ -463,6 +478,7 @@ function LoginPage() {
 
   const runPasskeyVerify = useCallback(
     async (challengeToken: string, credential: unknown) => {
+      logAuthFlow("passkey verify started");
       const response = await verifyPasskeyAuth({
         data: {
           challengeToken,
@@ -471,6 +487,9 @@ function LoginPage() {
         },
       });
       saveLastAuthMethod("email");
+      logAuthFlow("passkey sign-in successful", {
+        redirectTo: getNextUrl(),
+      });
       toast.success(`Welcome back${response.user.firstName ? `, ${response.user.firstName}` : ""}`);
       invalidateSessionCache();
       window.location.replace(getNextUrl());
@@ -491,14 +510,19 @@ function LoginPage() {
 
     haptics.selection();
     setPasskeyLoading(true);
+    logAuthFlow("passkey sign-in started");
     const passkey = await loadPasskey();
     try {
       const { options, challengeToken } = await getPasskeyAuthOptions({
         data: { email: normalizedEmail },
       });
+      logAuthFlow("passkey auth options received");
       const credential = await passkey.runAuthentication(options);
       await runPasskeyVerify(challengeToken, credential);
     } catch (error) {
+      warnAuthFlow("passkey sign-in failed", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
       const msg = passkey.passkeyErrorMessage(error);
       if (msg && !msg.toLowerCase().includes("cancel")) {
         toast.error(msg);
@@ -523,6 +547,7 @@ function LoginPage() {
         const { isPasskeyAutofillSupported, runAuthentication } = await loadPasskey();
         const supportsAutofill = await isPasskeyAutofillSupported();
         if (cancelled || !supportsAutofill) return;
+        logAuthFlow("passkey autofill started");
         const { options, challengeToken } = await getPasskeyAuthOptions({
           data: { email: normalizedEmail },
         });
@@ -538,7 +563,7 @@ function LoginPage() {
           !msg.toLowerCase().includes("cancel") &&
           !msg.toLowerCase().includes("notallowed")
         ) {
-          console.warn("[passkey-autofill]", msg);
+          warnAuthFlow("passkey autofill failed", { message: msg });
         }
       }
     })();
@@ -559,11 +584,16 @@ function LoginPage() {
 
     setEmailError(null);
     setLoading(true);
+    logAuthFlow("email otp request started");
     try {
       await requestLoginOtp({ data: { email, geo: await getClientGeo() } });
+      logAuthFlow("email otp request successful");
       toast.success("Verification code sent");
       setStep("otp");
     } catch (error) {
+      warnAuthFlow("email otp request failed", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
       toast.error(getFriendlyAuthError(error, "Failed to send code"));
     } finally {
       setLoading(false);
@@ -575,6 +605,7 @@ function LoginPage() {
     const code = otpRef.current;
     if (code.length < 6) return;
     setLoading(true);
+    logAuthFlow("email code verification started");
     try {
       const response = await verifyEmailCode({
         data: { email, code, geo: await getClientGeo() },
@@ -588,16 +619,23 @@ function LoginPage() {
           },
           { next: getNextUrl() },
         );
+        logAuthFlow("email code verification requires two-factor challenge");
         navigate({ to: "/2fa", search: nav.search, hash: nav.hash });
         return;
       }
 
       saveLastAuthMethod("email");
+      logAuthFlow("email code verification successful", {
+        redirectTo: getNextUrl(),
+      });
       toast.success(`Welcome back${response.user.firstName ? `, ${response.user.firstName}` : ""}`);
       invalidateSessionCache();
       window.location.replace(getNextUrl());
       return;
     } catch (error) {
+      warnAuthFlow("email code verification failed", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
       toast.error(getFriendlyAuthError(error, "Verification failed"));
       setLoading(false);
     }
@@ -608,10 +646,15 @@ function LoginPage() {
     setOtp("");
     if (!email.trim()) return;
     setLoading(true);
+    logAuthFlow("email otp resend started");
     try {
       await resendAuthCode({ data: { email, geo: await getClientGeo() } });
+      logAuthFlow("email otp resend successful");
       toast.success("Code resent");
     } catch (error) {
+      warnAuthFlow("email otp resend failed", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
       toast.error(getFriendlyAuthError(error, "Failed to resend code"));
     } finally {
       setLoading(false);

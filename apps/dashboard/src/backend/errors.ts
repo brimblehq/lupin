@@ -1,5 +1,7 @@
 import type { ApiErrorShape } from "./types";
 
+export const PLAN_UPGRADE_REQUIRED_CODE = "PLAN_UPGRADE_REQUIRED";
+
 export class BackendNotImplementedError extends Error {
   constructor(scope: string, methodName: string) {
     super(`[backend boilerplate] ${scope}.${methodName} is not implemented yet.`);

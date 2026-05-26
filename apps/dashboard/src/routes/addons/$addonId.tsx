@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, ExternalLink, ChevronDown } from "lucide-react";
 import { ToggleSwitch } from "../../components/shared/toggle-switch";
+import { SimpleTooltip } from "../../components/shared/tooltip";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { AddonCard } from "../../components/shared/addon-card";
 import { GlossyButton } from "../../components/shared/glossy-button";
@@ -15,7 +17,11 @@ import type { GithubAccount, GithubAccountsResult } from "@/backend/repositories
 import { deployMcpTemplateServerFn, getMcpTemplateServerFn, listMcpTemplatesServerFn } from "@/server/mcp/actions";
 import { listGithubAccountsServerFn } from "@/server/repositories/actions";
 import { mapMcpTemplateToAddon, mapMcpTemplateToAddonDetail } from "@/utils/discover-mcp";
+import { getBuildDisabledMessage } from "@/utils/dashboard";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
+import type { SettingsSidebarSnapshot } from "@/backend/settings";
+
+const rootRoute = getRouteApi("__root__");
 
 export const Route = createFileRoute("/addons/$addonId")({
   staleTime: 300_000,
@@ -127,6 +133,12 @@ function chooseGithubInstallation(accounts: GithubAccount[], workspace?: string)
 
 function AddonDetailPage() {
   const { canWrite } = useWorkspaceRole();
+  const { planKey } = usePlanGate();
+  const isFreePlan = planKey === "free";
+  const { settingsSnapshot } = (rootRoute.useLoaderData() ?? {}) as { settingsSnapshot: SettingsSidebarSnapshot | null };
+  const profile = settingsSnapshot?.profile;
+  const buildBlockMessage = getBuildDisabledMessage(Boolean(profile?.buildDisabled), profile?.buildDisabledBy, "deploy this server");
+  const deployBlockMessage = buildBlockMessage ?? (isFreePlan ? "Upgrade your plan to deploy MCP servers." : null);
   const router = useRouter();
   const navigate = useNavigate();
   const search = Route.useSearch() as { workspace?: string };
@@ -317,18 +329,27 @@ function AddonDetailPage() {
             </div>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {canWrite && (
-              <GlossyButton
-                className="min-w-[160px]"
-                loading={deploying}
-                loadingLabel="Deploying..."
-                onClick={() => {
-                  void handleDeployServer();
-                }}
-              >
-                Deploy server
-              </GlossyButton>
-            )}
+            {canWrite &&
+              (deployBlockMessage ? (
+                <SimpleTooltip content={deployBlockMessage}>
+                  <span className="inline-flex">
+                    <GlossyButton className="min-w-[160px]" disabled>
+                      Deploy server
+                    </GlossyButton>
+                  </span>
+                </SimpleTooltip>
+              ) : (
+                <GlossyButton
+                  className="min-w-[160px]"
+                  loading={deploying}
+                  loadingLabel="Deploying..."
+                  onClick={() => {
+                    void handleDeployServer();
+                  }}
+                >
+                  Deploy server
+                </GlossyButton>
+              ))}
             {detail.githubUrl || detail.documentationUrl ? (
               <a
                 href={detail.githubUrl || detail.documentationUrl}

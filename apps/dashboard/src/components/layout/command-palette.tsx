@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { Command } from "cmdk";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check, SignOut, Compass } from "@phosphor-icons/react";
+import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check, SignOut, Compass, Cube, HardDrives } from "@phosphor-icons/react";
 import { startProductTour } from "../shared/product-tour";
 import { PaletteView, Theme } from "../../types/enums";
 import { useScoutBar } from "../../contexts/scoutbar-context";
@@ -21,6 +21,7 @@ import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import { logoutServerFn } from "@/server/auth/actions";
 import { invalidateSessionCache } from "@/lib/auth-guards";
+import { logAuthFlow, warnAuthFlow } from "@/lib/auth-flow-logger";
 import { posthog } from "@/lib/posthog";
 
 const rootRoute = getRouteApi("__root__");
@@ -530,6 +531,17 @@ export function CommandPalette() {
                             </Command.Group>
                           )}
 
+                          <Command.Group heading="SANDBOXES &amp; VOLUMES">
+                            <Command.Item value="sandboxes sandbox environments" onSelect={() => runAction(() => go("/sandboxes"))}>
+                              <Cube className="size-4" />
+                              <span>Sandboxes</span>
+                            </Command.Item>
+                            <Command.Item value="volumes storage disks" onSelect={() => runAction(() => go("/volumes"))}>
+                              <HardDrives className="size-4" />
+                              <span>Volumes</span>
+                            </Command.Item>
+                          </Command.Group>
+
                           <Command.Group heading="TEAM">
                             <Command.Item value="switch environment staging production development" onSelect={openEnvironmentSearch}>
                               <TreeStructure className="size-4" />
@@ -595,9 +607,15 @@ export function CommandPalette() {
                               value="logout sign out"
                               onSelect={() =>
                                 runAction(() => {
-                                  logoutServerFn()
-                                    .catch(() => {})
+                                  logAuthFlow("user initiated sign-out from command palette");
+                                  void logoutServerFn()
+                                    .catch((error) => {
+                                      warnAuthFlow("sign-out request failed in command palette", {
+                                        message: error instanceof Error ? error.message : "Unknown error",
+                                      });
+                                    })
                                     .then(() => {
+                                      logAuthFlow("sign-out flow navigating to login from command palette");
                                       posthog.reset();
                                       invalidateSessionCache();
                                       window.location.href = "/login";

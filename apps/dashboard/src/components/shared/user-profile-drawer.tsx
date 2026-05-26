@@ -24,6 +24,7 @@ import {
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics, setHapticsEnabled } from "@/hooks/use-haptics";
 import { invalidateSessionCache } from "@/lib/auth-guards";
+import { logAuthFlow, warnAuthFlow } from "@/lib/auth-flow-logger";
 import { posthog } from "@/lib/posthog";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { InviteMembersModal } from "../settings/invite-members-modal";
@@ -2100,11 +2101,17 @@ export function UserProfileDrawer({
       return;
     }
 
+    logAuthFlow("user initiated sign-out from profile drawer");
     setIsSigningOut(true);
 
-    logoutServerFn()
-      .catch(() => {})
+    void logoutServerFn()
+      .catch((error) => {
+        warnAuthFlow("sign-out request failed in profile drawer", {
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      })
       .then(() => {
+        logAuthFlow("sign-out flow navigating to login from profile drawer");
         posthog.reset();
         invalidateSessionCache();
         window.location.href = "/login";

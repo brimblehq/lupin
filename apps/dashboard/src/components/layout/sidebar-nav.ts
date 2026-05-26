@@ -18,18 +18,18 @@ export const mainNav = [
     tourId: "scaling",
   },
   {
-    label: "Buckets",
-    icon: "/icons/bucket.svg",
-    href: "/buckets",
-    flag: FeatureFlags.ENABLE_BUCKETS,
+    label: "Volumes",
+    icon: "/icons/storage-menu.svg",
+    href: "/volumes",
+    flag: FeatureFlags.ENABLE_SANDBOX,
   },
   {
     label: "Sandboxes",
-    icon: "/icons/sandbox.svg",
+    icon: "/icons/sandbox-sidebar.svg",
     href: "/sandboxes",
     flag: FeatureFlags.ENABLE_SANDBOX,
-    comingSoon: true,
   },
+  { label: "Buckets", icon: "/icons/bucket.svg", href: "/buckets", flag: FeatureFlags.ENABLE_BUCKETS },
 ];
 
 export const moreNav = [

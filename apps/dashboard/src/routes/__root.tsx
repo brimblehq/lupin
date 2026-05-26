@@ -1,5 +1,6 @@
 import { HeadContent, Outlet, Scripts, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { NuqsAdapter } from "nuqs/adapters/react";
 import { capturePostHog, initPostHog, isPostHogEnabled } from "@/lib/posthog";
 import { useTheme } from "../hooks/use-theme";
 import { DashboardLayout } from "../components/layout/dashboard-layout";
@@ -322,17 +323,19 @@ function RootComponent() {
   }, [fetchTags, hydrate, hydrated, storeWorkspace, tags, workspace]);
 
   return (
-    <DashboardLayout
-      initialWorkspaceSlug={loaderWorkspace}
-      initialSettingsSnapshot={settingsSnapshot}
-      initialWorkspaces={workspaces}
-      initialProjectSwitcherProjects={projectSwitcherProjects}
-      initialOnboardingProjects={onboardingProjects}
-      initialSubscriptionStats={subscriptionStats ?? null}
-      initialUserOverview={userOverview ?? null}
-      initialPricing={pricing}
-    >
-      <Outlet />
-    </DashboardLayout>
+    <NuqsAdapter>
+      <DashboardLayout
+        initialWorkspaceSlug={loaderWorkspace}
+        initialSettingsSnapshot={settingsSnapshot}
+        initialWorkspaces={workspaces}
+        initialProjectSwitcherProjects={projectSwitcherProjects}
+        initialOnboardingProjects={onboardingProjects}
+        initialSubscriptionStats={subscriptionStats ?? null}
+        initialUserOverview={userOverview ?? null}
+        initialPricing={pricing}
+      >
+        <Outlet />
+      </DashboardLayout>
+    </NuqsAdapter>
   );
 }

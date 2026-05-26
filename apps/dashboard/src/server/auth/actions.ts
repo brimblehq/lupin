@@ -250,15 +250,22 @@ export const getAccessTokenServerFn = createServerFn({ method: "GET" }).handler(
 export const getCurrentSessionServerFn = createServerFn({ method: "GET" }).handler(async () => {
   const accessToken = getServerAccessToken();
   if (!accessToken) {
+    authLogger.info("getCurrentSession skipped: missing access token");
     return null;
   }
 
   try {
     const session = await getServerBackendApi().auth.getCurrentSession();
-    if (!session) return null;
+    if (!session) {
+      authLogger.warn("getCurrentSession returned empty session");
+      return null;
+    }
     return { user: session.user };
   } catch (error: any) {
-    if (error?.status === 401) return null;
+    if (error?.status === 401) {
+      authLogger.info("getCurrentSession unauthorized (401)");
+      return null;
+    }
     authLogger.warn("getCurrentSession error", getErrorMeta(error));
     throw error;
   }
@@ -282,6 +289,7 @@ type RefreshSessionServerResult =
 export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler(async () => {
   const refreshToken = getServerRefreshToken();
   if (!refreshToken) {
+    authLogger.info("refreshSession skipped: missing refresh token");
     return {
       status: "missing",
     } satisfies RefreshSessionServerResult;
@@ -295,6 +303,7 @@ export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler
 
     const session = await refreshServerSession(refreshToken);
     if (!session) {
+      authLogger.warn("refreshSession returned empty session");
       return {
         status: "missing",
       } satisfies RefreshSessionServerResult;
@@ -315,6 +324,9 @@ export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler
     authLogger.warn("refreshSession failed", getErrorMeta(error));
 
     if (status === 401 || status === 403) {
+      authLogger.warn("refreshSession expired", {
+        status,
+      });
       return {
         status: "expired",
       } satisfies RefreshSessionServerResult;

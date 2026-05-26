@@ -1,5 +1,4 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Info } from "lucide-react";
 import { Modal, ModalFooter, ModalCancelButton, ModalContinueButton } from "@/components/shared/modal";
 
 interface ConfirmServerRuntimeModalProps {
@@ -26,8 +25,8 @@ export function ConfirmServerRuntimeModal({
   return (
     <Modal open={open} onOpenChange={onOpenChange} width={460}>
       <div className="flex flex-col items-center gap-4 px-6 pt-6 pb-5 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full bg-[#4879f8]/10">
-          <Info className="size-5 text-[#4879f8]" />
+        <div className="flex size-12 items-center justify-center rounded-full bg-[#4879f8]">
+          <img src="/icons/info.svg" alt="" className="size-6" />
         </div>
         <div className="flex flex-col gap-1.5">
           <Dialog.Title className="text-base font-medium leading-[1.4] tracking-[-0.096px] text-dash-text-strong">

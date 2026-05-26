@@ -247,6 +247,56 @@ export function ProjectsListPending() {
 }
 
 /* ─────────────────────────────────────────────
+   /addons (Discover MCP Servers)
+
+   Mirrors routes/addons/index.tsx:
+   1. Header banner card: title + subtitle + small "N servers" pill
+   2. Category chips row (rounded-full pills)
+   3. Search bar
+   4. 3-col grid of AddonCards (gradient header + name + description + footer link)
+   ───────────────────────────────────────────── */
+
+export function AddonsPending() {
+  const chipWidths = ["w-12", "w-20", "w-16", "w-24", "w-14"];
+
+  return (
+    <div className="px-4 py-8 md:px-10" aria-hidden="true">
+      <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft">
+        <div className="px-8 py-8">
+          <div className={`h-4 w-44 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+          <div className={`mt-2 h-3.5 w-full max-w-[540px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+          <div className={`mt-4 h-7 w-40 rounded-[4px] ${PULSE_BG_MEDIUM} animate-pulse`} />
+        </div>
+      </div>
+
+      <div className="mt-5 flex gap-2">
+        {chipWidths.map((w, i) => (
+          <div key={i} className={`h-7 ${w} rounded-full ${PULSE_BG_WEAK} animate-pulse`} />
+        ))}
+      </div>
+
+      <div className="mt-4 h-9 w-full animate-pulse rounded-[4px] border border-dash-border bg-dash-bg-elevated/30" />
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft">
+            <div className="h-[101px] animate-pulse border-b-[0.5px] border-dash-border bg-dash-bg-elevated/40" />
+            <div className="px-3.5 pt-3 pb-2">
+              <div className={`h-3.5 w-32 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+              <div className={`mt-2 h-3 w-full rounded ${PULSE_BG_WEAK} animate-pulse`} />
+              <div className={`mt-1.5 h-3 w-3/4 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            </div>
+            <div className="border-t-[0.5px] border-dash-border-soft px-3.5 py-2">
+              <div className={`h-3.5 w-20 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    /projects/$projectId (overview)
 
    Mirrors the actual layout:

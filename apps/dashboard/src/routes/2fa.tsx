@@ -6,6 +6,7 @@ import { AuthSplitLayout, OtpInput } from "@/components/auth/auth-split-layout";
 import { verifyTwoFactorChallengeServerFn } from "@/server/auth/actions";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { invalidateSessionCache } from "@/lib/auth-guards";
+import { logAuthFlow, warnAuthFlow } from "@/lib/auth-flow-logger";
 import { getClientGeo } from "@/lib/client-geo";
 import { parseTwoFactorChallengeHash } from "@/lib/auth/two-factor";
 
@@ -62,10 +63,12 @@ function TwoFactorChallengePage() {
 
     const parsed = parseTwoFactorChallengeHash(window.location.hash);
     if (!parsed) {
+      warnAuthFlow("two-factor page missing or invalid challenge token");
       setErrorMessage("Missing or invalid challenge token. Please log in again.");
       return;
     }
 
+    logAuthFlow("two-factor challenge loaded from hash");
     setChallengeToken(parsed.challengeToken);
     setDeadlineAt(Date.now() + parsed.expiresIn * 1000);
     setNow(Date.now());
@@ -99,6 +102,7 @@ function TwoFactorChallengePage() {
     }
 
     didExpireRef.current = true;
+    warnAuthFlow("two-factor challenge expired, redirecting to login");
     toast.error("Two-factor challenge expired. Please log in again.");
     window.location.replace(getLoginRedirectUrl());
   }, [deadlineAt, remainingSeconds]);
@@ -113,6 +117,7 @@ function TwoFactorChallengePage() {
 
     setLoading(true);
     setErrorMessage(null);
+    logAuthFlow("two-factor verification started", { mode });
 
     try {
       const result = await verifyTwoFactorChallenge({
@@ -123,6 +128,7 @@ function TwoFactorChallengePage() {
         },
       });
 
+      logAuthFlow("two-factor verification successful", { redirectTo: getNextUrl() });
       toast.success(`Welcome back${result.user.firstName ? `, ${result.user.firstName}` : ""}`);
       invalidateSessionCache();
       window.location.replace(getNextUrl());
@@ -130,8 +136,13 @@ function TwoFactorChallengePage() {
     } catch (error: any) {
       const message = error instanceof Error ? error.message : "Verification failed";
       setErrorMessage(message);
+      warnAuthFlow("two-factor verification failed", {
+        status: error?.status ?? null,
+        message,
+      });
 
       if (error?.status === 401) {
+        warnAuthFlow("two-factor verification unauthorized, redirecting to login");
         toast.error(message);
         window.location.replace(getLoginRedirectUrl());
         return;

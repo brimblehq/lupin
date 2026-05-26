@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, getRouteApi, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
+import { debounce, parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import {
   parsePositivePageSearchValue,
   parseTextSearchValue,
@@ -158,24 +159,30 @@ function mapDomainToRow(domain: DomainRecord, fallbackProjectName: string): Doma
 function ProjectDomainsPage() {
   const { projectId } = Route.useParams();
   const router = useRouter();
-  const search = Route.useSearch();
+  const [{ q: searchQuery, page }, setSearchParams] = useQueryStates(
+    {
+      q: parseAsString.withDefault(""),
+      page: parseAsInteger.withDefault(1),
+    },
+    {
+      history: "replace",
+      clearOnDefault: true,
+    },
+  );
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const { settingsSnapshot } = (RootRoute.useLoaderData() ?? {}) as any;
   const { customDomain } = usePlanGate();
   const { canWrite } = useWorkspaceRole();
-  const { domains: domainsResult, projects } = Route.useLoaderData();
+  const { domains: initialDomainsResult, projects } = Route.useLoaderData();
   const [addDomainOpen, setAddDomainOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(search.q ?? "");
-  const [rows, setRows] = useState<Domain[]>(() => domainsResult.items.map((item) => mapDomainToRow(item, project.name)));
+  const [domainsResult, setDomainsResult] = useState<PaginatedDomainsResponse>(initialDomainsResult);
+  const [rows, setRows] = useState<Domain[]>(() => initialDomainsResult.items.map((item) => mapDomainToRow(item, project.name)));
+  const [isDomainsLoading, setIsDomainsLoading] = useState(false);
+  const [loadingPage, setLoadingPage] = useState<number | null>(null);
   const navigate = useNavigate({ from: "/projects/$projectId/domains/" });
-  const isRouterLoading = useRouterState({ select: (s) => s.isLoading });
-  const pendingPage = useRouterState({
-    select: (s) => {
-      const pending = s.pendingLocation ?? s.location;
-      const raw = (pending.search as Record<string, unknown>)?.page;
-      return typeof raw === "number" && raw >= 1 ? Math.floor(raw) : 1;
-    },
-  });
+  const listDomainsPage = useServerFn(listDomainsPageServerFn as any) as (args: {
+    data: { page?: number; workspace?: string; projectName?: string; q?: string };
+  }) => Promise<PaginatedDomainsResponse>;
   const refreshDomainStatus = useServerFn(refreshDomainStatusServerFn as any) as (args: {
     data: { workspace?: string; domainName: string };
   }) => Promise<DomainRecord | null>;
@@ -202,34 +209,54 @@ function ProjectDomainsPage() {
   const { requestStepUp } = useStepUpTwoFactor();
 
   useEffect(() => {
-    setRows(domainsResult.items.map((item) => mapDomainToRow(item, project.name)));
-  }, [domainsResult.items, project.name]);
+    setDomainsResult(initialDomainsResult);
+    setRows(initialDomainsResult.items.map((item) => mapDomainToRow(item, project.name)));
+  }, [initialDomainsResult, project.name]);
 
   useEffect(() => {
-    setSearchQuery(search.q ?? "");
-  }, [search.q]);
+    let cancelled = false;
+    const nextPage = page > 0 ? page : 1;
+    const nextQuery = searchQuery.trim() || undefined;
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      const nextQ = searchQuery.trim() || undefined;
-      if ((search.q ?? undefined) === nextQ) return;
+    setIsDomainsLoading(true);
+    setLoadingPage(nextPage);
 
-      navigate({
-        to: "/projects/$projectId/domains/",
-        params: { projectId },
-        replace: true,
-        search: {
-          ...(search || {}),
-          q: nextQ,
-          page: undefined,
-        },
+    void listDomainsPage({
+      data: {
+        page: nextPage === 1 ? undefined : nextPage,
+        workspace,
+        projectName: projectId,
+        q: nextQuery,
+      },
+    })
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        setDomainsResult(result);
+        setRows(result.items.map((item) => mapDomainToRow(item, project.name)));
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+
+        toast.error("Unable to load project domains");
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setIsDomainsLoading(false);
+        setLoadingPage(null);
       });
-    }, 300);
 
     return () => {
-      window.clearTimeout(timeout);
+      cancelled = true;
     };
-  }, [navigate, projectId, search, searchQuery]);
+  }, [listDomainsPage, page, project.name, projectId, searchQuery, workspace]);
 
   if (!shouldShowProjectDomainsTab(project)) {
     return (
@@ -253,14 +280,7 @@ function ProjectDomainsPage() {
       return;
     }
 
-    navigate({
-      to: "/projects/$projectId/domains/",
-      params: { projectId },
-      search: {
-        ...(search || {}),
-        page: page === 1 ? undefined : page,
-      },
-    });
+    void setSearchParams({ page });
   }
 
   async function handleRefreshDomain(domain: Domain) {
@@ -461,8 +481,18 @@ function ProjectDomainsPage() {
         basePath={`/projects/${projectId}/domains`}
         projects={projects}
         searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        searchLoading={searchQuery.trim() !== (search.q?.trim() ?? "") || (isRouterLoading && (search.q?.trim() ?? "") !== "")}
+        onSearchQueryChange={(nextSearchQuery) => {
+          void setSearchParams(
+            {
+              q: nextSearchQuery,
+              page: 1,
+            },
+            {
+              limitUrlUpdates: debounce(300),
+            },
+          );
+        }}
+        searchLoading={isDomainsLoading}
         onRefreshDomain={handleRefreshDomain}
         onConfigureDomain={canWrite ? handleConfigureDomain : undefined}
         onDeleteDomain={canWrite ? handleDeleteDomain : undefined}
@@ -473,8 +503,8 @@ function ProjectDomainsPage() {
           currentPage={domainsResult.currentPage}
           totalPages={domainsResult.totalPages}
           onPageChange={handlePageChange}
-          isLoading={isRouterLoading}
-          loadingPage={isRouterLoading ? pendingPage : null}
+          isLoading={isDomainsLoading}
+          loadingPage={loadingPage}
         />
       </div>
 
