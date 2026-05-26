@@ -1,5 +1,26 @@
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 
+// Why an action that triggers a build is blocked right now, or null if it isn't. Builds are
+// required to deploy, so a build lock blocks creating projects, deploying MCP servers, etc.
+// The message depends on who locked builds (BUILD_DISABLED_BY in @brimble/models): "user" can
+// self-serve, "system"/"payment_failure" can't. Pass `action` to fit the call site.
+export function getBuildDisabledMessage(
+  buildDisabled: boolean,
+  buildDisabledBy?: string | null,
+  action = "create a project",
+): string | null {
+  if (!buildDisabled) return null;
+
+  switch (buildDisabledBy?.toLowerCase()) {
+    case "system":
+      return `Builds are disabled on your account. Settle your pending invoice or contact support to ${action}.`;
+    case "payment_failure":
+      return `Builds are paused due to an unpaid invoice. Settle your pending invoice to ${action}.`;
+    default:
+      return `Builds are turned off. Re-enable them in your settings to ${action}.`;
+  }
+}
+
 export interface DrawerUserProfile {
   firstName: string;
   lastName: string;

@@ -25,6 +25,8 @@ import { SimpleTooltip } from "../shared/tooltip";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 import { FolderTrashIcon } from "../shared/folder-trash-icon";
 import { WarningModal } from "../shared/warning-modal";
+import { ChangePlanModal } from "../shared/change-plan-modal";
+import { PLAN_UPGRADE_REQUIRED_CODE } from "@/backend/errors";
 import {
   backupDatabaseProjectServerFn,
   deleteProjectServerFn,
@@ -136,6 +138,8 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
   const [deleting, setDeleting] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [refreshingDb, setRefreshingDb] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const { planKey } = usePlanGate();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -315,6 +319,12 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
       });
       void invalidateActiveMatches(router);
     } catch (error: any) {
+      if (error?.code === PLAN_UPGRADE_REQUIRED_CODE) {
+        toast.dismiss(toastId);
+        setUpgradeModalOpen(true);
+        return;
+      }
+
       toast.error("Failed to redeploy project", {
         id: toastId,
         description: typeof error?.message === "string" ? error.message : "Please try again.",
@@ -750,6 +760,8 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
         projectName={projectName}
         currentWorkspaceSlug={workspaceParam}
       />
+
+      <ChangePlanModal open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen} currentPlan={planKey} />
     </>
   );
 }

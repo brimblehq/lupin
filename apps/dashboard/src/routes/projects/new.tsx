@@ -35,6 +35,8 @@ import { ToggleSwitch } from "../../components/shared/toggle-switch";
 import { RangeSlider } from "../../components/shared/range-slider";
 import { Dropdown } from "../../components/shared/dropdown";
 import { SimpleTooltip } from "../../components/shared/tooltip";
+import { getBuildDisabledMessage } from "@/utils/dashboard";
+import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import { DiskSizeSelect } from "../../components/shared/disk-size-select";
 import { diskSizes } from "../../components/shared/disk-size-options";
 import { VolumePicker } from "@/components/volumes/volume-picker";
@@ -1890,6 +1892,7 @@ function Phase3Configure({
   deploying = false,
   saving = false,
   projectCount = 0,
+  buildBlockMessage = null,
   onDeploy,
   onSaveForLater,
   repoBrowser,
@@ -1915,6 +1918,7 @@ function Phase3Configure({
   deploying?: boolean;
   saving?: boolean;
   projectCount?: number;
+  buildBlockMessage?: string | null;
   onDeploy: (input: Phase3DeployInput) => boolean | Promise<boolean>;
   onSaveForLater: (input: Phase3DeployInput) => boolean | Promise<boolean>;
   repoBrowser?: {
@@ -2718,31 +2722,41 @@ function Phase3Configure({
             Save For Later
           </GlossyButton>
 
-          <GlossyButton
-            variant="blue"
-            fullWidth
-            loading={deploying}
-            loadingLabel="Deploying..."
-            disabled={deploying || saving || !canSubmit}
-            onClick={() => {
-              if (limitReached) {
-                setShowUpgradeModal(true);
-                return;
-              }
-              if (requiresServerRuntime) {
-                setConfirmServerRuntimeOpen(true);
-                return;
-              }
-              const deployInput = buildDeployInput();
-              if (!deployInput) {
-                return;
-              }
+          {buildBlockMessage ? (
+            <SimpleTooltip content={buildBlockMessage}>
+              <span className="inline-flex w-full">
+                <GlossyButton variant="blue" fullWidth disabled>
+                  Deploy Project
+                </GlossyButton>
+              </span>
+            </SimpleTooltip>
+          ) : (
+            <GlossyButton
+              variant="blue"
+              fullWidth
+              loading={deploying}
+              loadingLabel="Deploying..."
+              disabled={deploying || saving || !canSubmit}
+              onClick={() => {
+                if (limitReached) {
+                  setShowUpgradeModal(true);
+                  return;
+                }
+                if (requiresServerRuntime) {
+                  setConfirmServerRuntimeOpen(true);
+                  return;
+                }
+                const deployInput = buildDeployInput();
+                if (!deployInput) {
+                  return;
+                }
 
-              void onDeploy(deployInput);
-            }}
-          >
-            Deploy Project
-          </GlossyButton>
+                void onDeploy(deployInput);
+              }}
+            >
+              Deploy Project
+            </GlossyButton>
+          )}
         </div>
 
         <ChangePlanModal
@@ -2805,9 +2819,14 @@ const rootRoute = getRouteApi("__root__");
 function NewProjectPage() {
   const { canWrite } = useWorkspaceRole();
   const router = useRouter();
-  const { onboardingProjects } = (rootRoute.useLoaderData() ?? {}) as {
+  const { onboardingProjects, settingsSnapshot } = (rootRoute.useLoaderData() ?? {}) as {
     onboardingProjects?: { items: unknown[]; total?: number };
+    settingsSnapshot?: SettingsSidebarSnapshot | null;
   };
+  const buildBlockMessage = getBuildDisabledMessage(
+    Boolean(settingsSnapshot?.profile?.buildDisabled),
+    settingsSnapshot?.profile?.buildDisabledBy,
+  );
   const navigate = useNavigate({ from: "/projects/new" });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspace = useMemo(() => {
@@ -3656,6 +3675,7 @@ function NewProjectPage() {
                       deploying={deployingProject}
                       saving={savingProject}
                       projectCount={currentProjectCount}
+                      buildBlockMessage={buildBlockMessage}
                       onDeploy={handleDeployProject}
                       onSaveForLater={handleSaveProjectForLater}
                     />

@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { Command } from "cmdk";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check, SignOut, Compass } from "@phosphor-icons/react";
+import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check, SignOut, Compass, Cube, HardDrives } from "@phosphor-icons/react";
 import { startProductTour } from "../shared/product-tour";
 import { PaletteView, Theme } from "../../types/enums";
 import { useScoutBar } from "../../contexts/scoutbar-context";
@@ -530,6 +530,17 @@ export function CommandPalette() {
                               </Command.Item>
                             </Command.Group>
                           )}
+
+                          <Command.Group heading="SANDBOXES &amp; VOLUMES">
+                            <Command.Item value="sandboxes sandbox environments" onSelect={() => runAction(() => go("/sandboxes"))}>
+                              <Cube className="size-4" />
+                              <span>Sandboxes</span>
+                            </Command.Item>
+                            <Command.Item value="volumes storage disks" onSelect={() => runAction(() => go("/volumes"))}>
+                              <HardDrives className="size-4" />
+                              <span>Volumes</span>
+                            </Command.Item>
+                          </Command.Group>
 
                           <Command.Group heading="TEAM">
                             <Command.Item value="switch environment staging production development" onSelect={openEnvironmentSearch}>

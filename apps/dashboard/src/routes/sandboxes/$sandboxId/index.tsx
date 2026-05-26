@@ -440,9 +440,6 @@ function TimelineRow({ event, isLast, onSelect }: { event: TimelineEvent; isLast
 }
 
 function buildStarterSnippet(sandbox: SandboxResponse): string {
-  const template = sandbox.template || "python-3.12";
-  const region = sandbox.regionName || sandbox.region || "auto";
-
   return [
     `import { Sandbox } from "@brimble/sandbox";`,
     ``,
@@ -451,12 +448,14 @@ function buildStarterSnippet(sandbox: SandboxResponse): string {
     `  apiKey: process.env.BRIMBLE_SANDBOX_KEY!,`,
     `});`,
     ``,
-    `const sandbox = await client.sandboxes.createReady({`,
-    `  template: "${template}",`,
-    `  region: "${region}",`,
-    `});`,
+    `// Use an existing sandbox by id`,
+    `const sandbox = client.sandboxes.use("${sandbox.id}");`,
     ``,
-    `const result = await sandbox.exec({ cmd: "echo 'Hello, world!'" });`,
+    `const result = await sandbox.exec(`,
+    `  { cmd: "echo 'Hello, world!'" },`,
+    `  { waitUntilReady: true }, // optional: auto-wait if sandbox is still starting/resuming`,
+    `);`,
+    ``,
     `console.log(result.stdout);`,
     ``,
     `await sandbox.destroy();`,

@@ -15,6 +15,7 @@ import { listMcpTemplatesServerFn, listMcpCategoriesServerFn } from "@/server/mc
 import type { McpServerListResult } from "@/backend/mcp";
 import { parsePositivePageSearchValue, parseTextSearchValue } from "@/utils/workspace-route-search";
 import { useHaptics } from "@/hooks/use-haptics";
+import { AddonsPending } from "@/components/shared/route-pending";
 
 const ADDONS_PAGE_SIZE = 18;
 
@@ -32,15 +33,7 @@ export const Route = createFileRoute("/addons/")({
     if (q) next.q = q;
     return next;
   },
-  loaderDeps: ({ search }) => ({
-    page: parsePositivePageSearchValue(search.page) ?? 1,
-    category: parseTextSearchValue(search.category),
-    q: parseTextSearchValue(search.q),
-  }),
-  loader: async ({ deps }) => {
-    const page = deps.page;
-    const offset = (page - 1) * ADDONS_PAGE_SIZE;
-
+  loader: async () => {
     const [result, categories] = await Promise.all([
       (
         listMcpTemplatesServerFn as unknown as (input: {
@@ -48,10 +41,8 @@ export const Route = createFileRoute("/addons/")({
         }) => Promise<McpServerListResult>
       )({
         data: {
-          query: deps.q,
           limit: ADDONS_PAGE_SIZE,
-          offset,
-          category: deps.category,
+          offset: 0,
         },
       }),
       (listMcpCategoriesServerFn as unknown as () => Promise<string[]>)().catch(() => [] as string[]),
@@ -61,9 +52,10 @@ export const Route = createFileRoute("/addons/")({
     const total = result.pagination.total ?? addons.length;
     const totalPages = Math.max(1, Math.ceil(total / ADDONS_PAGE_SIZE));
 
-    return { addons, total, page, totalPages, categories };
+    return { addons, total, page: 1, totalPages, categories };
   },
   component: AddonsPage,
+  pendingComponent: AddonsPending,
 });
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -120,6 +112,7 @@ function AddonsPage() {
   const displayAddons = addonData.addons;
   const displayTotal = addonData.total;
   const isSearchSettling = isLoadingAddons;
+  const showBlockingLoader = isLoadingAddons && displayAddons.length === 0;
 
   useEffect(() => {
     setAddonData({
@@ -271,7 +264,7 @@ function AddonsPage() {
 
       <div className="mt-6">
         <AnimatePresence mode="wait">
-          {isLoadingAddons ? (
+          {showBlockingLoader ? (
             <motion.div
               key="loading"
               initial={{ opacity: 0 }}
@@ -297,7 +290,7 @@ function AddonsPage() {
                   <NumberPagination
                     currentPage={addonData.page}
                     totalPages={addonData.totalPages}
-                    isLoading={isLoadingAddons}
+                    isLoading={isLoadingAddons && !showBlockingLoader}
                     loadingPage={loadingPage}
                     onPageChange={(nextPage) => {
                       void setSearchParams({

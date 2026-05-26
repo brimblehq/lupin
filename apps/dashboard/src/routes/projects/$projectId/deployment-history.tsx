@@ -41,6 +41,9 @@ import {
 import { consumeDeploymentHistoryRefresh } from "@/utils/deployment-history-refresh";
 import { useProjectDeploymentLogsDrawer } from "@/contexts/project-deployment-logs-drawer-context";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { usePlanGate } from "@/hooks/use-plan-gate";
+import { ChangePlanModal } from "@/components/shared/change-plan-modal";
+import { PLAN_UPGRADE_REQUIRED_CODE } from "@/backend/errors";
 import { usePushNotification } from "@/hooks/use-push-notification";
 import { Route as RootRoute } from "@/routes/__root";
 import type { TeamDetails, TeamMember } from "@/backend/teams";
@@ -258,9 +261,11 @@ function DeploymentMenu({
   onRedeployed: () => void;
 }) {
   const { canWrite } = useWorkspaceRole();
+  const { planKey } = usePlanGate();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -313,8 +318,10 @@ function DeploymentMenu({
         data: { projectId, logId: deployment.id, workspace },
       });
       onRedeployed();
-    } catch {
-      // silently fail for now
+    } catch (error) {
+      if ((error as { code?: string })?.code === PLAN_UPGRADE_REQUIRED_CODE) {
+        setUpgradeOpen(true);
+      }
     } finally {
       setLoading(false);
       setOpen(false);
@@ -468,6 +475,8 @@ function DeploymentMenu({
           </AnimatePresence>,
           document.body,
         )}
+
+      <ChangePlanModal open={upgradeOpen} onOpenChange={setUpgradeOpen} currentPlan={planKey} />
     </>
   );
 }
