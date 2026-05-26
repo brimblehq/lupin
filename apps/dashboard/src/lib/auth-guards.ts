@@ -25,6 +25,19 @@ type EnforceRouteAuthOptions = {
 };
 
 export async function enforceRouteAuth(pathname: string, search?: string, options?: EnforceRouteAuthOptions) {
+  if (import.meta.env.VITE_BYPASS_AUTH === "true") {
+    return {
+      session: {
+        user: {
+          id: "mock-user-id",
+          email: "dev@brimble.io",
+          username: "dev_brimble",
+          name: "Dev Brimble",
+          onboarded: true,
+        },
+      },
+    };
+  }
   const isPublicRoute = publicRoutes.has(pathname);
   const isTwoFactorRoute = pathname === "/2fa";
   const isPreload = options?.preload === true;

@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { MoreVertical, Database } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Database } from "lucide-react";
 import { SearchFilterBar } from "./search-filter-bar";
-import { FolderTrashIcon } from "./folder-trash-icon";
+import { BucketCard } from "./bucket-card";
 import { WarningModal } from "./warning-modal";
+import { CreateBucketCard } from "./create-bucket-card";
 
 export interface Bucket {
   id: string;
@@ -12,60 +12,22 @@ export interface Bucket {
   region?: string;
   createdAt: string;
   objectCount?: number;
+  storageUsed?: number;
+  quota?: number;
 }
 
-interface BucketMenuItem {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  danger?: boolean;
-  onClick: () => void;
-}
+function getCreateCardSpan(count: number) {
+  const smRemaining = count % 2 === 0 ? 2 : 2 - (count % 2);
+  const lgRemaining = count % 3 === 0 ? 3 : 3 - (count % 3);
+  const xlRemaining = count % 4 === 0 ? 4 : 4 - (count % 4);
 
-function BucketActionsMenu({ items }: { items: BucketMenuItem[] }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="text-dash-text-faded transition-colors hover:text-dash-text-strong">
-        <MoreVertical className="size-4" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[160px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_rgba(0,0,0,0.08)]">
-          {items.map((item, index) => {
-            const showDivider = Boolean(item.danger) && index > 0;
-            return (
-              <div key={item.id}>
-                {showDivider ? <hr className="my-1 border-dash-border-soft" /> : null}
-                <button
-                  onClick={() => {
-                    item.onClick();
-                    setOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-dash-bg-elevated ${
-                    item.danger ? "text-red-500" : "text-dash-text-body"
-                  }`}
-                >
-                  {item.icon}
-                  {item.label}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+  return [
+    smRemaining >= 2 ? "sm:col-span-2" : "",
+    lgRemaining >= 3 ? "lg:col-span-3" : lgRemaining >= 2 ? "lg:col-span-2" : "lg:col-span-1",
+    xlRemaining >= 4 ? "xl:col-span-4" : xlRemaining >= 3 ? "xl:col-span-3" : xlRemaining >= 2 ? "xl:col-span-2" : "xl:col-span-1",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function BucketList({
@@ -74,12 +36,14 @@ export function BucketList({
   onSearchQueryChange,
   searchLoading = false,
   onDeleteBucket,
+  onCreate,
 }: {
   buckets: Bucket[];
   searchQuery?: string;
   onSearchQueryChange?: (value: string) => void;
   searchLoading?: boolean;
   onDeleteBucket?: (bucket: Bucket) => Promise<void>;
+  onCreate?: () => void;
 }) {
   const [searchQueryInternal, setSearchQueryInternal] = useState("");
   const [deletingBucket, setDeletingBucket] = useState<Bucket | null>(null);
@@ -91,33 +55,24 @@ export function BucketList({
 
   const filtered = buckets.filter((b) => b.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  function actionsFor(bucket: Bucket) {
-    const items: BucketMenuItem[] = [];
-
-    items.push({
-      id: "delete",
-      label: "Delete bucket",
-      icon: <FolderTrashIcon className="size-3.5" />,
-      danger: true,
-      onClick: () => {
-        setDeleteConfirmName("");
-        setDeletingBucket(bucket);
-      },
-    });
-
-    return { items };
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      {/* Search Bar */}
-      <div className="flex items-center gap-3">
+      {/* Search Bar & Filter */}
+      <div className="flex w-full items-center">
         <SearchFilterBar
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Search buckets"
+          placeholder="Search storage buckets..."
           loading={searchLoading}
-          className="flex-1"
+          className="w-full max-w-[1000px] h-[48px]"
+          rightSlot={
+            <button className="flex h-full items-center justify-center gap-2 whitespace-nowrap bg-dash-bg-elevated px-4 text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-border">
+              <svg width="12" height="14" viewBox="0 0 12 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10.35 1.95C10.35 2.61274 8.20097 3.15 5.55 3.15C2.89903 3.15 0.75 2.61274 0.75 1.95M10.35 1.95C10.35 1.28726 8.20097 0.75 5.55 0.75C2.89903 0.75 0.75 1.28726 0.75 1.95M10.35 1.95V3.00442C10.35 4.63433 9.70252 6.19748 8.55 7.35L7.49558 8.40442C7.01819 8.88181 6.75 9.52928 6.75 10.2044V11.55C6.75 12.2127 6.21274 12.75 5.55 12.75C4.88726 12.75 4.35 12.2127 4.35 11.55V10.2044C4.35 9.52928 4.0818 8.88181 3.60441 8.40442L2.55 7.35C1.39748 6.19748 0.75 4.63433 0.75 3.00442V1.95" stroke="#7A7C81" strokeWidth="1.5"/>
+              </svg>
+              Filter status
+            </button>
+          }
         />
       </div>
 
@@ -131,52 +86,25 @@ export function BucketList({
         </div>
       )}
 
-      {/* Buckets */}
+      {/* Buckets Grid */}
       {filtered.length > 0 && (
-        <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
-          <table className="w-full border-collapse">
-            <tbody>
-              {filtered.map((bucket, i) => {
-                const actions = actionsFor(bucket);
-                return (
-                  <tr
-                    key={bucket.id}
-                    className={`h-[68px] transition-colors hover:bg-dash-bg-elevated ${
-                      i !== filtered.length - 1 ? "border-b-[0.5px] border-dash-border" : ""
-                    }`}
-                  >
-                    <td className="py-2 pl-3.5">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5">
-                          <Database className="size-4 text-dash-text-faded" />
-                          <Link to={`/buckets/${bucket.id}`} className="text-sm font-medium tracking-[-0.084px] text-dash-text-body hover:text-[#3c6ce7] hover:underline">
-                            {bucket.name}
-                          </Link>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-dash-text-faded">Region: {bucket.region || "Global"}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="w-auto py-2 sm:w-[140px]">
-                      <span className="text-sm font-light leading-5 tracking-[-0.02px] text-dash-text-body">
-                        {bucket.objectCount ?? 0} {(bucket.objectCount ?? 0) === 1 ? 'item' : 'items'}
-                      </span>
-                    </td>
-                    <td className="w-[180px] py-2">
-                      <div className="flex flex-col gap-1 text-right">
-                        <span className="text-sm tracking-[-0.084px] text-dash-text-body">Created</span>
-                        <span className="text-sm font-light leading-[1.3] text-dash-text-extra-faded">{bucket.createdAt}</span>
-                      </div>
-                    </td>
-                    <td className="w-10 pr-3.5 text-right">
-                      <BucketActionsMenu {...actions} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered.map((bucket) => (
+            <BucketCard 
+              key={bucket.id} 
+              bucket={bucket} 
+              onDelete={() => {
+                setDeleteConfirmName("");
+                setDeletingBucket(bucket);
+              }}
+            />
+          ))}
+          {onCreate && (
+            <CreateBucketCard
+              onClick={onCreate}
+              className={getCreateCardSpan(filtered.length)}
+            />
+          )}
         </div>
       )}
 

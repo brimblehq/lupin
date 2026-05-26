@@ -125,7 +125,7 @@ function ProjectStoragePage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1000px] flex-col gap-6 py-8">
+    <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
       <div className="flex items-center justify-between">
         <TabHeader title="Storage Buckets">
           Manage object storage buckets associated with your project. Upload, manage, and deliver files.
@@ -144,10 +144,10 @@ function ProjectStoragePage() {
 
       <BucketList
         buckets={rows}
-        basePath={`/projects/${projectId}/storage`}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         onDeleteBucket={canWrite ? handleDeleteBucket : undefined}
+        onCreate={canWrite ? () => setAddBucketOpen(true) : undefined}
       />
 
       {canWrite && (

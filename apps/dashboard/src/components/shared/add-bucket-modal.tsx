@@ -1,41 +1,61 @@
 import { useState } from "react";
-import { Modal, ModalHeader, ModalFooter, ModalCancelButton, ModalContinueButton } from "./modal";
-import { dashInputClassName } from "./dash-input";
+import { Modal } from "./modal";
+import { useHaptics } from "@/hooks/use-haptics";
+import { LoadingButtonContent } from "./loading-button-content";
+import { Dropdown, type DropdownOption } from "./dropdown";
 
 interface AddBucketModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onContinue: (name: string, region?: string) => Promise<{ bucket: any; token?: string }>;
+  onContinue: (data: { name: string; description: string; region: string; isPublic: boolean }) => Promise<{ bucket: any; token?: string }>;
 }
 
+const regionOptions: DropdownOption[] = [
+  { id: "Global", label: "Global (Automatic)" },
+  { id: "US East (N. Virginia)", label: "US East (N. Virginia)" },
+  { id: "EU (Frankfurt)", label: "EU (Frankfurt)" },
+];
+
 export function AddBucketModal({ open, onOpenChange, onContinue }: AddBucketModalProps) {
+  const [step, setStep] = useState<1 | 2>(1);
   const [bucketName, setBucketName] = useState("");
+  const [description, setDescription] = useState("");
   const [bucketRegion, setBucketRegion] = useState("Global");
+  const [isPublic, setIsPublic] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successToken, setSuccessToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const haptics = useHaptics();
 
-  async function handleContinue() {
+  async function handleCreate() {
     const normalizedName = bucketName.trim().toLowerCase();
     
     if (!normalizedName) {
       setError("Bucket name is required.");
+      setStep(1);
       return;
     }
 
     if (!/^[a-z0-9-]+$/.test(normalizedName)) {
       setError("Bucket name can only contain lowercase letters, numbers, and hyphens.");
+      setStep(1);
       return;
     }
 
     try {
       setSubmitting(true);
       setError(null);
-      const result = await onContinue(normalizedName, bucketRegion === "Global" ? undefined : bucketRegion);
+      const result = await onContinue({
+        name: normalizedName,
+        description: description.trim(),
+        region: bucketRegion === "Global" ? "" : bucketRegion,
+        isPublic
+      });
       setSuccessToken(result?.token || null);
     } catch (e: any) {
       setError(e.message || "Failed to create bucket");
+      setStep(1);
     } finally {
       setSubmitting(false);
     }
@@ -50,8 +70,11 @@ export function AddBucketModal({ open, onOpenChange, onContinue }: AddBucketModa
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
+      setStep(1);
       setBucketName("");
+      setDescription("");
       setBucketRegion("Global");
+      setIsPublic(false);
       setError(null);
       setSuccessToken(null);
       setCopied(false);
@@ -61,8 +84,11 @@ export function AddBucketModal({ open, onOpenChange, onContinue }: AddBucketModa
 
   if (successToken) {
     return (
-      <Modal open={open} onOpenChange={handleOpenChange} width={480}>
-        <ModalHeader title="Bucket Created!" description="Your storage bucket is ready to use" />
+      <Modal open={open} onOpenChange={handleOpenChange} width={500}>
+        <div className="flex flex-col gap-0.5 rounded-t-[8px] border-b-[0.5px] border-dash-border bg-dash-bg-elevated px-6 py-4">
+          <h2 className="text-base leading-[1.4] tracking-[-0.096px] text-dash-text-strong">Bucket Created!</h2>
+          <p className="text-sm font-light leading-[1.3] text-dash-text-faded">Your storage bucket is ready to use</p>
+        </div>
 
         <div className="flex flex-col gap-4 px-6 pb-5 pt-4">
           <div className="flex items-center gap-2 rounded-[4px] bg-[#22c55e]/10 px-3 py-2">
@@ -94,76 +120,156 @@ export function AddBucketModal({ open, onOpenChange, onContinue }: AddBucketModa
           </div>
         </div>
 
-        <ModalFooter>
+        <div className="flex items-center justify-end border-t-[0.5px] border-dash-border px-4 py-4">
           <button
             onClick={() => handleOpenChange(false)}
             className="rounded-[4px] bg-[#3c6ce7] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#345cc7]"
           >
             Done
           </button>
-        </ModalFooter>
+        </div>
       </Modal>
     );
   }
 
+  const sharedHeader = (
+    <>
+      <div className="flex flex-col px-6 pt-5 pb-4 bg-dash-bg">
+        <h2 style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 400, fontSize: "14px", lineHeight: "100%", letterSpacing: "-0.006em" }} className="text-dash-text-strong">
+          Create Storage Bucket
+        </h2>
+        <p style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 300, fontSize: "14px", lineHeight: "130%", letterSpacing: "0%" }} className="mt-1 text-dash-text-faded">
+          Connect to frontend-web-store
+        </p>
+      </div>
+      <div className="h-[0.5px] w-full bg-dash-border" />
+      <div className="flex items-center gap-2 px-6 py-4 bg-dash-bg">
+        <span style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: step === 1 ? 700 : 400, fontSize: "12px", lineHeight: "20px", letterSpacing: "-0.0016em" }} className={step === 1 ? "text-dash-text-strong" : "text-dash-text-faded"}>
+          Bucket Details
+        </span>
+        <div className="h-[1px] w-4 bg-dash-border" />
+        <span style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: step === 2 ? 700 : 400, fontSize: "12px", lineHeight: "20px", letterSpacing: "-0.0016em" }} className={step === 2 ? "text-dash-text-strong" : "text-dash-text-faded"}>
+          Bucket Visibility
+        </span>
+      </div>
+    </>
+  );
+
   return (
-    <Modal open={open} onOpenChange={handleOpenChange} width={450}>
-      <ModalHeader title="Create Bucket" description="Create a new storage bucket for your workspace" />
+    <Modal open={open} onOpenChange={handleOpenChange} width={500} className="!h-[437px] rounded-[8px]">
+      {sharedHeader}
 
-      <div className="flex flex-col gap-4 px-6 pb-5 pt-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">Bucket Name</label>
-          <input
-            type="text"
-            placeholder="my-awesome-bucket"
-            value={bucketName}
-            onChange={(e) => {
-              setBucketName(e.target.value);
-              if (error) setError(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void handleContinue();
-              }
-            }}
-            autoFocus
-            className={`${dashInputClassName} w-full ${
-              error
-                ? "shadow-[0px_0px_0px_1px_#e1291d,0px_0px_0px_3px_rgba(225,41,29,0.15)] dark:shadow-[0px_0px_0px_1px_#e1291d,0px_0px_0px_3px_rgba(225,41,29,0.15)]"
-                : "input-focus"
-            }`}
-          />
-          {error && <p className="text-sm font-light leading-5 text-[#e1291d]">{error}</p>}
-        </div>
+      <div className="flex-1 overflow-y-auto px-[14px]">
+        {step === 1 ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <label style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 400, fontSize: "14px", lineHeight: "20px", letterSpacing: "-0.0016em" }} className="text-dash-text-strong">Name your Bucket</label>
+              <input
+                type="text"
+                placeholder="Name"
+                value={bucketName}
+                onChange={(e) => {
+                  setBucketName(e.target.value);
+                  if (error) setError(null);
+                }}
+                autoFocus
+                className="w-full h-[33px] px-2 py-[6px] rounded-[6px] border-[0.5px] border-dash-border bg-transparent text-sm text-dash-text-strong outline-none focus:border-[#3c6ce7] placeholder:text-dash-text-faded"
+              />
+              {error && <p className="text-xs text-[#e1291d]">{error}</p>}
+            </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-strong">Region</label>
-          <select
-            value={bucketRegion}
-            onChange={(e) => setBucketRegion(e.target.value)}
-            className={`${dashInputClassName} w-full input-focus cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%221.5%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px] bg-[right_8px_center] bg-no-repeat pr-8`}
-          >
-            <option value="Global">Global (Automatic)</option>
-            <option value="US East (N. Virginia)">US East (N. Virginia)</option>
-            <option value="EU (Frankfurt)">EU (Frankfurt)</option>
-          </select>
-        </div>
+            <div className="flex flex-col gap-2">
+              <label style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 400, fontSize: "14px", lineHeight: "20px", letterSpacing: "-0.0016em" }} className="text-dash-text-strong">Describe your bucket</label>
+              <input
+                type="text"
+                placeholder="Enter a description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full h-[33px] px-2 py-[6px] rounded-[6px] border-[0.5px] border-dash-border bg-transparent text-sm text-dash-text-strong outline-none focus:border-[#3c6ce7] placeholder:text-dash-text-faded"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 400, fontSize: "14px", lineHeight: "20px", letterSpacing: "-0.0016em" }} className="text-dash-text-strong">Storage location</label>
+              <Dropdown
+                value={bucketRegion}
+                options={regionOptions}
+                onChange={setBucketRegion}
+                placeholder="Select region"
+                className="!min-h-[33px] !px-2 !py-[6px] !rounded-[6px]"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <p style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 300, fontSize: "14px", lineHeight: "150%", letterSpacing: "-0.015em" }} className="text-dash-text-faded">
+              Store, organize, and manage application 
+            </p>
+            
+            <div 
+              onClick={() => setIsPublic(true)}
+              className={`flex h-[71px] w-full cursor-pointer items-start gap-3 rounded-[10px] border-[2px] p-3 transition-colors ${isPublic ? "border-[#3c6ce7] bg-[#3c6ce7]/5" : "border-dash-border hover:border-dash-border/80"}`}
+            >
+              <div className="flex-1 flex flex-col gap-1.5">
+                <span style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 400, fontSize: "12px", lineHeight: "100%", letterSpacing: "-0.006em" }} className="text-dash-text-strong">Public</span>
+                <span style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 300, fontSize: "12px", lineHeight: "130%", letterSpacing: "0%" }} className="text-dash-text-faded">Files are accessible publicly using direct URLs.</span>
+              </div>
+              <div className={`mt-1 flex h-[14px] w-[14px] items-center justify-center rounded-full border ${isPublic ? "border-[#3c6ce7]" : "border-[#7A7C81]"}`}>
+                {isPublic && <div className="h-2 w-2 rounded-full bg-[#3c6ce7]" />}
+              </div>
+            </div>
+
+            <div 
+              onClick={() => setIsPublic(false)}
+              className={`flex h-[71px] w-full cursor-pointer items-start gap-3 rounded-[10px] border-[2px] p-3 transition-colors ${!isPublic ? "border-[#3c6ce7] bg-[#3c6ce7]/5" : "border-dash-border hover:border-dash-border/80"}`}
+            >
+              <div className="flex-1 flex flex-col gap-1.5">
+                <span style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 400, fontSize: "12px", lineHeight: "100%", letterSpacing: "-0.006em" }} className="text-dash-text-strong">Private</span>
+                <span style={{ fontFamily: "ABC Marfa Variable Unlicensed Trial, sans-serif", fontWeight: 300, fontSize: "12px", lineHeight: "130%", letterSpacing: "0%" }} className="text-dash-text-faded">Files require authentication or secure access tokens.</span>
+              </div>
+              <div className={`mt-1 flex h-[14px] w-[14px] items-center justify-center rounded-full border ${!isPublic ? "border-[#3c6ce7]" : "border-[#7A7C81]"}`}>
+                {!isPublic && <div className="h-2 w-2 rounded-full bg-[#3c6ce7]" />}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <ModalFooter>
-        <ModalCancelButton />
-        <ModalContinueButton
-          onClick={() => {
-            void handleContinue();
-          }}
-          disabled={!bucketName.trim() || submitting}
-          loading={submitting}
-          loadingLabel="Creating..."
+      <div className="h-[0.5px] w-full bg-dash-border mt-4" />
+      
+      <div className="flex items-center justify-end gap-2 px-6 py-4">
+        <button
+          onClick={() => handleOpenChange(false)}
+          className="flex h-[34px] w-[64px] items-center justify-center rounded-[4px] border border-dash-border text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated px-4"
         >
-          Create Bucket
-        </ModalContinueButton>
-      </ModalFooter>
+          Cancel
+        </button>
+        
+        {step === 1 ? (
+          <button
+            onClick={() => setStep(2)}
+            disabled={!bucketName.trim()}
+            className="flex h-[34px] w-[64px] items-center justify-center rounded-[4px] bg-[#010F1A] dark:bg-white text-sm font-medium text-white dark:text-[#010F1A] transition-colors hover:opacity-90 disabled:opacity-50 px-4"
+          >
+            Next
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              if (!submitting) {
+                haptics.medium();
+                void handleCreate();
+              }
+            }}
+            disabled={submitting}
+            className="flex h-[34px] items-center justify-center px-4 rounded-[4px] bg-[#010F1A] dark:bg-white text-sm font-medium text-white dark:text-[#010F1A] transition-colors hover:opacity-90 disabled:opacity-50"
+          >
+            <LoadingButtonContent loading={submitting} loadingLabel="Creating...">
+              Create Storage Bucket
+            </LoadingButtonContent>
+          </button>
+        )}
+      </div>
     </Modal>
   );
 }
