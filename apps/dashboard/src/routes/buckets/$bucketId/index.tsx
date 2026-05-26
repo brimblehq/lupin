@@ -15,6 +15,7 @@ import {
   createBucketTokenServerFn,
   generateDownloadUrlServerFn,
   presignUploadServerFn,
+  confirmUploadServerFn,
   initiateMultipartUploadServerFn,
   getMultipartUrlsServerFn,
   completeMultipartUploadServerFn,
@@ -62,6 +63,7 @@ function BucketDetailPage() {
   const createToken = useServerFn(createBucketTokenServerFn as any) as any;
   const generateDownloadUrl = useServerFn(generateDownloadUrlServerFn as any) as any;
   const presignUpload = useServerFn(presignUploadServerFn as any) as any;
+  const confirmUpload = useServerFn(confirmUploadServerFn as any) as any;
   const initiateMultipart = useServerFn(initiateMultipartUploadServerFn as any) as any;
   const getMultipartUrls = useServerFn(getMultipartUrlsServerFn as any) as any;
   const completeMultipart = useServerFn(completeMultipartUploadServerFn as any) as any;
@@ -96,6 +98,10 @@ function BucketDetailPage() {
           headers: { 'Content-Type': file.type || 'application/octet-stream' }
         });
         if (!res.ok) throw new Error("Upload failed");
+
+        await confirmUpload({
+          data: { workspace, bucketId: bucket._id || bucket.id, uploadId: result.uploadId }
+        });
       } else {
         const totalParts = Math.ceil(file.size / CHUNK_SIZE);
         

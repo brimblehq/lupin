@@ -130,6 +130,15 @@ export const createStorageApi = (client: BackendClient) => {
         .then((res) => res?.data?.data ?? res?.data ?? res);
     },
 
+    userConfirmUpload: (data: { bucketId: string; uploadId: string; teamId?: string }) => {
+      return client
+        .request<any>(`${basePath}/${data.bucketId}/user-uploads/${data.uploadId}/confirm`, {
+          method: "POST",
+          query: data.teamId ? { teamId: data.teamId } : undefined,
+        })
+        .then((res) => res?.data?.data ?? res?.data ?? res);
+    },
+
     userMultipartInitiate: (data: { bucketId: string; path: string; contentType?: string; size: number; teamId?: string }) => {
       return client
         .request<any>(`${basePath}/${data.bucketId}/user-multipart/initiate`, {

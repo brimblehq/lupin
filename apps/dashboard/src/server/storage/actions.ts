@@ -164,6 +164,17 @@ export const abortMultipartUploadServerFn = createServerFn({
   });
 });
 
+export const confirmUploadServerFn = createServerFn({
+  method: "POST",
+}).handler(async ({ data }) => {
+  const payload = data as { workspace?: string; bucketId: string; uploadId: string } | undefined;
+  if (!payload?.bucketId || !payload?.uploadId) throw new Error("Missing required parameters");
+  return withTokenRefresh(async (api) => {
+    const teamId = await resolveTeamId(api, payload.workspace);
+    return api.storage.userConfirmUpload({ ...payload, teamId });
+  });
+});
+
 export const deleteObjectServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
