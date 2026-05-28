@@ -22,16 +22,10 @@ export function tokenFingerprint(token: string | null | undefined): string | nul
 }
 
 export function getServerAccessToken(): string | null {
-  if (import.meta.env.VITE_BYPASS_AUTH === "true") {
-    return "mock-jwt-token";
-  }
   return getCookie(config.accessTokenCookie) ?? null;
 }
 
 export function getServerRefreshToken(): string | null {
-  if (import.meta.env.VITE_BYPASS_AUTH === "true") {
-    return "mock-refresh-token";
-  }
   return getCookie(config.refreshTokenCookie) ?? null;
 }
 
