@@ -118,6 +118,17 @@ export interface CreateProjectInput {
   [key: string]: unknown;
 }
 
+type DetachProjectVolumeResult = {
+  id: string;
+  redeployQueued: boolean;
+};
+
+type DetachProjectVolumeApiResponse = Partial<DetachProjectVolumeResult> & {
+  data?: Partial<DetachProjectVolumeResult> & {
+    data?: Partial<DetachProjectVolumeResult>;
+  };
+};
+
 export interface ValidateDockerImageInput {
   imageUri: string;
   credentials?: {
@@ -280,6 +291,7 @@ export interface ProjectsApi {
       payload?: Record<string, unknown>;
     },
   ): Promise<{ id?: string; message?: string }>;
+  detachVolume(projectId: string, input?: { teamId?: string }): Promise<DetachProjectVolumeResult>;
   debugSuggestions(projectId: string, input: { logId: string; messageId: string; message: string }): Promise<DebugSuggestionsResponse>;
   debugSuggestionsPr(
     projectId: string,
@@ -697,6 +709,29 @@ export function createProjectsApi(client: ApiClient): ProjectsApi {
       return {
         id: pickString(rootRecord, "id", "_id"),
         message: pickString(rootRecord, "message"),
+      };
+    },
+    async detachVolume(projectId, input) {
+      const response = await client.request<DetachProjectVolumeApiResponse>(
+        `${listEndpoint}/${encodeURIComponent(projectId)}/volume/detach`,
+        {
+          method: "POST",
+          query: { teamId: input?.teamId },
+        },
+      );
+
+      const root = response?.data?.data ?? response?.data ?? response ?? {};
+      const rootRecord = asRecord(root);
+      const id = pickString(rootRecord, "id");
+      const redeployQueued = pickBoolean(rootRecord, "redeployQueued");
+
+      if (!id || redeployQueued === undefined) {
+        throw new Error("Invalid detach volume response from API");
+      }
+
+      return {
+        id,
+        redeployQueued,
       };
     },
     async debugSuggestions(projectId, input) {

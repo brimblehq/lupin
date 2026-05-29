@@ -92,8 +92,8 @@ export function AnnouncementSlideout({ announcements, onDismiss, onCta }: Announ
       initial="initial"
       animate="animate"
       exit="exit"
-      style={{ transformOrigin: "bottom right" }}
-      className="fixed bottom-3 left-3 right-3 z-40 sm:bottom-5 sm:left-auto sm:right-5 sm:w-[380px]"
+      style={{ transformOrigin: "bottom left" }}
+      className="fixed bottom-3 left-3 right-3 z-40 sm:bottom-5 sm:right-auto sm:left-5 sm:w-[380px]"
       role="region"
       aria-label="Announcements"
       aria-roledescription={hasMultiple ? "carousel" : undefined}

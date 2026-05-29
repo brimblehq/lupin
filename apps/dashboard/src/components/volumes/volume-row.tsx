@@ -14,10 +14,11 @@ const TYPE_BADGE: Record<VolumeType, { label: string; className: string }> = {
 
 interface VolumeRowProps {
   volume: VolumeResponse;
+  onDetachRequest: (volume: VolumeResponse) => void;
   onDeleteRequest: (volume: VolumeResponse) => void;
 }
 
-export function VolumeRow({ volume, onDeleteRequest }: VolumeRowProps) {
+export function VolumeRow({ volume, onDetachRequest, onDeleteRequest }: VolumeRowProps) {
   const isAttached = Boolean(volume.attachedSandboxId || volume.attachedProjectId);
   const regionName = volume.region?.name ?? "—";
 
@@ -41,7 +42,7 @@ export function VolumeRow({ volume, onDeleteRequest }: VolumeRowProps) {
       <div className="flex w-24 shrink-0 justify-end">
         <StatusChip status={isAttached ? "ATTACHED" : "DETACHED"} className="origin-center scale-[0.92]" />
       </div>
-      <VolumeActionsMenu volume={volume} isAttached={isAttached} onDeleteRequest={onDeleteRequest} />
+      <VolumeActionsMenu volume={volume} isAttached={isAttached} onDetachRequest={onDetachRequest} onDeleteRequest={onDeleteRequest} />
     </div>
   );
 }
@@ -83,16 +84,20 @@ function AttachedToLabel({ volume }: { volume: VolumeResponse }) {
 function VolumeActionsMenu({
   volume,
   isAttached,
+  onDetachRequest,
   onDeleteRequest,
 }: {
   volume: VolumeResponse;
   isAttached: boolean;
+  onDetachRequest: (volume: VolumeResponse) => void;
   onDeleteRequest: (volume: VolumeResponse) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const canDetach = Boolean(volume.attachedProjectId);
+  const detachTitle = volume.attachedSandboxId ? "Destroy the attached sandbox to detach this volume." : undefined;
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
@@ -132,9 +137,13 @@ function VolumeActionsMenu({
             >
               <button
                 type="button"
-                disabled
-                title="Detach by destroying the attached sandbox."
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-dash-text-body transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!canDetach}
+                title={detachTitle}
+                onClick={() => {
+                  setOpen(false);
+                  onDetachRequest(volume);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-dash-text-body transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
               >
                 <Link2Off className="size-3.5" />
                 Detach
@@ -143,7 +152,7 @@ function VolumeActionsMenu({
               <button
                 type="button"
                 disabled={isAttached}
-                title={isAttached ? "Detach by destroying the attached sandbox first." : undefined}
+                title={isAttached ? "Detach this volume before deleting it." : undefined}
                 onClick={() => {
                   setOpen(false);
                   onDeleteRequest(volume);

@@ -8,12 +8,14 @@ import type { SetProjectPasswordProtectionPayload } from "./types";
 const persistentStorageSchema = Yup.object({
   diskSize: Yup.number().integer().min(10).max(150),
   volumeId: Yup.string().trim(),
-  mountPath: Yup.string().trim().test("mount-path-format", "", function (value) {
-    if (!value) return true;
-    if (!MOUNT_PATH_PATTERN.test(value)) return this.createError({ message: MOUNT_PATH_ERROR });
-    if (value === "/") return this.createError({ message: MOUNT_PATH_ROOT_ERROR });
-    return true;
-  }),
+  mountPath: Yup.string()
+    .trim()
+    .test("mount-path-format", "", function (value) {
+      if (!value) return true;
+      if (!MOUNT_PATH_PATTERN.test(value)) return this.createError({ message: MOUNT_PATH_ERROR });
+      if (value === "/") return this.createError({ message: MOUNT_PATH_ROOT_ERROR });
+      return true;
+    }),
 }).test("project-mount-path", "", function (value) {
   if (!value) return true;
 
@@ -353,6 +355,31 @@ export const redeployProjectServerFn = createServerFn({
     });
   });
 });
+
+type DetachProjectVolumePayload = {
+  projectId: string;
+  workspace?: string;
+};
+
+const detachProjectVolumeSchema = Yup.object({
+  projectId: Yup.string().trim().required("Project ID is required"),
+  workspace: Yup.string().trim(),
+});
+
+export const detachProjectVolumeServerFn = createServerFn({
+  method: "POST",
+})
+  .inputValidator((input: DetachProjectVolumePayload | undefined) => {
+    return detachProjectVolumeSchema.validateSync(input ?? {}, { stripUnknown: true }) as DetachProjectVolumePayload;
+  })
+  .handler(async ({ data: payload }) => {
+    const workspaceSlug = payload.workspace?.trim().toLowerCase();
+
+    return withTokenRefresh(async (api) => {
+      const teamId = await resolveTeamId(api, workspaceSlug);
+      return api.projects.detachVolume(payload.projectId, { teamId });
+    });
+  });
 
 export const debugSuggestionsServerFn = createServerFn({
   method: "POST",

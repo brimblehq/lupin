@@ -15,6 +15,7 @@ import { useHaptics } from "@/hooks/use-haptics";
 import { VolumeRow } from "@/components/volumes/volume-row";
 import { CreateVolumeModal } from "@/components/volumes/create-volume-modal";
 import { DeleteVolumeModal } from "@/components/volumes/delete-volume-modal";
+import { DetachVolumeModal } from "@/components/volumes/detach-volume-modal";
 import { SnapshotRow } from "@/components/sandboxes/snapshot-row";
 import { DeleteSnapshotModal } from "@/components/sandboxes/delete-snapshot-modal";
 import { VolumeType, type PaginatedVolumesResponse, type VolumeResponse } from "@/backend/volumes";
@@ -74,6 +75,11 @@ const SNAPSHOT_STATUS_OPTIONS: FilterOption[] = [
   { label: "Failed", value: "failed", dot: "#fc391e" },
 ];
 
+const VIEW_OPTIONS: FilterOption[] = [
+  { label: "Volumes", value: "volumes" },
+  { label: "Snapshots", value: "snapshots" },
+];
+
 export const Route = createFileRoute("/volumes/")({
   pendingComponent: VolumesPending,
   staleTime: 300_000,
@@ -85,17 +91,23 @@ export const Route = createFileRoute("/volumes/")({
     const workspace = deps.workspace;
 
     const [volumesResult, regions, snapshotsResult] = await Promise.all([
-      (listVolumesServerFn as unknown as (input: {
-        data: { workspace?: string; page?: number; limit?: number };
-      }) => Promise<PaginatedVolumesResponse>)({
+      (
+        listVolumesServerFn as unknown as (input: {
+          data: { workspace?: string; page?: number; limit?: number };
+        }) => Promise<PaginatedVolumesResponse>
+      )({
         data: { workspace, page: 1, limit: VOLUMES_PAGE_SIZE },
       }),
-      (listRegionsServerFn as unknown as (input: { data: { type: "sandbox"; enabled: boolean; workspace?: string } }) => Promise<Region[]>)({
-        data: { type: "sandbox", enabled: true, workspace },
-      }),
-      (listSandboxSnapshotsServerFn as unknown as (input: {
-        data: { workspace?: string; page?: number; limit?: number };
-      }) => Promise<PaginatedSnapshotsResponse>)({
+      (listRegionsServerFn as unknown as (input: { data: { type: "sandbox"; enabled: boolean; workspace?: string } }) => Promise<Region[]>)(
+        {
+          data: { type: "sandbox", enabled: true, workspace },
+        },
+      ),
+      (
+        listSandboxSnapshotsServerFn as unknown as (input: {
+          data: { workspace?: string; page?: number; limit?: number };
+        }) => Promise<PaginatedSnapshotsResponse>
+      )({
         data: { workspace, page: 1, limit: SNAPSHOTS_PAGE_SIZE },
       }),
     ]);
@@ -142,6 +154,7 @@ function VolumesListPage() {
   const [snapshots, setSnapshots] = useState<SnapshotResponse[]>(loaderData.snapshotsPage.items);
   const [snapshotsTotalPages, setSnapshotsTotalPages] = useState<number>(loaderData.snapshotsPage.totalPages);
   const [createOpen, setCreateOpen] = useState(false);
+  const [detachTarget, setDetachTarget] = useState<VolumeResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VolumeResponse | null>(null);
   const [deleteSnapshotTarget, setDeleteSnapshotTarget] = useState<SnapshotResponse | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -275,6 +288,16 @@ function VolumesListPage() {
     setDeleteTarget(null);
   }, []);
 
+  const handleDetached = useCallback((target: VolumeResponse) => {
+    setVolumes((prev) =>
+      prev.map((volume) => {
+        if (volume.id !== target.id) return volume;
+        return { ...volume, attachedProjectId: null, lastAttachedAt: null };
+      }),
+    );
+    setDetachTarget(null);
+  }, []);
+
   const filteredSnapshots = useMemo(() => {
     const normalizedQuery = snapshotQ.trim().toLowerCase();
     return snapshots
@@ -314,21 +337,6 @@ function VolumesListPage() {
         Persistent storage and re-runnable sandbox images. Manage your block volumes and the snapshots you've taken from sandboxes.
       </PageHeader>
 
-      <div className="mb-5 inline-flex items-center rounded-[4px] border-[0.5px] border-dash-border p-0.5">
-        {(["volumes", "snapshots"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => switchTab(tab)}
-            className={`shrink-0 whitespace-nowrap rounded-[3px] px-3 py-1 text-xs font-medium transition-colors ${
-              tab === activeTab ? "bg-dash-bg-elevated text-dash-text-strong" : "text-dash-text-faded hover:text-dash-text-body"
-            }`}
-          >
-            {tab === "volumes" ? "Volumes" : "Snapshots"}
-          </button>
-        ))}
-      </div>
-
       {activeTab === "volumes" ? (
         <>
           <div className="mb-4">
@@ -340,11 +348,16 @@ function VolumesListPage() {
               placeholder="Search volumes"
               rightSlot={
                 <FilterDropdown
-                  value={statusFilter}
-                  onChange={(value) => setStatusFilter(value as StatusFilter)}
-                  options={STATUS_OPTIONS}
-                  placeholder="All volumes"
-                  dropdownWidth={180}
+                  sections={[
+                    { label: "View", value: activeTab, onChange: (value) => switchTab(value as TabKey), options: VIEW_OPTIONS },
+                    {
+                      label: "Status",
+                      value: statusFilter,
+                      onChange: (value) => setStatusFilter(value as StatusFilter),
+                      options: STATUS_OPTIONS,
+                    },
+                  ]}
+                  dropdownWidth={190}
                 />
               }
             />
@@ -387,7 +400,7 @@ function VolumesListPage() {
                           highlightedId === volume.id ? "rounded-[4px] ring-2 ring-[#4879f8]" : ""
                         }`}
                       >
-                        <VolumeRow volume={volume} onDeleteRequest={setDeleteTarget} />
+                        <VolumeRow volume={volume} onDetachRequest={setDetachTarget} onDeleteRequest={setDeleteTarget} />
                       </div>
                     ))}
                   </div>
@@ -403,11 +416,7 @@ function VolumesListPage() {
 
           {volumesTotalPages > 1 ? (
             <div className="mt-6 flex justify-end">
-              <NumberPagination
-                currentPage={volumesPage}
-                totalPages={volumesTotalPages}
-                onPageChange={handleVolumesPageChange}
-              />
+              <NumberPagination currentPage={volumesPage} totalPages={volumesTotalPages} onPageChange={handleVolumesPageChange} />
             </div>
           ) : null}
         </>
@@ -422,11 +431,16 @@ function VolumesListPage() {
               placeholder="Search snapshots"
               rightSlot={
                 <FilterDropdown
-                  value={snapshotStatusFilter}
-                  onChange={(value) => setSnapshotStatusFilter(value as SnapshotStatusFilter)}
-                  options={SNAPSHOT_STATUS_OPTIONS}
-                  placeholder="All snapshots"
-                  dropdownWidth={180}
+                  sections={[
+                    { label: "View", value: activeTab, onChange: (value) => switchTab(value as TabKey), options: VIEW_OPTIONS },
+                    {
+                      label: "Status",
+                      value: snapshotStatusFilter,
+                      onChange: (value) => setSnapshotStatusFilter(value as SnapshotStatusFilter),
+                      options: SNAPSHOT_STATUS_OPTIONS,
+                    },
+                  ]}
+                  dropdownWidth={190}
                 />
               }
             />
@@ -468,11 +482,7 @@ function VolumesListPage() {
 
           {snapshotsTotalPages > 1 ? (
             <div className="mt-6 flex justify-end">
-              <NumberPagination
-                currentPage={snapshotsPage}
-                totalPages={snapshotsTotalPages}
-                onPageChange={handleSnapshotsPageChange}
-              />
+              <NumberPagination currentPage={snapshotsPage} totalPages={snapshotsTotalPages} onPageChange={handleSnapshotsPageChange} />
             </div>
           ) : null}
         </>
@@ -487,6 +497,18 @@ function VolumesListPage() {
         defaultRegion={search.region}
         onCreated={handleCreated}
       />
+
+      {detachTarget ? (
+        <DetachVolumeModal
+          open={Boolean(detachTarget)}
+          onOpenChange={(next) => {
+            if (!next) setDetachTarget(null);
+          }}
+          volume={detachTarget}
+          workspace={workspace}
+          onDetached={handleDetached}
+        />
+      ) : null}
 
       {deleteTarget ? (
         <DeleteVolumeModal
