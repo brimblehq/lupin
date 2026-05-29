@@ -23,6 +23,7 @@ import { logoutServerFn } from "@/server/auth/actions";
 import { invalidateSessionCache } from "@/lib/auth-guards";
 import { logAuthFlow, warnAuthFlow } from "@/lib/auth-flow-logger";
 import { posthog } from "@/lib/posthog";
+import { FeatureFlags, useFeatureFlagStrict } from "@/lib/feature-flags";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -43,6 +44,7 @@ export function CommandPalette() {
   const { isOpen, setIsOpen } = useScoutBar();
   const { theme, mode, setTheme, toggleTheme } = useTheme();
   const { canWrite } = useWorkspaceRole();
+  const sandboxEnabled = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const currentPathname = useRouterState({ select: (s) => s.location.pathname });
   const { onboardingProjects, workspaces, settingsSnapshot } = (rootRoute.useLoaderData() ?? {}) as {
@@ -532,10 +534,12 @@ export function CommandPalette() {
                           )}
 
                           <Command.Group heading="SANDBOXES &amp; VOLUMES">
-                            <Command.Item value="sandboxes sandbox environments" onSelect={() => runAction(() => go("/sandboxes"))}>
-                              <Cube className="size-4" />
-                              <span>Sandboxes</span>
-                            </Command.Item>
+                            {sandboxEnabled && (
+                              <Command.Item value="sandboxes sandbox environments" onSelect={() => runAction(() => go("/sandboxes"))}>
+                                <Cube className="size-4" />
+                                <span>Sandboxes</span>
+                              </Command.Item>
+                            )}
                             <Command.Item value="volumes storage disks" onSelect={() => runAction(() => go("/volumes"))}>
                               <HardDrives className="size-4" />
                               <span>Volumes</span>

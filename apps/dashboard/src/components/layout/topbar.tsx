@@ -50,6 +50,7 @@ import { toTitleCase } from "@/utils/dashboard";
 import { Theme } from "@/types/enums";
 import { buildProjectSwitchUrl, buildWorkspaceSwitchUrl, setPendingDomainsAction, setPendingVolumesAction, withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
+import { FeatureFlags, useFeatureFlagStrict } from "@/lib/feature-flags";
 
 function getWorkspaceSearch(searchStr?: string) {
   const params = new URLSearchParams(searchStr || "");
@@ -1066,6 +1067,7 @@ const domainsCreateMenuItems = [
 
 function CreateDropdown() {
   const { canWrite } = useWorkspaceRole();
+  const sandboxEnabled = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -1076,7 +1078,9 @@ function CreateDropdown() {
   const isDomainsPage = /^\/domains(\/|$)/.test(pathname);
   const isDomainsListPage = pathname === "/domains" || pathname === "/domains/";
   const isVolumesListPage = pathname === "/volumes" || pathname === "/volumes/";
-  const menuItems = isDomainsPage ? domainsCreateMenuItems : defaultCreateMenuItems;
+  const menuItems = isDomainsPage
+    ? domainsCreateMenuItems
+    : defaultCreateMenuItems.filter((item) => item.label !== "Create sandbox" || sandboxEnabled);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

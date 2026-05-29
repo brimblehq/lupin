@@ -8,7 +8,7 @@ export const listTooltipMessagesServerFn = createServerFn({
   const payload = data as
     | {
         workspace?: string;
-        type?: "notifications";
+        type?: "notifications" | "announcement";
         limit?: number;
         page?: number;
       }

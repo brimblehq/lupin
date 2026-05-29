@@ -12,6 +12,7 @@ export const FeatureFlags = {
   ENABLE_BUCKETS: "enable_buckets",
   ENABLE_WEB_ANALYTICS: "enable_web_analytics",
   ENABLE_AI_DEBUG: "enable_ai_debug",
+  ENABLE_ANNOUNCEMENTS: "enable_announcements",
 } as const;
 
 export type FeatureFlagKey = (typeof FeatureFlags)[keyof typeof FeatureFlags];

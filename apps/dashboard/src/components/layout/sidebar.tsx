@@ -51,6 +51,10 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
     () =>
       mainNav
         .filter((item) => {
+          if (item.flag === FeatureFlags.ENABLE_SANDBOX) {
+            return strictFlagValues[item.flag] === true;
+          }
+
           if (item.flag && !item.comingSoon) return flagValues[item.flag] !== false;
           return true;
         })

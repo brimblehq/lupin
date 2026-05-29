@@ -468,11 +468,13 @@ function ProjectLayout() {
         const eventName = message.name ?? "";
 
         if (DEPLOYMENT_EVENT_NAMES.includes(eventName)) {
+          markProjectCacheStale();
           window.dispatchEvent(
             new CustomEvent("brimble:deployment-updated", {
               detail: { projectId: backendProjectId, ...(message.data ?? {}) },
             }),
           );
+          void invalidateActiveMatches(router);
         }
 
         if (DATABASE_EVENT_NAMES.includes(eventName)) {
