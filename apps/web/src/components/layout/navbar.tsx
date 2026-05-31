@@ -5,6 +5,9 @@ import { siteConfig } from "@/config/site";
 import { useTheme } from "@brimble/config";
 import brimbleLogo from "@/assets/icons/brimble-logo.svg";
 
+type NavLink = (typeof siteConfig.navLinks)[number];
+type ExternalNavLink = Extract<NavLink, { href: `http${string}` }>;
+
 function StatusDot() {
   return (
     <span className="relative flex size-2">
@@ -12,6 +15,14 @@ function StatusDot() {
       <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
     </span>
   );
+}
+
+function isExternalNavLink(link: NavLink): link is ExternalNavLink {
+  return link.href.startsWith("http");
+}
+
+function hasStatus(link: NavLink) {
+  return "status" in link && link.status;
 }
 
 export function Navbar() {
@@ -32,7 +43,7 @@ export function Navbar() {
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain pr-1 sm:gap-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {siteConfig.navLinks.map((link, i) => {
-              const isExternal = link.href.startsWith("http");
+              const isExternal = isExternalNavLink(link);
               const isActive = !isExternal && pathname === link.href;
               const linkBase =
                 "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 py-1 font-body text-sm font-medium transition-colors duration-150 hover:bg-brimble-air-gray dark:hover:bg-white/10";
@@ -55,7 +66,7 @@ export function Navbar() {
                       rel="noopener noreferrer"
                       className={`${linkBase} text-brimble-black/50 dark:text-white/50 shadow-none`}
                     >
-                      {link.status && <StatusDot />}
+                      {hasStatus(link) && <StatusDot />}
                       {link.label}
                     </a>
                   ) : (
