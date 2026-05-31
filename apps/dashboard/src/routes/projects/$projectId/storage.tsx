@@ -1,11 +1,11 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/volumes")({
+export const Route = createFileRoute("/projects/$projectId/storage")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
-  component: VolumesLayout,
+  component: ProjectStorageLayout,
 });
 
-function VolumesLayout() {
+function ProjectStorageLayout() {
   return <Outlet />;
 }

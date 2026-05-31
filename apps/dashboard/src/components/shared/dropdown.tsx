@@ -64,13 +64,11 @@ export function Dropdown({
   const updatePos = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const measuredMenuHeight = menuRef.current?.offsetHeight ?? MENU_MAX_HEIGHT;
-    const menuHeight = Math.min(MENU_MAX_HEIGHT, measuredMenuHeight);
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
-    const flipAbove = spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow;
+    const flipAbove = spaceBelow < MENU_MAX_HEIGHT + 8 && spaceAbove > spaceBelow;
     setPos({
-      top: flipAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
+      top: flipAbove ? rect.top - MENU_MAX_HEIGHT - 4 : rect.bottom + 4,
       left: rect.left,
       width: rect.width,
       placement: flipAbove ? "top" : "bottom",
@@ -80,11 +78,9 @@ export function Dropdown({
   useLayoutEffect(() => {
     if (!open) return;
     updatePos();
-    const frame = window.requestAnimationFrame(updatePos);
     window.addEventListener("scroll", updatePos, { capture: true, passive: true });
     window.addEventListener("resize", updatePos, { passive: true });
     return () => {
-      window.cancelAnimationFrame(frame);
       window.removeEventListener("scroll", updatePos, { capture: true });
       window.removeEventListener("resize", updatePos);
     };

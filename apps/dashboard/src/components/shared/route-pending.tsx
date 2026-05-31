@@ -65,10 +65,6 @@ export function DefaultRoutePending() {
     select: (state) => state.pendingLocation?.pathname || state.location.pathname || state.resolvedLocation?.pathname || "/",
   });
 
-  if (/^\/(login|signup|2fa|passkey-recovery|reset-password)(\/|$)/.test(pathname)) {
-    return null;
-  }
-
   if (/^\/projects\/new(?:\/|$)/.test(pathname)) {
     return <NewProjectPending />;
   }
@@ -79,6 +75,14 @@ export function DefaultRoutePending() {
 
   if (pathname === "/projects" || pathname === "/projects/") {
     return <ProjectsListPending />;
+  }
+
+  if (/^\/sandboxes\/[^/]+(?:\/|$)/.test(pathname) && !/^\/sandboxes\/new(?:\/|$)/.test(pathname)) {
+    return <SandboxDetailPending />;
+  }
+
+  if (pathname === "/sandboxes" || pathname === "/sandboxes/") {
+    return <SandboxesListPending />;
   }
 
   if (pathname === "/" || pathname.startsWith("/workspace")) {
@@ -253,6 +257,148 @@ export function ProjectsListPending() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SandboxCardPending() {
+  return (
+    <div className="min-h-[168px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30">
+      <div className="flex min-h-[126px] flex-col gap-5 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className={`size-7 shrink-0 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+            <div className="min-w-0">
+              <div className={`mb-2 h-4 w-40 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+              <div className={`h-3 w-24 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+            </div>
+          </div>
+          <div className={`h-7 w-24 shrink-0 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+        </div>
+        <div className="flex flex-wrap gap-5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className={`h-3.5 w-20 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+          ))}
+        </div>
+        <div className={`h-3.5 w-36 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+      </div>
+      <div className="flex h-10 items-center border-t-[0.5px] border-dash-border px-5">
+        <div className={`h-3.5 w-16 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+      </div>
+    </div>
+  );
+}
+
+export function SandboxesListPending() {
+  return (
+    <div className="mx-auto w-full max-w-[1000px] py-8" aria-hidden="true">
+      <div className="mb-8 flex items-center gap-4">
+        <div className={`hidden size-[80px] shrink-0 rounded ${PULSE_BG_MEDIUM} animate-pulse sm:block`} />
+        <div className="min-w-0">
+          <div className={`mb-2 h-6 w-40 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+          <div className="flex flex-col gap-1.5">
+            <div className={`h-3.5 w-full max-w-[520px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+            <div className={`h-3.5 w-full max-w-[420px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-10 min-w-0 flex-1 animate-pulse rounded-[4px] border border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-10 w-[180px] animate-pulse rounded-[4px] border border-dash-border bg-dash-bg-elevated/30" />
+      </div>
+
+      <div className="mb-8 flex h-[120px] items-center justify-end rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/20 px-10">
+        <div className={`h-10 w-52 rounded-[4px] ${PULSE_BG_MEDIUM} animate-pulse`} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SandboxCardPending key={i} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SandboxDetailPending() {
+  return (
+    <div className="mx-auto w-full max-w-[1000px] py-8" aria-hidden="true">
+      <div className={`mb-4 h-3.5 w-24 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+
+      <div className="mb-6 flex items-start gap-3">
+        <div className={`size-10 shrink-0 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-center gap-2">
+            <div className={`h-4 w-44 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+            <div className={`h-5 w-24 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+          </div>
+          <div className={`h-3.5 w-28 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2 border-b-[0.5px] border-dash-border">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className={`h-9 w-24 rounded-t ${PULSE_BG_WEAK} animate-pulse`} />
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-6">
+        <Block className="h-[118px]" />
+
+        <section className="flex flex-col gap-3">
+          <TabHeaderSkeleton />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-2 rounded-[4px] bg-dash-bg-elevated px-3 py-2.5">
+                <div className={`h-3 w-20 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+                <div className={`h-4 w-24 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <TabHeaderSkeleton />
+          <div className="grid grid-cols-1 rounded-[4px] border-[0.5px] border-dash-border sm:grid-cols-2">
+            {Array.from({ length: 2 }).map((_, columnIndex) => (
+              <div
+                key={columnIndex}
+                className={`flex flex-col px-4 ${columnIndex === 0 ? "sm:border-r-[0.5px] sm:border-dash-border-soft" : ""}`}
+              >
+                {Array.from({ length: 5 }).map((_, rowIndex) => (
+                  <div
+                    key={rowIndex}
+                    className="flex items-center justify-between gap-3 border-b-[0.5px] border-dash-border-soft py-3 last:border-b-0"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={`size-3.5 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+                      <div className={`h-3.5 w-32 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+                    </div>
+                    <div className={`h-3.5 w-24 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <TabHeaderSkeleton />
+          <div className="rounded-[4px] border-[0.5px] border-dash-border">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex h-[62px] items-center gap-3 border-b-[0.5px] border-dash-border px-4 last:border-b-0">
+                <div className={`size-3 rounded-full ${PULSE_BG_MEDIUM} animate-pulse`} />
+                <div className="min-w-0 flex-1">
+                  <div className={`mb-2 h-3.5 w-40 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+                  <div className={`h-3 w-64 max-w-full rounded ${PULSE_BG_WEAK} animate-pulse`} />
+                </div>
+                <div className={`h-3 w-16 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

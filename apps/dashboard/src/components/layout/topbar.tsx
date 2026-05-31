@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ElementType } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Search,
@@ -9,6 +9,7 @@ import {
   Plus,
   Globe,
   Users,
+  Database,
   Box,
   HardDrive,
   Menu,
@@ -48,9 +49,16 @@ import { WarningModal } from "../shared/warning-modal";
 import { Dropdown } from "../shared/dropdown";
 import { toTitleCase } from "@/utils/dashboard";
 import { Theme } from "@/types/enums";
-import { buildProjectSwitchUrl, buildWorkspaceSwitchUrl, setPendingDomainsAction, setPendingVolumesAction, withWorkspaceQuery } from "@/utils/topbar-navigation";
+import {
+  buildProjectSwitchUrl,
+  buildWorkspaceSwitchUrl,
+  setPendingDomainsAction,
+  setPendingVolumesAction,
+  withWorkspaceQuery,
+} from "@/utils/topbar-navigation";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
-import { FeatureFlags, useFeatureFlagStrict } from "@/lib/feature-flags";
+import { FeatureFlags, useFeatureFlag, useFeatureFlagStrict } from "@/lib/feature-flags";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 
 function getWorkspaceSearch(searchStr?: string) {
   const params = new URLSearchParams(searchStr || "");
@@ -1052,18 +1060,11 @@ function NotificationsDropdown({ haptics }: { haptics?: ReturnType<typeof useHap
   );
 }
 
-const defaultCreateMenuItems = [
-  { label: "Create project", icon: Plus },
-  { label: "Create sandbox", icon: Box },
-  { label: "Create volume", icon: HardDrive },
-  { label: "Register domain", icon: Globe },
-  { label: "New workspace", icon: Users },
-];
-
-const domainsCreateMenuItems = [
-  { label: "Buy domain", icon: ShoppingBag },
-  { label: "Transfer in", icon: ArrowRightLeft },
-];
+type CreateMenuItem = {
+  label: string;
+  icon: ElementType<{ className?: string }>;
+  onClick: () => void;
+};
 
 function CreateDropdown() {
   const { canWrite } = useWorkspaceRole();
@@ -1075,12 +1076,12 @@ function CreateDropdown() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
 
+  const { objectStorageEnabled } = usePlanGate();
+  const bucketFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const bucketsEnabled = bucketFeatureEnabled && objectStorageEnabled;
   const isDomainsPage = /^\/domains(\/|$)/.test(pathname);
   const isDomainsListPage = pathname === "/domains" || pathname === "/domains/";
   const isVolumesListPage = pathname === "/volumes" || pathname === "/volumes/";
-  const menuItems = isDomainsPage
-    ? domainsCreateMenuItems
-    : defaultCreateMenuItems.filter((item) => item.label !== "Create sandbox" || sandboxEnabled);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -1100,80 +1101,143 @@ function CreateDropdown() {
       window.dispatchEvent(new CustomEvent("brimble:add-domain"));
     } else if (isDomainsPage) {
       setPendingDomainsAction("add-domain");
-      void navigate({
+      navigate({
         to: withWorkspaceQuery({
           pathname: "/domains",
           searchStr,
-        }),
+        }) as any,
       });
     } else {
-      void navigate({
+      navigate({
         to: withWorkspaceQuery({
           pathname: "/projects/new",
           searchStr,
-        }),
+        }) as any,
       });
     }
   }
 
-  function handleMenuItemClick(label: string) {
+  const domainsCreateMenuItems = [
+    {
+      label: "Buy domain",
+      icon: ShoppingBag,
+      onClick: () => {
+        navigate({
+          to: withWorkspaceQuery({
+            pathname: "/domains/buy",
+            searchStr,
+          }) as any,
+        });
+      },
+    },
+    {
+      label: "Transfer in",
+      icon: ArrowRightLeft,
+      onClick: () => {
+        if (isDomainsListPage) {
+          window.dispatchEvent(new CustomEvent("brimble:transfer-in"));
+        } else {
+          setPendingDomainsAction("transfer-in");
+          navigate({
+            to: withWorkspaceQuery({
+              pathname: "/domains",
+              searchStr,
+            }) as any,
+          });
+        }
+      },
+    },
+  ] satisfies CreateMenuItem[];
+
+  const defaultCreateMenuItems = [
+    {
+      label: "Create project",
+      icon: Plus,
+      onClick: () => {
+        navigate({
+          to: withWorkspaceQuery({
+            pathname: "/projects/new",
+            searchStr,
+          }) as any,
+        });
+      },
+    },
+    ...(bucketsEnabled
+      ? [
+          {
+            label: "Create storage bucket",
+            icon: Database,
+            onClick: () => {
+              navigate({
+                to: withWorkspaceQuery({
+                  pathname: "/buckets",
+                  searchStr,
+                }) as any,
+              });
+            },
+          },
+        ]
+      : []),
+    ...(sandboxEnabled
+      ? [
+          {
+            label: "Create sandbox",
+            icon: Box,
+            onClick: () => {
+              navigate({
+                to: withWorkspaceQuery({
+                  pathname: "/sandboxes/new",
+                  searchStr,
+                }) as any,
+              });
+            },
+          },
+        ]
+      : []),
+    {
+      label: "Create volume",
+      icon: HardDrive,
+      onClick: () => {
+        if (isVolumesListPage) {
+          window.dispatchEvent(new CustomEvent("brimble:create-volume"));
+        } else {
+          setPendingVolumesAction("create-volume");
+          navigate({
+            to: withWorkspaceQuery({
+              pathname: "/volumes",
+              searchStr,
+            }) as any,
+          });
+        }
+      },
+    },
+    {
+      label: "Register domain",
+      icon: Globe,
+      onClick: () => {
+        navigate({
+          to: withWorkspaceQuery({
+            pathname: "/domains/buy",
+            searchStr,
+          }) as any,
+        });
+      },
+    },
+    {
+      label: "New workspace",
+      icon: Users,
+      onClick: () => {
+        navigate({ to: "/workspace/new" });
+      },
+    },
+  ] satisfies CreateMenuItem[];
+
+  const menuItems = isDomainsPage ? domainsCreateMenuItems : defaultCreateMenuItems;
+
+  function handleMenuItemClick(item: CreateMenuItem) {
     haptics.light();
     setOpen(false);
-    if (label === "Buy domain") {
-      void navigate({
-        to: withWorkspaceQuery({
-          pathname: "/domains/buy",
-          searchStr,
-        }),
-      });
-    } else if (label === "Transfer in") {
-      if (isDomainsListPage) {
-        window.dispatchEvent(new CustomEvent("brimble:transfer-in"));
-      } else {
-        setPendingDomainsAction("transfer-in");
-        void navigate({
-          to: withWorkspaceQuery({
-            pathname: "/domains",
-            searchStr,
-          }),
-        });
-      }
-    } else if (label === "Create project") {
-      void navigate({
-        to: withWorkspaceQuery({
-          pathname: "/projects/new",
-          searchStr,
-        }),
-      });
-    } else if (label === "Create sandbox") {
-      void navigate({
-        to: withWorkspaceQuery({
-          pathname: "/sandboxes/new",
-          searchStr,
-        }),
-      });
-    } else if (label === "Create volume") {
-      if (isVolumesListPage) {
-        window.dispatchEvent(new CustomEvent("brimble:create-volume"));
-      } else {
-        setPendingVolumesAction("create-volume");
-        void navigate({
-          to: withWorkspaceQuery({
-            pathname: "/volumes",
-            searchStr,
-          }),
-        });
-      }
-    } else if (label === "Register domain") {
-      void navigate({
-        to: withWorkspaceQuery({
-          pathname: "/domains/buy",
-          searchStr,
-        }),
-      });
-    } else if (label === "New workspace") {
-      void navigate({ to: "/workspace/new" });
-    }
+    item.onClick();
   }
 
   if (!canWrite) return null;
@@ -1217,7 +1281,7 @@ function CreateDropdown() {
               return (
                 <button
                   key={item.label}
-                  onClick={() => handleMenuItemClick(item.label)}
+                  onClick={() => handleMenuItemClick(item)}
                   className="mx-1 flex w-[calc(100%-8px)] items-center gap-2 rounded-[2px] px-2 py-1.5 text-sm font-light text-dash-text-body dark:text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
                 >
                   <Icon className="size-4" />

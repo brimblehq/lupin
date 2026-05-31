@@ -5,6 +5,7 @@ import type { Pricing, PlanSpecs } from "@/types/pricing";
 
 const SPECS_TTL = 10 * 60_000; // 10 minutes
 let specsCache: { data: Pricing; ts: number } | null = null;
+type UnknownRecord = Record<string, unknown>;
 
 export const getSubscriptionSpecsServerFn = createServerFn({
   method: "GET",
@@ -23,14 +24,33 @@ export const getSubscriptionSpecsServerFn = createServerFn({
   }
 });
 
-function normalizePricing(raw: any): Pricing {
-  if (!raw || typeof raw !== "object") return DEFAULT_PRICING;
+function asRecord(value: unknown): UnknownRecord | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
 
-  const specs = raw.specifications;
-  const prices = raw.pricing;
+  return value as UnknownRecord;
+}
+
+function getNumber(record: UnknownRecord | undefined, key: string, fallback: number): number {
+  return Number(record?.[key] ?? fallback);
+}
+
+function getString(record: UnknownRecord | undefined, key: string, fallback: string): string {
+  return String(record?.[key] ?? fallback);
+}
+
+function normalizePricing(raw: unknown): Pricing {
+  const root = asRecord(raw);
+  if (!root) return DEFAULT_PRICING;
+
+  const specs = asRecord(root.specifications);
+  const prices = asRecord(root.pricing);
 
   if (!specs || !prices) return DEFAULT_PRICING;
 
+  const hackerPrice = asRecord(prices.hacker);
+  const developerPrice = asRecord(prices.developer);
   const plans = [
     {
       id: "free",
@@ -41,39 +61,46 @@ function normalizePricing(raw: any): Pricing {
     {
       id: "hacker",
       name: "Hacker",
-      amount: Number(prices.hacker?.unit_amount ?? DEFAULT_PRICING.plans[1].amount),
-      interval: String(prices.hacker?.interval ?? "month"),
+      amount: getNumber(hackerPrice, "unit_amount", DEFAULT_PRICING.plans[1].amount),
+      interval: getString(hackerPrice, "interval", "month"),
     },
     {
       id: "developer",
       name: "Pro",
-      amount: Number(prices.developer?.unit_amount ?? DEFAULT_PRICING.plans[2].amount),
-      interval: String(prices.developer?.interval ?? "month"),
+      amount: getNumber(developerPrice, "unit_amount", DEFAULT_PRICING.plans[2].amount),
+      interval: getString(developerPrice, "interval", "month"),
     },
   ];
 
-  const teamSpec = specs.team;
+  const teamSpec = asRecord(specs.team);
+  const teamMemberPrice = asRecord(prices.team_member);
+  const teamBuildPrice = asRecord(prices.team_build);
   const team = {
-    costPerMember: Number(prices.team_member?.unit_amount ?? DEFAULT_PRICING.team.costPerMember),
-    costPerBuild: Number(prices.team_build?.unit_amount ?? DEFAULT_PRICING.team.costPerBuild),
-    maxProjects: Number(teamSpec?.project_limit ?? DEFAULT_PRICING.team.maxProjects),
-    bandwidthGb: Number(teamSpec?.bandwidth ?? DEFAULT_PRICING.team.bandwidthGb),
-    defaultConcurrentBuilds: Number(teamSpec?.concurrent_builds ?? DEFAULT_PRICING.team.defaultConcurrentBuilds),
-    logRetentionDays: Number(teamSpec?.log_retention ?? DEFAULT_PRICING.team.logRetentionDays),
+    costPerMember: getNumber(teamMemberPrice, "unit_amount", DEFAULT_PRICING.team.costPerMember),
+    costPerBuild: getNumber(teamBuildPrice, "unit_amount", DEFAULT_PRICING.team.costPerBuild),
+    maxProjects: getNumber(teamSpec, "project_limit", DEFAULT_PRICING.team.maxProjects),
+    bandwidthGb: getNumber(teamSpec, "bandwidth", DEFAULT_PRICING.team.bandwidthGb),
+    defaultConcurrentBuilds: getNumber(teamSpec, "concurrent_builds", DEFAULT_PRICING.team.defaultConcurrentBuilds),
+    logRetentionDays: getNumber(teamSpec, "log_retention", DEFAULT_PRICING.team.logRetentionDays),
   };
 
   const overage = DEFAULT_PRICING.overage;
+  const meteredPrices = asRecord(prices.metered);
+  const cpuPerGbMonth = asRecord(meteredPrices?.cpu_per_gb_month);
+  const memoryPerGbMonth = asRecord(meteredPrices?.memory_per_gb_month);
+  const storagePerGbMonth = asRecord(meteredPrices?.storage_per_gb_month);
 
   const metered = {
-    cpuPerGbMonth: Number(prices.metered?.cpu_per_gb_month?.unit_amount ?? DEFAULT_PRICING.metered.cpuPerGbMonth),
-    memoryPerGbMonth: Number(prices.metered?.memory_per_gb_month?.unit_amount ?? DEFAULT_PRICING.metered.memoryPerGbMonth),
-    storagePerGbMonth: Number(prices.metered?.storage_per_gb_month?.unit_amount ?? DEFAULT_PRICING.metered.storagePerGbMonth),
+    cpuPerGbMonth: getNumber(cpuPerGbMonth, "unit_amount", DEFAULT_PRICING.metered.cpuPerGbMonth),
+    memoryPerGbMonth: getNumber(memoryPerGbMonth, "unit_amount", DEFAULT_PRICING.metered.memoryPerGbMonth),
+    storagePerGbMonth: getNumber(storagePerGbMonth, "unit_amount", DEFAULT_PRICING.metered.storagePerGbMonth),
   };
 
   const specsMap: Record<string, PlanSpecs> = {};
   for (const key of ["free", "hacker", "developer", "team"] as const) {
-    if (specs[key]) {
-      specsMap[key] = normalizePlanSpecs(specs[key], DEFAULT_PRICING.specs[key]);
+    const planSpecs = asRecord(specs[key]);
+    if (planSpecs) {
+      specsMap[key] = normalizePlanSpecs(planSpecs, DEFAULT_PRICING.specs[key]);
     }
   }
 
@@ -88,7 +115,7 @@ function toBool(value: unknown, fallback = false): boolean {
   return fallback;
 }
 
-function normalizePlanSpecs(raw: any, defaults?: PlanSpecs): PlanSpecs {
+function normalizePlanSpecs(raw: UnknownRecord, defaults?: PlanSpecs): PlanSpecs {
   // Returns null when the value is explicitly null / "unlimited" / -1, the
   // fallback when the value is undefined (i.e. backend hasn't supplied the
   // field yet), and the parsed number otherwise.
@@ -99,13 +126,13 @@ function normalizePlanSpecs(raw: any, defaults?: PlanSpecs): PlanSpecs {
     return Number.isFinite(parsed) ? parsed : (fallback ?? null);
   };
 
-  const sandbox = raw?.sandbox;
-  const sandboxConcurrentLimit = Number(sandbox?.concurrent_limit ?? 0);
-  const sandboxCpuHoursIncluded = Number(sandbox?.cpu_hours_included ?? 0);
-  const sandboxMemoryGbHoursIncluded = Number(sandbox?.memory_gb_hours_included ?? 0);
-  const sandboxMaxRuntimeMinutes = Number(sandbox?.max_runtime_minutes ?? 0);
-  const sandboxMaxVcpuPerSandbox = Number(sandbox?.max_vcpu_per_sandbox ?? 0);
-  const sandboxMaxMemoryGbPerSandbox = Number(sandbox?.max_memory_gb_per_sandbox ?? 0);
+  const sandbox = asRecord(raw.sandbox);
+  const sandboxConcurrentLimit = getNumber(sandbox, "concurrent_limit", 0);
+  const sandboxCpuHoursIncluded = getNumber(sandbox, "cpu_hours_included", 0);
+  const sandboxMemoryGbHoursIncluded = getNumber(sandbox, "memory_gb_hours_included", 0);
+  const sandboxMaxRuntimeMinutes = getNumber(sandbox, "max_runtime_minutes", 0);
+  const sandboxMaxVcpuPerSandbox = getNumber(sandbox, "max_vcpu_per_sandbox", 0);
+  const sandboxMaxMemoryGbPerSandbox = getNumber(sandbox, "max_memory_gb_per_sandbox", 0);
   const sandboxEnabledFlag = toBool(sandbox?.enabled, defaults?.sandboxEnabled ?? false);
   const sandboxEnabledByLimits =
     sandboxConcurrentLimit > 0 ||
@@ -116,23 +143,24 @@ function normalizePlanSpecs(raw: any, defaults?: PlanSpecs): PlanSpecs {
     sandboxMaxMemoryGbPerSandbox > 0;
 
   return {
-    projectLimit: raw?.project_limit === -1 || raw?.project_limit === "unlimited" ? null : Number(raw?.project_limit ?? 3),
-    webhookEnabled: toBool(raw?.webhook_enabled),
-    customDomain: toBool(raw?.custom_domain),
-    deployPrivateOrganization: toBool(raw?.deploy_private_organization),
-    autoscalingEnabled: toBool(raw?.autoscaling_enabled),
+    projectLimit: raw.project_limit === -1 || raw.project_limit === "unlimited" ? null : Number(raw.project_limit ?? 3),
+    webhookEnabled: toBool(raw.webhook_enabled),
+    customDomain: toBool(raw.custom_domain),
+    deployPrivateOrganization: toBool(raw.deploy_private_organization),
+    autoscalingEnabled: toBool(raw.autoscaling_enabled),
+    objectStorageEnabled: toBool(raw.object_storage_enabled, defaults?.objectStorageEnabled ?? false),
     sandboxEnabled: sandboxEnabledFlag || sandboxEnabledByLimits,
-    sandboxMaxCount: Number(sandbox?.sandbox_max_count ?? defaults?.sandboxMaxCount ?? 0),
-    analytics: toBool(raw?.analytics),
-    pullRequestPreview: toBool(raw?.pull_request_preview),
-    buildMinutes: Number(raw?.build_minutes ?? 0),
-    bandwidth: Number(raw?.bandwidth ?? 0),
-    storage: Number(raw?.storage ?? 0),
-    concurrentBuilds: Number(raw?.concurrent_builds ?? 1),
-    logRetention: Number(raw?.log_retention ?? 1),
-    supportLevel: String(raw?.support ?? "community"),
-    dbMaxCpu: toNullableNumberWithFallback(raw?.db_max_cpu, defaults?.dbMaxCpu),
-    dbMaxMemory: toNullableNumberWithFallback(raw?.db_max_memory, defaults?.dbMaxMemory),
-    dbMaxStorage: toNullableNumberWithFallback(raw?.db_max_storage, defaults?.dbMaxStorage),
+    sandboxMaxCount: getNumber(sandbox, "sandbox_max_count", defaults?.sandboxMaxCount ?? 0),
+    analytics: toBool(raw.analytics),
+    pullRequestPreview: toBool(raw.pull_request_preview),
+    buildMinutes: getNumber(raw, "build_minutes", 0),
+    bandwidth: getNumber(raw, "bandwidth", 0),
+    storage: getNumber(raw, "storage", 0),
+    concurrentBuilds: getNumber(raw, "concurrent_builds", 1),
+    logRetention: getNumber(raw, "log_retention", 1),
+    supportLevel: getString(raw, "support", "community"),
+    dbMaxCpu: toNullableNumberWithFallback(raw.db_max_cpu, defaults?.dbMaxCpu),
+    dbMaxMemory: toNullableNumberWithFallback(raw.db_max_memory, defaults?.dbMaxMemory),
+    dbMaxStorage: toNullableNumberWithFallback(raw.db_max_storage, defaults?.dbMaxStorage),
   };
 }

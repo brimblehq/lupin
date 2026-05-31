@@ -49,6 +49,7 @@ import { listProjectEnvironmentsServerFn } from "@/server/environments/actions";
 import type { ProjectEnvironment } from "@/backend/environments";
 import type { ActivityLogsResponse, ActivityLogGroup } from "@/backend/activity-logs";
 import {
+  createSettingsApiKeyServerFn,
   decryptSettingsApiKeyServerFn,
   disconnectGitProviderServerFn,
   getSettingsSidebarSnapshotServerFn,
@@ -74,7 +75,6 @@ import {
   getPaymentMethodsServerFn,
   getSpendingLimitStatusServerFn,
   getSubscriptionServerFn,
-  getSubscriptionStatsServerFn,
 } from "@/server/payments/actions";
 import { paymentKeys } from "@/hooks/use-payments";
 import {
@@ -389,6 +389,7 @@ function ProfileForm({
   onSave,
   onBuildsChange,
   onHapticsChange,
+  onCreateApiKey,
   onResetApiKey,
   onDecryptApiKey,
   gitConnections,
@@ -405,7 +406,8 @@ function ProfileForm({
   onSave?: (data: { firstName: string; lastName: string; username: string; avatarUrl?: string }) => void | Promise<void>;
   onBuildsChange?: (enabled: boolean) => Promise<void> | void;
   onHapticsChange?: (enabled: boolean) => Promise<void> | void;
-  onResetApiKey?: (hadKey: boolean) => Promise<string | undefined> | string | undefined;
+  onCreateApiKey?: () => Promise<string | undefined> | string | undefined;
+  onResetApiKey?: () => Promise<string | undefined> | string | undefined;
   onDecryptApiKey?: (encryptedApiKey: string) => Promise<string | null | undefined>;
   gitConnections: { id: string; name: string; connected: boolean }[];
   onDisconnectGitProvider?: (providerId: string) => Promise<void> | void;
@@ -725,6 +727,7 @@ function ProfileForm({
         initialApiKey={profile.apiKey}
         isFreePlan={isFreePlan}
         onUpgradePlan={onOpenBilling}
+        onCreate={onCreateApiKey}
         onReset={onResetApiKey}
         onDecrypt={onDecryptApiKey}
       />
@@ -1080,13 +1083,15 @@ function ApiKeySection({
   initialApiKey,
   isFreePlan = false,
   onUpgradePlan,
+  onCreate,
   onReset,
   onDecrypt,
 }: {
   initialApiKey?: string;
   isFreePlan?: boolean;
   onUpgradePlan?: () => void;
-  onReset?: (hadKey: boolean) => Promise<string | undefined> | string | undefined;
+  onCreate?: () => Promise<string | undefined> | string | undefined;
+  onReset?: () => Promise<string | undefined> | string | undefined;
   onDecrypt?: (encryptedApiKey: string) => Promise<string | null | undefined>;
 }) {
   const [encryptedApiKey, setEncryptedApiKey] = useState(initialApiKey ?? "");
@@ -1194,23 +1199,7 @@ function ApiKeySection({
             )}
 
             <button
-              onClick={async () => {
-                if (hasApiKey) {
-                  setRerollOpen(true);
-                  return;
-                }
-                setIsSubmitting(true);
-                try {
-                  const nextKey = await onReset?.(false);
-                  if (nextKey) {
-                    setEncryptedApiKey(nextKey);
-                    setDecryptedApiKey(null);
-                    setRevealed(false);
-                  }
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
+              onClick={() => setRerollOpen(true)}
               disabled={isSubmitting}
               className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[6px] border border-dash-border bg-dash-bg px-3 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated"
             >
@@ -1229,7 +1218,7 @@ function ApiKeySection({
             onConfirm={async () => {
               setIsSubmitting(true);
               try {
-                const nextKey = await onReset?.(true);
+                const nextKey = encryptedApiKey ? await onReset?.() : await onCreate?.();
                 if (nextKey) {
                   setEncryptedApiKey(nextKey);
                   setDecryptedApiKey(null);
@@ -1789,9 +1778,8 @@ export function UserProfileDrawer({
   const updateHaptics = useServerFn(updateSettingsHapticsServerFn as any) as (args: {
     data: { haptics: boolean };
   }) => Promise<{ ok: true }>;
-  const resetApiKey = useServerFn(resetSettingsApiKeyServerFn as any) as (args?: {
-    data?: { twoFactorToken?: string };
-  }) => Promise<{ apiKey?: string }>;
+  const createApiKey = useServerFn(createSettingsApiKeyServerFn);
+  const resetApiKey = useServerFn(resetSettingsApiKeyServerFn);
   const disconnectGitProvider = useServerFn(disconnectGitProviderServerFn as any) as (args: {
     data: { provider: string };
   }) => Promise<{ ok: true }>;
@@ -1815,9 +1803,8 @@ export function UserProfileDrawer({
   const [twoFactorStatus, setTwoFactorStatus] = useState<TwoFactorStatus | null>(null);
   const [prefetchedPasskeys, setPrefetchedPasskeys] = useState<PasskeySummary[] | undefined>(undefined);
   const decryptApiKey = useServerFn(decryptSettingsApiKeyServerFn as any) as (args: {
-    data: { encryptedApiKey: string; twoFactorToken?: string };
+    data: { encryptedApiKey: string };
   }) => Promise<string | null>;
-  const { requestStepUp: requestApiKeyStepUp } = useStepUpTwoFactor();
   const updateWebhooks = useServerFn(updateSettingsWebhooksServerFn as any) as (args: {
     data: {
       webhookUrl: string | null;
@@ -1942,10 +1929,6 @@ export function UserProfileDrawer({
         queryClient.prefetchQuery({
           queryKey: paymentKeys.subscription(),
           queryFn: () => getSubscriptionServerFn(),
-        }),
-        queryClient.prefetchQuery({
-          queryKey: paymentKeys.subscriptionStats(teamId),
-          queryFn: () => getSubscriptionStatsServerFn({ data: teamId ? { team_id: teamId } : {} } as any),
         }),
         queryClient.prefetchQuery({
           queryKey: paymentKeys.spendingLimitStatus(teamId),
@@ -2131,7 +2114,7 @@ export function UserProfileDrawer({
         logAuthFlow("sign-out flow navigating to login from profile drawer");
         posthog.reset();
         invalidateSessionCache();
-        void router.navigate({ to: "/login", replace: true });
+        window.location.href = "/login";
       });
   }
 
@@ -2173,15 +2156,9 @@ export function UserProfileDrawer({
               <Drawer.Title className="text-base font-medium leading-[25px] tracking-[-0.0256px] text-dash-text-strong capitalize">
                 {drawerTitle}
               </Drawer.Title>
-              <a
-                href="https://brimble.io/faq"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Help & FAQ"
-                className="flex size-8 items-center justify-center rounded-full border border-dash-border-soft text-dash-text-faded transition-colors hover:text-dash-text-strong"
-              >
+              <button className="flex size-8 items-center justify-center rounded-full border border-dash-border-soft text-dash-text-faded transition-colors hover:text-dash-text-strong">
                 <HelpCircle className="size-4" />
-              </a>
+              </button>
             </div>
 
             {/* Form */}
@@ -2335,23 +2312,9 @@ export function UserProfileDrawer({
                       throw error;
                     }
                   }}
-                  onResetApiKey={async (hadKey) => {
+                  onCreateApiKey={async () => {
                     try {
-                      let twoFactorToken: string | undefined;
-                      if (twoFactorStatus?.enabled) {
-                        const token = await requestApiKeyStepUp({
-                          action: hadKey ? "reset_api_key" : "create_api_key",
-                          resourceId: "api_key",
-                        });
-                        if (!token) {
-                          return undefined;
-                        }
-                        twoFactorToken = token;
-                      }
-
-                      const result = await resetApiKey({
-                        data: twoFactorToken ? { twoFactorToken } : undefined,
-                      });
+                      const result = await createApiKey();
                       const apiKeyValue = result.apiKey;
 
                       if (apiKeyValue) {
@@ -2368,28 +2331,47 @@ export function UserProfileDrawer({
                             },
                           };
                         });
-                        toast.success(hadKey ? "API key reset" : "API key created");
+                        toast.success("API key created");
                       }
 
                       return apiKeyValue;
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : hadKey ? "Failed to reset API key" : "Failed to create API key");
+                      toast.error(error instanceof Error ? error.message : "Failed to create API key");
+                      return undefined;
+                    }
+                  }}
+                  onResetApiKey={async () => {
+                    try {
+                      const result = await resetApiKey();
+                      const apiKeyValue = result.apiKey;
+
+                      if (apiKeyValue) {
+                        setSnapshot((prev) => {
+                          if (!prev) {
+                            return prev;
+                          }
+
+                          return {
+                            ...prev,
+                            profile: {
+                              ...prev.profile,
+                              apiKey: apiKeyValue,
+                            },
+                          };
+                        });
+                        toast.success("API key reset");
+                      }
+
+                      return apiKeyValue;
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : "Failed to reset API key");
                       return undefined;
                     }
                   }}
                   onDecryptApiKey={async (encryptedApiKey) => {
                     try {
-                      let twoFactorToken: string | undefined;
-                      if (twoFactorStatus?.enabled) {
-                        const token = await requestApiKeyStepUp({ action: "view_api_key", resourceId: "api_key" });
-                        if (!token) {
-                          return null;
-                        }
-                        twoFactorToken = token;
-                      }
-
                       return await decryptApiKey({
-                        data: { encryptedApiKey, ...(twoFactorToken ? { twoFactorToken } : {}) },
+                        data: { encryptedApiKey },
                       });
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Failed to decrypt API key");

@@ -45,6 +45,7 @@ import { getTwoFactorStatusServerFn } from "@/server/auth/actions";
 import type { TwoFactorStatus } from "@/backend/auth/types";
 import { identifyPostHog, isPostHogEnabled } from "@/lib/posthog";
 import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/feature-flags";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 import { AddonDetailPending } from "@/components/shared/route-pending";
 
 const CommandPalette = lazy(() => import("./command-palette").then((m) => ({ default: m.CommandPalette })));
@@ -82,7 +83,7 @@ const dashboardQueryClient = new QueryClient({
   },
 });
 
-const mobileNavItemBase = "flex w-full items-center gap-3 whitespace-nowrap px-5 py-4 text-sm tracking-[-0.09px] transition-colors";
+const mobileNavItemBase = "flex w-full items-center gap-3 px-5 py-4 text-sm tracking-[-0.09px] transition-colors";
 const DISMISSED_SNACKBARS_STORAGE_PREFIX = "brimble:dismissed-snackbars:";
 const DISMISSED_ANNOUNCEMENTS_STORAGE_PREFIX = "brimble:dismissed-announcements:";
 
@@ -442,6 +443,118 @@ function ProjectDetailTabSkeleton() {
   );
 }
 
+function SandboxListTabSkeleton() {
+  return (
+    <div className="max-w-[1000px] animate-pulse">
+      <PageHeaderSkeleton />
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-10 min-w-0 flex-1 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+        <div className="h-10 w-[180px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30" />
+      </div>
+      <div className="mb-8 flex h-[120px] items-center justify-end rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/20 px-10">
+        <div className="h-10 w-52 rounded-[4px] bg-dash-border-soft/50" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="min-h-[168px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/30">
+            <div className="flex min-h-[126px] flex-col gap-5 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="size-7 shrink-0 rounded bg-dash-border-soft/50" />
+                  <div className="min-w-0">
+                    <div className="mb-2 h-4 w-40 rounded bg-dash-border-soft/70" />
+                    <div className="h-3 w-24 rounded bg-dash-border-soft/50" />
+                  </div>
+                </div>
+                <div className="h-7 w-24 shrink-0 rounded bg-dash-border-soft/50" />
+              </div>
+              <div className="flex flex-wrap gap-5">
+                <div className="h-3.5 w-20 rounded bg-dash-border-soft/30" />
+                <div className="h-3.5 w-20 rounded bg-dash-border-soft/30" />
+                <div className="h-3.5 w-20 rounded bg-dash-border-soft/30" />
+              </div>
+              <div className="h-3.5 w-36 rounded bg-dash-border-soft/30" />
+            </div>
+            <div className="flex h-10 items-center border-t-[0.5px] border-dash-border px-5">
+              <div className="h-3.5 w-16 rounded bg-dash-border-soft/30" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SandboxDetailTabSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-[1000px] animate-pulse py-8">
+      <div className="mb-4 h-3.5 w-24 rounded bg-dash-border-soft/30" />
+      <div className="mb-6 flex items-start gap-3">
+        <div className="size-10 shrink-0 rounded bg-dash-border-soft/50" />
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="h-4 w-44 rounded bg-dash-border-soft/70" />
+            <div className="h-5 w-24 rounded bg-dash-border-soft/50" />
+          </div>
+          <div className="h-3.5 w-28 rounded bg-dash-border-soft/30" />
+        </div>
+      </div>
+      <div className="mb-6 flex flex-wrap gap-2 border-b-[0.5px] border-dash-border">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-9 w-24 rounded-t bg-dash-border-soft/30" />
+        ))}
+      </div>
+      <div className="flex flex-col gap-6">
+        <div className="h-[118px] rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/40" />
+        <div>
+          <div className="mb-3 h-5 w-28 rounded bg-dash-border-soft/70" />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="h-[66px] rounded-[4px] bg-dash-bg-elevated" />
+            <div className="h-[66px] rounded-[4px] bg-dash-bg-elevated" />
+            <div className="h-[66px] rounded-[4px] bg-dash-bg-elevated" />
+          </div>
+        </div>
+        <div>
+          <div className="mb-3 h-5 w-24 rounded bg-dash-border-soft/70" />
+          <div className="grid grid-cols-1 rounded-[4px] border-[0.5px] border-dash-border sm:grid-cols-2">
+            {Array.from({ length: 2 }).map((_, columnIndex) => (
+              <div
+                key={columnIndex}
+                className={cn("flex flex-col px-4", columnIndex === 0 && "sm:border-r-[0.5px] sm:border-dash-border-soft")}
+              >
+                {Array.from({ length: 5 }).map((_, rowIndex) => (
+                  <div
+                    key={rowIndex}
+                    className="flex items-center justify-between border-b-[0.5px] border-dash-border-soft py-3 last:border-b-0"
+                  >
+                    <div className="h-3.5 w-32 rounded bg-dash-border-soft/50" />
+                    <div className="h-3.5 w-24 rounded bg-dash-border-soft/30" />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="mb-3 h-5 w-24 rounded bg-dash-border-soft/70" />
+          <div className="rounded-[4px] border-[0.5px] border-dash-border">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex h-[62px] items-center gap-3 border-b-[0.5px] border-dash-border px-4 last:border-b-0">
+                <div className="size-3 rounded-full bg-dash-border-soft/50" />
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 h-3.5 w-40 rounded bg-dash-border-soft/50" />
+                  <div className="h-3 w-64 max-w-full rounded bg-dash-border-soft/30" />
+                </div>
+                <div className="h-3 w-16 rounded bg-dash-border-soft/30" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RouteTransitionSkeleton({ pathname, fullWidth }: { pathname: string; fullWidth?: boolean }) {
   if (/^\/projects\/new(?:\/|$)/.test(pathname)) {
     return <NewProjectTabSkeleton />;
@@ -457,6 +570,14 @@ function RouteTransitionSkeleton({ pathname, fullWidth }: { pathname: string; fu
 
   if (pathname.startsWith("/projects")) {
     return <ProjectsTabSkeleton />;
+  }
+
+  if (/^\/sandboxes\/[^/]+(?:\/|$)/.test(pathname) && !/^\/sandboxes\/new(?:\/|$)/.test(pathname)) {
+    return <SandboxDetailTabSkeleton />;
+  }
+
+  if (pathname.startsWith("/sandboxes")) {
+    return <SandboxListTabSkeleton />;
   }
 
   if (pathname.startsWith("/domains")) {
@@ -502,9 +623,11 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
 
   const domainsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DOMAINS);
   const scalingEnabled = useFeatureFlag(FeatureFlags.ENABLE_AUTO_SCALING);
-  const bucketsEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const { objectStorageEnabled } = usePlanGate();
+  const bucketFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const bucketsEnabled = bucketFeatureEnabled && objectStorageEnabled;
   const sandboxEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
-  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS);
+  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS) && objectStorageEnabled;
   const sandboxStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
   const mcpServersStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
 
@@ -544,14 +667,7 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
           return true;
         })
         .map((item) => {
-          if (
-            "comingSoon" in item &&
-            item.comingSoon &&
-            "flag" in item &&
-            item.flag &&
-            isPostHogEnabled &&
-            strictFlagValues[item.flag]
-          ) {
+          if ("comingSoon" in item && item.comingSoon && "flag" in item && item.flag && isPostHogEnabled && strictFlagValues[item.flag]) {
             return { ...item, comingSoon: false };
           }
           return item;
@@ -734,7 +850,7 @@ export function DashboardLayout({
   });
   const navigate = useNavigate();
   const isAuthRoute = /^\/(login|signup)$/.test(layoutPathname) || /^\/(login|signup)$/.test(pathname);
-  const knownPrefixes = /^\/(login|signup|projects|domains|addons|scaling|workspace|teams|sandboxes|volumes)?(\/|$)/;
+  const knownPrefixes = /^\/(login|signup|projects|domains|buckets|addons|scaling|workspace|teams|sandboxes|volumes)?(\/|$)/;
   const isCatchAll = layoutPathname !== "/" && !knownPrefixes.test(layoutPathname);
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const resolvedSearchStr = useRouterState({
@@ -938,6 +1054,9 @@ export function DashboardLayout({
     if (p && (p.firstName || p.lastName || p.username || p.email)) {
       setUserProfile((prev) => {
         if (!prev || (!prev.firstName && !prev.lastName && p.firstName)) return p;
+        if (p.subscription?.planType && p.subscription.planType !== prev.subscription?.planType) {
+          return { ...prev, subscription: p.subscription };
+        }
         return prev;
       });
     }

@@ -9,6 +9,7 @@ const SURVEY_BLOCK_STYLE_ID = "brimble-posthog-survey-block-style";
 const SURVEY_CONTAINER_SELECTOR = '[class^="PostHogSurvey-"], [class*=" PostHogSurvey-"], [class*="PostHogSurvey-"]';
 const SURVEY_BRANDING_SELECTOR = 'a.footer-branding[href*="posthog.com/surveys"], a[href*="posthog.com/surveys"], .footer-branding';
 const SURVEY_SUBMIT_SELECTOR = 'button.form-submit[aria-label="Submit survey"]';
+const POSTHOG_DISABLED_APP_ENVS = new Set(["local", "dev"]);
 
 type PostHogClient = {
   init: (apiKey: string, config?: Record<string, unknown>) => void;
@@ -21,29 +22,20 @@ type PostHogClient = {
   offFeatureFlags?: (callback: () => void) => void;
 };
 
+function isDisabledAppEnv(): boolean {
+  const appEnv = config.appEnv.toLowerCase();
+  return POSTHOG_DISABLED_APP_ENVS.has(appEnv);
+}
+
 function shouldEnablePostHog(): boolean {
   if (!config.posthogKey) return false;
-
-  // const viteEnv =
-  //   typeof import.meta !== "undefined"
-  //     ? ((import.meta as ImportMeta).env as
-  //         | { DEV?: boolean }
-  //         | undefined)
-  //     : undefined;
-  // if (viteEnv?.DEV) return false;
-
-  // const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } })
-  //   .process?.env?.NODE_ENV;
-  // if (nodeEnv && nodeEnv !== "production") return false;
-
-  // if (typeof window !== "undefined" && isLocalhostHost(window.location.hostname)) {
-  //   return false;
-  // }
+  if (isDisabledAppEnv()) return false;
 
   return true;
 }
 
 export const isPostHogEnabled = shouldEnablePostHog();
+export const isPostHogDisabledByAppEnv = isDisabledAppEnv();
 
 async function loadPostHogClient(): Promise<PostHogClient | null> {
   if (typeof window === "undefined" || !isPostHogEnabled) {
@@ -51,9 +43,7 @@ async function loadPostHogClient(): Promise<PostHogClient | null> {
   }
 
   if (!posthogClientPromise) {
-    posthogClientPromise = import("posthog-js")
-      .then((module) => (module.default as PostHogClient) ?? null)
-      .catch(() => null);
+    posthogClientPromise = import("posthog-js").then((module) => (module.default as PostHogClient) ?? null).catch(() => null);
   }
 
   return posthogClientPromise;

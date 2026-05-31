@@ -1,29 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
-import * as Yup from "yup";
 import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
-
-type ListRegionsPayload = {
-  type?: "web" | "database" | "sandbox";
-  enabled?: boolean;
-  teamId?: string;
-  workspace?: string;
-};
-
-const listRegionsSchema = Yup.object({
-  type: Yup.mixed<"web" | "database" | "sandbox">().oneOf(["web", "database", "sandbox"]),
-  enabled: Yup.boolean(),
-  teamId: Yup.string().trim(),
-  workspace: Yup.string().trim(),
-});
 
 export const listRegionsServerFn = createServerFn({
   method: "GET",
-}).inputValidator((input: ListRegionsPayload | undefined) => {
-  return listRegionsSchema.validateSync(input ?? {}, { stripUnknown: true }) as ListRegionsPayload;
-}).handler(async ({ data: payload }) => {
+}).handler(async ({ data }) => {
+  const payload = data as
+    | {
+        type?: "web" | "database";
+        enabled?: boolean;
+        teamId?: string;
+        workspace?: string;
+      }
+    | undefined;
 
   let teamId = payload?.teamId;
-  const workspaceSlug = payload?.workspace?.trim().toLowerCase();
+
+  const workspaceSlug = typeof payload?.workspace === "string" ? payload.workspace.trim().toLowerCase() : undefined;
 
   return withTokenRefresh(async (api) => {
     if (!teamId && workspaceSlug) {

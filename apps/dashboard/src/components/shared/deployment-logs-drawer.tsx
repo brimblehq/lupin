@@ -22,6 +22,7 @@ import { BUILD_PHASE_LABEL, summarizePhases } from "@/utils/deployment-logs";
 import { downloadDeploymentLogsServerFn } from "@/server/deployments/actions";
 import { LogAiDebugPanel, LOG_AI_DEBUG_MAX_MESSAGE_LENGTH } from "@/components/shared/log-ai-debug-panel";
 import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
+import { SnykSecurityModal } from "./snyk-security-modal";
 
 interface DeploymentLogsDrawerProps {
   open: boolean;
@@ -196,6 +197,10 @@ export function DeploymentLogsDrawer({
   const buildInProgress = isBuildInProgress(deploymentStatus);
   const trimmedQuery = searchQuery.trim();
   const hasQuery = trimmedQuery.length > 0;
+
+  const [securityModalOpen, setSecurityModalOpen] = useState(false);
+  const [securityVulnerabilities, setSecurityVulnerabilities] = useState<any[]>([]);
+  const [securityLogContext, setSecurityLogContext] = useState<DeploymentDrawerLogEntry | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -637,7 +642,7 @@ export function DeploymentLogsDrawer({
                                   type="button"
                                   onClick={() => copyLogLine(log, index)}
                                   className={`flex w-full items-start gap-3 pt-2.5 pl-9 pr-2 text-left transition-colors hover:bg-dash-bg-elevated sm:pl-12 ${
-                                    showDebugAction ? "pb-1" : "pb-2.5"
+                                    showDebugAction || log.securityData?.vulnerabilities ? "pb-1" : "pb-2.5"
                                   }`}
                                 >
                                   <span
@@ -649,6 +654,22 @@ export function DeploymentLogsDrawer({
                                     <span className="shrink-0 font-logs text-[10px] uppercase tracking-wider text-[#13d282]">Copied</span>
                                   )}
                                 </button>
+                                {log.securityData?.vulnerabilities && (
+                                  <div className="flex items-center pb-2.5 pl-9 pr-2 sm:pl-12">
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        setSecurityLogContext(log);
+                                        setSecurityVulnerabilities(log.securityData.vulnerabilities);
+                                        setSecurityModalOpen(true);
+                                      }}
+                                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-logs text-[10px] uppercase tracking-wider underline underline-offset-2 transition-colors text-[#fc391e] decoration-[#fc391e]/50 hover:bg-[#fc391e]/10 hover:decoration-[#fc391e]"
+                                    >
+                                      <span>View Issues</span>
+                                    </button>
+                                  </div>
+                                )}
                                 {showDebugAction && (
                                   <div className="flex items-center pb-2.5 pl-9 pr-2 sm:pl-12">
                                     <button
@@ -724,6 +745,22 @@ export function DeploymentLogsDrawer({
         logId={deploymentId ?? ""}
         messageId={aiDebugSelection?.messageId ?? ""}
         message={aiDebugSelection?.message ?? ""}
+      />
+      <SnykSecurityModal
+        open={securityModalOpen}
+        onOpenChange={setSecurityModalOpen}
+        vulnerabilities={securityVulnerabilities}
+        onAiDebug={() => {
+          if (!securityLogContext || !securityLogContext.messageId) return;
+          
+          const aiMessage = "Snyk Security Vulnerabilities:\n" + securityVulnerabilities.map(v => `- ${v.packageName}@${v.version}: ${v.title} (${v.severity})`).join('\n');
+          
+          setAiDebugSelection({
+            message: aiMessage,
+            messageId: securityLogContext.messageId,
+          });
+          setSecurityModalOpen(false);
+        }}
       />
     </Drawer.Root>
   );

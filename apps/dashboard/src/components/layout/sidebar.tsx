@@ -9,10 +9,11 @@ import { useHaptics } from "@/hooks/use-haptics";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/feature-flags";
 import { isPostHogEnabled } from "@/lib/posthog";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 import { mainNav, moreNav } from "./sidebar-nav";
 
 const navItemBase =
-  "flex items-center gap-2 whitespace-nowrap rounded px-2 py-1.5 text-sm tracking-[-0.09px] transition-colors text-dash-text-faded dark:text-dash-text-strong";
+  "flex items-center gap-2 rounded px-2 py-1.5 text-sm tracking-[-0.09px] transition-colors text-dash-text-faded dark:text-dash-text-strong";
 
 export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: boolean) => void }) {
   const { theme, mode, cycleTheme } = useTheme();
@@ -23,10 +24,12 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
 
   const domainsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DOMAINS);
   const scalingEnabled = useFeatureFlag(FeatureFlags.ENABLE_AUTO_SCALING);
-  const bucketsEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const { objectStorageEnabled } = usePlanGate();
+  const bucketFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const bucketsEnabled = bucketFeatureEnabled && objectStorageEnabled;
   const sandboxEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
 
-  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS);
+  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS) && objectStorageEnabled;
   const sandboxStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
   const mcpServersStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
 
@@ -95,7 +98,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
                       alt=""
                       className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
                     />
-                    <span className="min-w-0 truncate">{item.label}</span>
+                    {item.label}
                     <span className="ml-auto rounded-full bg-dash-bg-elevated px-1.5 py-px text-[10px] font-medium text-dash-text-extra-faded">
                       Soon
                     </span>
@@ -127,7 +130,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
                     alt=""
                     className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
                   />
-                  <span className="min-w-0 truncate">{item.label}</span>
+                  {item.label}
                 </button>
               );
             })}
@@ -155,7 +158,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
                         alt=""
                         className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
                       />
-                      <span className="min-w-0 truncate">{item.label}</span>
+                      {item.label}
                     </a>
                   );
                 }
@@ -186,7 +189,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
                       alt=""
                       className="size-4 shrink-0 dark:invert dark:sepia dark:saturate-[3] dark:hue-rotate-[345deg] dark:opacity-80"
                     />
-                    <span className="min-w-0 truncate">{item.label}</span>
+                    {item.label}
                   </button>
                 );
               })}

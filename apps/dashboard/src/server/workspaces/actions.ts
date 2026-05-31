@@ -49,7 +49,7 @@ export const createWorkspaceServerFn = createServerFn({
   if (typeof memberCount !== "number" || !Number.isFinite(memberCount) || memberCount < 1) {
     throw new Error("Team size is invalid");
   }
-  if (!Number.isFinite(concurrentBuilds) || concurrentBuilds < 2) {
+  if (typeof concurrentBuilds !== "number" || !Number.isFinite(concurrentBuilds) || concurrentBuilds < 2) {
     throw new Error("Concurrent builds is invalid");
   }
 
@@ -58,7 +58,7 @@ export const createWorkspaceServerFn = createServerFn({
 
   const body = {
     team_name: teamName,
-    type: "TEAM_PLAN",
+    type: "TEAM_PLAN" as const,
     members,
     image,
     startup_code_reference: payload?.startup_code_reference?.trim() ?? "",

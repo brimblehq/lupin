@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VolumesRouteImport } from './routes/volumes'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ScalingRouteImport } from './routes/scaling'
 import { Route as SandboxesRouteImport } from './routes/sandboxes'
@@ -27,6 +26,7 @@ import { Route as ScalingIndexRouteImport } from './routes/scaling/index'
 import { Route as SandboxesIndexRouteImport } from './routes/sandboxes/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as DomainsIndexRouteImport } from './routes/domains/index'
+import { Route as BucketsIndexRouteImport } from './routes/buckets/index'
 import { Route as AddonsIndexRouteImport } from './routes/addons/index'
 import { Route as WorkspaceNewRouteImport } from './routes/workspace/new'
 import { Route as SandboxesNewRouteImport } from './routes/sandboxes/new'
@@ -38,6 +38,7 @@ import { Route as DomainsDomainNameRouteImport } from './routes/domains/$domainN
 import { Route as AddonsAddonIdRouteImport } from './routes/addons/$addonId'
 import { Route as SandboxesSandboxIdIndexRouteImport } from './routes/sandboxes/$sandboxId/index'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as BucketsBucketIdIndexRouteImport } from './routes/buckets/$bucketId/index'
 import { Route as TeamsTeamNameTransferRouteImport } from './routes/teams/$teamName/transfer'
 import { Route as TeamsTeamNameOwnershipTransferRouteImport } from './routes/teams/$teamName/ownership-transfer'
 import { Route as TeamsTeamNameInvitationRouteImport } from './routes/teams/$teamName/invitation'
@@ -45,20 +46,19 @@ import { Route as SandboxesSandboxIdTerminalRouteImport } from './routes/sandbox
 import { Route as SandboxesSandboxIdSnapshotsRouteImport } from './routes/sandboxes/$sandboxId/snapshots'
 import { Route as SandboxesSandboxIdObservabilityRouteImport } from './routes/sandboxes/$sandboxId/observability'
 import { Route as ProjectsProjectIdWebAnalyticsRouteImport } from './routes/projects/$projectId/web-analytics'
+import { Route as ProjectsProjectIdStorageRouteImport } from './routes/projects/$projectId/storage'
 import { Route as ProjectsProjectIdObservabilityRouteImport } from './routes/projects/$projectId/observability'
 import { Route as ProjectsProjectIdLogsRouteImport } from './routes/projects/$projectId/logs'
 import { Route as ProjectsProjectIdEnvironmentRouteImport } from './routes/projects/$projectId/environment'
 import { Route as ProjectsProjectIdDomainsRouteImport } from './routes/projects/$projectId/domains'
 import { Route as ProjectsProjectIdDeploymentHistoryRouteImport } from './routes/projects/$projectId/deployment-history'
 import { Route as ProjectsProjectIdConfigurationRouteImport } from './routes/projects/$projectId/configuration'
+import { Route as ProjectsProjectIdStorageIndexRouteImport } from './routes/projects/$projectId/storage/index'
 import { Route as ProjectsProjectIdDomainsIndexRouteImport } from './routes/projects/$projectId/domains/index'
+import { Route as BucketsBucketIdMigrateIndexRouteImport } from './routes/buckets/$bucketId/migrate/index'
 import { Route as ProjectsProjectIdDomainsDomainNameRouteImport } from './routes/projects/$projectId/domains/$domainName'
+import { Route as BucketsBucketIdMigrateNewRouteImport } from './routes/buckets/$bucketId/migrate/new'
 
-const VolumesRoute = VolumesRouteImport.update({
-  id: '/volumes',
-  path: '/volumes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -120,9 +120,9 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const VolumesIndexRoute = VolumesIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => VolumesRoute,
+  id: '/volumes/',
+  path: '/volumes/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ScalingIndexRoute = ScalingIndexRouteImport.update({
   id: '/',
@@ -143,6 +143,11 @@ const DomainsIndexRoute = DomainsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DomainsRoute,
+} as any)
+const BucketsIndexRoute = BucketsIndexRouteImport.update({
+  id: '/buckets/',
+  path: '/buckets/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AddonsIndexRoute = AddonsIndexRouteImport.update({
   id: '/',
@@ -199,6 +204,11 @@ const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ProjectsProjectIdRoute,
 } as any)
+const BucketsBucketIdIndexRoute = BucketsBucketIdIndexRouteImport.update({
+  id: '/buckets/$bucketId/',
+  path: '/buckets/$bucketId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamsTeamNameTransferRoute = TeamsTeamNameTransferRouteImport.update({
   id: '/teams/$teamName/transfer',
   path: '/teams/$teamName/transfer',
@@ -239,6 +249,12 @@ const ProjectsProjectIdWebAnalyticsRoute =
     path: '/web-analytics',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
+const ProjectsProjectIdStorageRoute =
+  ProjectsProjectIdStorageRouteImport.update({
+    id: '/storage',
+    path: '/storage',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
 const ProjectsProjectIdObservabilityRoute =
   ProjectsProjectIdObservabilityRouteImport.update({
     id: '/observability',
@@ -274,17 +290,35 @@ const ProjectsProjectIdConfigurationRoute =
     path: '/configuration',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
+const ProjectsProjectIdStorageIndexRoute =
+  ProjectsProjectIdStorageIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => ProjectsProjectIdStorageRoute,
+  } as any)
 const ProjectsProjectIdDomainsIndexRoute =
   ProjectsProjectIdDomainsIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => ProjectsProjectIdDomainsRoute,
   } as any)
+const BucketsBucketIdMigrateIndexRoute =
+  BucketsBucketIdMigrateIndexRouteImport.update({
+    id: '/buckets/$bucketId/migrate/',
+    path: '/buckets/$bucketId/migrate/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProjectsProjectIdDomainsDomainNameRoute =
   ProjectsProjectIdDomainsDomainNameRouteImport.update({
     id: '/$domainName',
     path: '/$domainName',
     getParentRoute: () => ProjectsProjectIdDomainsRoute,
+  } as any)
+const BucketsBucketIdMigrateNewRoute =
+  BucketsBucketIdMigrateNewRouteImport.update({
+    id: '/buckets/$bucketId/migrate/new',
+    path: '/buckets/$bucketId/migrate/new',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -300,7 +334,6 @@ export interface FileRoutesByFullPath {
   '/sandboxes': typeof SandboxesRouteWithChildren
   '/scaling': typeof ScalingRouteWithChildren
   '/signup': typeof SignupRoute
-  '/volumes': typeof VolumesRouteWithChildren
   '/addons/$addonId': typeof AddonsAddonIdRoute
   '/domains/$domainName': typeof DomainsDomainNameRoute
   '/domains/buy': typeof DomainsBuyRoute
@@ -310,6 +343,7 @@ export interface FileRoutesByFullPath {
   '/sandboxes/new': typeof SandboxesNewRoute
   '/workspace/new': typeof WorkspaceNewRoute
   '/addons/': typeof AddonsIndexRoute
+  '/buckets/': typeof BucketsIndexRoute
   '/domains/': typeof DomainsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/sandboxes/': typeof SandboxesIndexRoute
@@ -321,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
+  '/projects/$projectId/storage': typeof ProjectsProjectIdStorageRouteWithChildren
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/sandboxes/$sandboxId/observability': typeof SandboxesSandboxIdObservabilityRoute
   '/sandboxes/$sandboxId/snapshots': typeof SandboxesSandboxIdSnapshotsRoute
@@ -328,10 +363,14 @@ export interface FileRoutesByFullPath {
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
+  '/buckets/$bucketId/': typeof BucketsBucketIdIndexRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/sandboxes/$sandboxId/': typeof SandboxesSandboxIdIndexRoute
+  '/buckets/$bucketId/migrate/new': typeof BucketsBucketIdMigrateNewRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
+  '/buckets/$bucketId/migrate/': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains/': typeof ProjectsProjectIdDomainsIndexRoute
+  '/projects/$projectId/storage/': typeof ProjectsProjectIdStorageIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -348,6 +387,7 @@ export interface FileRoutesByTo {
   '/sandboxes/new': typeof SandboxesNewRoute
   '/workspace/new': typeof WorkspaceNewRoute
   '/addons': typeof AddonsIndexRoute
+  '/buckets': typeof BucketsIndexRoute
   '/domains': typeof DomainsIndexRoute
   '/projects': typeof ProjectsIndexRoute
   '/sandboxes': typeof SandboxesIndexRoute
@@ -365,10 +405,14 @@ export interface FileRoutesByTo {
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
+  '/buckets/$bucketId': typeof BucketsBucketIdIndexRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/sandboxes/$sandboxId': typeof SandboxesSandboxIdIndexRoute
+  '/buckets/$bucketId/migrate/new': typeof BucketsBucketIdMigrateNewRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
+  '/buckets/$bucketId/migrate': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains': typeof ProjectsProjectIdDomainsIndexRoute
+  '/projects/$projectId/storage': typeof ProjectsProjectIdStorageIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -384,7 +428,6 @@ export interface FileRoutesById {
   '/sandboxes': typeof SandboxesRouteWithChildren
   '/scaling': typeof ScalingRouteWithChildren
   '/signup': typeof SignupRoute
-  '/volumes': typeof VolumesRouteWithChildren
   '/addons/$addonId': typeof AddonsAddonIdRoute
   '/domains/$domainName': typeof DomainsDomainNameRoute
   '/domains/buy': typeof DomainsBuyRoute
@@ -394,6 +437,7 @@ export interface FileRoutesById {
   '/sandboxes/new': typeof SandboxesNewRoute
   '/workspace/new': typeof WorkspaceNewRoute
   '/addons/': typeof AddonsIndexRoute
+  '/buckets/': typeof BucketsIndexRoute
   '/domains/': typeof DomainsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/sandboxes/': typeof SandboxesIndexRoute
@@ -405,6 +449,7 @@ export interface FileRoutesById {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
+  '/projects/$projectId/storage': typeof ProjectsProjectIdStorageRouteWithChildren
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/sandboxes/$sandboxId/observability': typeof SandboxesSandboxIdObservabilityRoute
   '/sandboxes/$sandboxId/snapshots': typeof SandboxesSandboxIdSnapshotsRoute
@@ -412,10 +457,14 @@ export interface FileRoutesById {
   '/teams/$teamName/invitation': typeof TeamsTeamNameInvitationRoute
   '/teams/$teamName/ownership-transfer': typeof TeamsTeamNameOwnershipTransferRoute
   '/teams/$teamName/transfer': typeof TeamsTeamNameTransferRoute
+  '/buckets/$bucketId/': typeof BucketsBucketIdIndexRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/sandboxes/$sandboxId/': typeof SandboxesSandboxIdIndexRoute
+  '/buckets/$bucketId/migrate/new': typeof BucketsBucketIdMigrateNewRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
+  '/buckets/$bucketId/migrate/': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains/': typeof ProjectsProjectIdDomainsIndexRoute
+  '/projects/$projectId/storage/': typeof ProjectsProjectIdStorageIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -432,7 +481,6 @@ export interface FileRouteTypes {
     | '/sandboxes'
     | '/scaling'
     | '/signup'
-    | '/volumes'
     | '/addons/$addonId'
     | '/domains/$domainName'
     | '/domains/buy'
@@ -442,6 +490,7 @@ export interface FileRouteTypes {
     | '/sandboxes/new'
     | '/workspace/new'
     | '/addons/'
+    | '/buckets/'
     | '/domains/'
     | '/projects/'
     | '/sandboxes/'
@@ -453,6 +502,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
+    | '/projects/$projectId/storage'
     | '/projects/$projectId/web-analytics'
     | '/sandboxes/$sandboxId/observability'
     | '/sandboxes/$sandboxId/snapshots'
@@ -460,10 +510,14 @@ export interface FileRouteTypes {
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
+    | '/buckets/$bucketId/'
     | '/projects/$projectId/'
     | '/sandboxes/$sandboxId/'
+    | '/buckets/$bucketId/migrate/new'
     | '/projects/$projectId/domains/$domainName'
+    | '/buckets/$bucketId/migrate/'
     | '/projects/$projectId/domains/'
+    | '/projects/$projectId/storage/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -480,6 +534,7 @@ export interface FileRouteTypes {
     | '/sandboxes/new'
     | '/workspace/new'
     | '/addons'
+    | '/buckets'
     | '/domains'
     | '/projects'
     | '/sandboxes'
@@ -497,10 +552,14 @@ export interface FileRouteTypes {
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
+    | '/buckets/$bucketId'
     | '/projects/$projectId'
     | '/sandboxes/$sandboxId'
+    | '/buckets/$bucketId/migrate/new'
     | '/projects/$projectId/domains/$domainName'
+    | '/buckets/$bucketId/migrate'
     | '/projects/$projectId/domains'
+    | '/projects/$projectId/storage'
   id:
     | '__root__'
     | '/'
@@ -515,7 +574,6 @@ export interface FileRouteTypes {
     | '/sandboxes'
     | '/scaling'
     | '/signup'
-    | '/volumes'
     | '/addons/$addonId'
     | '/domains/$domainName'
     | '/domains/buy'
@@ -525,6 +583,7 @@ export interface FileRouteTypes {
     | '/sandboxes/new'
     | '/workspace/new'
     | '/addons/'
+    | '/buckets/'
     | '/domains/'
     | '/projects/'
     | '/sandboxes/'
@@ -536,6 +595,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
+    | '/projects/$projectId/storage'
     | '/projects/$projectId/web-analytics'
     | '/sandboxes/$sandboxId/observability'
     | '/sandboxes/$sandboxId/snapshots'
@@ -543,10 +603,14 @@ export interface FileRouteTypes {
     | '/teams/$teamName/invitation'
     | '/teams/$teamName/ownership-transfer'
     | '/teams/$teamName/transfer'
+    | '/buckets/$bucketId/'
     | '/projects/$projectId/'
     | '/sandboxes/$sandboxId/'
+    | '/buckets/$bucketId/migrate/new'
     | '/projects/$projectId/domains/$domainName'
+    | '/buckets/$bucketId/migrate/'
     | '/projects/$projectId/domains/'
+    | '/projects/$projectId/storage/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -562,22 +626,19 @@ export interface RootRouteChildren {
   SandboxesRoute: typeof SandboxesRouteWithChildren
   ScalingRoute: typeof ScalingRouteWithChildren
   SignupRoute: typeof SignupRoute
-  VolumesRoute: typeof VolumesRouteWithChildren
   WorkspaceNewRoute: typeof WorkspaceNewRoute
+  BucketsIndexRoute: typeof BucketsIndexRoute
+  VolumesIndexRoute: typeof VolumesIndexRoute
   TeamsTeamNameInvitationRoute: typeof TeamsTeamNameInvitationRoute
   TeamsTeamNameOwnershipTransferRoute: typeof TeamsTeamNameOwnershipTransferRoute
   TeamsTeamNameTransferRoute: typeof TeamsTeamNameTransferRoute
+  BucketsBucketIdIndexRoute: typeof BucketsBucketIdIndexRoute
+  BucketsBucketIdMigrateNewRoute: typeof BucketsBucketIdMigrateNewRoute
+  BucketsBucketIdMigrateIndexRoute: typeof BucketsBucketIdMigrateIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/volumes': {
-      id: '/volumes'
-      path: '/volumes'
-      fullPath: '/volumes'
-      preLoaderRoute: typeof VolumesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -664,10 +725,10 @@ declare module '@tanstack/react-router' {
     }
     '/volumes/': {
       id: '/volumes/'
-      path: '/'
+      path: '/volumes'
       fullPath: '/volumes/'
       preLoaderRoute: typeof VolumesIndexRouteImport
-      parentRoute: typeof VolumesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/scaling/': {
       id: '/scaling/'
@@ -696,6 +757,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/domains/'
       preLoaderRoute: typeof DomainsIndexRouteImport
       parentRoute: typeof DomainsRoute
+    }
+    '/buckets/': {
+      id: '/buckets/'
+      path: '/buckets'
+      fullPath: '/buckets/'
+      preLoaderRoute: typeof BucketsIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/addons/': {
       id: '/addons/'
@@ -774,6 +842,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/buckets/$bucketId/': {
+      id: '/buckets/$bucketId/'
+      path: '/buckets/$bucketId'
+      fullPath: '/buckets/$bucketId/'
+      preLoaderRoute: typeof BucketsBucketIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams/$teamName/transfer': {
       id: '/teams/$teamName/transfer'
       path: '/teams/$teamName/transfer'
@@ -823,6 +898,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdWebAnalyticsRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/projects/$projectId/storage': {
+      id: '/projects/$projectId/storage'
+      path: '/storage'
+      fullPath: '/projects/$projectId/storage'
+      preLoaderRoute: typeof ProjectsProjectIdStorageRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
     '/projects/$projectId/observability': {
       id: '/projects/$projectId/observability'
       path: '/observability'
@@ -865,6 +947,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdConfigurationRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/projects/$projectId/storage/': {
+      id: '/projects/$projectId/storage/'
+      path: '/'
+      fullPath: '/projects/$projectId/storage/'
+      preLoaderRoute: typeof ProjectsProjectIdStorageIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdStorageRoute
+    }
     '/projects/$projectId/domains/': {
       id: '/projects/$projectId/domains/'
       path: '/'
@@ -872,12 +961,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdDomainsIndexRouteImport
       parentRoute: typeof ProjectsProjectIdDomainsRoute
     }
+    '/buckets/$bucketId/migrate/': {
+      id: '/buckets/$bucketId/migrate/'
+      path: '/buckets/$bucketId/migrate'
+      fullPath: '/buckets/$bucketId/migrate/'
+      preLoaderRoute: typeof BucketsBucketIdMigrateIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects/$projectId/domains/$domainName': {
       id: '/projects/$projectId/domains/$domainName'
       path: '/$domainName'
       fullPath: '/projects/$projectId/domains/$domainName'
       preLoaderRoute: typeof ProjectsProjectIdDomainsDomainNameRouteImport
       parentRoute: typeof ProjectsProjectIdDomainsRoute
+    }
+    '/buckets/$bucketId/migrate/new': {
+      id: '/buckets/$bucketId/migrate/new'
+      path: '/buckets/$bucketId/migrate/new'
+      fullPath: '/buckets/$bucketId/migrate/new'
+      preLoaderRoute: typeof BucketsBucketIdMigrateNewRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -927,6 +1030,20 @@ const ProjectsProjectIdDomainsRouteWithChildren =
     ProjectsProjectIdDomainsRouteChildren,
   )
 
+interface ProjectsProjectIdStorageRouteChildren {
+  ProjectsProjectIdStorageIndexRoute: typeof ProjectsProjectIdStorageIndexRoute
+}
+
+const ProjectsProjectIdStorageRouteChildren: ProjectsProjectIdStorageRouteChildren =
+  {
+    ProjectsProjectIdStorageIndexRoute: ProjectsProjectIdStorageIndexRoute,
+  }
+
+const ProjectsProjectIdStorageRouteWithChildren =
+  ProjectsProjectIdStorageRoute._addFileChildren(
+    ProjectsProjectIdStorageRouteChildren,
+  )
+
 interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdConfigurationRoute: typeof ProjectsProjectIdConfigurationRoute
   ProjectsProjectIdDeploymentHistoryRoute: typeof ProjectsProjectIdDeploymentHistoryRoute
@@ -934,6 +1051,7 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdEnvironmentRoute: typeof ProjectsProjectIdEnvironmentRoute
   ProjectsProjectIdLogsRoute: typeof ProjectsProjectIdLogsRoute
   ProjectsProjectIdObservabilityRoute: typeof ProjectsProjectIdObservabilityRoute
+  ProjectsProjectIdStorageRoute: typeof ProjectsProjectIdStorageRouteWithChildren
   ProjectsProjectIdWebAnalyticsRoute: typeof ProjectsProjectIdWebAnalyticsRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
@@ -946,6 +1064,7 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
   ProjectsProjectIdEnvironmentRoute: ProjectsProjectIdEnvironmentRoute,
   ProjectsProjectIdLogsRoute: ProjectsProjectIdLogsRoute,
   ProjectsProjectIdObservabilityRoute: ProjectsProjectIdObservabilityRoute,
+  ProjectsProjectIdStorageRoute: ProjectsProjectIdStorageRouteWithChildren,
   ProjectsProjectIdWebAnalyticsRoute: ProjectsProjectIdWebAnalyticsRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }
@@ -1013,17 +1132,6 @@ const ScalingRouteChildren: ScalingRouteChildren = {
 const ScalingRouteWithChildren =
   ScalingRoute._addFileChildren(ScalingRouteChildren)
 
-interface VolumesRouteChildren {
-  VolumesIndexRoute: typeof VolumesIndexRoute
-}
-
-const VolumesRouteChildren: VolumesRouteChildren = {
-  VolumesIndexRoute: VolumesIndexRoute,
-}
-
-const VolumesRouteWithChildren =
-  VolumesRoute._addFileChildren(VolumesRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
@@ -1037,11 +1145,15 @@ const rootRouteChildren: RootRouteChildren = {
   SandboxesRoute: SandboxesRouteWithChildren,
   ScalingRoute: ScalingRouteWithChildren,
   SignupRoute: SignupRoute,
-  VolumesRoute: VolumesRouteWithChildren,
   WorkspaceNewRoute: WorkspaceNewRoute,
+  BucketsIndexRoute: BucketsIndexRoute,
+  VolumesIndexRoute: VolumesIndexRoute,
   TeamsTeamNameInvitationRoute: TeamsTeamNameInvitationRoute,
   TeamsTeamNameOwnershipTransferRoute: TeamsTeamNameOwnershipTransferRoute,
   TeamsTeamNameTransferRoute: TeamsTeamNameTransferRoute,
+  BucketsBucketIdIndexRoute: BucketsBucketIdIndexRoute,
+  BucketsBucketIdMigrateNewRoute: BucketsBucketIdMigrateNewRoute,
+  BucketsBucketIdMigrateIndexRoute: BucketsBucketIdMigrateIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

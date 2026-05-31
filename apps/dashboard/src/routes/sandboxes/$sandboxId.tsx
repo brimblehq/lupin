@@ -5,6 +5,7 @@ import { hapticToast as toast } from "@/utils/haptic-toast";
 import { SimpleTooltip } from "@/components/shared/tooltip";
 import { StatusChip } from "@/components/shared/status-chip";
 import { TabHeader } from "@/components/shared/tab-header";
+import { SandboxDetailPending } from "@/components/shared/route-pending";
 import { SandboxSubnav } from "@/components/sandboxes/sandbox-subnav";
 import { SandboxTerminal } from "@/components/sandboxes/sandbox-terminal";
 import { getSandboxScopedAblyOptions } from "@/lib/ably-auth";
@@ -38,6 +39,7 @@ export const Route = createFileRoute("/sandboxes/$sandboxId")({
       });
     }
   },
+  pendingComponent: SandboxDetailPending,
   component: SandboxDetailLayout,
 });
 

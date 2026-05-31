@@ -366,11 +366,21 @@ code {
 
 /* Router progress bar — trickle animation mimics nprogress without DOM thrash */
 @keyframes router-progress-trickle {
-  0%   { transform: scaleX(0); }
-  20%  { transform: scaleX(0.35); }
-  50%  { transform: scaleX(0.65); }
-  80%  { transform: scaleX(0.85); }
-  100% { transform: scaleX(0.92); }
+  0% {
+    transform: scaleX(0);
+  }
+  20% {
+    transform: scaleX(0.35);
+  }
+  50% {
+    transform: scaleX(0.65);
+  }
+  80% {
+    transform: scaleX(0.85);
+  }
+  100% {
+    transform: scaleX(0.92);
+  }
 }
 
 .router-progress {
@@ -389,7 +399,9 @@ code {
 }
 .router-progress[data-phase="finishing"] {
   transform: scaleX(1);
-  transition: transform 200ms ease-out, opacity 250ms ease-out 100ms;
+  transition:
+    transform 200ms ease-out,
+    opacity 250ms ease-out 100ms;
   opacity: 0;
 }
 
@@ -476,7 +488,6 @@ code {
 .sandbox-terminal-host .xterm .xterm-helper-textarea {
   caret-color: transparent !important;
 }
-
 /* ─── Date range picker ─── */
 
 /* Each month: 296px, 12px padding, 8px row gap */

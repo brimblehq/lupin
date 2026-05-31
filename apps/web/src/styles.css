@@ -73,18 +73,6 @@ body {
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
-/* Hide scrollbar while preserving scroll behavior */
-.scrollbar-hidden {
-  -ms-overflow-style: none;
-  scrollbar-width: none !important;
-}
-
-.scrollbar-hidden::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-  display: none !important;
-}
-
 code {
   font-family: "IBM Plex Mono", source-code-pro, Menlo, Monaco, Consolas, monospace;
 }

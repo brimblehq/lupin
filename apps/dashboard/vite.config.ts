@@ -25,7 +25,7 @@ function cacheHeaders(): Plugin {
 }
 
 const config = defineConfig({
-  envPrefix: ["VITE_"],
+  envPrefix: ["VITE_", "APP_ENV"],
   plugins: [
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),

@@ -72,14 +72,11 @@ const KEYWORDS = Array.from(
   ]),
 );
 
-type JsonLd = Record<string, unknown>;
-
 type SeoHeadInput = {
   title?: string;
   description?: string;
   path?: string;
   noIndex?: boolean;
-  jsonLd?: JsonLd | JsonLd[];
 };
 
 function getCanonicalUrl(path = "/") {
@@ -91,16 +88,12 @@ function getPageTitle(title?: string) {
   return title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
 }
 
-export function buildSeoHead({ title, description = DEFAULT_DESCRIPTION, path = "/", noIndex = false, jsonLd }: SeoHeadInput = {}) {
+export function buildSeoHead({ title, description = DEFAULT_DESCRIPTION, path = "/", noIndex = false }: SeoHeadInput = {}) {
   const pageTitle = getPageTitle(title);
   const url = getCanonicalUrl(path);
   const robots = noIndex ? "noindex, nofollow" : "index, follow";
 
-  const head: {
-    meta: Array<Record<string, string>>;
-    links: Array<Record<string, string>>;
-    scripts?: Array<{ type: string; children: string }>;
-  } = {
+  return {
     meta: [
       { title: pageTitle },
       { name: "description", content: description },
@@ -126,14 +119,4 @@ export function buildSeoHead({ title, description = DEFAULT_DESCRIPTION, path = 
     ],
     links: [{ rel: "canonical", href: url }],
   };
-
-  if (jsonLd) {
-    const payloads = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
-    head.scripts = payloads.map((payload) => ({
-      type: "application/ld+json",
-      children: JSON.stringify(payload),
-    }));
-  }
-
-  return head;
 }

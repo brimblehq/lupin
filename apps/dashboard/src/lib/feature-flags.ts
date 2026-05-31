@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { getPostHogFeatureFlag, isPostHogEnabled, subscribePostHogFeatureFlag } from "@/lib/posthog";
+import { getPostHogFeatureFlag, isPostHogDisabledByAppEnv, isPostHogEnabled, subscribePostHogFeatureFlag } from "@/lib/posthog";
 
 export const FeatureFlags = {
   ENABLE_WEBHOOKS: "enable_webhooks",
@@ -58,6 +58,7 @@ export function useFeatureFlag(flag: FeatureFlagKey): boolean {
 
 export function useFeatureFlagStrict(flag: FeatureFlagKey): boolean {
   const value = usePostHogFeatureFlag(flag);
+  if (isPostHogDisabledByAppEnv) return true;
   if (!isPostHogEnabled) return false;
   return value === true;
 }

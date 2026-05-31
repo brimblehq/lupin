@@ -38,7 +38,7 @@ export function SearchFilterBar({
       {rightSlot ? (
         <>
           <div className="h-full w-px self-stretch bg-dash-border" />
-          <div className="flex shrink-0 items-center">{rightSlot}</div>
+          <div className="flex shrink-0 items-center self-stretch">{rightSlot}</div>
         </>
       ) : null}
     </div>

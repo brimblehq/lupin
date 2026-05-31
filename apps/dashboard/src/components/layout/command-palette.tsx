@@ -622,7 +622,7 @@ export function CommandPalette() {
                                       logAuthFlow("sign-out flow navigating to login from command palette");
                                       posthog.reset();
                                       invalidateSessionCache();
-                                      void navigate({ to: "/login", replace: true });
+                                      window.location.href = "/login";
                                     });
                                 })
                               }

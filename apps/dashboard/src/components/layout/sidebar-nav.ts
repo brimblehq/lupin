@@ -29,13 +29,7 @@ export const mainNav = [
     href: "/sandboxes",
     flag: FeatureFlags.ENABLE_SANDBOX,
   },
-  {
-    label: "Buckets",
-    icon: "/icons/bucket.svg",
-    href: "/buckets",
-    flag: FeatureFlags.ENABLE_BUCKETS,
-    comingSoon: true,
-  },
+  { label: "Buckets", icon: "/icons/bucket.svg", href: "/buckets", flag: FeatureFlags.ENABLE_BUCKETS },
 ];
 
 export const moreNav = [

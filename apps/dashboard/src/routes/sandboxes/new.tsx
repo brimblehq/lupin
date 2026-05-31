@@ -6,7 +6,6 @@ import * as Yup from "yup";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { ArrowsClockwise } from "@phosphor-icons/react";
-import { uniqueNamesGenerator, adjectives, animals } from "unique-names-generator";
 import { GlossyButton } from "@/components/shared/glossy-button";
 import { DashInput } from "@/components/shared/dash-input";
 import { SimpleTooltip } from "@/components/shared/tooltip";
@@ -23,19 +22,11 @@ import { listRegionsServerFn } from "@/server/regions/actions";
 import { createSandboxServerFn, listSandboxSnapshotsServerFn, listSandboxTemplatesServerFn } from "@/server/sandboxes/actions";
 import { listVolumesServerFn } from "@/server/volumes/actions";
 import { MOUNT_PATH_ERROR, MOUNT_PATH_PATTERN, MOUNT_PATH_ROOT_ERROR } from "@/lib/mount-path";
+import { generateResourceName } from "@/lib/resource-names";
 
 export const Route = createFileRoute("/sandboxes/new")({
   component: NewSandboxPage,
 });
-
-function generateSandboxName(): string {
-  return uniqueNamesGenerator({
-    dictionaries: [adjectives, animals],
-    separator: "-",
-    length: 2,
-    style: "lowerCase",
-  });
-}
 
 const DESTROY_TIMEOUT_OPTIONS = [
   { id: DestroyTimeout.ThirtyMinutes, label: "30 minutes" },
@@ -254,7 +245,7 @@ function NewSandboxPage() {
   const [volumeOptions, setVolumeOptions] = useState<VolumeOption[]>([]);
   const [snapshotOptions, setSnapshotOptions] = useState<SnapshotResponse[]>([]);
 
-  const defaultValues = useMemo<SandboxFormValues>(() => ({ ...initialValues, name: generateSandboxName() }), []);
+  const defaultValues = useMemo<SandboxFormValues>(() => ({ ...initialValues, name: generateResourceName() }), []);
 
   const formik = useFormik<SandboxFormValues>({
     initialValues: defaultValues,
@@ -503,7 +494,7 @@ function NewSandboxPage() {
                     onClick={() => {
                       haptics.selection();
                       setNameSpin((s) => s + 1);
-                      void setFieldValue("name", generateSandboxName());
+                      void setFieldValue("name", generateResourceName());
                     }}
                     className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong"
                   >

@@ -208,42 +208,27 @@ Why:
 
 Reach for hand-rolled checks only for trivial single-field guards (`if (!id) throw` is fine).
 
-## 17. No unnecessary fallbacks
+## 17. Don't repeat the type suffix in local variable names
 
-Fallbacks for cases that cannot happen are not "safe defaults" — they are bloat. Each one adds a line a future reader has to mentally execute, hides bugs by silently coercing them into wrong-but-plausible data, and lies to the type system about what the contract actually is.
-
-Do not write a fallback when:
-
-- The type already guarantees the value exists (`user.name ?? "Unknown"` on a `name: string` field).
-- The value comes from a schema that already validated it.
-- The "fallback" branch would only fire in a state your code path cannot produce.
-- You are guarding a function's own return value against a possibility its signature rules out.
+When a local binding's role is already clear from context — usually the field it'll be assigned to — drop the redundant `Id` / `Name` / `Url` suffix. The destructure on the consuming side does the labelling.
 
 ```ts
-// Bad — Volume.name is `string`, the ?? branch is dead code
-<span>{volume.name ?? "Untitled volume"}</span>
+// Bad — `resolvedTeamId` reads as `teamId twice`
+const resolvedTeamId = teamId || (await resolveTeamId(api, workspace));
+return api.storage.listCredentials(bucketId, { teamId: resolvedTeamId });
 
-// Bad — schema already required `email`; the fallback is theatre
-const email = parsed.email || "no-email@unknown.local";
-
-// Bad — wrapping a guaranteed-sync call to "protect" callers
-try {
-  return formatRelativeTime(date);
-} catch {
-  return "recently";
-}
+// Good
+const resolvedTeam = teamId || (await resolveTeamId(api, workspace));
+return api.storage.listCredentials(bucketId, { teamId: resolvedTeam });
 ```
 
-```ts
-// Good — trust the type, let real bugs surface
-<span>{volume.name}</span>
-const { email } = schema.validateSync(payload);
-return formatRelativeTime(date);
-```
+Same pattern for `const bucket = bucketId`, `const owner = ownerId`, etc. — when the variable holds an id and the field name already conveys `Id`, the local doesn't need to repeat it.
 
-Legitimate fallbacks: parsing untrusted input, optional fields the type explicitly marks as `T | undefined`, network responses where partial data is documented behaviour. Outside those, delete the fallback.
+The exceptions are obvious:
+- The variable is used in multiple places where its `Id`-ness is not obvious from the surrounding field name.
+- You're shadowing a same-named outer scope — then a distinct suffix prevents a collision.
 
-A fallback you can't explain in one sentence — "this fires when X happens, and the right user-facing behaviour is Y" — is a fallback that shouldn't exist.
+When in doubt, lean shorter. Repetition is noise.
 
 ---
 

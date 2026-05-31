@@ -9,6 +9,7 @@ import type { PaginatedSandboxesResponse, SandboxResponse } from "@/backend/sand
 import { SearchFilterBar } from "@/components/shared/search-filter-bar";
 import { FilterDropdown, type FilterOption } from "@/components/shared/filter-dropdown";
 import { NumberPagination } from "@/components/shared/pagination";
+import { SandboxesListPending } from "@/components/shared/route-pending";
 import { CreateSandboxCard } from "@/components/sandboxes/create-sandbox-card";
 import { SandboxCard } from "@/components/sandboxes/sandbox-card";
 import { SandboxIntroModal } from "@/components/sandboxes/sandbox-intro-modal";
@@ -72,6 +73,7 @@ export const Route = createFileRoute("/sandboxes/")({
       },
     };
   },
+  pendingComponent: SandboxesListPending,
   component: SandboxesListPage,
 });
 

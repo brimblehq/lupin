@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SandboxesRouteImport } from './routes/sandboxes'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as DomainsRouteImport } from './routes/domains'
@@ -21,11 +20,6 @@ import { Route as CareersIndexRouteImport } from './routes/careers/index'
 import { Route as LegalSlugRouteImport } from './routes/legal/$slug'
 import { Route as CareersSlugRouteImport } from './routes/careers/$slug'
 
-const SandboxesRoute = SandboxesRouteImport.update({
-  id: '/sandboxes',
-  path: '/sandboxes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
@@ -83,7 +77,6 @@ export interface FileRoutesByFullPath {
   '/domains': typeof DomainsRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
-  '/sandboxes': typeof SandboxesRoute
   '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/careers/': typeof CareersIndexRoute
@@ -96,7 +89,6 @@ export interface FileRoutesByTo {
   '/domains': typeof DomainsRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
-  '/sandboxes': typeof SandboxesRoute
   '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/careers': typeof CareersIndexRoute
@@ -110,7 +102,6 @@ export interface FileRoutesById {
   '/domains': typeof DomainsRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
-  '/sandboxes': typeof SandboxesRoute
   '/careers/$slug': typeof CareersSlugRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/careers/': typeof CareersIndexRoute
@@ -125,7 +116,6 @@ export interface FileRouteTypes {
     | '/domains'
     | '/faq'
     | '/pricing'
-    | '/sandboxes'
     | '/careers/$slug'
     | '/legal/$slug'
     | '/careers/'
@@ -138,7 +128,6 @@ export interface FileRouteTypes {
     | '/domains'
     | '/faq'
     | '/pricing'
-    | '/sandboxes'
     | '/careers/$slug'
     | '/legal/$slug'
     | '/careers'
@@ -151,7 +140,6 @@ export interface FileRouteTypes {
     | '/domains'
     | '/faq'
     | '/pricing'
-    | '/sandboxes'
     | '/careers/$slug'
     | '/legal/$slug'
     | '/careers/'
@@ -165,7 +153,6 @@ export interface RootRouteChildren {
   DomainsRoute: typeof DomainsRoute
   FaqRoute: typeof FaqRoute
   PricingRoute: typeof PricingRoute
-  SandboxesRoute: typeof SandboxesRoute
   CareersSlugRoute: typeof CareersSlugRoute
   LegalSlugRoute: typeof LegalSlugRoute
   CareersIndexRoute: typeof CareersIndexRoute
@@ -175,13 +162,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sandboxes': {
-      id: '/sandboxes'
-      path: '/sandboxes'
-      fullPath: '/sandboxes'
-      preLoaderRoute: typeof SandboxesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/pricing': {
       id: '/pricing'
       path: '/pricing'
@@ -261,7 +241,6 @@ const rootRouteChildren: RootRouteChildren = {
   DomainsRoute: DomainsRoute,
   FaqRoute: FaqRoute,
   PricingRoute: PricingRoute,
-  SandboxesRoute: SandboxesRoute,
   CareersSlugRoute: CareersSlugRoute,
   LegalSlugRoute: LegalSlugRoute,
   CareersIndexRoute: CareersIndexRoute,

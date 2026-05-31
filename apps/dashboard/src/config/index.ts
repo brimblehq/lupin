@@ -14,6 +14,7 @@ function readEnv(key: string): string | undefined {
 const gatewayUrl = readEnv("VITE_GATEWAY_URL") ?? "https://api.brimble.io";
 
 export const config = {
+  appEnv: readEnv("APP_ENV") ?? readEnv("VITE_APP_ENV") ?? "",
   gatewayUrl,
   apiUrl: `${gatewayUrl}/core`,
   authApiUrl: `${gatewayUrl}/auth`,
