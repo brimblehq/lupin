@@ -16,6 +16,7 @@ import type { McpServerListResult } from "@/backend/mcp";
 import { parsePositivePageSearchValue, parseTextSearchValue } from "@/utils/workspace-route-search";
 import { useHaptics } from "@/hooks/use-haptics";
 import { AddonsPending } from "@/components/shared/route-pending";
+import { FeatureFlags, useFeatureFlagStrict } from "@/lib/feature-flags";
 
 const ADDONS_PAGE_SIZE = 18;
 
@@ -79,6 +80,7 @@ function AddonGrid({ items, delayOffset = 0 }: { items: DiscoverAddon[]; delayOf
 
 function AddonsPage() {
   const haptics = useHaptics();
+  const mcpServersEnabled = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
   const [{ q: searchQuery, page, category }, setSearchParams] = useQueryStates(
     {
       q: parseAsString.withDefault(""),
@@ -124,6 +126,10 @@ function AddonsPage() {
   }, [loaderData.addons, loaderData.page, loaderData.total, loaderData.totalPages]);
 
   useEffect(() => {
+    if (!mcpServersEnabled) {
+      return;
+    }
+
     let cancelled = false;
     const nextPage = page > 0 ? page : 1;
     const query = searchQuery.trim() || undefined;
@@ -176,7 +182,7 @@ function AddonsPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeCategory, listMcpTemplates, page, searchQuery]);
+  }, [activeCategory, listMcpTemplates, mcpServersEnabled, page, searchQuery]);
 
   function selectCategory(cat?: string) {
     haptics.selection();
@@ -189,6 +195,17 @@ function AddonsPage() {
       category: nextCategory || "",
       page: 1,
     });
+  }
+
+  if (!mcpServersEnabled) {
+    return (
+      <div className="px-4 py-8 md:px-10">
+        <div className="flex h-[50vh] flex-col items-center justify-center text-center">
+          <h2 className="text-sm font-medium text-dash-text-strong">Discover is not available</h2>
+          <p className="mt-1 max-w-[320px] text-sm text-dash-text-faded">MCP server discovery is not enabled for this workspace.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

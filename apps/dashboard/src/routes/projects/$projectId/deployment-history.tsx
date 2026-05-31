@@ -787,6 +787,7 @@ function DeploymentHistoryPage() {
   const prevStatusMapRef = useRef<Record<string, string>>({});
   const failureToastDedupeRef = useRef<Set<string>>(new Set());
   const latestRequestRef = useRef(0);
+  const loadingRequestRef = useRef(0);
   const previousProjectScopeRef = useRef<string | null>(null);
   const deploymentsCacheRef = useRef<Map<string, DeploymentsCacheEntry>>(new Map());
 
@@ -846,6 +847,7 @@ function DeploymentHistoryPage() {
       }
 
       if (!silent && !backgroundRefreshFromStaleCache) {
+        loadingRequestRef.current = requestId;
         setFetching(true);
       }
 
@@ -919,7 +921,7 @@ function DeploymentHistoryPage() {
       } catch {
         // keep existing data
       } finally {
-        if (!silent && !backgroundRefreshFromStaleCache && requestId === latestRequestRef.current) {
+        if (!silent && !backgroundRefreshFromStaleCache && requestId === loadingRequestRef.current) {
           setFetching(false);
         }
       }
@@ -954,6 +956,7 @@ function DeploymentHistoryPage() {
 
     previousProjectScopeRef.current = projectScope;
     latestRequestRef.current += 1;
+    loadingRequestRef.current = latestRequestRef.current;
     deploymentsCacheRef.current.clear();
     prevStatusMapRef.current = {};
     setCurrentPage(1);

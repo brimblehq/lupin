@@ -8,7 +8,7 @@ interface CreateBucketCardProps {
 export function CreateBucketCard({ className, onClick }: CreateBucketCardProps) {
   return (
     <div
-      className={`create-new-project-card flex h-[136px] items-center justify-center overflow-clip rounded-[8px] border-[0.8px] border-dash-border ${className ?? ""}`}
+      className={`create-new-project-card flex h-[136px] items-center justify-center overflow-clip rounded-[4px] border-[0.8px] border-dash-border ${className ?? ""}`}
     >
       <button
         onClick={onClick}

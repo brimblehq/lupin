@@ -21,6 +21,7 @@ import {
   ArrowsClockwise,
   Tag,
   Database,
+  ArrowUpRight,
 } from "@phosphor-icons/react";
 import { SimpleTooltip } from "../shared/tooltip";
 import { usePlanGate } from "@/hooks/use-plan-gate";
@@ -216,7 +217,9 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
   const deploymentsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DEPLOYMENTS);
   const databasesEnabled = useFeatureFlag(FeatureFlags.ENABLE_DATABASES);
   const webAnalyticsEnabled = useFeatureFlag(FeatureFlags.ENABLE_WEB_ANALYTICS);
-  const planSupportsAnalytics = usePlanGate().analytics !== false;
+  const planGate = usePlanGate();
+  const planSupportsAnalytics = planGate.analytics !== false;
+  const objectStorageEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS) && planGate.objectStorageEnabled;
 
   const tabs = baseTabs.filter((tab) => {
     if (tab.slug === "observability" && !shouldShowProjectObservabilityTab(project as any)) {
@@ -236,6 +239,10 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
     }
 
     if (tab.slug === "environment" && !shouldShowProjectEnvironmentTab(project as any)) {
+      return false;
+    }
+
+    if (tab.slug === "storage" && !objectStorageEnabled) {
       return false;
     }
 
@@ -555,8 +562,9 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
               href={visitHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden items-center gap-1.5 text-sm font-light text-dash-text-body transition-colors hover:text-dash-text-strong md:flex"
+              className="hidden items-center gap-1.5 text-sm text-dash-text-strong transition-opacity hover:opacity-70 md:flex"
             >
+              <ArrowUpRight className="size-4" />
               <span>Visit site</span>
             </a>
           )}

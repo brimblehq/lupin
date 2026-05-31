@@ -15,7 +15,7 @@ export interface AppTooltipMessage {
 export interface MessagesApi {
   listTooltipMessages(input: {
     subscriptionId?: string;
-    type?: "notifications";
+    type?: "notifications" | "announcement";
     limit?: number;
     page?: number;
   }): Promise<AppTooltipMessage[] | null>;
@@ -39,6 +39,40 @@ function mapMessage(value: unknown): AppTooltipMessage | null {
     type: pickNonEmptyString(row, "type"),
     route: pickNonEmptyString(row, "route"),
     meta: asRecord(row.meta),
+  };
+}
+
+export interface AnnouncementContent {
+  id: string;
+  title: string;
+  body: string;
+  ctaLabel: string;
+  route?: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  learnMoreUrl?: string;
+}
+
+export function parseAnnouncement(msg: AppTooltipMessage): AnnouncementContent | null {
+  if (msg.type && msg.type !== "announcement") return null;
+
+  const meta = msg.meta ?? {};
+
+  const id = pickNonEmptyString(meta, "id");
+
+  const title = pickNonEmptyString(meta, "title");
+
+  if (!id || !title) return null;
+
+  return {
+    id,
+    title,
+    body: msg.message,
+    ctaLabel: pickNonEmptyString(meta, "ctaLabel") ?? "Open",
+    route: msg.route,
+    imageUrl: pickNonEmptyString(meta, "imageUrl"),
+    imageAlt: pickNonEmptyString(meta, "imageAlt"),
+    learnMoreUrl: pickNonEmptyString(meta, "learnMoreUrl"),
   };
 }
 

@@ -40,5 +40,5 @@ export const moreNav = [
     external: true,
     tourId: "docs",
   },
-  { label: "Discover", icon: "/icons/discover.svg", href: "/addons", tourId: "discover" },
+  { label: "Discover", icon: "/icons/discover.svg", href: "/addons", flag: FeatureFlags.ENABLE_MCP_SERVERS, tourId: "discover" },
 ];

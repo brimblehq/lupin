@@ -9,6 +9,7 @@ import { useHaptics } from "@/hooks/use-haptics";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/feature-flags";
 import { isPostHogEnabled } from "@/lib/posthog";
+import { usePlanGate } from "@/hooks/use-plan-gate";
 import { mainNav, moreNav } from "./sidebar-nav";
 
 const navItemBase =
@@ -23,11 +24,14 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
 
   const domainsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DOMAINS);
   const scalingEnabled = useFeatureFlag(FeatureFlags.ENABLE_AUTO_SCALING);
-  const bucketsEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const { objectStorageEnabled } = usePlanGate();
+  const bucketFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const bucketsEnabled = bucketFeatureEnabled && objectStorageEnabled;
   const sandboxEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
 
-  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS);
+  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS) && objectStorageEnabled;
   const sandboxStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
+  const mcpServersStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
 
   const flagValues: Record<string, boolean> = useMemo(
     () => ({
@@ -35,22 +39,28 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
       [FeatureFlags.ENABLE_AUTO_SCALING]: scalingEnabled,
       [FeatureFlags.ENABLE_BUCKETS]: bucketsEnabled,
       [FeatureFlags.ENABLE_SANDBOX]: sandboxEnabled,
+      [FeatureFlags.ENABLE_MCP_SERVERS]: mcpServersStrict,
     }),
-    [domainsEnabled, scalingEnabled, bucketsEnabled, sandboxEnabled],
+    [domainsEnabled, scalingEnabled, bucketsEnabled, sandboxEnabled, mcpServersStrict],
   );
 
   const strictFlagValues: Record<string, boolean> = useMemo(
     () => ({
       [FeatureFlags.ENABLE_BUCKETS]: bucketsStrict,
       [FeatureFlags.ENABLE_SANDBOX]: sandboxStrict,
+      [FeatureFlags.ENABLE_MCP_SERVERS]: mcpServersStrict,
     }),
-    [bucketsStrict, sandboxStrict],
+    [bucketsStrict, sandboxStrict, mcpServersStrict],
   );
 
   const filteredMainNav = useMemo(
     () =>
       mainNav
         .filter((item) => {
+          if (item.flag === FeatureFlags.ENABLE_SANDBOX) {
+            return strictFlagValues[item.flag] === true;
+          }
+
           if (item.flag && !item.comingSoon) return flagValues[item.flag] !== false;
           return true;
         })
@@ -60,6 +70,17 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
           }
           return item;
         }),
+    [flagValues, strictFlagValues],
+  );
+  const filteredMoreNav = useMemo(
+    () =>
+      moreNav.filter((item) => {
+        if (item.flag === FeatureFlags.ENABLE_MCP_SERVERS) {
+          return strictFlagValues[item.flag] === true;
+        }
+
+        return !item.flag || flagValues[item.flag] !== false;
+      }),
     [flagValues, strictFlagValues],
   );
 
@@ -120,7 +141,7 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
               <span className="text-xs font-medium tracking-[-0.09px] text-dash-text-extra-faded">MORE</span>
             </div>
             <div className="flex flex-col gap-1">
-              {moreNav.map((item) => {
+              {filteredMoreNav.map((item) => {
                 if (item.external) {
                   return (
                     <a

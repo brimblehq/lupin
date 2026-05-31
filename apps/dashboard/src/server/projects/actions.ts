@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import * as Yup from "yup";
 import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 import { projectsLogger } from "@/server/shared/logger";
 import type { SetProjectPasswordProtectionPayload } from "./types";
@@ -311,6 +312,31 @@ export const redeployProjectServerFn = createServerFn({
     });
   });
 });
+
+type DetachProjectVolumePayload = {
+  projectId: string;
+  workspace?: string;
+};
+
+const detachProjectVolumeSchema = Yup.object({
+  projectId: Yup.string().trim().required("Project ID is required"),
+  workspace: Yup.string().trim(),
+});
+
+export const detachProjectVolumeServerFn = createServerFn({
+  method: "POST",
+})
+  .inputValidator((input: DetachProjectVolumePayload | undefined) => {
+    return detachProjectVolumeSchema.validateSync(input ?? {}, { stripUnknown: true }) as DetachProjectVolumePayload;
+  })
+  .handler(async ({ data: payload }) => {
+    const workspaceSlug = payload.workspace?.trim().toLowerCase();
+
+    return withTokenRefresh(async (api) => {
+      const teamId = await resolveTeamId(api, workspaceSlug);
+      return api.projects.detachVolume(payload.projectId, { teamId });
+    });
+  });
 
 export const debugSuggestionsServerFn = createServerFn({
   method: "POST",

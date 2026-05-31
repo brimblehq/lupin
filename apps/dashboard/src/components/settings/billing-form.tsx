@@ -713,6 +713,18 @@ const USAGE_GROUPS: ReadonlyArray<{ label: string; resources: ReadonlyArray<Usag
       },
     ],
   },
+  {
+    label: "Object Storage",
+    resources: [
+      {
+        key: "object_storage",
+        label: "Object storage",
+        iconSrc: "/icons/bucket.svg",
+        unit: "GB-month",
+        tooltip: "Object storage usage beyond your included allowance.",
+      },
+    ],
+  },
 ];
 
 const quantityFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });

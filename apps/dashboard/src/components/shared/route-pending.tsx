@@ -93,6 +93,14 @@ export function DefaultRoutePending() {
     return <ScalingPending />;
   }
 
+  if (/^\/addons\/[^/]+(?:\/|$)/.test(pathname)) {
+    return <AddonDetailPending />;
+  }
+
+  if (pathname === "/addons" || pathname === "/addons/") {
+    return <AddonsPending />;
+  }
+
   return <RoutePending />;
 }
 
@@ -469,6 +477,112 @@ export function AddonsPending() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   /addons/$addonId (MCP Server detail)
+
+   Mirrors routes/addons/$addonId.tsx:
+   1. Back link
+   2. Hero preview + detail copy/actions
+   3. More details and tools list
+   4. Related addon cards
+   ───────────────────────────────────────────── */
+
+export function AddonDetailPending() {
+  return (
+    <div className="mx-auto max-w-[1000px] px-4 py-8 md:px-10" aria-hidden="true">
+      <div className={`h-4 w-10 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+
+      <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:gap-8">
+        <div className="relative h-[210px] w-full shrink-0 overflow-clip rounded-[8px] bg-dash-bg-elevated/50 lg:w-[437px]">
+          <div
+            className="absolute top-[26px] bottom-0 w-[388px] overflow-clip rounded-t-[4px] border-[0.5px] border-dash-border border-b-0 bg-dash-bg"
+            style={{ left: "calc(50% + 80.5px)", transform: "translateX(-50%)" }}
+          >
+            <div className="flex items-center gap-[3px] px-2.5 py-[6px]">
+              <span className={`size-[5px] rounded-full ${PULSE_BG_WEAK}`} />
+              <span className={`size-[5px] rounded-full ${PULSE_BG_WEAK}`} />
+              <span className={`size-[5px] rounded-full ${PULSE_BG_WEAK}`} />
+            </div>
+            <div className="mx-[6px] h-px bg-dash-border" />
+          </div>
+
+          <div className={`absolute left-[17px] top-[18px] size-[60px] animate-pulse rounded-full ${PULSE_BG_STRONG}`} />
+        </div>
+
+        <div className="flex flex-1 flex-col justify-between">
+          <div>
+            <div className={`h-4 w-32 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+            <div className={`mt-3 h-3.5 w-full max-w-[420px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+            <div className={`mt-2 h-3.5 w-4/5 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+            <div className={`mt-3 h-3.5 w-32 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {["w-20", "w-28", "w-24", "w-10"].map((width, index) => (
+                <div key={index} className={`h-7 ${width} rounded-full ${PULSE_BG_WEAK} animate-pulse`} />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center gap-3">
+            <div className={`h-5 w-10 rounded-full ${PULSE_BG_MEDIUM} animate-pulse`} />
+            <div className="flex flex-1 flex-col gap-2">
+              <div className={`h-3.5 w-40 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+              <div className={`h-3 w-full max-w-[360px] rounded ${PULSE_BG_WEAK} animate-pulse`} />
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className={`h-10 w-40 rounded-[8px] ${PULSE_BG_STRONG} animate-pulse`} />
+            <div className="h-10 w-44 animate-pulse rounded-[8px] border border-dash-border bg-dash-bg-elevated/40" />
+          </div>
+        </div>
+      </div>
+
+      <hr className="my-8 border-dash-border-soft" />
+
+      <div className="flex flex-col gap-8">
+        <div>
+          <div className={`h-4 w-28 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+          <div className={`mt-4 h-3.5 w-full max-w-[520px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+          <div className={`mt-2 h-3.5 w-3/4 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+
+          <div className="mt-7">
+            <div className={`mb-2 h-3.5 w-20 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+            <div className="divide-y divide-dash-border-soft">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className={`h-3.5 w-36 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+                    <div className={`mt-2 h-3 w-full max-w-[520px] rounded ${PULSE_BG_WEAK} animate-pulse`} />
+                  </div>
+                  <div className={`size-3.5 shrink-0 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr className="my-8 border-dash-border-soft" />
+
+      <div>
+        <div className={`mb-4 h-4 w-28 rounded ${PULSE_BG_STRONG} animate-pulse`} />
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="flex h-[190px] flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border-soft">
+              <div className="h-[96px] animate-pulse border-b-[0.5px] border-dash-border bg-dash-bg-elevated/40" />
+              <div className="px-3.5 pt-3 pb-2">
+                <div className={`h-3.5 w-28 rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
+                <div className={`mt-2 h-3 w-full rounded ${PULSE_BG_WEAK} animate-pulse`} />
+                <div className={`mt-1.5 h-3 w-3/4 rounded ${PULSE_BG_WEAK} animate-pulse`} />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

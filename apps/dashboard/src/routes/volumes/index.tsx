@@ -4,18 +4,18 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import * as Yup from "yup";
-import { Check, Plus } from "lucide-react";
-import { Funnel } from "@phosphor-icons/react";
+import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { VolumesPending } from "@/components/shared/route-pending";
 import { consumePendingVolumesAction } from "@/utils/topbar-navigation";
 import { SearchFilterBar } from "@/components/shared/search-filter-bar";
-import type { FilterOption } from "@/components/shared/filter-dropdown";
+import { FilterDropdown, type FilterOption } from "@/components/shared/filter-dropdown";
 import { NumberPagination } from "@/components/shared/pagination";
 import { useHaptics } from "@/hooks/use-haptics";
 import { VolumeRow } from "@/components/volumes/volume-row";
 import { CreateVolumeModal } from "@/components/volumes/create-volume-modal";
 import { DeleteVolumeModal } from "@/components/volumes/delete-volume-modal";
+import { DetachVolumeModal } from "@/components/volumes/detach-volume-modal";
 import { SnapshotRow } from "@/components/sandboxes/snapshot-row";
 import { DeleteSnapshotModal } from "@/components/sandboxes/delete-snapshot-modal";
 import { VolumeType, type PaginatedVolumesResponse, type VolumeResponse } from "@/backend/volumes";
@@ -75,7 +75,7 @@ const SNAPSHOT_STATUS_OPTIONS: FilterOption[] = [
   { label: "Failed", value: "failed", dot: "#fc391e" },
 ];
 
-const VIEW_OPTIONS: Array<{ label: string; value: TabKey }> = [
+const VIEW_OPTIONS: FilterOption[] = [
   { label: "Volumes", value: "volumes" },
   { label: "Snapshots", value: "snapshots" },
 ];
@@ -91,17 +91,23 @@ export const Route = createFileRoute("/volumes/")({
     const workspace = deps.workspace;
 
     const [volumesResult, regions, snapshotsResult] = await Promise.all([
-      (listVolumesServerFn as unknown as (input: {
-        data: { workspace?: string; page?: number; limit?: number };
-      }) => Promise<PaginatedVolumesResponse>)({
+      (
+        listVolumesServerFn as unknown as (input: {
+          data: { workspace?: string; page?: number; limit?: number };
+        }) => Promise<PaginatedVolumesResponse>
+      )({
         data: { workspace, page: 1, limit: VOLUMES_PAGE_SIZE },
       }),
-      (listRegionsServerFn as unknown as (input: { data: { type: "sandbox"; enabled: boolean; workspace?: string } }) => Promise<Region[]>)({
-        data: { type: "sandbox", enabled: true, workspace },
-      }),
-      (listSandboxSnapshotsServerFn as unknown as (input: {
-        data: { workspace?: string; page?: number; limit?: number };
-      }) => Promise<PaginatedSnapshotsResponse>)({
+      (listRegionsServerFn as unknown as (input: { data: { type: "sandbox"; enabled: boolean; workspace?: string } }) => Promise<Region[]>)(
+        {
+          data: { type: "sandbox", enabled: true, workspace },
+        },
+      ),
+      (
+        listSandboxSnapshotsServerFn as unknown as (input: {
+          data: { workspace?: string; page?: number; limit?: number };
+        }) => Promise<PaginatedSnapshotsResponse>
+      )({
         data: { workspace, page: 1, limit: SNAPSHOTS_PAGE_SIZE },
       }),
     ]);
@@ -148,6 +154,7 @@ function VolumesListPage() {
   const [snapshots, setSnapshots] = useState<SnapshotResponse[]>(loaderData.snapshotsPage.items);
   const [snapshotsTotalPages, setSnapshotsTotalPages] = useState<number>(loaderData.snapshotsPage.totalPages);
   const [createOpen, setCreateOpen] = useState(false);
+  const [detachTarget, setDetachTarget] = useState<VolumeResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VolumeResponse | null>(null);
   const [deleteSnapshotTarget, setDeleteSnapshotTarget] = useState<SnapshotResponse | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -281,6 +288,16 @@ function VolumesListPage() {
     setDeleteTarget(null);
   }, []);
 
+  const handleDetached = useCallback((target: VolumeResponse) => {
+    setVolumes((prev) =>
+      prev.map((volume) => {
+        if (volume.id !== target.id) return volume;
+        return { ...volume, attachedProjectId: null, lastAttachedAt: null };
+      }),
+    );
+    setDetachTarget(null);
+  }, []);
+
   const filteredSnapshots = useMemo(() => {
     const normalizedQuery = snapshotQ.trim().toLowerCase();
     return snapshots
@@ -330,13 +347,17 @@ function VolumesListPage() {
               }}
               placeholder="Search volumes"
               rightSlot={
-                <VolumesSearchDropdown
-                  activeTab={activeTab}
-                  onTabChange={switchTab}
-                  statusFilter={statusFilter}
-                  onStatusChange={setStatusFilter}
-                  snapshotStatusFilter={snapshotStatusFilter}
-                  onSnapshotStatusChange={setSnapshotStatusFilter}
+                <FilterDropdown
+                  sections={[
+                    { label: "View", value: activeTab, onChange: (value) => switchTab(value as TabKey), options: VIEW_OPTIONS },
+                    {
+                      label: "Status",
+                      value: statusFilter,
+                      onChange: (value) => setStatusFilter(value as StatusFilter),
+                      options: STATUS_OPTIONS,
+                    },
+                  ]}
+                  dropdownWidth={190}
                 />
               }
             />
@@ -379,7 +400,7 @@ function VolumesListPage() {
                           highlightedId === volume.id ? "rounded-[4px] ring-2 ring-[#4879f8]" : ""
                         }`}
                       >
-                        <VolumeRow volume={volume} onDeleteRequest={setDeleteTarget} />
+                        <VolumeRow volume={volume} onDetachRequest={setDetachTarget} onDeleteRequest={setDeleteTarget} />
                       </div>
                     ))}
                   </div>
@@ -395,11 +416,7 @@ function VolumesListPage() {
 
           {volumesTotalPages > 1 ? (
             <div className="mt-6 flex justify-end">
-              <NumberPagination
-                currentPage={volumesPage}
-                totalPages={volumesTotalPages}
-                onPageChange={handleVolumesPageChange}
-              />
+              <NumberPagination currentPage={volumesPage} totalPages={volumesTotalPages} onPageChange={handleVolumesPageChange} />
             </div>
           ) : null}
         </>
@@ -413,13 +430,17 @@ function VolumesListPage() {
               }}
               placeholder="Search snapshots"
               rightSlot={
-                <VolumesSearchDropdown
-                  activeTab={activeTab}
-                  onTabChange={switchTab}
-                  statusFilter={statusFilter}
-                  onStatusChange={setStatusFilter}
-                  snapshotStatusFilter={snapshotStatusFilter}
-                  onSnapshotStatusChange={setSnapshotStatusFilter}
+                <FilterDropdown
+                  sections={[
+                    { label: "View", value: activeTab, onChange: (value) => switchTab(value as TabKey), options: VIEW_OPTIONS },
+                    {
+                      label: "Status",
+                      value: snapshotStatusFilter,
+                      onChange: (value) => setSnapshotStatusFilter(value as SnapshotStatusFilter),
+                      options: SNAPSHOT_STATUS_OPTIONS,
+                    },
+                  ]}
+                  dropdownWidth={190}
                 />
               }
             />
@@ -461,11 +482,7 @@ function VolumesListPage() {
 
           {snapshotsTotalPages > 1 ? (
             <div className="mt-6 flex justify-end">
-              <NumberPagination
-                currentPage={snapshotsPage}
-                totalPages={snapshotsTotalPages}
-                onPageChange={handleSnapshotsPageChange}
-              />
+              <NumberPagination currentPage={snapshotsPage} totalPages={snapshotsTotalPages} onPageChange={handleSnapshotsPageChange} />
             </div>
           ) : null}
         </>
@@ -480,6 +497,18 @@ function VolumesListPage() {
         defaultRegion={search.region}
         onCreated={handleCreated}
       />
+
+      {detachTarget ? (
+        <DetachVolumeModal
+          open={Boolean(detachTarget)}
+          onOpenChange={(next) => {
+            if (!next) setDetachTarget(null);
+          }}
+          volume={detachTarget}
+          workspace={workspace}
+          onDetached={handleDetached}
+        />
+      ) : null}
 
       {deleteTarget ? (
         <DeleteVolumeModal
@@ -504,120 +533,6 @@ function VolumesListPage() {
           onDeleted={handleSnapshotDeleted}
         />
       ) : null}
-    </div>
-  );
-}
-
-function VolumesSearchDropdown({
-  activeTab,
-  onTabChange,
-  statusFilter,
-  onStatusChange,
-  snapshotStatusFilter,
-  onSnapshotStatusChange,
-}: {
-  activeTab: TabKey;
-  onTabChange: (tab: TabKey) => void;
-  statusFilter: StatusFilter;
-  onStatusChange: (status: StatusFilter) => void;
-  snapshotStatusFilter: SnapshotStatusFilter;
-  onSnapshotStatusChange: (status: SnapshotStatusFilter) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const haptics = useHaptics();
-  const statusOptions = activeTab === "volumes" ? STATUS_OPTIONS : SNAPSHOT_STATUS_OPTIONS;
-  const currentStatus = activeTab === "volumes" ? statusFilter : snapshotStatusFilter;
-  const activeStatusOption = statusOptions.find((option) => option.value === currentStatus);
-  const displayLabel = activeStatusOption?.label ?? (activeTab === "volumes" ? "All volumes" : "All snapshots");
-  const activeDot = currentStatus !== "all" ? activeStatusOption?.dot : undefined;
-
-  useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    if (open) {
-      document.addEventListener("mousedown", handleClick);
-      return () => document.removeEventListener("mousedown", handleClick);
-    }
-  }, [open]);
-
-  function selectStatus(value: string) {
-    haptics.selection();
-    if (activeTab === "volumes") {
-      onStatusChange(value as StatusFilter);
-    } else {
-      onSnapshotStatusChange(value as SnapshotStatusFilter);
-    }
-    setOpen(false);
-  }
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => {
-          haptics.selection();
-          setOpen((value) => !value);
-        }}
-        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-dash-text-body transition-colors hover:text-dash-text-strong"
-      >
-        {activeDot ? (
-          <span className="size-[6px] shrink-0 rounded-full" style={{ backgroundColor: activeDot }} />
-        ) : (
-          <Funnel className="size-4" />
-        )}
-        {displayLabel}
-      </button>
-
-      <AnimatePresence>
-        {open ? (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-full z-50 mt-1 w-[200px] origin-top-right overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_2px_4px_-4px_rgba(0,0,0,0.07)]"
-          >
-            <div className="px-3 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-dash-text-extra-faded">View</div>
-            {VIEW_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  haptics.selection();
-                  onTabChange(option.value);
-                  setOpen(false);
-                }}
-                className="mx-1 flex w-[calc(100%-8px)] items-center justify-between rounded-[2px] px-2 py-1.5 text-sm text-dash-text-body transition-colors hover:bg-dash-bg-elevated dark:text-dash-text-strong"
-              >
-                {option.label}
-                {activeTab === option.value ? <Check className="size-3.5 text-[#4879f8]" /> : null}
-              </button>
-            ))}
-
-            <div className="my-1 h-px bg-dash-border" />
-            <div className="px-3 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-dash-text-extra-faded">Filter</div>
-            {statusOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => selectStatus(option.value)}
-                className="mx-1 flex w-[calc(100%-8px)] items-center justify-between rounded-[2px] px-2 py-1.5 text-sm text-dash-text-body transition-colors hover:bg-dash-bg-elevated dark:text-dash-text-strong"
-              >
-                <span className="flex items-center gap-2">
-                  {option.dot ? <span className="size-[6px] rounded-full" style={{ backgroundColor: option.dot }} /> : null}
-                  {option.label}
-                </span>
-                {currentStatus === option.value ? <Check className="size-3.5 text-[#4879f8]" /> : null}
-              </button>
-            ))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </div>
   );
 }

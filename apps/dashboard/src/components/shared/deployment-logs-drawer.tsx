@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import {
   Clock,
@@ -13,7 +13,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { DownloadSimple } from "@phosphor-icons/react";
+import { DownloadSimple, MagnifyingGlass } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import { useServerFn } from "@tanstack/react-start";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -92,7 +92,26 @@ function getDetailToneClasses(tone: "error" | "warning" | "default") {
   };
 }
 
-function renderLogTextWithLinks(text: string, linkHoverClass = "hover:text-dash-text-strong") {
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightMatches(text: string, query: string): ReactNode {
+  const trimmed = query.trim();
+  if (!trimmed) return text;
+  const parts = text.split(new RegExp(`(${escapeRegExp(trimmed)})`, "ig"));
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark key={i} className="rounded-sm bg-[#b37a10]/30 px-0.5 text-[#b37a10] dark:bg-[#f5a623]/25 dark:text-[#f5a623]">
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
+function renderLogTextWithLinks(text: string, linkHoverClass = "hover:text-dash-text-strong", highlight?: string) {
   const parts = text.split(urlPattern);
 
   return parts.map((part, index) => {
@@ -111,7 +130,7 @@ function renderLogTextWithLinks(text: string, linkHoverClass = "hover:text-dash-
       );
     }
 
-    return <span key={`${index}-${part}`}>{part}</span>;
+    return <span key={`${index}-${part}`}>{highlight ? highlightMatches(part, highlight) : part}</span>;
   });
 }
 
@@ -171,9 +190,13 @@ export function DeploymentLogsDrawer({
   const [copiedRowIndex, setCopiedRowIndex] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeMatchIndex, setActiveMatchIndex] = useState(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollTopRef = useRef(0);
   const buildInProgress = isBuildInProgress(deploymentStatus);
+  const trimmedQuery = searchQuery.trim();
+  const hasQuery = trimmedQuery.length > 0;
 
   const [securityModalOpen, setSecurityModalOpen] = useState(false);
   const [securityVulnerabilities, setSecurityVulnerabilities] = useState<any[]>([]);
@@ -188,11 +211,16 @@ export function DeploymentLogsDrawer({
     setAiDebugSelection(null);
     setAutoScroll(true);
     setCopiedAll(false);
+    setSearchQuery("");
     lastScrollTopRef.current = 0;
   }, [open]);
 
   useEffect(() => {
-    if (!open || !autoScroll || !scrollRef.current) {
+    setActiveMatchIndex(-1);
+  }, [trimmedQuery]);
+
+  useEffect(() => {
+    if (!open || !autoScroll || !scrollRef.current || hasQuery) {
       return;
     }
 
@@ -214,11 +242,21 @@ export function DeploymentLogsDrawer({
       window.cancelAnimationFrame(rafId);
       observer.disconnect();
     };
-  }, [autoScroll, open, logs, collapsedSections]);
+  }, [autoScroll, open, logs, collapsedSections, hasQuery]);
 
   const phaseSummaries = summarizePhases(logs);
   const activePhase = phaseSummaries.length > 0 ? phaseSummaries[phaseSummaries.length - 1].phase : null;
   const showPhaseRail = phaseSummaries.length > 0;
+
+  const lowerQuery = trimmedQuery.toLowerCase();
+  const matchIndices = hasQuery
+    ? logs.reduce<number[]>((acc, log, i) => {
+        if (log.message.toLowerCase().includes(lowerQuery)) acc.push(i);
+        return acc;
+      }, [])
+    : [];
+  const matchCount = matchIndices.length;
+  const activeLogIndex = activeMatchIndex >= 0 && activeMatchIndex < matchCount ? matchIndices[activeMatchIndex] : -1;
 
   const successCount = logs.filter((l) => l.type === "section" && l.status === "success").length;
   const errorCount = logs.filter((l) => {
@@ -310,7 +348,7 @@ export function DeploymentLogsDrawer({
       currentSectionIndex = i;
       visibleRows.push({ log, index: i });
     } else {
-      const isCollapsed = currentSectionIndex !== null && collapsedSections.has(currentSectionIndex);
+      const isCollapsed = !hasQuery && currentSectionIndex !== null && collapsedSections.has(currentSectionIndex);
       if (!isCollapsed) {
         visibleRows.push({ log, index: i });
       }
@@ -353,7 +391,9 @@ export function DeploymentLogsDrawer({
             <div className="flex shrink-0 flex-col gap-2 border-b-[0.5px] border-[#e5e5e5] px-3.5 pb-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-dash-border">
               <div className="flex items-center gap-2">
                 <Clock className="size-4 text-dash-text-faded" />
-                <span className="text-sm leading-[1.3] tracking-[-0.0224px] text-dash-text-strong">Build History</span>
+                <Drawer.Title asChild>
+                  <span className="text-sm leading-[1.3] tracking-[-0.0224px] text-dash-text-strong">Build History</span>
+                </Drawer.Title>
               </div>
 
               <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:flex-1 sm:justify-end sm:gap-6">
@@ -437,6 +477,51 @@ export function DeploymentLogsDrawer({
               </div>
             </div>
 
+            {/* ─── Search ─── */}
+            <div className="flex shrink-0 items-center gap-2 border-b-[0.5px] border-[#e5e5e5] px-3.5 py-2 sm:px-5 dark:border-dash-border">
+              <MagnifyingGlass className="size-3.5 shrink-0 text-dash-text-faded" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" || matchCount === 0) {
+                    return;
+                  }
+                  event.preventDefault();
+                  const next = (activeMatchIndex + 1) % matchCount;
+                  setActiveMatchIndex(next);
+                  const logIndex = matchIndices[next];
+                  window.requestAnimationFrame(() => {
+                    scrollRef.current
+                      ?.querySelector<HTMLElement>(`[data-log-index="${logIndex}"]`)
+                      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+                  });
+                }}
+                placeholder="Search logs..."
+                spellCheck={false}
+                className="min-w-0 flex-1 bg-transparent font-logs text-xs leading-[1.4] tracking-[-0.01px] text-dash-text-strong placeholder:text-dash-text-faded focus:outline-none"
+              />
+              {hasQuery && (
+                <>
+                  <span className="shrink-0 font-logs text-[11px] leading-[1.4] tracking-[-0.01px] text-dash-text-faded">
+                    {matchCount === 0
+                      ? "No matches"
+                      : activeMatchIndex >= 0
+                        ? `${activeMatchIndex + 1} / ${matchCount}`
+                        : `${matchCount} ${matchCount === 1 ? "match" : "matches"}`}
+                  </span>
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    aria-label="Clear search"
+                    className="shrink-0 rounded p-0.5 text-dash-text-faded transition-colors hover:text-dash-text-strong"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+
             {/* ─── Phase rail ─── */}
             {showPhaseRail && (
               <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b-[0.5px] border-[#e5e5e5] px-3.5 py-2 sm:px-5 dark:border-dash-border">
@@ -495,7 +580,7 @@ export function DeploymentLogsDrawer({
                   ) : (
                     visibleRows.map(({ log, index }) => {
                       const isSection = log.type === "section";
-                      const isCollapsed = collapsedSections.has(index);
+                      const isCollapsed = !hasQuery && collapsedSections.has(index);
                       const canCollapse = isSection ? sectionHasChildren(index) : false;
                       const detailTone = getLogLineTone(log.message);
                       const detailClasses = getDetailToneClasses(detailTone);
@@ -508,12 +593,14 @@ export function DeploymentLogsDrawer({
                       const debugDisabled = showDebugAction && buildInProgress;
 
                       let rowClassName = "border-b-[0.5px] border-[#e5e5e5] dark:border-[#2a2a2b]";
-                      if (!isSection && detailClasses.row) {
+                      if (index === activeLogIndex) {
+                        rowClassName = `${rowClassName} bg-[#b37a10]/12 dark:bg-[#f5a623]/12`;
+                      } else if (!isSection && detailClasses.row) {
                         rowClassName = `${rowClassName} ${detailClasses.row}`;
                       }
 
                       return (
-                        <tr key={index} className={rowClassName}>
+                        <tr key={index} data-log-index={index} className={rowClassName}>
                           <td className="align-top">
                             {isSection ? (
                               <button
@@ -541,7 +628,7 @@ export function DeploymentLogsDrawer({
                                 {log.status === "error" && <XCircle className="size-3.5 shrink-0 text-[#fc391e]" />}
                                 {log.status === "pending" && <CircleDashed className="size-3.5 shrink-0 text-[#ffb020]" />}
                                 <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px] text-dash-text-strong">
-                                  {renderLogTextWithLinks(log.message)}
+                                  {renderLogTextWithLinks(log.message, undefined, hasQuery ? trimmedQuery : undefined)}
                                 </span>
                                 {copiedRowIndex === index && (
                                   <span className="ml-auto shrink-0 font-logs text-[10px] uppercase tracking-wider text-[#13d282]">
@@ -561,7 +648,7 @@ export function DeploymentLogsDrawer({
                                   <span
                                     className={`flex-1 whitespace-pre-wrap font-logs text-xs leading-[1.4] tracking-[-0.01px] ${detailClasses.text}`}
                                   >
-                                    {renderLogTextWithLinks(log.message, detailClasses.link)}
+                                    {renderLogTextWithLinks(log.message, detailClasses.link, hasQuery ? trimmedQuery : undefined)}
                                   </span>
                                   {copiedRowIndex === index && (
                                     <span className="shrink-0 font-logs text-[10px] uppercase tracking-wider text-[#13d282]">Copied</span>

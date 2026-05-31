@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { PageHeader } from "@/components/shared/page-header";
 import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
-import { FeatureFlags, useFeatureFlag } from "@/lib/feature-flags";
+import { FeatureFlags, useFeatureFlagStrict } from "@/lib/feature-flags";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 
 export const Route = createFileRoute("/sandboxes")({
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/sandboxes")({
 function SandboxesLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { sandboxEnabled } = usePlanGate();
-  const sandboxFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
+  const sandboxFeatureEnabled = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
   const isListRoot = pathname === "/sandboxes" || pathname === "/sandboxes/";
 
   if (!sandboxEnabled || !sandboxFeatureEnabled) {

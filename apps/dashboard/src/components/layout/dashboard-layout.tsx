@@ -22,7 +22,9 @@ import type { ApiListResponse } from "@/backend";
 import type { Workspace } from "@/backend/workspaces";
 import type { Project } from "@/backend/projects";
 import type { TeamDetails } from "@/backend/teams";
-import type { AppTooltipMessage } from "@/backend/messages";
+import type { AppTooltipMessage, AnnouncementContent } from "@/backend/messages";
+import { parseAnnouncement } from "@/backend/messages";
+import { AnnouncementSlideout } from "../shared/announcement-slideout";
 import type { ActivityLogsResponse } from "@/backend/activity-logs";
 import type { SubscriptionStats } from "@/backend/payments";
 import type { PaymentMethod } from "@/backend/payments";
@@ -42,7 +44,9 @@ import { getWorkspaceTeamMembersServerFn } from "@/server/teams/actions";
 import { getTwoFactorStatusServerFn } from "@/server/auth/actions";
 import type { TwoFactorStatus } from "@/backend/auth/types";
 import { identifyPostHog, isPostHogEnabled } from "@/lib/posthog";
-import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
+import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/feature-flags";
+import { usePlanGate } from "@/hooks/use-plan-gate";
+import { AddonDetailPending } from "@/components/shared/route-pending";
 
 const CommandPalette = lazy(() => import("./command-palette").then((m) => ({ default: m.CommandPalette })));
 const UserProfileDrawer = lazy(() => import("../shared/user-profile-drawer").then((m) => ({ default: m.UserProfileDrawer })));
@@ -81,6 +85,7 @@ const dashboardQueryClient = new QueryClient({
 
 const mobileNavItemBase = "flex w-full items-center gap-3 px-5 py-4 text-sm tracking-[-0.09px] transition-colors";
 const DISMISSED_SNACKBARS_STORAGE_PREFIX = "brimble:dismissed-snackbars:";
+const DISMISSED_ANNOUNCEMENTS_STORAGE_PREFIX = "brimble:dismissed-announcements:";
 
 function mapSnackbarVariant(level: AppTooltipMessage["level"]): "info" | "warning" | "error" {
   if (level === "critical") return "error";
@@ -143,6 +148,42 @@ function writeDismissedSnackbars(workspace: string | undefined, keys: Set<string
 
   try {
     localStorage.setItem(getDismissedSnackbarsStorageKey(workspace), JSON.stringify([...keys]));
+  } catch {
+    // ignore storage write failures
+  }
+}
+
+function getDismissedAnnouncementsStorageKey(userId: string) {
+  return `${DISMISSED_ANNOUNCEMENTS_STORAGE_PREFIX}${userId}`;
+}
+
+function readDismissedAnnouncements(userId: string): Set<string> {
+  if (typeof window === "undefined") {
+    return new Set();
+  }
+
+  try {
+    const raw = localStorage.getItem(getDismissedAnnouncementsStorageKey(userId));
+    if (!raw) {
+      return new Set();
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return new Set();
+    }
+    return new Set(parsed.filter((item): item is string => typeof item === "string" && item.length > 0));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDismissedAnnouncements(userId: string, keys: Set<string>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(getDismissedAnnouncementsStorageKey(userId), JSON.stringify([...keys]));
   } catch {
     // ignore storage write failures
   }
@@ -547,6 +588,10 @@ function RouteTransitionSkeleton({ pathname, fullWidth }: { pathname: string; fu
     return <ScalingTabSkeleton />;
   }
 
+  if (/^\/addons\/[^/]+(?:\/|$)/.test(pathname)) {
+    return <AddonDetailPending />;
+  }
+
   if (pathname.startsWith("/addons")) {
     return <DiscoverTabSkeleton />;
   }
@@ -578,8 +623,13 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
 
   const domainsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DOMAINS);
   const scalingEnabled = useFeatureFlag(FeatureFlags.ENABLE_AUTO_SCALING);
-  const bucketsEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const { objectStorageEnabled } = usePlanGate();
+  const bucketFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
+  const bucketsEnabled = bucketFeatureEnabled && objectStorageEnabled;
   const sandboxEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
+  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS) && objectStorageEnabled;
+  const sandboxStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
+  const mcpServersStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
 
   const flagValues: Record<string, boolean> = useMemo(
     () => ({
@@ -587,24 +637,42 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
       [FeatureFlags.ENABLE_AUTO_SCALING]: scalingEnabled,
       [FeatureFlags.ENABLE_BUCKETS]: bucketsEnabled,
       [FeatureFlags.ENABLE_SANDBOX]: sandboxEnabled,
+      [FeatureFlags.ENABLE_MCP_SERVERS]: mcpServersStrict,
     }),
-    [domainsEnabled, scalingEnabled, bucketsEnabled, sandboxEnabled],
+    [domainsEnabled, scalingEnabled, bucketsEnabled, sandboxEnabled, mcpServersStrict],
+  );
+
+  const strictFlagValues: Record<string, boolean> = useMemo(
+    () => ({
+      [FeatureFlags.ENABLE_BUCKETS]: bucketsStrict,
+      [FeatureFlags.ENABLE_SANDBOX]: sandboxStrict,
+      [FeatureFlags.ENABLE_MCP_SERVERS]: mcpServersStrict,
+    }),
+    [bucketsStrict, sandboxStrict, mcpServersStrict],
   );
 
   const allNav = useMemo(
     () =>
       [...mainNav, ...moreNav]
         .filter((item) => {
+          if ("flag" in item && item.flag === FeatureFlags.ENABLE_SANDBOX) {
+            return strictFlagValues[item.flag] === true;
+          }
+
+          if ("flag" in item && item.flag === FeatureFlags.ENABLE_MCP_SERVERS) {
+            return strictFlagValues[item.flag] === true;
+          }
+
           if ("flag" in item && item.flag && !("comingSoon" in item && item.comingSoon)) return flagValues[item.flag] !== false;
           return true;
         })
         .map((item) => {
-          if ("comingSoon" in item && item.comingSoon && "flag" in item && item.flag && isPostHogEnabled && flagValues[item.flag]) {
+          if ("comingSoon" in item && item.comingSoon && "flag" in item && item.flag && isPostHogEnabled && strictFlagValues[item.flag]) {
             return { ...item, comingSoon: false };
           }
           return item;
         }),
-    [flagValues],
+    [flagValues, strictFlagValues],
   );
 
   return (
@@ -952,7 +1020,7 @@ export function DashboardLayout({
   const getTooltipMessages = useServerFn(listTooltipMessagesServerFn as any) as (args: {
     data?: {
       workspace?: string;
-      type?: "notifications";
+      type?: "notifications" | "announcement";
       limit?: number;
       page?: number;
     };
@@ -964,8 +1032,10 @@ export function DashboardLayout({
     data: { workspace: string };
   }) => Promise<TeamDetails>;
   const [tooltipMessages, setTooltipMessages] = useState<AppTooltipMessage[] | null>(initialTooltipMessages ?? null);
+  const [announcementMessages, setAnnouncementMessages] = useState<AppTooltipMessage[] | null>(null);
   // Keep initial render deterministic for SSR hydration; load localStorage after mount.
   const [dismissedSnackbarKeys, setDismissedSnackbarKeys] = useState<Set<string>>(() => new Set());
+  const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(() => new Set());
   const activeSettingsSnapshot = settingsSnapshotCache[settingsScopeKey] ?? null;
 
   // Profile is workspace-independent — extract once and keep stable across workspace switches
@@ -1186,11 +1256,42 @@ export function DashboardLayout({
   }, [currentWorkspace, getTooltipMessages]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    setAnnouncementMessages(null);
+
+    void getTooltipMessages({
+      data: { workspace: currentWorkspace, type: "announcement" },
+    })
+      .then((result) => {
+        if (!cancelled) {
+          setAnnouncementMessages(result ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAnnouncementMessages(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentWorkspace, getTooltipMessages]);
+
+  useEffect(() => {
     setDismissedSnackbarKeys(readDismissedSnackbars(currentWorkspace));
   }, [currentWorkspace]);
 
+  useEffect(() => {
+    if (userProfile?.id) {
+      setDismissedAnnouncements(readDismissedAnnouncements(userProfile.id));
+    }
+  }, [userProfile?.id]);
+
   const visibleSnackbars = useMemo(() => {
     return (tooltipMessages ?? [])
+      .filter((msg) => msg.type !== "announcement")
       .map((msg, index) => {
         const key = `${msg.type ?? "general"}:${msg.level}:${msg.route ?? ""}:${msg.message}:${index}`;
         return { key, msg, originalIndex: index };
@@ -1205,6 +1306,34 @@ export function DashboardLayout({
       })
       .slice(0, 2);
   }, [dismissedSnackbarKeys, tooltipMessages]);
+
+  const activeAnnouncements = useMemo<AnnouncementContent[]>(() => {
+    const levelRank = (level: AppTooltipMessage["level"]) => (level === "critical" ? 0 : level === "warn" ? 1 : 2);
+    return (announcementMessages ?? [])
+      .map((msg) => ({ msg, announcement: parseAnnouncement(msg) }))
+      .filter(
+        (entry): entry is { msg: AppTooltipMessage; announcement: AnnouncementContent } =>
+          entry.announcement !== null && !dismissedAnnouncements.has(entry.announcement.id),
+      )
+      .sort((a, b) => levelRank(a.msg.level) - levelRank(b.msg.level))
+      .map((entry) => entry.announcement);
+  }, [announcementMessages, dismissedAnnouncements]);
+
+  const announcementsEnabled = useFeatureFlag(FeatureFlags.ENABLE_ANNOUNCEMENTS);
+
+  const markAnnouncementDismissed = useCallback(
+    (id: string) => {
+      const userId = userProfile?.id;
+      if (!userId) return;
+      setDismissedAnnouncements((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        writeDismissedAnnouncements(userId, next);
+        return next;
+      });
+    },
+    [userProfile?.id],
+  );
 
   const pricing = initialPricing ?? DEFAULT_PRICING;
   const planType = activeSettingsSnapshot?.profile?.subscription?.planType ?? userProfile?.subscription?.planType;
@@ -1357,6 +1486,28 @@ export function DashboardLayout({
                             />
                           );
                         })}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {announcementsEnabled && userProfile?.id && !workspaceRoleValue.isViewer && activeAnnouncements.length > 0 && (
+                          <AnnouncementSlideout
+                            key="announcement-carousel"
+                            announcements={activeAnnouncements}
+                            onDismiss={(id) => markAnnouncementDismissed(id)}
+                            onCta={(announcement) => {
+                              markAnnouncementDismissed(announcement.id);
+                              const route = announcement.route;
+                              if (!route) return;
+                              if (/^https?:\/\//.test(route)) {
+                                window.open(route, "_blank", "noopener,noreferrer");
+                                return;
+                              }
+                              void navigate({
+                                to: route as any,
+                                search: currentWorkspace ? ({ workspace: currentWorkspace } as any) : undefined,
+                              });
+                            }}
+                          />
+                        )}
                       </AnimatePresence>
 
                       {!shouldRenderDesktopSidebar ? (

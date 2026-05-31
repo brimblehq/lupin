@@ -208,6 +208,28 @@ Why:
 
 Reach for hand-rolled checks only for trivial single-field guards (`if (!id) throw` is fine).
 
+## 17. Don't repeat the type suffix in local variable names
+
+When a local binding's role is already clear from context — usually the field it'll be assigned to — drop the redundant `Id` / `Name` / `Url` suffix. The destructure on the consuming side does the labelling.
+
+```ts
+// Bad — `resolvedTeamId` reads as `teamId twice`
+const resolvedTeamId = teamId || (await resolveTeamId(api, workspace));
+return api.storage.listCredentials(bucketId, { teamId: resolvedTeamId });
+
+// Good
+const resolvedTeam = teamId || (await resolveTeamId(api, workspace));
+return api.storage.listCredentials(bucketId, { teamId: resolvedTeam });
+```
+
+Same pattern for `const bucket = bucketId`, `const owner = ownerId`, etc. — when the variable holds an id and the field name already conveys `Id`, the local doesn't need to repeat it.
+
+The exceptions are obvious:
+- The variable is used in multiple places where its `Id`-ness is not obvious from the surrounding field name.
+- You're shadowing a same-named outer scope — then a distinct suffix prevents a collision.
+
+When in doubt, lean shorter. Repetition is noise.
+
 ---
 
 ## Summary

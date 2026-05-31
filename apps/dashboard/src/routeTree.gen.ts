@@ -55,7 +55,9 @@ import { Route as ProjectsProjectIdDeploymentHistoryRouteImport } from './routes
 import { Route as ProjectsProjectIdConfigurationRouteImport } from './routes/projects/$projectId/configuration'
 import { Route as ProjectsProjectIdStorageIndexRouteImport } from './routes/projects/$projectId/storage/index'
 import { Route as ProjectsProjectIdDomainsIndexRouteImport } from './routes/projects/$projectId/domains/index'
+import { Route as BucketsBucketIdMigrateIndexRouteImport } from './routes/buckets/$bucketId/migrate/index'
 import { Route as ProjectsProjectIdDomainsDomainNameRouteImport } from './routes/projects/$projectId/domains/$domainName'
+import { Route as BucketsBucketIdMigrateNewRouteImport } from './routes/buckets/$bucketId/migrate/new'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -300,11 +302,23 @@ const ProjectsProjectIdDomainsIndexRoute =
     path: '/',
     getParentRoute: () => ProjectsProjectIdDomainsRoute,
   } as any)
+const BucketsBucketIdMigrateIndexRoute =
+  BucketsBucketIdMigrateIndexRouteImport.update({
+    id: '/buckets/$bucketId/migrate/',
+    path: '/buckets/$bucketId/migrate/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProjectsProjectIdDomainsDomainNameRoute =
   ProjectsProjectIdDomainsDomainNameRouteImport.update({
     id: '/$domainName',
     path: '/$domainName',
     getParentRoute: () => ProjectsProjectIdDomainsRoute,
+  } as any)
+const BucketsBucketIdMigrateNewRoute =
+  BucketsBucketIdMigrateNewRouteImport.update({
+    id: '/buckets/$bucketId/migrate/new',
+    path: '/buckets/$bucketId/migrate/new',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -352,7 +366,9 @@ export interface FileRoutesByFullPath {
   '/buckets/$bucketId/': typeof BucketsBucketIdIndexRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/sandboxes/$sandboxId/': typeof SandboxesSandboxIdIndexRoute
+  '/buckets/$bucketId/migrate/new': typeof BucketsBucketIdMigrateNewRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
+  '/buckets/$bucketId/migrate/': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains/': typeof ProjectsProjectIdDomainsIndexRoute
   '/projects/$projectId/storage/': typeof ProjectsProjectIdStorageIndexRoute
 }
@@ -392,7 +408,9 @@ export interface FileRoutesByTo {
   '/buckets/$bucketId': typeof BucketsBucketIdIndexRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/sandboxes/$sandboxId': typeof SandboxesSandboxIdIndexRoute
+  '/buckets/$bucketId/migrate/new': typeof BucketsBucketIdMigrateNewRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
+  '/buckets/$bucketId/migrate': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains': typeof ProjectsProjectIdDomainsIndexRoute
   '/projects/$projectId/storage': typeof ProjectsProjectIdStorageIndexRoute
 }
@@ -442,7 +460,9 @@ export interface FileRoutesById {
   '/buckets/$bucketId/': typeof BucketsBucketIdIndexRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/sandboxes/$sandboxId/': typeof SandboxesSandboxIdIndexRoute
+  '/buckets/$bucketId/migrate/new': typeof BucketsBucketIdMigrateNewRoute
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
+  '/buckets/$bucketId/migrate/': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains/': typeof ProjectsProjectIdDomainsIndexRoute
   '/projects/$projectId/storage/': typeof ProjectsProjectIdStorageIndexRoute
 }
@@ -493,7 +513,9 @@ export interface FileRouteTypes {
     | '/buckets/$bucketId/'
     | '/projects/$projectId/'
     | '/sandboxes/$sandboxId/'
+    | '/buckets/$bucketId/migrate/new'
     | '/projects/$projectId/domains/$domainName'
+    | '/buckets/$bucketId/migrate/'
     | '/projects/$projectId/domains/'
     | '/projects/$projectId/storage/'
   fileRoutesByTo: FileRoutesByTo
@@ -533,7 +555,9 @@ export interface FileRouteTypes {
     | '/buckets/$bucketId'
     | '/projects/$projectId'
     | '/sandboxes/$sandboxId'
+    | '/buckets/$bucketId/migrate/new'
     | '/projects/$projectId/domains/$domainName'
+    | '/buckets/$bucketId/migrate'
     | '/projects/$projectId/domains'
     | '/projects/$projectId/storage'
   id:
@@ -582,7 +606,9 @@ export interface FileRouteTypes {
     | '/buckets/$bucketId/'
     | '/projects/$projectId/'
     | '/sandboxes/$sandboxId/'
+    | '/buckets/$bucketId/migrate/new'
     | '/projects/$projectId/domains/$domainName'
+    | '/buckets/$bucketId/migrate/'
     | '/projects/$projectId/domains/'
     | '/projects/$projectId/storage/'
   fileRoutesById: FileRoutesById
@@ -607,6 +633,8 @@ export interface RootRouteChildren {
   TeamsTeamNameOwnershipTransferRoute: typeof TeamsTeamNameOwnershipTransferRoute
   TeamsTeamNameTransferRoute: typeof TeamsTeamNameTransferRoute
   BucketsBucketIdIndexRoute: typeof BucketsBucketIdIndexRoute
+  BucketsBucketIdMigrateNewRoute: typeof BucketsBucketIdMigrateNewRoute
+  BucketsBucketIdMigrateIndexRoute: typeof BucketsBucketIdMigrateIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -933,12 +961,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdDomainsIndexRouteImport
       parentRoute: typeof ProjectsProjectIdDomainsRoute
     }
+    '/buckets/$bucketId/migrate/': {
+      id: '/buckets/$bucketId/migrate/'
+      path: '/buckets/$bucketId/migrate'
+      fullPath: '/buckets/$bucketId/migrate/'
+      preLoaderRoute: typeof BucketsBucketIdMigrateIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects/$projectId/domains/$domainName': {
       id: '/projects/$projectId/domains/$domainName'
       path: '/$domainName'
       fullPath: '/projects/$projectId/domains/$domainName'
       preLoaderRoute: typeof ProjectsProjectIdDomainsDomainNameRouteImport
       parentRoute: typeof ProjectsProjectIdDomainsRoute
+    }
+    '/buckets/$bucketId/migrate/new': {
+      id: '/buckets/$bucketId/migrate/new'
+      path: '/buckets/$bucketId/migrate/new'
+      fullPath: '/buckets/$bucketId/migrate/new'
+      preLoaderRoute: typeof BucketsBucketIdMigrateNewRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -1110,6 +1152,8 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsTeamNameOwnershipTransferRoute: TeamsTeamNameOwnershipTransferRoute,
   TeamsTeamNameTransferRoute: TeamsTeamNameTransferRoute,
   BucketsBucketIdIndexRoute: BucketsBucketIdIndexRoute,
+  BucketsBucketIdMigrateNewRoute: BucketsBucketIdMigrateNewRoute,
+  BucketsBucketIdMigrateIndexRoute: BucketsBucketIdMigrateIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

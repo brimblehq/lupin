@@ -69,6 +69,11 @@ export interface UsageBreakdown {
   storage: UsageBreakdownResource;
   bandwidth: UsageBreakdownResource;
   compute: UsageBreakdownResource;
+  sandbox_cpu?: UsageBreakdownResource;
+  sandbox_memory?: UsageBreakdownResource;
+  sandbox_snapshot_storage?: UsageBreakdownResource;
+  volume_storage?: UsageBreakdownResource;
+  object_storage?: UsageBreakdownResource;
   metered_total: number;
 }
 

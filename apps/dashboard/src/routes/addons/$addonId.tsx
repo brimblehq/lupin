@@ -20,6 +20,8 @@ import { mapMcpTemplateToAddon, mapMcpTemplateToAddonDetail } from "@/utils/disc
 import { getBuildDisabledMessage } from "@/utils/dashboard";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
+import { AddonDetailPending } from "@/components/shared/route-pending";
+import { FeatureFlags, useFeatureFlagStrict } from "@/lib/feature-flags";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -55,6 +57,7 @@ export const Route = createFileRoute("/addons/$addonId")({
     };
   },
   component: AddonDetailPage,
+  pendingComponent: AddonDetailPending,
 });
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -133,6 +136,7 @@ function chooseGithubInstallation(accounts: GithubAccount[], workspace?: string)
 
 function AddonDetailPage() {
   const { canWrite } = useWorkspaceRole();
+  const mcpServersEnabled = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
   const { planKey } = usePlanGate();
   const isFreePlan = planKey === "free";
   const { settingsSnapshot } = (rootRoute.useLoaderData() ?? {}) as { settingsSnapshot: SettingsSidebarSnapshot | null };
@@ -155,6 +159,17 @@ function AddonDetailPage() {
       authEnabled?: boolean;
     };
   }) => Promise<{ name?: string; slug?: string }>;
+
+  if (!mcpServersEnabled) {
+    return (
+      <div className="px-4 py-8 md:px-10">
+        <div className="flex h-[50vh] flex-col items-center justify-center text-center">
+          <h2 className="text-sm font-medium text-dash-text-strong">Discover is not available</h2>
+          <p className="mt-1 max-w-[320px] text-sm text-dash-text-faded">MCP server discovery is not enabled for this workspace.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!detail) {
     return (
