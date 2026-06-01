@@ -108,7 +108,7 @@ export const Route = createFileRoute("/buckets/$bucketId/")({
     return { workspace, bucket };
   },
   component: BucketDetailPage,
-  pendingComponent: () => <div className="p-8 text-center text-sm text-gray-500">Loading bucket...</div>,
+  pendingComponent: BucketDetailPending,
 });
 
 function formatBytes(bytes: number) {
@@ -252,6 +252,54 @@ function ObjectTableSkeleton() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function BucketDetailSkeletonBar({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-full bg-dash-border/70 ${className}`} />;
+}
+
+function BucketDetailPending() {
+  return (
+    <div className="flex max-w-[1000px] flex-col gap-4" aria-hidden="true">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <BucketDetailSkeletonBar className="h-5 w-40" />
+          <BucketDetailSkeletonBar className="h-4 w-48" />
+          <BucketDetailSkeletonBar className="h-4 w-64 max-w-full" />
+        </div>
+        <div className="size-8 shrink-0 animate-pulse rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated/50" />
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="rounded-[4px] border border-dash-border bg-dash-bg p-4">
+            <BucketDetailSkeletonBar className="h-3 w-16" />
+            <BucketDetailSkeletonBar className="mt-2 h-5 w-20" />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex items-start gap-2.5 rounded-[4px] bg-[#4879f8]/[0.06] px-3 py-2.5 dark:bg-[#4879f8]/[0.08]">
+        <div className="mt-0.5 size-3.5 shrink-0 animate-pulse rounded-full bg-[#4879f8]/30" />
+        <BucketDetailSkeletonBar className="h-4 w-[420px] max-w-full bg-[#4879f8]/20" />
+      </div>
+
+      <div className="mt-6">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <BucketDetailSkeletonBar className="h-5 w-20" />
+            <BucketDetailSkeletonBar className="mt-2 h-4 w-72 max-w-full" />
+          </div>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="h-9 w-full animate-pulse rounded-[4px] border border-dash-border bg-dash-bg sm:w-[280px]" />
+            <div className="h-9 w-full animate-pulse rounded-[4px] bg-dash-bg-elevated sm:w-20" />
+          </div>
+        </div>
+
+        <ObjectTableSkeleton />
+      </div>
     </div>
   );
 }
