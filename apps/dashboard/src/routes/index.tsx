@@ -40,6 +40,7 @@ import { resolveEnvironmentId } from "@/utils/environment-selection";
 import { workspaceLoaderDeps } from "@/utils/workspace-route-search";
 import { getRouteApi } from "@tanstack/react-router";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
+import { FeatureFlags, useFeatureFlagStrict } from "@/lib/feature-flags";
 
 const rootRoute = getRouteApi("__root__");
 const EMPTY_PROJECTS: BackendProject[] = [];
@@ -74,17 +75,21 @@ export const Route = createFileRoute("/")({
   loader: async ({ deps }) => {
     const workspace = deps.workspace;
     const [environments, persistedEnvironmentId, mcpTemplatesResult, frameworksList] = await Promise.all([
-      (listProjectEnvironmentsServerFn as unknown as (input: {
-        data?: { workspace?: string };
-      }) => Promise<Array<{ _id: string; isDefault?: boolean }>>)({
+      (
+        listProjectEnvironmentsServerFn as unknown as (input: {
+          data?: { workspace?: string };
+        }) => Promise<Array<{ _id: string; isDefault?: boolean }>>
+      )({
         data: { workspace },
       }).catch(() => []),
       (getActiveEnvironmentPreferenceServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<string | null>)({
         data: { workspace },
       }).catch(() => null),
-      (listRecommendedMcpTemplatesServerFn as unknown as (input: {
-        data?: { limit?: number; category?: string; officialOnly?: boolean; shuffle?: boolean };
-      }) => Promise<McpServerListResult>)({
+      (
+        listRecommendedMcpTemplatesServerFn as unknown as (input: {
+          data?: { limit?: number; category?: string; officialOnly?: boolean; shuffle?: boolean };
+        }) => Promise<McpServerListResult>
+      )({
         data: { limit: 3, category: "development", officialOnly: true, shuffle: true },
       }).catch(() => ({ servers: [], pagination: {} }) as McpServerListResult),
       (listFrameworksServerFn as unknown as () => Promise<FrameworkOption[]>)().catch(() => [] as FrameworkOption[]),
@@ -100,9 +105,11 @@ export const Route = createFileRoute("/")({
     let bandwidth = EMPTY_BANDWIDTH;
 
     try {
-      const projectsResponse = await (listHomeProjectsServerFn as unknown as (input: {
-        data: { workspace?: string; environmentId?: string };
-      }) => Promise<ApiListResponse<BackendProject>>)({
+      const projectsResponse = await (
+        listHomeProjectsServerFn as unknown as (input: {
+          data: { workspace?: string; environmentId?: string };
+        }) => Promise<ApiListResponse<BackendProject>>
+      )({
         data: { workspace, environmentId },
       });
       projects = projectsResponse.items;
@@ -111,9 +118,9 @@ export const Route = createFileRoute("/")({
     }
 
     try {
-      overview = await (getHomeOverviewServerFn as unknown as (input: {
-        data: { workspace?: string; environmentId?: string };
-      }) => Promise<OverviewSummary>)({
+      overview = await (
+        getHomeOverviewServerFn as unknown as (input: { data: { workspace?: string; environmentId?: string } }) => Promise<OverviewSummary>
+      )({
         data: { workspace, environmentId },
       });
     } catch (error) {
@@ -121,9 +128,11 @@ export const Route = createFileRoute("/")({
     }
 
     try {
-      bandwidth = await (getHomeBandwidthServerFn as unknown as (input: {
-        data: { workspace?: string; environmentId?: string };
-      }) => Promise<BandwidthSummary>)({
+      bandwidth = await (
+        getHomeBandwidthServerFn as unknown as (input: {
+          data: { workspace?: string; environmentId?: string };
+        }) => Promise<BandwidthSummary>
+      )({
         data: { workspace, environmentId },
       });
     } catch (error) {
@@ -174,6 +183,7 @@ function DashboardHome() {
   const [ownershipTransferOpen, setOwnershipTransferOpen] = useState(search.transferOwnership === "1");
   const [ownershipTransferLoading, setOwnershipTransferLoading] = useState(false);
   const [ownershipTransferLoadingAction, setOwnershipTransferLoadingAction] = useState<"accept" | "deny" | undefined>(undefined);
+  const mcpServersEnabled = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
   const planType = settingsSnapshot?.profile?.subscription?.planType;
   const workspaceSlug = search.workspace?.trim().toLowerCase();
   const loaderWorkspaceSlug = workspace?.trim().toLowerCase();
@@ -256,7 +266,7 @@ function DashboardHome() {
       <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
       <ConnectedDomains activeDomains={overview?.total?.domain ?? 0} />
       <hr className="-mx-4 mb-10 border-dash-border-soft md:-ml-10 md:mr-0" />
-      <FeaturedIntegrations addons={featuredAddons} workspace={workspace} />
+      {mcpServersEnabled && <FeaturedIntegrations addons={featuredAddons} workspace={workspace} />}
 
       {invitationData && (
         <TeamInviteModal
