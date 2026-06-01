@@ -1,5 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 import { getCurrentSessionServerFn, refreshSessionServerFn } from "@/server/auth/actions";
+import { RefreshSessionStatus } from "@/server/auth/enums";
 import { logAuthFlow, warnAuthFlow } from "@/lib/auth-flow-logger";
 import { clearSessionCache, isSessionRecentlyVerified, markSessionVerified } from "./auth-cache";
 
@@ -63,7 +64,7 @@ export async function enforceRouteAuth(pathname: string, search?: string, option
 
   let session: unknown = null;
   let authCheckFailed = false;
-  let refreshStatus: "ok" | "missing" | "expired" | "error" | null = null;
+  let refreshStatus: RefreshSessionStatus | null = null;
 
   try {
     session = await getCurrentSessionServerFn();
@@ -87,7 +88,7 @@ export async function enforceRouteAuth(pathname: string, search?: string, option
       refreshStatus,
     });
 
-    if (refreshResult?.status === "ok") {
+    if (refreshResult?.status === RefreshSessionStatus.Ok) {
       session = {
         user: refreshResult.user,
       };
@@ -102,7 +103,10 @@ export async function enforceRouteAuth(pathname: string, search?: string, option
   const shouldRedirectToLogin =
     !session &&
     !isPublicRoute &&
-    (refreshStatus === "expired" || refreshStatus === "missing" || refreshStatus === "error" || authCheckFailed);
+    (refreshStatus === RefreshSessionStatus.Expired ||
+      refreshStatus === RefreshSessionStatus.Missing ||
+      refreshStatus === RefreshSessionStatus.Error ||
+      authCheckFailed);
 
   if (shouldRedirectToLogin) {
     clearSessionCache();
@@ -115,7 +119,7 @@ export async function enforceRouteAuth(pathname: string, search?: string, option
       to: "/login",
       search: {
         next: buildNextPath(pathname, search),
-        ...(refreshStatus === "expired" ? { reason: "session-expired" } : {}),
+        ...(refreshStatus === RefreshSessionStatus.Expired ? { reason: "session-expired" } : {}),
       },
     });
   }

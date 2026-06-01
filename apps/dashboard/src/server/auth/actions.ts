@@ -13,7 +13,15 @@ import type {
 } from "@/backend/auth/types";
 import serverConfig from "@/config/server";
 import { clearServerAuthCookies, getServerAccessToken, getServerRefreshToken, setServerAuthCookies } from "./cookies";
-import { getServerBackendApi, refreshServerSession, withTokenRefresh, type ClientGeoData } from "@/server/shared/backend";
+import { RefreshSessionStatus } from "./enums";
+import type { RefreshSessionServerResult } from "./types";
+import {
+  getServerBackendApi,
+  isRefreshTokenReuseStatus,
+  refreshServerSession,
+  withTokenRefresh,
+  type ClientGeoData,
+} from "@/server/shared/backend";
 import { authLogger } from "@/server/shared/logger";
 
 function getErrorMeta(error: any) {
@@ -271,27 +279,12 @@ export const getCurrentSessionServerFn = createServerFn({ method: "GET" }).handl
   }
 });
 
-type RefreshSessionServerResult =
-  | {
-      status: "ok";
-      user: AuthSession["user"];
-    }
-  | {
-      status: "missing";
-    }
-  | {
-      status: "expired";
-    }
-  | {
-      status: "error";
-    };
-
 export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler(async () => {
   const refreshToken = getServerRefreshToken();
   if (!refreshToken) {
     authLogger.info("refreshSession skipped: missing refresh token");
     return {
-      status: "missing",
+      status: RefreshSessionStatus.Missing,
     } satisfies RefreshSessionServerResult;
   }
 
@@ -305,7 +298,7 @@ export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler
     if (!session) {
       authLogger.warn("refreshSession returned empty session");
       return {
-        status: "missing",
+        status: RefreshSessionStatus.Missing,
       } satisfies RefreshSessionServerResult;
     }
 
@@ -316,24 +309,33 @@ export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler
     });
 
     return {
-      status: "ok",
+      status: RefreshSessionStatus.Ok,
       user: session.user,
     } satisfies RefreshSessionServerResult;
   } catch (error: any) {
     const status = error?.status;
     authLogger.warn("refreshSession failed", getErrorMeta(error));
 
+    if (isRefreshTokenReuseStatus(error)) {
+      authLogger.warn("refreshSession stale refresh token response", {
+        status,
+      });
+      return {
+        status: RefreshSessionStatus.Retry,
+      } satisfies RefreshSessionServerResult;
+    }
+
     if (status === 401 || status === 403) {
       authLogger.warn("refreshSession expired", {
         status,
       });
       return {
-        status: "expired",
+        status: RefreshSessionStatus.Expired,
       } satisfies RefreshSessionServerResult;
     }
 
     return {
-      status: "error",
+      status: RefreshSessionStatus.Error,
     } satisfies RefreshSessionServerResult;
   }
 });

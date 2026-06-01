@@ -122,6 +122,19 @@ function createUnauthorizedError(message: string) {
   return error;
 }
 
+export function isRefreshTokenReuseStatus(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const status = "status" in error ? error.status : undefined;
+  if (status !== 409) {
+    return false;
+  }
+
+  return isRefreshTokenReuseError(error);
+}
+
 function doRefresh(refreshToken: string): Promise<AuthSession> {
   const refreshTokenFp = tokenFingerprint(refreshToken);
   const existingPromise = activeRefreshPromises.get(refreshToken);
@@ -265,11 +278,6 @@ export async function refreshServerSession(refreshToken = getServerRefreshToken(
         attemptMatchesLatestRefreshToken,
         activePromiseForAttempt: activeRefreshPromises.has(refreshToken),
       });
-
-      if (attemptMatchesLatestRefreshToken) {
-        clearServerAuthCookies();
-        throw createUnauthorizedError("Session expired. Please sign in again.");
-      }
     }
 
     authLogger.warn("refreshServerSession failed", {
