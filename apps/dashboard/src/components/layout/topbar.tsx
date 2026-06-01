@@ -1332,7 +1332,7 @@ export function Topbar({
     <div data-topbar className="flex shrink-0 flex-col bg-dash-bg">
       {/* Top row: search + notifications */}
       <div className="border-b border-dash-border-soft">
-        <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 md:px-0">
+        <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 md:px-6">
           <div className="flex items-center gap-3">
             {onMobileNavToggle && (
               <button
@@ -1407,7 +1407,7 @@ export function Topbar({
 
       {/* Breadcrumb row */}
       <div className="border-b border-dash-border-soft">
-        <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 md:px-0">
+        <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 md:px-6">
           <div className="flex min-w-0 items-center">
             <WorkspaceSwitcher profile={userProfile ?? null} workspaces={workspaces ?? []} pathname={pathname} searchStr={searchStr} />
             <span className="mx-2 text-sm text-dash-text-faded">/</span>
