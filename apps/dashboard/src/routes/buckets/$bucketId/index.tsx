@@ -370,9 +370,11 @@ function BucketDetailPage() {
   const search = Route.useSearch() as { workspace?: string; path?: string };
   const { bucket, workspace } = Route.useLoaderData() as {
     workspace?: string;
-    bucket: any;
+    bucket: BucketRecord | null;
   };
   const bucketLoaded = Boolean(bucket);
+  const bucketUrl = bucket?.url || (bucket?.bucket_name ? `https://${bucket.bucket_name}.objects.brimble.io` : "");
+  const bucketDisplayUrl = bucketUrl.replace(/^https?:\/\//, "");
   const currentPrefix = search.path ? `${search.path}/` : "";
   const breadcrumbSegments = search.path ? search.path.split("/").filter(Boolean) : [];
   const [objectSearch, setObjectSearch] = useState("");
@@ -1067,18 +1069,18 @@ function BucketDetailPage() {
           <p className="text-sm font-light leading-[1.3] text-dash-text-extra-faded">
             {bucket.region || "Global"} · Created {formatRelativeTime(bucket.createdAt || bucket.updatedAt)}
           </p>
-          {bucket.bucket_name && (
+          {bucketDisplayUrl && (
             <button
               type="button"
               onClick={() => {
-                void navigator.clipboard.writeText(`https://${bucket.bucket_name}.storage.brimble.io`);
+                void navigator.clipboard.writeText(bucketUrl);
                 setUrlCopied(true);
                 window.setTimeout(() => setUrlCopied(false), 1500);
               }}
               title="Copy bucket URL"
               className="flex w-fit max-w-full items-center gap-1.5 text-dash-text-faded transition-colors hover:text-dash-text-strong"
             >
-              <span className="truncate font-mono text-xs">{bucket.bucket_name}.storage.brimble.io</span>
+              <span className="truncate font-mono text-xs">{bucketDisplayUrl}</span>
               {urlCopied ? <Check className="size-3.5 shrink-0 text-[#13d282]" /> : <Copy className="size-3.5 shrink-0" />}
             </button>
           )}

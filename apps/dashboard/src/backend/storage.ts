@@ -24,6 +24,7 @@ export interface BucketRecord {
   lifecycle_rules?: object[];
   createdAt: string;
   updatedAt?: string;
+  url?: string;
 }
 
 export const S3_CREDENTIAL_ROLES = ["ReadOnly", "Editor"] as const;
