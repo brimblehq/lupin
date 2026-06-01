@@ -1,16 +1,34 @@
 export const siteConfig = {
   name: "Brimble",
   description: "Ship faster with Brimble: the all-in-one platform to deploy, scale, and manage every part of your stack.",
-  navLinks: [
+  navGroups: [
+    {
+      label: "Products",
+      items: [
+        { label: "Sandboxes", href: "/sandboxes", description: "Isolated, ephemeral compute on demand." },
+        { label: "Object Storage", href: "/object-storage", description: "S3-compatible buckets for uploads, assets, and backups." },
+        { label: "Domains", href: "/domains", description: "Buy and manage custom domains." },
+      ],
+    },
+    {
+      label: "Resources",
+      items: [
+        { label: "FAQ", href: "/faq", description: "Common questions, short answers." },
+        { label: "Changelog", href: "/changelog", description: "What's new this week." },
+        { label: "Docs", href: "https://paper.brimble.io", description: "Guides and API reference.", external: true },
+      ],
+    },
+    {
+      label: "Company",
+      items: [
+        { label: "Careers", href: "/careers", description: "Open roles at Brimble." },
+        { label: "About", href: "/legal", description: "Who we are, what we're building." },
+      ],
+    },
+  ],
+  navStandalone: [
     { label: "Pricing", href: "/pricing" },
-    { label: "Sandboxes", href: "/sandboxes" },
-    { label: "Domains", href: "/domains" },
-    { label: "Careers", href: "/careers" },
-    { label: "Changelog", href: "/changelog" },
-    { label: "FAQ", href: "/faq" },
-    { label: "Docs", href: "https://paper.brimble.io" },
-    { label: "Status", href: "https://status.brimble.io", status: true },
-    // { label: "Talk to Founder", href: "https://cal.com/brimble/15min" },
+    { label: "Status", href: "https://status.brimble.io", status: true, external: true },
   ],
   socials: {
     heading: "Follow Brimble",

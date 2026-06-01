@@ -20,7 +20,6 @@ import {
   GitBranch,
   ArrowsClockwise,
   Tag,
-  Database,
   ArrowUpRight,
 } from "@phosphor-icons/react";
 import { SimpleTooltip } from "../shared/tooltip";
@@ -61,7 +60,6 @@ const baseTabs = [
   { label: "Configuration", slug: "configuration", Icon: GearSix },
   { label: "Observability", slug: "observability", Icon: ChartBar },
   { label: "Web analytics", slug: "web-analytics", Icon: Pulse },
-  { label: "Storage", slug: "storage", Icon: Database },
   { label: "Domains", slug: "domains", Icon: FileText },
   { label: "Secrets", slug: "environment", Icon: LockKey },
   {
@@ -219,7 +217,6 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
   const webAnalyticsEnabled = useFeatureFlag(FeatureFlags.ENABLE_WEB_ANALYTICS);
   const planGate = usePlanGate();
   const planSupportsAnalytics = planGate.analytics !== false;
-  const objectStorageEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS) && planGate.objectStorageEnabled;
 
   const tabs = baseTabs.filter((tab) => {
     if (tab.slug === "observability" && !shouldShowProjectObservabilityTab(project as any)) {
@@ -239,10 +236,6 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
     }
 
     if (tab.slug === "environment" && !shouldShowProjectEnvironmentTab(project as any)) {
-      return false;
-    }
-
-    if (tab.slug === "storage" && !objectStorageEnabled) {
       return false;
     }
 

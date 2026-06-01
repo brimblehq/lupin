@@ -46,14 +46,12 @@ import { Route as SandboxesSandboxIdTerminalRouteImport } from './routes/sandbox
 import { Route as SandboxesSandboxIdSnapshotsRouteImport } from './routes/sandboxes/$sandboxId/snapshots'
 import { Route as SandboxesSandboxIdObservabilityRouteImport } from './routes/sandboxes/$sandboxId/observability'
 import { Route as ProjectsProjectIdWebAnalyticsRouteImport } from './routes/projects/$projectId/web-analytics'
-import { Route as ProjectsProjectIdStorageRouteImport } from './routes/projects/$projectId/storage'
 import { Route as ProjectsProjectIdObservabilityRouteImport } from './routes/projects/$projectId/observability'
 import { Route as ProjectsProjectIdLogsRouteImport } from './routes/projects/$projectId/logs'
 import { Route as ProjectsProjectIdEnvironmentRouteImport } from './routes/projects/$projectId/environment'
 import { Route as ProjectsProjectIdDomainsRouteImport } from './routes/projects/$projectId/domains'
 import { Route as ProjectsProjectIdDeploymentHistoryRouteImport } from './routes/projects/$projectId/deployment-history'
 import { Route as ProjectsProjectIdConfigurationRouteImport } from './routes/projects/$projectId/configuration'
-import { Route as ProjectsProjectIdStorageIndexRouteImport } from './routes/projects/$projectId/storage/index'
 import { Route as ProjectsProjectIdDomainsIndexRouteImport } from './routes/projects/$projectId/domains/index'
 import { Route as BucketsBucketIdMigrateIndexRouteImport } from './routes/buckets/$bucketId/migrate/index'
 import { Route as ProjectsProjectIdDomainsDomainNameRouteImport } from './routes/projects/$projectId/domains/$domainName'
@@ -249,12 +247,6 @@ const ProjectsProjectIdWebAnalyticsRoute =
     path: '/web-analytics',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
-const ProjectsProjectIdStorageRoute =
-  ProjectsProjectIdStorageRouteImport.update({
-    id: '/storage',
-    path: '/storage',
-    getParentRoute: () => ProjectsProjectIdRoute,
-  } as any)
 const ProjectsProjectIdObservabilityRoute =
   ProjectsProjectIdObservabilityRouteImport.update({
     id: '/observability',
@@ -289,12 +281,6 @@ const ProjectsProjectIdConfigurationRoute =
     id: '/configuration',
     path: '/configuration',
     getParentRoute: () => ProjectsProjectIdRoute,
-  } as any)
-const ProjectsProjectIdStorageIndexRoute =
-  ProjectsProjectIdStorageIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => ProjectsProjectIdStorageRoute,
   } as any)
 const ProjectsProjectIdDomainsIndexRoute =
   ProjectsProjectIdDomainsIndexRouteImport.update({
@@ -355,7 +341,6 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
-  '/projects/$projectId/storage': typeof ProjectsProjectIdStorageRouteWithChildren
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/sandboxes/$sandboxId/observability': typeof SandboxesSandboxIdObservabilityRoute
   '/sandboxes/$sandboxId/snapshots': typeof SandboxesSandboxIdSnapshotsRoute
@@ -370,7 +355,6 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
   '/buckets/$bucketId/migrate/': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains/': typeof ProjectsProjectIdDomainsIndexRoute
-  '/projects/$projectId/storage/': typeof ProjectsProjectIdStorageIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -412,7 +396,6 @@ export interface FileRoutesByTo {
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
   '/buckets/$bucketId/migrate': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains': typeof ProjectsProjectIdDomainsIndexRoute
-  '/projects/$projectId/storage': typeof ProjectsProjectIdStorageIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -449,7 +432,6 @@ export interface FileRoutesById {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
-  '/projects/$projectId/storage': typeof ProjectsProjectIdStorageRouteWithChildren
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/sandboxes/$sandboxId/observability': typeof SandboxesSandboxIdObservabilityRoute
   '/sandboxes/$sandboxId/snapshots': typeof SandboxesSandboxIdSnapshotsRoute
@@ -464,7 +446,6 @@ export interface FileRoutesById {
   '/projects/$projectId/domains/$domainName': typeof ProjectsProjectIdDomainsDomainNameRoute
   '/buckets/$bucketId/migrate/': typeof BucketsBucketIdMigrateIndexRoute
   '/projects/$projectId/domains/': typeof ProjectsProjectIdDomainsIndexRoute
-  '/projects/$projectId/storage/': typeof ProjectsProjectIdStorageIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -502,7 +483,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
-    | '/projects/$projectId/storage'
     | '/projects/$projectId/web-analytics'
     | '/sandboxes/$sandboxId/observability'
     | '/sandboxes/$sandboxId/snapshots'
@@ -517,7 +497,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/domains/$domainName'
     | '/buckets/$bucketId/migrate/'
     | '/projects/$projectId/domains/'
-    | '/projects/$projectId/storage/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -559,7 +538,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/domains/$domainName'
     | '/buckets/$bucketId/migrate'
     | '/projects/$projectId/domains'
-    | '/projects/$projectId/storage'
   id:
     | '__root__'
     | '/'
@@ -595,7 +573,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
-    | '/projects/$projectId/storage'
     | '/projects/$projectId/web-analytics'
     | '/sandboxes/$sandboxId/observability'
     | '/sandboxes/$sandboxId/snapshots'
@@ -610,7 +587,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/domains/$domainName'
     | '/buckets/$bucketId/migrate/'
     | '/projects/$projectId/domains/'
-    | '/projects/$projectId/storage/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -898,13 +874,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdWebAnalyticsRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
-    '/projects/$projectId/storage': {
-      id: '/projects/$projectId/storage'
-      path: '/storage'
-      fullPath: '/projects/$projectId/storage'
-      preLoaderRoute: typeof ProjectsProjectIdStorageRouteImport
-      parentRoute: typeof ProjectsProjectIdRoute
-    }
     '/projects/$projectId/observability': {
       id: '/projects/$projectId/observability'
       path: '/observability'
@@ -946,13 +915,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/projects/$projectId/configuration'
       preLoaderRoute: typeof ProjectsProjectIdConfigurationRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
-    }
-    '/projects/$projectId/storage/': {
-      id: '/projects/$projectId/storage/'
-      path: '/'
-      fullPath: '/projects/$projectId/storage/'
-      preLoaderRoute: typeof ProjectsProjectIdStorageIndexRouteImport
-      parentRoute: typeof ProjectsProjectIdStorageRoute
     }
     '/projects/$projectId/domains/': {
       id: '/projects/$projectId/domains/'
@@ -1030,20 +992,6 @@ const ProjectsProjectIdDomainsRouteWithChildren =
     ProjectsProjectIdDomainsRouteChildren,
   )
 
-interface ProjectsProjectIdStorageRouteChildren {
-  ProjectsProjectIdStorageIndexRoute: typeof ProjectsProjectIdStorageIndexRoute
-}
-
-const ProjectsProjectIdStorageRouteChildren: ProjectsProjectIdStorageRouteChildren =
-  {
-    ProjectsProjectIdStorageIndexRoute: ProjectsProjectIdStorageIndexRoute,
-  }
-
-const ProjectsProjectIdStorageRouteWithChildren =
-  ProjectsProjectIdStorageRoute._addFileChildren(
-    ProjectsProjectIdStorageRouteChildren,
-  )
-
 interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdConfigurationRoute: typeof ProjectsProjectIdConfigurationRoute
   ProjectsProjectIdDeploymentHistoryRoute: typeof ProjectsProjectIdDeploymentHistoryRoute
@@ -1051,7 +999,6 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdEnvironmentRoute: typeof ProjectsProjectIdEnvironmentRoute
   ProjectsProjectIdLogsRoute: typeof ProjectsProjectIdLogsRoute
   ProjectsProjectIdObservabilityRoute: typeof ProjectsProjectIdObservabilityRoute
-  ProjectsProjectIdStorageRoute: typeof ProjectsProjectIdStorageRouteWithChildren
   ProjectsProjectIdWebAnalyticsRoute: typeof ProjectsProjectIdWebAnalyticsRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
@@ -1064,7 +1011,6 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
   ProjectsProjectIdEnvironmentRoute: ProjectsProjectIdEnvironmentRoute,
   ProjectsProjectIdLogsRoute: ProjectsProjectIdLogsRoute,
   ProjectsProjectIdObservabilityRoute: ProjectsProjectIdObservabilityRoute,
-  ProjectsProjectIdStorageRoute: ProjectsProjectIdStorageRouteWithChildren,
   ProjectsProjectIdWebAnalyticsRoute: ProjectsProjectIdWebAnalyticsRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }

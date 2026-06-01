@@ -220,7 +220,7 @@ export function SandboxQuickstart() {
                 })}
               </div>
               <div className="flex items-center gap-3 pr-1 font-mono text-[10px] uppercase tracking-[1.4px] text-white/35">
-                <span className="hidden sm:inline">{tab.filename}</span>
+                <span className="hidden normal-case sm:inline">{tab.filename}</span>
                 <button
                   type="button"
                   onClick={copy}
