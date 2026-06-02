@@ -12,6 +12,7 @@ import {
   Sparkles,
   Copy,
   Check,
+  MoreVertical,
 } from "lucide-react";
 import { DownloadSimple, MagnifyingGlass } from "@phosphor-icons/react";
 import { motion } from "motion/react";
@@ -165,6 +166,59 @@ function formatPhaseDuration(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+}
+
+type LogsToolbarActionId = "bottom" | "copy" | "download" | "collapse" | "close";
+
+interface LogsToolbarAction {
+  id: LogsToolbarActionId;
+  label: string;
+  icon: ReactNode;
+  disabled?: boolean;
+}
+
+function LogsActionsMenu({ actions, onAction }: { actions: LogsToolbarAction[]; onAction: (action: LogsToolbarActionId) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  return (
+    <div className="relative sm:hidden" ref={ref}>
+      <button
+        onClick={() => setOpen((value) => !value)}
+        aria-label="More actions"
+        className="flex size-7 items-center justify-center rounded text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+      >
+        <MoreVertical className="size-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1 w-[160px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg py-1 shadow-[0px_4px_12px_rgba(0,0,0,0.08)]">
+          {actions.map((action) => (
+            <button
+              key={action.id}
+              onClick={() => {
+                onAction(action.id);
+                setOpen(false);
+              }}
+              disabled={action.disabled}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-dash-text-body transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+            >
+              {action.icon}
+              <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">{action.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function DeploymentLogsDrawer({
@@ -371,6 +425,72 @@ export function DeploymentLogsDrawer({
     return false;
   }
 
+  function scrollToBottom() {
+    setAutoScroll(true);
+    const scroll = scrollRef.current;
+    scroll?.scrollTo({
+      top: scroll.scrollHeight,
+      behavior: "smooth",
+    });
+  }
+
+  function handleDownload() {
+    void (async () => {
+      if (projectId && deploymentId) {
+        try {
+          const result = await downloadFromApi({
+            data: { projectId, logId: deploymentId, workspace },
+          });
+          const filename = result.filename.endsWith(".log")
+            ? result.filename
+            : `${result.filename.replace(/\.\w+$/, "")}.log`;
+          triggerFileDownload(result.content, filename);
+          return;
+        } catch {
+          // fall through to client-side download
+        }
+      }
+      downloadLogsClientFallback(logs);
+    })();
+  }
+
+  function handleToolbarAction(action: LogsToolbarActionId) {
+    if (action === "bottom") {
+      scrollToBottom();
+      return;
+    }
+
+    if (action === "copy") {
+      copyAllLogs();
+      return;
+    }
+
+    if (action === "download") {
+      handleDownload();
+      return;
+    }
+
+    if (action === "collapse") {
+      collapseAll();
+      return;
+    }
+
+    onOpenChange(false);
+  }
+
+  const toolbarActions: LogsToolbarAction[] = [
+    { id: "bottom", label: "Bottom", icon: <ChevronsDown className="size-4" /> },
+    {
+      id: "copy",
+      label: copiedAll ? "Copied" : "Copy all",
+      icon: copiedAll ? <Check className="size-4 text-[#13d282]" /> : <Copy className="size-4" />,
+      disabled: logs.length === 0,
+    },
+    { id: "download", label: "Download", icon: <DownloadSimple className="size-4" /> },
+    { id: "collapse", label: "Collapse", icon: <ChevronsDownUp className="size-4" /> },
+    { id: "close", label: "Close", icon: <X className="size-4" /> },
+  ];
+
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction="bottom" modal={false}>
       <Drawer.Portal>
@@ -411,69 +531,21 @@ export function DeploymentLogsDrawer({
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-                  <button
-                    onClick={() => {
-                      setAutoScroll(true);
-                      scrollRef.current?.scrollTo({
-                        top: scrollRef.current.scrollHeight,
-                        behavior: "smooth",
-                      });
-                    }}
-                    className="flex items-center gap-1.5 rounded px-1 py-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated sm:gap-2 sm:px-0.5"
-                  >
-                    <ChevronsDown className="size-4" />
-                    <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px] sm:inline">Bottom</span>
-                  </button>
-                  <button
-                    onClick={copyAllLogs}
-                    disabled={logs.length === 0}
-                    className="flex items-center gap-1.5 rounded px-1 py-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent sm:gap-2 sm:px-0.5"
-                  >
-                    {copiedAll ? <Check className="size-4 text-[#13d282]" /> : <Copy className="size-4" />}
-                    <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">{copiedAll ? "Copied" : "Copy all"}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      void (async () => {
-                        if (projectId && deploymentId) {
-                          try {
-                            const result = await downloadFromApi({
-                              data: { projectId, logId: deploymentId, workspace },
-                            });
-                            const filename = result.filename.endsWith(".log")
-                              ? result.filename
-                              : `${result.filename.replace(/\.\w+$/, "")}.log`;
-                            triggerFileDownload(result.content, filename);
-                            return;
-                          } catch {
-                            // fall through to client-side download
-                          }
-                        }
-                        downloadLogsClientFallback(logs);
-                      })();
-                    }}
-                    className="flex items-center gap-1.5 rounded px-1 py-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated sm:gap-2 sm:px-0.5"
-                  >
-                    <DownloadSimple className="size-4" />
-                    <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">Download</span>
-                  </button>
-                  <button
-                    onClick={collapseAll}
-                    className="flex items-center gap-1.5 rounded px-1 py-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated sm:gap-2 sm:px-0.5"
-                  >
-                    <ChevronsDownUp className="size-4" />
-                    <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">Collapse</span>
-                  </button>
-                  <button
-                    onClick={() => onOpenChange(false)}
-                    className="flex items-center gap-1.5 rounded px-1 py-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated sm:gap-2 sm:px-0.5"
-                  >
-                    <X className="size-4" />
-                    <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">Close</span>
-                  </button>
+                {/* Actions — inline on desktop, collapsed into a menu on mobile */}
+                <div className="hidden flex-wrap items-center justify-end gap-1.5 sm:flex sm:gap-2">
+                  {toolbarActions.map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => handleToolbarAction(action.id)}
+                      disabled={action.disabled}
+                      className="flex items-center gap-1.5 rounded px-1 py-0.5 text-dash-text-strong transition-colors hover:bg-dash-bg-elevated disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent sm:gap-2 sm:px-0.5"
+                    >
+                      {action.icon}
+                      <span className="font-logs text-xs leading-[1.4] tracking-[-0.01px]">{action.label}</span>
+                    </button>
+                  ))}
                 </div>
+                <LogsActionsMenu actions={toolbarActions} onAction={handleToolbarAction} />
               </div>
             </div>
 

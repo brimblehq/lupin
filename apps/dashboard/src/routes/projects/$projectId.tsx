@@ -462,7 +462,7 @@ function ProjectLayout() {
 
       const ably = new Realtime(authOptions);
 
-      const channel = ably.channels.get(backendProjectId);
+      const channel = ably.channels.get(`project:${backendProjectId}`);
 
       void channel.subscribe((message) => {
         const eventName = message.name ?? "";

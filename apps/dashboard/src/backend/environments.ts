@@ -13,6 +13,10 @@ export interface ProjectEnvironmentVariable {
   avatar?: string;
   isSystem?: boolean;
   encrypted?: boolean;
+  sharedSource?: "own" | "inherited";
+  sourceEnvironment?: string;
+  inheritable?: boolean;
+  sourceProject?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -42,6 +46,7 @@ export interface EffectiveEnvironmentVariable {
   source: "inherited" | "own";
   sourceEnvironment?: string;
   inheritable?: boolean;
+  sourceProject?: string | null;
   user?: string;
   avatar?: string;
   createdAt?: string;
@@ -63,10 +68,13 @@ export interface ProjectEnvironmentsApi {
     input: { name?: string; inheritFrom?: string | null; teamId?: string },
   ): Promise<ProjectEnvironment>;
   deleteEnvironment(environmentId: string, input: { moveTo: string; teamId?: string }): Promise<{ success: boolean }>;
-  listEnvironmentVariables(environmentId: string, input?: { teamId?: string }): Promise<EffectiveEnvironmentVariable[]>;
+  listEnvironmentVariables(
+    environmentId: string,
+    input?: { teamId?: string; projectId?: string },
+  ): Promise<EffectiveEnvironmentVariable[]>;
   saveEnvironmentVariables(
     environmentId: string,
-    input: { variables: EnvironmentVariableInput[]; teamId?: string },
+    input: { variables: EnvironmentVariableInput[]; teamId?: string; projectId?: string },
   ): Promise<EffectiveEnvironmentVariable[]>;
   updateEnvironmentVariable(
     environmentId: string,
@@ -74,7 +82,7 @@ export interface ProjectEnvironmentsApi {
     input: EnvironmentVariableInput & { teamId?: string },
   ): Promise<{ success: boolean }>;
   deleteEnvironmentVariable(environmentId: string, variableId: string, input?: { teamId?: string }): Promise<{ success: boolean }>;
-  get(projectId: string, input?: { target?: string }): Promise<ProjectEnvironmentSnapshot>;
+  get(projectId: string, input?: { target?: string; includeEnvironment?: boolean }): Promise<ProjectEnvironmentSnapshot>;
   listTargets(projectId: string): Promise<string[]>;
   add(
     projectId: string,
@@ -99,6 +107,13 @@ function unwrapData<T = any>(payload: any): T {
   }
 
   return payload as T;
+}
+
+function mapSharedSource(value: unknown): "own" | "inherited" | undefined {
+  const source = asString(value);
+  if (source === "own" || source === "inherited") {
+    return source;
+  }
 }
 
 function mapEnvVariable(item: any): ProjectEnvironmentVariable {
@@ -136,6 +151,10 @@ function mapEnvVariable(item: any): ProjectEnvironmentVariable {
     avatar,
     isSystem,
     encrypted,
+    sharedSource: mapSharedSource(row.sharedSource),
+    sourceEnvironment: asString(row.sourceEnvironment) ?? undefined,
+    inheritable: pickBoolean(row, "inheritable") ?? undefined,
+    sourceProject: asString(row.sourceProject) ?? null,
     createdAt: asString(row.createdAt) ?? asString(nestedVariable?.createdAt),
     updatedAt: asString(row.updatedAt) ?? asString(nestedVariable?.updatedAt),
   };
@@ -185,6 +204,7 @@ function mapEffectiveEnvironmentVariable(item: any): EffectiveEnvironmentVariabl
     source,
     sourceEnvironment: asString(row.sourceEnvironment) ?? undefined,
     inheritable: pickBoolean(row, "inheritable") ?? undefined,
+    sourceProject: asString(row.sourceProject) ?? null,
     user: pickString(row, "user") ?? undefined,
     avatar: pickString(row, "avatar") ?? undefined,
     createdAt: asString(row.createdAt) ?? undefined,
@@ -277,6 +297,7 @@ export function createProjectEnvironmentsApi(client: ApiClient): ProjectEnvironm
         method: "GET",
         query: {
           teamId: input?.teamId,
+          projectId: input?.projectId,
         },
       });
 
@@ -292,8 +313,10 @@ export function createProjectEnvironmentsApi(client: ApiClient): ProjectEnvironm
         method: "POST",
         query: {
           teamId: input.teamId,
+          projectId: input.projectId,
         },
         body: {
+          projectId: input.projectId,
           variables: input.variables.map((variable) => ({
             name: variable.name,
             value: variable.value,
@@ -339,7 +362,12 @@ export function createProjectEnvironmentsApi(client: ApiClient): ProjectEnvironm
       const path = target
         ? `${basePath}/${encodeURIComponent(projectId)}/${encodeURIComponent(target)}`
         : `${basePath}/${encodeURIComponent(projectId)}`;
-      const response = await client.request(path, { method: "GET" });
+      const response = await client.request(path, {
+        method: "GET",
+        query: {
+          includeEnvironment: input?.includeEnvironment ? true : undefined,
+        },
+      });
       return mapSnapshot(response);
     },
     async listTargets(projectId) {

@@ -159,28 +159,13 @@ export const deleteProjectEnvironmentServerFn = createServerFn({
   });
 });
 
-export const getEnvironmentVariablesServerFn = createServerFn({
-  method: "GET",
-}).handler(async ({ data }) => {
-  const payload = data as { environmentId: string; workspace?: string } | undefined;
-
-  const environmentId = payload?.environmentId?.trim();
-  if (!environmentId) {
-    throw new Error("Environment ID is required");
-  }
-
-  return withTokenRefresh(async (api) => {
-    const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
-    return api.environments.listEnvironmentVariables(environmentId, { teamId });
-  });
-});
-
 export const saveEnvironmentVariablesServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {
   const payload = data as
     | {
         environmentId: string;
+        projectId?: string;
         workspace?: string;
         variables: Array<{ name: string; value: string; inheritable?: boolean }>;
       }
@@ -199,6 +184,7 @@ export const saveEnvironmentVariablesServerFn = createServerFn({
   return withTokenRefresh(async (api) => {
     const teamId = await resolveWorkspaceTeamId(api, payload?.workspace);
     return api.environments.saveEnvironmentVariables(environmentId, {
+      projectId: payload?.projectId?.trim() || undefined,
       teamId,
       variables,
     });
@@ -276,6 +262,7 @@ export const getProjectEnvironmentServerFn = createServerFn({
     | {
         projectId: string;
         target?: string;
+        includeEnvironment?: boolean;
       }
     | undefined;
 
@@ -287,7 +274,7 @@ export const getProjectEnvironmentServerFn = createServerFn({
   const target = payload?.target?.trim() || undefined;
 
   return withTokenRefresh(async (api) => {
-    return api.environments.get(projectId, { target });
+    return api.environments.get(projectId, { target, includeEnvironment: payload?.includeEnvironment });
   });
 });
 

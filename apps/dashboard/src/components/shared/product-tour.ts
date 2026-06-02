@@ -68,20 +68,52 @@ const steps: TourStepDef[] = [
   },
 ];
 
-export function startProductTour(): void {
-  const activeSteps: DriveStep[] = steps
-    .filter((step) => document.querySelector(`[data-tour-item="${step.tourId}"]`))
-    .map((step) => ({
-      element: `[data-tour-item="${step.tourId}"]`,
-      popover: {
-        title: step.title,
-        description: step.description,
-        side: step.side ?? "right",
-        align: "start",
-      },
-    }));
+const MOBILE_NAV_EVENT = "brimble:set-mobile-nav";
 
-  if (activeSteps.length === 0) return;
+function setMobileNav(open: boolean): void {
+  window.dispatchEvent(new CustomEvent(MOBILE_NAV_EVENT, { detail: { open } }));
+}
+
+function isMobileViewport(): boolean {
+  return window.matchMedia("(max-width: 767.98px)").matches;
+}
+
+// The same `data-tour-item` exists in both the desktop sidebar (hidden on mobile)
+// and the mobile nav menu, so resolve to the element that is actually rendered
+// and visible rather than relying on the selector (which would match the hidden one).
+function findVisibleTourTarget(tourId: string): HTMLElement | null {
+  const elements = document.querySelectorAll<HTMLElement>(`[data-tour-item="${tourId}"]`);
+  for (const element of elements) {
+    if (element.offsetParent === null) continue;
+    const rect = element.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) return element;
+  }
+  return null;
+}
+
+function buildSteps(mobile: boolean): DriveStep[] {
+  return steps.flatMap((step) => {
+    const element = findVisibleTourTarget(step.tourId);
+    if (!element) return [];
+    return [
+      {
+        element,
+        popover: {
+          title: step.title,
+          description: step.description,
+          side: mobile ? "bottom" : (step.side ?? "right"),
+          align: "start" as const,
+        },
+      },
+    ];
+  });
+}
+
+function runTour(activeSteps: DriveStep[], onDestroyed: () => void): void {
+  if (activeSteps.length === 0) {
+    onDestroyed();
+    return;
+  }
 
   const instance = driver({
     showProgress: true,
@@ -94,8 +126,35 @@ export function startProductTour(): void {
     doneBtnText: "Done",
     progressText: "{{current}} of {{total}}",
     steps: activeSteps,
-    onDestroyed: () => markTourCompleted(),
+    onDestroyed,
   });
 
   instance.drive();
+}
+
+export function startProductTour(): void {
+  if (!isMobileViewport()) {
+    runTour(buildSteps(false), () => markTourCompleted());
+    return;
+  }
+
+  // Mobile: the nav items live behind the hamburger menu, so open it, wait for it
+  // to render/animate in, then run the tour against the menu items.
+  setMobileNav(true);
+
+  const start = performance.now();
+  const waitForMenu = () => {
+    if (findVisibleTourTarget("home") || performance.now() - start > 1500) {
+      // Small settle delay so the open animation has finished before highlighting.
+      window.setTimeout(() => {
+        runTour(buildSteps(true), () => {
+          markTourCompleted();
+          setMobileNav(false);
+        });
+      }, 200);
+      return;
+    }
+    requestAnimationFrame(waitForMenu);
+  };
+  requestAnimationFrame(waitForMenu);
 }

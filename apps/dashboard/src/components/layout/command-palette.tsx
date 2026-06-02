@@ -465,7 +465,7 @@ export function CommandPalette() {
               />
             </Dialog.Overlay>
 
-            <Dialog.Content asChild aria-label="Command palette">
+            <Dialog.Content asChild>
               <motion.div
                 initial={{ opacity: 0, scale: 0.96, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -473,6 +473,7 @@ export function CommandPalette() {
                 transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 className="cmdk-dialog"
               >
+                <Dialog.Title className="sr-only">Command palette</Dialog.Title>
                 <Command loop>
                   <Command.Input placeholder={inputPlaceholder} value={query} onValueChange={setQuery} />
                   <Command.List>

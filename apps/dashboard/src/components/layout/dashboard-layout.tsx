@@ -709,6 +709,7 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
             ) : "external" in item && item.external ? (
               <a
                 href={item.href}
+                data-tour-item={(item as { tourId?: string }).tourId}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(mobileNavItemBase, "text-dash-text-faded hover:bg-dash-bg-elevated")}
@@ -719,6 +720,7 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
             ) : (
               <button
                 type="button"
+                data-tour-item={(item as { tourId?: string }).tourId}
                 onClick={() =>
                   void navigate({
                     to: item.href as any,
@@ -967,6 +969,16 @@ export function DashboardLayout({
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
+
+  // Allow the product tour to open/close the mobile nav so it can highlight nav items on mobile.
+  useEffect(() => {
+    function handleSetMobileNav(event: Event) {
+      const open = (event as CustomEvent<{ open?: boolean }>).detail?.open;
+      setMobileNavOpen(Boolean(open));
+    }
+    window.addEventListener("brimble:set-mobile-nav", handleSetMobileNav);
+    return () => window.removeEventListener("brimble:set-mobile-nav", handleSetMobileNav);
+  }, []);
 
   // Settings drawer — shared between sidebar & topbar
   const [profileOpen, setProfileOpen] = useState(false);

@@ -727,7 +727,7 @@ function ProjectsPage() {
       const ably = new Realtime(authOptions);
 
       const channels = visibleProjectIds.map((id) => {
-        const channel = ably.channels.get(id);
+        const channel = ably.channels.get(`project:${id}`);
         channel.subscribe((message) => {
           if ((message.name ?? "").startsWith("deployment:")) {
             scheduleInvalidate();

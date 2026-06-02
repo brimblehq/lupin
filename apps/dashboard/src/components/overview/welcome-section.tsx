@@ -1,8 +1,14 @@
+import { useEffect, useState } from "react";
 import { Route as RootRoute } from "@/routes/__root";
 
 export function WelcomeSection() {
-  const { settingsSnapshot } = RootRoute.useLoaderData() ?? ({} as any);
-  const firstName = settingsSnapshot?.profile?.firstName?.trim() || "there";
+  const { settingsSnapshot } = RootRoute.useLoaderData();
+  const profileFirstName = settingsSnapshot?.profile?.firstName?.trim();
+  const [firstName, setFirstName] = useState("there");
+
+  useEffect(() => {
+    setFirstName(profileFirstName || "there");
+  }, [profileFirstName]);
 
   return (
     <div className="mb-6">

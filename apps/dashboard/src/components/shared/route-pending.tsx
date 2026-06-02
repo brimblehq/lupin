@@ -292,18 +292,7 @@ function SandboxCardPending() {
 
 export function SandboxesListPending() {
   return (
-    <div className="mx-auto w-full max-w-[1000px] py-8" aria-hidden="true">
-      <div className="mb-8 flex items-center gap-4">
-        <div className={`hidden size-[80px] shrink-0 rounded ${PULSE_BG_MEDIUM} animate-pulse sm:block`} />
-        <div className="min-w-0">
-          <div className={`mb-2 h-6 w-40 rounded ${PULSE_BG_STRONG} animate-pulse`} />
-          <div className="flex flex-col gap-1.5">
-            <div className={`h-3.5 w-full max-w-[520px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
-            <div className={`h-3.5 w-full max-w-[420px] rounded ${PULSE_BG_MEDIUM} animate-pulse`} />
-          </div>
-        </div>
-      </div>
-
+    <div className="mx-auto w-full max-w-[1000px]" aria-hidden="true">
       <div className="mb-4 flex items-center gap-3">
         <div className="h-10 min-w-0 flex-1 animate-pulse rounded-[4px] border border-dash-border bg-dash-bg-elevated/30" />
         <div className="h-10 w-[180px] animate-pulse rounded-[4px] border border-dash-border bg-dash-bg-elevated/30" />

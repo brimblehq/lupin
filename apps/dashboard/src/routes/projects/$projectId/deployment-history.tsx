@@ -1144,7 +1144,7 @@ function DeploymentHistoryPage() {
       }
 
       const ably = new Realtime(authOptions);
-      const channel = ably.channels.get(projectId);
+      const channel = ably.channels.get(`project:${projectId}`);
       channel.subscribe("log", handleLogEvent);
 
       cleanup = () => {

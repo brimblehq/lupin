@@ -19,7 +19,6 @@ import {
   decryptProjectEnvironmentValuesServerFn,
   deleteProjectEnvironmentVariableServerFn,
   deleteEnvironmentVariableServerFn,
-  getEnvironmentVariablesServerFn,
   getProjectEnvironmentServerFn,
   listProjectEnvironmentTargetsServerFn,
   saveEnvironmentVariablesServerFn,
@@ -96,6 +95,43 @@ type LoaderData = {
   initialEnvLevelVarsKey: string | null;
 };
 
+function splitCombinedEnvironmentSnapshot(snapshot: ProjectEnvironmentSnapshot): {
+  projectSnapshot: ProjectEnvironmentSnapshot;
+  envLevelVars: EffectiveEnvironmentVariable[];
+} {
+  const projectRows: ProjectEnvironmentVariable[] = [];
+  const envLevelVars: EffectiveEnvironmentVariable[] = [];
+
+  for (const row of snapshot.envs) {
+    if (row.source !== "environment") {
+      projectRows.push(row);
+      continue;
+    }
+
+    envLevelVars.push({
+      id: row.envId ?? row.id,
+      name: row.name,
+      value: row.value,
+      source: row.sharedSource ?? "own",
+      sourceEnvironment: row.sourceEnvironment,
+      inheritable: row.inheritable,
+      sourceProject: row.sourceProject,
+      user: row.user,
+      avatar: row.avatar,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    });
+  }
+
+  return {
+    projectSnapshot: {
+      ...snapshot,
+      envs: projectRows,
+    },
+    envLevelVars,
+  };
+}
+
 export const Route = createFileRoute("/projects/$projectId/environment")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
@@ -107,38 +143,22 @@ export const Route = createFileRoute("/projects/$projectId/environment")({
     const inheritEnvironmentVars = project?.inheritEnvironmentVars as boolean | undefined;
     const sharedLayerEnabled = Boolean(projectEnvironmentId) && inheritEnvironmentVars !== false;
 
-    const [snapshot, targets, envLevelResult] = await Promise.all([
+    const [combinedSnapshot, targets] = await Promise.all([
       (getProjectEnvironmentServerFn as any)({
-        data: { projectId, target: DEFAULT_TARGET },
+        data: { projectId, target: DEFAULT_TARGET, includeEnvironment: sharedLayerEnabled },
       }).catch(() => ({ envs: [] })),
       (listProjectEnvironmentTargetsServerFn as any)({
         data: { projectId },
       }).catch(() => [DEFAULT_TARGET]),
-      sharedLayerEnabled && projectEnvironmentId
-        ? (getEnvironmentVariablesServerFn as any)({
-            data: { environmentId: projectEnvironmentId, workspace },
-          })
-            .then((vars: unknown) => ({
-              loaded: true,
-              vars: Array.isArray(vars) ? (vars as EffectiveEnvironmentVariable[]) : [],
-            }))
-            .catch(() => ({
-              loaded: false,
-              vars: [] as EffectiveEnvironmentVariable[],
-            }))
-        : Promise.resolve({
-            loaded: true,
-            vars: [] as EffectiveEnvironmentVariable[],
-          }),
     ]);
+    const { projectSnapshot: snapshot, envLevelVars } = splitCombinedEnvironmentSnapshot(combinedSnapshot);
 
     const data = {
       initialTarget: DEFAULT_TARGET,
       initialSnapshot: snapshot,
       targets: sortEnvironmentTargets(targets),
-      initialEnvLevelVars: envLevelResult.vars,
-      initialEnvLevelVarsKey:
-        sharedLayerEnabled && projectEnvironmentId && envLevelResult.loaded ? `${projectEnvironmentId}:${workspace ?? ""}` : null,
+      initialEnvLevelVars: envLevelVars,
+      initialEnvLevelVarsKey: sharedLayerEnabled && projectEnvironmentId ? `${projectEnvironmentId}:${workspace ?? ""}` : null,
     } satisfies LoaderData;
     return data;
   },
@@ -296,6 +316,7 @@ function EnvAccordionRow({
   const saveEnvLevelVars = useServerFn(saveEnvironmentVariablesServerFn as any) as (args: {
     data: {
       environmentId: string;
+      projectId?: string;
       workspace?: string;
       variables: Array<{ name: string; value: string; inheritable?: boolean }>;
     };
@@ -381,6 +402,7 @@ function EnvAccordionRow({
         await saveEnvLevelVars({
           data: {
             environmentId,
+            projectId,
             workspace,
             variables: [{ name: name.trim(), value }],
           },
@@ -418,6 +440,7 @@ function EnvAccordionRow({
           await saveEnvLevelVars({
             data: {
               environmentId,
+              projectId,
               workspace,
               variables: [{ name: name.trim(), value }],
             },
@@ -479,6 +502,7 @@ function EnvAccordionRow({
           const resolved = await saveEnvLevelVars({
             data: {
               environmentId,
+              projectId,
               workspace,
               variables: [{ name: row.name, value: valueForLookup }],
             },
@@ -886,7 +910,7 @@ function EnvironmentPage() {
   const envTabSupported = shouldShowEnvironmentTab(framework);
 
   const getEnvSnapshot = useServerFn(getProjectEnvironmentServerFn as any) as (args: {
-    data: { projectId: string; target?: string };
+    data: { projectId: string; target?: string; includeEnvironment?: boolean };
   }) => Promise<ProjectEnvironmentSnapshot>;
   const listTargets = useServerFn(listProjectEnvironmentTargetsServerFn as any) as (args: {
     data: { projectId: string };
@@ -910,12 +934,10 @@ function EnvironmentPage() {
       startOnly?: boolean;
     };
   }) => Promise<any>;
-  const getEnvLevelVars = useServerFn(getEnvironmentVariablesServerFn as any) as (args: {
-    data: { environmentId: string; workspace?: string };
-  }) => Promise<EffectiveEnvironmentVariable[]>;
   const saveEnvLevelVars = useServerFn(saveEnvironmentVariablesServerFn as any) as (args: {
     data: {
       environmentId: string;
+      projectId?: string;
       workspace?: string;
       variables: Array<{ name: string; value: string; inheritable?: boolean }>;
     };
@@ -968,15 +990,17 @@ function EnvironmentPage() {
   }, [selectedTarget]);
 
   const fetchEnvLevelVars = useCallback(async () => {
-    if (!projectEnvironmentId || !sharedLayerEnabled) {
+    if (!projectId || !projectEnvironmentId || !sharedLayerEnabled) {
       setEnvLevelVars([]);
       return;
     }
-    const vars = await getEnvLevelVars({
-      data: { environmentId: projectEnvironmentId, workspace },
-    }).catch(() => []);
-    setEnvLevelVars(Array.isArray(vars) ? vars : []);
-  }, [projectEnvironmentId, sharedLayerEnabled, workspace, getEnvLevelVars]);
+    const combinedSnapshot = await getEnvSnapshot({
+      data: { projectId, target: selectedTarget, includeEnvironment: true },
+    }).catch(() => ({ envs: [] }));
+    const { projectSnapshot, envLevelVars: nextEnvLevelVars } = splitCombinedEnvironmentSnapshot(combinedSnapshot);
+    setSnapshotsByTarget((prev) => ({ ...prev, [selectedTarget]: projectSnapshot }));
+    setEnvLevelVars(nextEnvLevelVars);
+  }, [projectId, projectEnvironmentId, sharedLayerEnabled, selectedTarget, getEnvSnapshot]);
 
   useEffect(() => {
     const envLevelVarsKey = projectEnvironmentId && sharedLayerEnabled ? `${projectEnvironmentId}:${workspace ?? ""}` : null;
@@ -1057,11 +1081,6 @@ function EnvironmentPage() {
   };
 
   const mergedRows = useMemo<MergedEnvRow[]>(() => {
-    const sharedByName = new Map<string, EffectiveEnvironmentVariable>();
-    for (const variable of envLevelVars) {
-      sharedByName.set(variable.name.trim().toUpperCase(), variable);
-    }
-
     const projectRows = currentSnapshot.envs.filter(isProjectLevelVariable).map((env) => ({
       ...env,
       meta: {
@@ -1069,7 +1088,7 @@ function EnvironmentPage() {
         encrypted: true,
       },
     }));
-    const sharedRowsFromApi = (sharedLayerEnabled ? envLevelVars : []).map((v) => ({
+    const sharedRows = (sharedLayerEnabled ? envLevelVars : []).map((v) => ({
       id: v.id ?? `shared:${v.name}`,
       name: v.name,
       value: v.value,
@@ -1086,25 +1105,7 @@ function EnvironmentPage() {
       },
     }));
 
-    const namesFromSharedApi = new Set(sharedRowsFromApi.map((row) => row.name.trim().toUpperCase()));
-
-    const sharedRowsFromLegacyList = (sharedLayerEnabled ? currentSnapshot.envs : [])
-      .filter((env) => env.source === "environment" && !namesFromSharedApi.has(env.name.trim().toUpperCase()))
-      .map((env) => {
-        const sharedMeta = sharedByName.get(env.name.trim().toUpperCase());
-        return {
-          ...env,
-          meta: {
-            isShared: true,
-            encrypted: true,
-            sharedVarId: sharedMeta?.id,
-            sharedSource: sharedMeta?.source,
-            sharedSourceEnvironment: sharedMeta?.sourceEnvironment,
-          },
-        };
-      });
-
-    return [...sharedRowsFromApi, ...sharedRowsFromLegacyList, ...projectRows];
+    return [...sharedRows, ...projectRows];
   }, [currentSnapshot.envs, envLevelVars, sharedLayerEnabled]);
 
   const filteredRows = useMemo(() => {
@@ -1135,8 +1136,12 @@ function EnvironmentPage() {
 
     try {
       setLoadingTarget(true);
-      const snapshot = await getEnvSnapshot({ data: { projectId, target } });
-      setSnapshotsByTarget((prev) => ({ ...prev, [target]: snapshot }));
+      const combinedSnapshot = await getEnvSnapshot({ data: { projectId, target, includeEnvironment: sharedLayerEnabled } });
+      const { projectSnapshot, envLevelVars: nextEnvLevelVars } = splitCombinedEnvironmentSnapshot(combinedSnapshot);
+      setSnapshotsByTarget((prev) => ({ ...prev, [target]: projectSnapshot }));
+      if (sharedLayerEnabled) {
+        setEnvLevelVars(nextEnvLevelVars);
+      }
       setDecryptedCache({});
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load secrets");
@@ -1255,6 +1260,7 @@ function EnvironmentPage() {
           saveEnvLevelVars({
             data: {
               environmentId: projectEnvironmentId,
+              projectId,
               workspace,
               variables: sharedRows.map((r) => ({
                 name: r.name,
@@ -1602,23 +1608,26 @@ function EnvironmentPage() {
                             }}
                             className="overflow-hidden"
                           >
-                            <div className="flex items-center gap-2 px-px py-1">
-                              <input
-                                type="text"
-                                value={row.name}
-                                onChange={(event) => updateDraftRow(row.id, "name", event.target.value)}
-                                onPaste={(event) => handleDraftPaste(row.id, event)}
-                                placeholder="APP_ENV"
-                                className="input-base input-focus h-[36px] min-w-0 flex-1 px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded"
-                              />
-                              <ReferenceHighlightInput
-                                value={row.value}
-                                onChange={(next) => updateDraftRow(row.id, "value", next)}
-                                placeholder="value"
-                                masked={hiddenDraftIds.has(row.id)}
-                                autocomplete={autocompleteConfig}
-                              />
-                              {sharedLayerEnabled && (
+                            <div className="flex flex-col gap-2 px-px py-1 sm:flex-row sm:items-center">
+                              <div className="min-w-0 space-y-2 sm:flex sm:flex-1 sm:flex-row sm:items-center sm:gap-2 sm:space-y-0">
+                                <input
+                                  type="text"
+                                  value={row.name}
+                                  onChange={(event) => updateDraftRow(row.id, "name", event.target.value)}
+                                  onPaste={(event) => handleDraftPaste(row.id, event)}
+                                  placeholder="APP_ENV"
+                                  className="input-base input-focus h-[36px] w-full min-w-0 px-3 font-mono text-sm text-dash-text-strong placeholder:text-dash-text-extra-faded sm:w-auto sm:flex-1"
+                                />
+                                <ReferenceHighlightInput
+                                  value={row.value}
+                                  onChange={(next) => updateDraftRow(row.id, "value", next)}
+                                  placeholder="value"
+                                  masked={hiddenDraftIds.has(row.id)}
+                                  autocomplete={autocompleteConfig}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2 self-end sm:self-auto">
+                                {sharedLayerEnabled && (
                                 <SimpleTooltip content="Share this variable across all projects in your workspace" side="top">
                                   <button
                                     type="button"
@@ -1665,6 +1674,7 @@ function EnvironmentPage() {
                               >
                                 <X className="size-4" />
                               </button>
+                              </div>
                             </div>
                             <ReferenceWarnings value={row.value} context={validationContext} />
                           </motion.div>

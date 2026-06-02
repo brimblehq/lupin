@@ -413,7 +413,10 @@ function ProjectDetailPage() {
               ) : null}
               {showBuildCacheRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
-                  <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Build cache enabled</span>
+                  <div className="flex items-center gap-2">
+                    <img src="/icons/storage.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
+                    <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Build cache enabled</span>
+                  </div>
                   <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{project?.buildCacheEnabled ? "Yes" : "No"}</span>
                 </div>
               ) : null}
