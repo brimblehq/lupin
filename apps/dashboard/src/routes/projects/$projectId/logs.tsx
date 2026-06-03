@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Activity, Forward, Download, X, Copy, Check, Calendar, ChevronDown } from "lucide-react";
 import { Pause, Play, Clock, MagnifyingGlass, CircleNotch, ArrowUp, ArrowDown } from "@phosphor-icons/react";
 import type { DateRange } from "react-day-picker";
-import { endOfDay, format, startOfDay, subDays, subHours } from "date-fns";
+import { endOfDay, format, startOfDay, subDays, subMinutes } from "date-fns";
 import { TabHeader } from "../../../components/shared/tab-header";
 import { ProjectLogsPending } from "@/components/shared/route-pending";
 import { FilterDropdown, type FilterOption } from "../../../components/shared/filter-dropdown";
@@ -168,6 +168,14 @@ function clampRangeToBounds(range: DateRange | undefined, minDate: Date, maxDate
     next.to = next.from;
   }
   return next;
+}
+
+function formatLogRangeLabel(range: DateRange | undefined): string {
+  if (range?.from && range?.to) {
+    return `${format(range.from, "MMM d, yyyy HH:mm")} - ${format(range.to, "MMM d, yyyy HH:mm")}`;
+  }
+
+  return "Select date range";
 }
 
 interface LogsActionItem {
@@ -477,15 +485,15 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
 
   const rangeStart = useMemo(() => {
     if (dateRange?.from) {
-      return startOfDay(dateRange.from);
+      return dateRange.from;
     }
 
-    return subHours(new Date(), 1);
+    return subMinutes(new Date(), 30);
   }, [dateRange]);
 
   const rangeEnd = useMemo(() => {
     if (dateRange?.to) {
-      return endOfDay(dateRange.to);
+      return dateRange.to;
     }
 
     return undefined;
@@ -674,12 +682,10 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
         />
 
         <div className="flex items-stretch rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
-          <DateRangePicker value={dateRange} onChange={setDateRange} minDate={minSelectableDate} maxDate={maxSelectableDate}>
+          <DateRangePicker value={dateRange} onChange={setDateRange} minDate={minSelectableDate} maxDate={maxSelectableDate} includeTime>
             <button type="button" className="flex items-center gap-2 px-3 py-3 transition-colors hover:bg-dash-bg-elevated">
               <Calendar className="size-3.5 text-dash-text-faded" />
-              {dateRange?.from && dateRange?.to
-                ? `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`
-                : "Select date range"}
+              <span className="max-w-[260px] truncate">{formatLogRangeLabel(dateRange)}</span>
             </button>
           </DateRangePicker>
           <LogsActionsMenu
@@ -748,6 +754,11 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
 
         <div className="overflow-hidden rounded-[4px] border border-dash-border dark:border-[#1f2123] bg-dash-bg-elevated dark:bg-[#0d0e10]">
           <div className="relative">
+            <div className="flex gap-3 border-b border-dash-border bg-dash-bg px-5 py-2 font-logs text-[10px] font-medium uppercase tracking-[0.14em] text-dash-text-faded dark:border-[#1f2123] dark:bg-[#101114] dark:text-white/35">
+              <span className="w-[156px] shrink-0">Time</span>
+              <span className="w-[64px] shrink-0">Level</span>
+              <span className="min-w-0 flex-1">Message</span>
+            </div>
             <div
               ref={scrollRef}
               onScroll={handleScroll}
@@ -768,8 +779,8 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
                       line.level === "error" ? "bg-red-500/[0.06]" : line.level === "warn" ? "bg-yellow-500/[0.06]" : ""
                     }`}
                   >
-                    <span className="shrink-0 select-none pt-px text-dash-text-extra-faded dark:text-white/20">{line.timestamp}</span>
-                    <span className={`shrink-0 select-none pt-px font-medium ${levelColors[line.level]}`}>{levelBadge[line.level]}</span>
+                    <span className="w-[156px] shrink-0 select-none pt-px text-dash-text-extra-faded dark:text-white/20">{line.timestamp}</span>
+                    <span className={`w-[64px] shrink-0 select-none pt-px font-medium ${levelColors[line.level]}`}>{levelBadge[line.level]}</span>
                     <span className="min-w-0 flex-1 text-dash-text-body dark:text-white/60">
                       <LogMessage text={line.message} highlight={searchQuery} />
                     </span>
@@ -1191,8 +1202,8 @@ function RequestLogs({ projectId, logRetentionDays }: { projectId: string; logRe
       };
       filters.statuses = map[statusFilter] ?? statusFilter;
     }
-    if (dateRange?.from) filters.start = startOfDay(dateRange.from).toISOString();
-    if (dateRange?.to) filters.end = endOfDay(dateRange.to).toISOString();
+    if (dateRange?.from) filters.start = dateRange.from.toISOString();
+    if (dateRange?.to) filters.end = dateRange.to.toISOString();
     if (searchQuery.trim()) filters.search = searchQuery.trim();
     return filters;
   }, [methodFilter, statusFilter, dateRange, searchQuery]);
@@ -1313,12 +1324,10 @@ function RequestLogs({ projectId, logRetentionDays }: { projectId: string; logRe
         />
 
         <div className="flex items-stretch rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
-          <DateRangePicker value={dateRange} onChange={setDateRange} minDate={minSelectableDate} maxDate={maxSelectableDate}>
+          <DateRangePicker value={dateRange} onChange={setDateRange} minDate={minSelectableDate} maxDate={maxSelectableDate} includeTime>
             <button type="button" className="flex items-center gap-2 px-3 py-3 transition-colors hover:bg-dash-bg-elevated">
               <Calendar className="size-3.5 text-dash-text-faded" />
-              {dateRange?.from && dateRange?.to
-                ? `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`
-                : "Select date range"}
+              <span className="max-w-[260px] truncate">{formatLogRangeLabel(dateRange)}</span>
             </button>
           </DateRangePicker>
           <LogsActionsMenu
@@ -1419,6 +1428,7 @@ function LogsPage() {
   const logRetentionDays = Math.max(1, Number(plan.logRetention ?? 1));
   const staticProject = isStaticProject(project);
   const databaseProject = isDatabaseProject(project as any);
+  const hasMultipleLogTabs = !staticProject && !databaseProject;
   const [activeTab, setActiveTab] = useState<LogTab>(staticProject ? LogTab.Request : LogTab.Application);
   const [hasMountedApplicationLogs, setHasMountedApplicationLogs] = useState(
     !staticProject && (databaseProject || activeTab === LogTab.Application),
@@ -1453,9 +1463,8 @@ function LogsPage() {
           {logRetentionDays === 1 ? "day" : "days"}.
         </TabHeader>
 
-        {/* Tab switcher */}
-        <div className="flex overflow-clip rounded-[4px] border border-dash-border-soft shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
-          {!staticProject && (
+        {hasMultipleLogTabs && (
+          <div className="flex overflow-clip rounded-[4px] border border-dash-border-soft shadow-[0px_1px_2px_rgba(18,18,23,0.05)]">
             <button
               onClick={() => {
                 haptics.selection();
@@ -1470,8 +1479,6 @@ function LogsPage() {
               <Activity className="size-4" />
               Application Logs
             </button>
-          )}
-          {!databaseProject && (
             <button
               onClick={() => {
                 haptics.selection();
@@ -1484,8 +1491,8 @@ function LogsPage() {
               <Forward className="size-4" />
               Request Logs
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}

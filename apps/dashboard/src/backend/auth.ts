@@ -349,18 +349,10 @@ export function createAuthApi(client: ApiClient): AuthApi {
       });
     },
     async getCurrentSession() {
-      try {
-        const response = await client.request(endpoints.me, {
-          method: "GET",
-        });
-        return mapSession(response);
-      } catch (error: any) {
-        if (error?.status === 401 || error?.status === 403) {
-          return null;
-        }
-
-        throw error;
-      }
+      const response = await client.request(endpoints.me, {
+        method: "GET",
+      });
+      return mapSession(response);
     },
 
     async getPasskeyFeatureStatus() {

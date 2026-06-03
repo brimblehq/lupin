@@ -10,6 +10,7 @@ import type {
   UpdateSettingsThemeInput,
   UpdateSettingsWebhooksInput,
 } from "@/backend/settings";
+import { clearServerAuthCookies } from "@/server/auth/cookies";
 import { withTokenRefresh } from "@/server/shared/backend";
 
 async function resolveWorkspaceSubscriptionId(backend: BackendApi, workspace?: string) {
@@ -47,8 +48,15 @@ export const getSettingsSidebarSnapshotServerFn = createServerFn({
   const payload = data as { workspace?: string } | undefined;
   return withTokenRefresh(async (api) => {
     const subscriptionId = await resolveWorkspaceSubscriptionId(api, payload?.workspace);
-    const snapshot = await api.settings.getSidebarSnapshot(1, { subscriptionId });
-    return snapshot satisfies SettingsSidebarSnapshot;
+    try {
+      const snapshot = await api.settings.getSidebarSnapshot(1, { subscriptionId });
+      return snapshot satisfies SettingsSidebarSnapshot;
+    } catch (error: unknown) {
+      if ((error as { status?: unknown } | null)?.status === 401) {
+        clearServerAuthCookies();
+      }
+      throw error;
+    }
   });
 });
 

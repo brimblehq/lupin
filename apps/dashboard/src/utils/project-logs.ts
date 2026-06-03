@@ -1,5 +1,5 @@
 import type { DateRange } from "react-day-picker";
-import { format, subDays } from "date-fns";
+import { format, subDays, subMinutes } from "date-fns";
 import type { RequestLogEntry as ApiRequestLogEntry } from "@/backend/logs";
 
 export interface UiRequestLogEntry {
@@ -36,9 +36,10 @@ export function defaultRequestLogsDateRange(): DateRange {
 }
 
 export function defaultApplicationLogsDateRange(): DateRange {
+  const now = new Date();
   return {
-    from: subDays(new Date(), 7),
-    to: new Date(),
+    from: subMinutes(now, 30),
+    to: now,
   };
 }
 

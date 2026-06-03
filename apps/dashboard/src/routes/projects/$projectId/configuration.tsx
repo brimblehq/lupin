@@ -1050,10 +1050,29 @@ function BuildSection({
 }) {
   const [values, setValues] = useState(initialValues);
   const [saving, setSaving] = useState(false);
+  const {
+    installCommand,
+    buildCommand,
+    startCommand,
+    healthCheckPath,
+    preStartCommand,
+    dockerImage,
+    outputDirectory,
+    watchPaths,
+  } = initialValues;
 
   useEffect(() => {
-    setValues(initialValues);
-  }, [initialValues]);
+    setValues({
+      installCommand,
+      buildCommand,
+      startCommand,
+      healthCheckPath,
+      preStartCommand,
+      dockerImage,
+      outputDirectory,
+      watchPaths,
+    });
+  }, [installCommand, buildCommand, startCommand, healthCheckPath, preStartCommand, dockerImage, outputDirectory, watchPaths]);
 
   const watchPathsChanged =
     values.watchPaths.length !== initialValues.watchPaths.length || values.watchPaths.some((p, i) => p !== initialValues.watchPaths[i]);
@@ -1204,6 +1223,12 @@ function BuildSection({
             className={inputClass}
           />
           <p className="mt-1 text-xs text-dash-text-faded">Health check endpoint to monitor your application's status</p>
+          {values.healthCheckPath.trim() ? (
+            <div className="mt-1 flex items-start gap-1.5 text-xs text-[#b37a10] dark:text-[#f5a623]">
+              <Warning className="mt-px size-3.5 shrink-0" />
+              <span>If the health check fails, your deployment won't go live.</span>
+            </div>
+          ) : null}
         </div>
       )}
 

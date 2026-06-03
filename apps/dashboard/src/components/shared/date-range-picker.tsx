@@ -9,6 +9,7 @@ interface DateRangePickerProps {
   onChange: (range: DateRange | undefined) => void;
   minDate?: Date;
   maxDate?: Date;
+  includeTime?: boolean;
   /** Trigger element — the button that opens the picker */
   children: React.ReactNode;
 }
@@ -46,7 +47,34 @@ function clampRangeToBounds(range: DateRange | undefined, minDate?: Date, maxDat
   return { from: next.from, to: next.to };
 }
 
-export function DateRangePicker({ value, onChange, minDate, maxDate, children }: DateRangePickerProps) {
+function formatTimeValue(date?: Date): string {
+  return date ? format(date, "HH:mm") : "";
+}
+
+function applyTime(date: Date, time: string): Date {
+  const [hours = "0", minutes = "0"] = time.split(":");
+  const next = new Date(date);
+  next.setHours(Number(hours), Number(minutes), 0, 0);
+  return next;
+}
+
+function mergeDateWithTime(date: Date, timeSource: Date | undefined, fallback: string): Date {
+  return applyTime(date, timeSource ? formatTimeValue(timeSource) : fallback);
+}
+
+function formatRangeLabel(range: DateRange | undefined, dateFormat: string): string {
+  if (range?.from && range?.to) {
+    return `${format(range.from, dateFormat)} - ${format(range.to, dateFormat)}`;
+  }
+
+  if (range?.from) {
+    return `${format(range.from, dateFormat)} - ...`;
+  }
+
+  return "Select a range";
+}
+
+export function DateRangePicker({ value, onChange, minDate, maxDate, includeTime = false, children }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [isMobileView, setIsMobileView] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(max-width: 639px)").matches : false,
@@ -92,12 +120,37 @@ export function DateRangePicker({ value, onChange, minDate, maxDate, children }:
     setOpen(false);
   }
 
-  const rangeLabel =
-    draft?.from && draft?.to
-      ? `${format(draft.from, "MMM d, yyyy")} - ${format(draft.to, "MMM d, yyyy")}`
-      : draft?.from
-        ? `${format(draft.from, "MMM d, yyyy")} - ...`
-        : "Select a range";
+  const dateFormat = includeTime ? "MMM d, yyyy HH:mm" : "MMM d, yyyy";
+  const rangeLabel = formatRangeLabel(draft, dateFormat);
+
+  function handleDateSelect(range: DateRange | undefined) {
+    if (!includeTime) {
+      setDraft(range);
+      return;
+    }
+
+    setDraft((prev) => ({
+      from: range?.from ? mergeDateWithTime(range.from, prev?.from, "00:00") : undefined,
+      to: range?.to ? mergeDateWithTime(range.to, prev?.to, "23:59") : undefined,
+    }));
+  }
+
+  function handleTimeChange(field: "from" | "to", time: string) {
+    setDraft((prev) => {
+      if (!prev?.[field]) {
+        return prev;
+      }
+
+      return clampRangeToBounds(
+        {
+          ...prev,
+          [field]: applyTime(prev[field], time),
+        },
+        minDate,
+        maxDate,
+      );
+    });
+  }
 
   return (
     <div className="relative" ref={ref}>
@@ -118,7 +171,7 @@ export function DateRangePicker({ value, onChange, minDate, maxDate, children }:
                 mode="range"
                 numberOfMonths={isMobileView ? 1 : 2}
                 selected={draft}
-                onSelect={setDraft}
+                onSelect={handleDateSelect}
                 disabled={[...(minDate ? [{ before: minDate }] : []), ...(maxDate ? [{ after: maxDate }] : [])]}
                 showOutsideDays
                 weekStartsOn={1}
@@ -154,6 +207,31 @@ export function DateRangePicker({ value, onChange, minDate, maxDate, children }:
                     orientation === "left" ? <ChevronLeft className="size-4" /> : <ChevronRight className="size-4" />,
                 }}
               />
+
+              {includeTime && (
+                <div className="grid gap-3 border-t-[0.5px] border-[#d9dadd] px-4 py-3 sm:grid-cols-2 dark:border-dash-border">
+                  <label className="flex min-w-0 flex-col gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-dash-text-faded">
+                    From
+                    <input
+                      type="time"
+                      value={formatTimeValue(draft?.from)}
+                      onChange={(event) => handleTimeChange("from", event.target.value)}
+                      disabled={!draft?.from}
+                      className="h-9 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-2.5 text-sm font-medium tracking-normal text-dash-text-strong outline-none transition-colors focus:border-[#4879f8] disabled:opacity-40"
+                    />
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-dash-text-faded">
+                    To
+                    <input
+                      type="time"
+                      value={formatTimeValue(draft?.to)}
+                      onChange={(event) => handleTimeChange("to", event.target.value)}
+                      disabled={!draft?.to}
+                      className="h-9 rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg-elevated px-2.5 text-sm font-medium tracking-normal text-dash-text-strong outline-none transition-colors focus:border-[#4879f8] disabled:opacity-40"
+                    />
+                  </label>
+                </div>
+              )}
 
               {/* Footer */}
               <div className="flex flex-col gap-3 border-t-[0.5px] border-[#d9dadd] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-dash-border">

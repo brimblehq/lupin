@@ -269,9 +269,10 @@ export const getCurrentSessionServerFn = createServerFn({ method: "GET" }).handl
       return null;
     }
     return { user: session.user };
-  } catch (error: any) {
-    if (error?.status === 401) {
-      authLogger.info("getCurrentSession unauthorized (401)");
+  } catch (error: unknown) {
+    if ((error as { status?: unknown } | null)?.status === 401) {
+      authLogger.info("getCurrentSession unauthorized (401); clearing auth cookies", getErrorMeta(error));
+      clearServerAuthCookies();
       return null;
     }
     authLogger.warn("getCurrentSession error", getErrorMeta(error));
