@@ -21,7 +21,7 @@ import { usePaymentMethods } from "@/hooks/use-payments";
 import type { PaymentMethod } from "@/backend/payments";
 import { getWorkspaceFromSearch, withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { PaymentProvider } from "@/providers/payment-provider";
-import { AddCardForm } from "@/components/settings/billing-form";
+import { AddCardForm } from "@/components/shared/add-card-form";
 
 const rootRoute = getRouteApi("__root__");
 

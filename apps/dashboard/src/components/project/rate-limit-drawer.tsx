@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Plus, ChevronDown } from "lucide-react";
@@ -12,7 +12,7 @@ import { FolderTrashIcon } from "@/components/shared/folder-trash-icon";
 import { dashInputClassName } from "@/components/shared/dash-input";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import type { RatelimitSettings, RateLimitZone } from "@/backend/ratelimits";
-import { getRatelimitSettingsServerFn, updateRatelimitSettingsServerFn } from "@/server/ratelimits/actions";
+import { getRatelimitSettingsServerFn, updateRatelimitSettingsServerFn, getRatelimitOptionsServerFn } from "@/server/ratelimits/actions";
 
 interface RateLimitDrawerProps {
   open: boolean;
@@ -25,24 +25,28 @@ const NO_SPINNER = "[appearance:textfield] [&::-webkit-outer-spin-button]:appear
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
 
-const WINDOW_OPTIONS: DropdownOption[] = [
-  { id: "10s", label: "10 seconds" },
-  { id: "60s", label: "1 minute" },
-  { id: "120s", label: "2 minutes" },
-  { id: "300s", label: "5 minutes" },
-  { id: "600s", label: "10 minutes" },
-  { id: "3600s", label: "1 hour" },
-];
-
 const KEY_OPTIONS: DropdownOption[] = [
   { id: "ip.src", label: "Client IP", description: "Count requests per client IP address." },
   { id: "cf.unique_visitor_id", label: "Unique visitor", description: "Count per unique visitor identified at the edge." },
   { id: "http.request.uri.path", label: "Request path", description: "Count per requested URL path." },
 ];
 
-const WINDOW_VALUES = WINDOW_OPTIONS.map((option) => option.id);
 const KEY_VALUES = KEY_OPTIONS.map((option) => option.id);
 const METHOD_VALUES = [...METHODS];
+
+// Friendly labels for the periods Core supports; anything else falls back to "<n> seconds".
+const PERIOD_LABELS: Record<number, string> = {
+  10: "10 seconds",
+  60: "1 minute",
+  120: "2 minutes",
+  300: "5 minutes",
+  600: "10 minutes",
+  3600: "1 hour",
+};
+
+function periodToOption(period: number): DropdownOption {
+  return { id: `${period}s`, label: PERIOD_LABELS[period] ?? `${period} seconds` };
+}
 
 const LIST_SEPARATOR = /[\n,]/;
 // A path token: no whitespace and not a full URL (no scheme://host). Backend adds the leading "/".
@@ -66,31 +70,37 @@ interface RateLimitForm {
 }
 
 const pathTokenSchema = Yup.string().trim().matches(PATH_PATTERN, "Use a path like /login — no spaces or full URLs.");
-const windowSchema = Yup.string().oneOf(WINDOW_VALUES);
 
 const pathsTextSchema = Yup.string().test("rate-limit-paths", "Use a path like /login — no spaces or full URLs.", (value) => {
   return parseList(value ?? "").every((path) => pathTokenSchema.isValidSync(path));
 });
 
-const zoneFormSchema = Yup.object({
-  id: Yup.string().required(),
-  name: Yup.string().trim().required("Each rule needs a name"),
-  key: Yup.string().oneOf(KEY_VALUES).required("Select a rate limit key"),
-  window: windowSchema.required("Pick a supported window"),
-  events: Yup.number().integer().min(1, "Limit must be at least 1").required("Limit is required"),
-  methods: Yup.array().of(Yup.string().oneOf(METHOD_VALUES).required()).required(),
-  pathsText: pathsTextSchema.default("").defined(),
-  ipv4Prefix: Yup.number().integer().min(0).max(32).optional(),
-  ipv6Prefix: Yup.number().integer().min(0).max(128).optional(),
-});
+// Built from the windows Core currently supports, so validation tracks live entitlement.
+function buildFormSchema(windowValues: string[]) {
+  return Yup.object({
+    enabled: Yup.boolean().required(),
+    zones: Yup.array()
+      .of(
+        Yup.object({
+          id: Yup.string().required(),
+          name: Yup.string().trim().required("Each rule needs a name"),
+          key: Yup.string().oneOf(KEY_VALUES).required("Select a rate limit key"),
+          window: Yup.string().oneOf(windowValues).required("Pick a supported window"),
+          events: Yup.number().integer().min(1, "Limit must be at least 1").required("Limit is required"),
+          methods: Yup.array().of(Yup.string().oneOf(METHOD_VALUES).required()).required(),
+          pathsText: pathsTextSchema.default("").defined(),
+          ipv4Prefix: Yup.number().integer().min(0).max(32).optional(),
+          ipv6Prefix: Yup.number().integer().min(0).max(128).optional(),
+        }),
+      )
+      .required(),
+  });
+}
 
-const rateLimitFormSchema = Yup.object({
-  enabled: Yup.boolean().required(),
-  zones: Yup.array().of(zoneFormSchema).required(),
-});
+type RateLimitFormSchema = ReturnType<typeof buildFormSchema>;
 
-function makeZone(): ZoneForm {
-  return { id: crypto.randomUUID(), name: "New rule", key: "ip.src", window: "60s", events: 100, methods: [], pathsText: "" };
+function makeZone(defaultWindow: string): ZoneForm {
+  return { id: crypto.randomUUID(), name: "New rule", key: "ip.src", window: defaultWindow, events: 100, methods: [], pathsText: "" };
 }
 
 function parseList(text: string): string[] {
@@ -100,22 +110,22 @@ function parseList(text: string): string[] {
     .filter(Boolean);
 }
 
-function normalizeWindow(value: string): string {
-  if (windowSchema.isValidSync(value)) {
+function normalizeWindow(value: string, windowValues: string[]): string {
+  if (windowValues.includes(value)) {
     return value;
   }
-
-  return "60s";
+  // Saved window is no longer supported — fall back to the first supported one.
+  return windowValues[0] ?? value;
 }
 
-function toForm(settings: RatelimitSettings): RateLimitForm {
+function toForm(settings: RatelimitSettings, windowValues: string[]): RateLimitForm {
   return {
     enabled: settings.enabled ?? true,
     zones: (settings.zones ?? []).map((zone) => ({
       id: crypto.randomUUID(),
       name: zone.name,
       key: zone.key,
-      window: normalizeWindow(zone.window),
+      window: normalizeWindow(zone.window, windowValues),
       events: zone.events,
       methods: zone.matcher?.methods ?? [],
       pathsText: (zone.matcher?.paths ?? []).join("\n"),
@@ -125,8 +135,8 @@ function toForm(settings: RatelimitSettings): RateLimitForm {
   };
 }
 
-function toZones(form: RateLimitForm): RateLimitZone[] {
-  const payload = rateLimitFormSchema.validateSync(form, { abortEarly: false, stripUnknown: true }) as RateLimitForm;
+function toZones(form: RateLimitForm, schema: RateLimitFormSchema): RateLimitZone[] {
+  const payload = schema.validateSync(form, { abortEarly: false, stripUnknown: true }) as RateLimitForm;
 
   return payload.zones.map((zone) => {
     const paths = parseList(zone.pathsText);
@@ -146,9 +156,9 @@ function toZones(form: RateLimitForm): RateLimitZone[] {
   });
 }
 
-function isRateLimitFormValid(form: RateLimitForm | null): boolean {
+function isRateLimitFormValid(form: RateLimitForm | null, schema: RateLimitFormSchema): boolean {
   if (!form) return false;
-  return rateLimitFormSchema.isValidSync(form, { abortEarly: false });
+  return schema.isValidSync(form, { abortEarly: false });
 }
 
 function getInvalidPaths(pathsText: string): string[] {
@@ -162,22 +172,38 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
   const updateSettings = useServerFn(updateRatelimitSettingsServerFn as any) as (args: {
     data: { projectId: string; workspace?: string; enabled?: boolean; zones?: RateLimitZone[] };
   }) => Promise<RatelimitSettings>;
+  const getOptions = useServerFn(getRatelimitOptionsServerFn as any) as (args?: {
+    data?: undefined;
+  }) => Promise<{ rateLimitPeriods: number[] }>;
 
+  const [periods, setPeriods] = useState<number[]>([]);
   const [form, setForm] = useState<RateLimitForm | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const windowOptions = useMemo(() => periods.map(periodToOption), [periods]);
+  const windowValues = useMemo(() => periods.map((period) => `${period}s`), [periods]);
+  const defaultWindow = windowValues[0] ?? "";
+  const formSchema = useMemo(() => buildFormSchema(windowValues), [windowValues]);
+  const formValid = isRateLimitFormValid(form, formSchema);
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    getSettings({ data: { projectId, workspace } })
-      .then((result) => {
+    Promise.all([getOptions({ data: undefined }), getSettings({ data: { projectId, workspace } })])
+      .then(([optionsResult, settingsResult]) => {
         if (cancelled) return;
-        const next = toForm(result);
+        const nextPeriods = optionsResult.rateLimitPeriods ?? [];
+        setPeriods(nextPeriods);
+        const next = toForm(
+          settingsResult,
+          nextPeriods.map((period) => `${period}s`),
+        );
         setForm(next);
+        // Collapse rules by default when there's more than one, so a long list stays scannable.
         setCollapsed(next.zones.length > 1 ? new Set(next.zones.map((zone) => zone.id)) : new Set());
       })
       .catch((error: unknown) => {
@@ -189,7 +215,7 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
     return () => {
       cancelled = true;
     };
-  }, [open, projectId, workspace, getSettings]);
+  }, [open, projectId, workspace, getOptions, getSettings]);
 
   function updateZone(id: string, patch: Partial<ZoneForm>) {
     setForm((prev) => (prev ? { ...prev, zones: prev.zones.map((zone) => (zone.id === id ? { ...zone, ...patch } : zone)) } : prev));
@@ -211,7 +237,7 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
   }
 
   function addZone() {
-    setForm((prev) => (prev ? { ...prev, zones: [...prev.zones, makeZone()] } : prev));
+    setForm((prev) => (prev ? { ...prev, zones: [...prev.zones, makeZone(defaultWindow)] } : prev));
   }
 
   function removeZone(id: string) {
@@ -241,14 +267,12 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
     });
   }
 
-  const formValid = isRateLimitFormValid(form);
-
   async function handleSave() {
     if (!form || !formValid) return;
     setSaving(true);
     try {
-      const result = await updateSettings({ data: { projectId, workspace, enabled: form.enabled, zones: toZones(form) } });
-      setForm(toForm(result));
+      const result = await updateSettings({ data: { projectId, workspace, enabled: form.enabled, zones: toZones(form, formSchema) } });
+      setForm(toForm(result, windowValues));
       toast.success("Rate limit configuration saved");
     } catch (error: unknown) {
       toast.error((error as Error)?.message || "Couldn't save rate limit settings");
@@ -322,6 +346,7 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
                           index={index}
                           collapsed={collapsed.has(zone.id)}
                           expanded={expanded.has(zone.id)}
+                          windowOptions={windowOptions}
                           onToggleCollapsed={() => toggleCollapsed(zone.id)}
                           onChange={(patch) => updateZone(zone.id, patch)}
                           onToggleMethod={(method) => toggleMethod(zone.id, method)}
@@ -376,6 +401,7 @@ interface ZoneCardProps {
   index: number;
   collapsed: boolean;
   expanded: boolean;
+  windowOptions: DropdownOption[];
   onToggleCollapsed: () => void;
   onChange: (patch: Partial<ZoneForm>) => void;
   onToggleMethod: (method: string) => void;
@@ -383,9 +409,20 @@ interface ZoneCardProps {
   onRemove: () => void;
 }
 
-function ZoneCard({ zone, index, collapsed, expanded, onToggleCollapsed, onChange, onToggleMethod, onToggleExpanded, onRemove }: ZoneCardProps) {
+function ZoneCard({
+  zone,
+  index,
+  collapsed,
+  expanded,
+  windowOptions,
+  onToggleCollapsed,
+  onChange,
+  onToggleMethod,
+  onToggleExpanded,
+  onRemove,
+}: ZoneCardProps) {
   const invalidPaths = getInvalidPaths(zone.pathsText);
-  const windowLabel = WINDOW_OPTIONS.find((option) => option.id === zone.window)?.label ?? zone.window;
+  const windowLabel = windowOptions.find((option) => option.id === zone.window)?.label ?? zone.window;
 
   return (
     <div className="flex flex-col gap-4 border-b-[0.5px] border-dash-border py-4">
@@ -414,111 +451,110 @@ function ZoneCard({ zone, index, collapsed, expanded, onToggleCollapsed, onChang
 
       {!collapsed ? (
         <>
-
-      <Field label="Name">
-        <input
-          type="text"
-          value={zone.name}
-          onChange={(event) => onChange({ name: event.target.value })}
-          placeholder="e.g. API requests"
-          className={`${dashInputClassName} text-sm`}
-        />
-      </Field>
-
-      <Field label="Limit">
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            value={zone.events}
-            onChange={(event) => onChange({ events: Number(event.target.value) || 0 })}
-            className={`${dashInputClassName} ${NO_SPINNER} w-24 text-sm`}
-          />
-          <span className="shrink-0 text-sm text-dash-text-faded">requests per</span>
-          <div className="w-[160px]">
-            <Dropdown value={zone.window} options={WINDOW_OPTIONS} onChange={(v) => onChange({ window: v })} menuMinWidth={200} />
-          </div>
-        </div>
-      </Field>
-
-      <Field label="Methods" hint="Leave empty to apply to every method.">
-        <div className="flex flex-wrap gap-1.5">
-          {METHODS.map((method) => {
-            const active = zone.methods.includes(method);
-            return (
-              <button
-                key={method}
-                type="button"
-                onClick={() => onToggleMethod(method)}
-                className={`flex-1 basis-[64px] rounded-[3px] border-[0.5px] px-2 py-1 text-center text-xs font-medium uppercase tracking-wider transition-colors ${
-                  active
-                    ? "border-[#3964d5] bg-[#4879f8] text-white"
-                    : "border-dash-border bg-dash-bg text-dash-text-faded hover:bg-dash-bg-elevated hover:text-dash-text-strong"
-                }`}
-              >
-                {method}
-              </button>
-            );
-          })}
-        </div>
-      </Field>
-
-      <Field label="Paths" hint="One per line. Leave empty to apply to all paths.">
-        <textarea
-          value={zone.pathsText}
-          onChange={(event) => onChange({ pathsText: event.target.value })}
-          rows={2}
-          placeholder={"/api/*\n/login"}
-          className={`${dashInputClassName} min-h-[56px] resize-y font-mono text-xs ${invalidPaths.length ? "ring-1 ring-red-400/60" : ""}`}
-        />
-        {invalidPaths.length > 0 ? (
-          <span className="text-[11px] leading-[1.4] text-red-400">
-            Invalid {invalidPaths.length === 1 ? "path" : "paths"}: {invalidPaths.join(", ")}. Use a path like /login — no spaces or full
-            URLs.
-          </span>
-        ) : null}
-      </Field>
-
-      <button
-        type="button"
-        onClick={onToggleExpanded}
-        className="inline-flex w-fit items-center gap-1 text-xs font-medium text-dash-text-faded transition-colors hover:text-dash-text-strong"
-      >
-        <ChevronDown className={`size-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
-        Advanced
-      </button>
-
-      {expanded ? (
-        <div className="flex flex-col gap-4 border-t-[0.5px] border-dash-border pt-4">
-          <Field label="Rate limit key" hint="What each request is counted against.">
-            <Dropdown value={zone.key} options={KEY_OPTIONS} onChange={(v) => onChange({ key: v })} />
+          <Field label="Name">
+            <input
+              type="text"
+              value={zone.name}
+              onChange={(event) => onChange({ name: event.target.value })}
+              placeholder="e.g. API requests"
+              className={`${dashInputClassName} text-sm`}
+            />
           </Field>
-          <div className="flex gap-3">
-            <Field label="IPv4 prefix" hint="0–32">
+
+          <Field label="Limit">
+            <div className="flex items-center gap-2">
               <input
                 type="number"
-                min={0}
-                max={32}
-                value={zone.ipv4Prefix ?? ""}
-                onChange={(event) => onChange({ ipv4Prefix: event.target.value === "" ? undefined : Number(event.target.value) })}
-                placeholder="32"
-                className={`${dashInputClassName} ${NO_SPINNER} w-full text-sm`}
+                min={1}
+                value={zone.events}
+                onChange={(event) => onChange({ events: Number(event.target.value) || 0 })}
+                className={`${dashInputClassName} ${NO_SPINNER} w-24 text-sm`}
               />
-            </Field>
-            <Field label="IPv6 prefix" hint="0–128">
-              <input
-                type="number"
-                min={0}
-                max={128}
-                value={zone.ipv6Prefix ?? ""}
-                onChange={(event) => onChange({ ipv6Prefix: event.target.value === "" ? undefined : Number(event.target.value) })}
-                placeholder="128"
-                className={`${dashInputClassName} ${NO_SPINNER} w-full text-sm`}
-              />
-            </Field>
-          </div>
-        </div>
-      ) : null}
+              <span className="shrink-0 text-sm text-dash-text-faded">requests per</span>
+              <div className="w-[160px]">
+                <Dropdown value={zone.window} options={windowOptions} onChange={(v) => onChange({ window: v })} menuMinWidth={200} />
+              </div>
+            </div>
+          </Field>
+
+          <Field label="Methods" hint="Leave empty to apply to every method.">
+            <div className="flex flex-wrap gap-1.5">
+              {METHODS.map((method) => {
+                const active = zone.methods.includes(method);
+                return (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => onToggleMethod(method)}
+                    className={`flex-1 basis-[64px] rounded-[3px] border-[0.5px] px-2 py-1 text-center text-xs font-medium uppercase tracking-wider transition-colors ${
+                      active
+                        ? "border-[#3964d5] bg-[#4879f8] text-white"
+                        : "border-dash-border bg-dash-bg text-dash-text-faded hover:bg-dash-bg-elevated hover:text-dash-text-strong"
+                    }`}
+                  >
+                    {method}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          <Field label="Paths" hint="One per line. Leave empty to apply to all paths.">
+            <textarea
+              value={zone.pathsText}
+              onChange={(event) => onChange({ pathsText: event.target.value })}
+              rows={2}
+              placeholder={"/api/*\n/login"}
+              className={`${dashInputClassName} min-h-[56px] resize-y font-mono text-xs ${invalidPaths.length ? "ring-1 ring-red-400/60" : ""}`}
+            />
+            {invalidPaths.length > 0 ? (
+              <span className="text-[11px] leading-[1.4] text-red-400">
+                Invalid {invalidPaths.length === 1 ? "path" : "paths"}: {invalidPaths.join(", ")}. Use a path like /login — no spaces or
+                full URLs.
+              </span>
+            ) : null}
+          </Field>
+
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            className="inline-flex w-fit items-center gap-1 text-xs font-medium text-dash-text-faded transition-colors hover:text-dash-text-strong"
+          >
+            <ChevronDown className={`size-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
+            Advanced
+          </button>
+
+          {expanded ? (
+            <div className="flex flex-col gap-4 border-t-[0.5px] border-dash-border pt-4">
+              <Field label="Rate limit key" hint="What each request is counted against.">
+                <Dropdown value={zone.key} options={KEY_OPTIONS} onChange={(v) => onChange({ key: v })} />
+              </Field>
+              <div className="flex gap-3">
+                <Field label="IPv4 prefix" hint="0–32">
+                  <input
+                    type="number"
+                    min={0}
+                    max={32}
+                    value={zone.ipv4Prefix ?? ""}
+                    onChange={(event) => onChange({ ipv4Prefix: event.target.value === "" ? undefined : Number(event.target.value) })}
+                    placeholder="32"
+                    className={`${dashInputClassName} ${NO_SPINNER} w-full text-sm`}
+                  />
+                </Field>
+                <Field label="IPv6 prefix" hint="0–128">
+                  <input
+                    type="number"
+                    min={0}
+                    max={128}
+                    value={zone.ipv6Prefix ?? ""}
+                    onChange={(event) => onChange({ ipv6Prefix: event.target.value === "" ? undefined : Number(event.target.value) })}
+                    placeholder="128"
+                    className={`${dashInputClassName} ${NO_SPINNER} w-full text-sm`}
+                  />
+                </Field>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

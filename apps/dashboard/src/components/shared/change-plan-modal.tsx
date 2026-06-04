@@ -6,6 +6,7 @@ import { Dropdown } from "./dropdown";
 import { usePricing } from "@/contexts/pricing-context";
 import { usePaymentMethods, useSubscription, useCreateSubscription, useSwapPlan } from "@/hooks/use-payments";
 import { PaymentProvider } from "@/providers/payment-provider";
+import { AddCardForm } from "./add-card-form";
 import type { PaymentMethod } from "@/backend/payments";
 
 const PLAN_ID_TO_API_TYPE: Record<string, string> = {
@@ -39,15 +40,17 @@ function ChangePlanModalInner({
   const stripe = useStripe();
   const [selectedPlan, setSelectedPlan] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [addedPaymentMethodId, setAddedPaymentMethodId] = useState("");
   const pricing = usePricing();
 
-  const { data: paymentMethods = [] } = usePaymentMethods(initialPaymentMethods ?? undefined);
+  const { data: paymentMethods = [], refetch: refetchPaymentMethods } = usePaymentMethods(initialPaymentMethods ?? undefined);
   const { data: subscription } = useSubscription();
   const createSubscription = useCreateSubscription();
   const swapPlan = useSwapPlan();
 
-  const defaultMethod = paymentMethods.find((m: any) => m.is_default) ?? paymentMethods[0];
-  const hasPaymentMethod = paymentMethods.length > 0;
+  const defaultMethod = paymentMethods.find((method: PaymentMethod) => method.is_default) ?? paymentMethods[0];
+  const paymentMethodId = defaultMethod?.id ?? addedPaymentMethodId;
+  const hasPaymentMethod = paymentMethods.length > 0 || Boolean(addedPaymentMethodId);
   const hasSubscription = subscription !== null && subscription !== undefined;
   const isPending = createSubscription.isPending || swapPlan.isPending;
 
@@ -86,6 +89,7 @@ function ChangePlanModalInner({
 
     setSelectedPlan(suggestedPlan);
     setAcceptedTerms(false);
+    setAddedPaymentMethodId("");
   }, [open, suggestedPlan]);
 
   const selectedIdx = billingPlans.findIndex((p) => p.name === selectedPlan);
@@ -124,11 +128,11 @@ function ChangePlanModalInner({
     }
 
     if (needsPaymentMethod) {
-      toast.error("Please add a payment method first before upgrading.");
+      toast.error("Add a payment method before upgrading.");
       return;
     }
 
-    if (!hasSubscription && !defaultMethod?.id && selectedObj.price > 0) {
+    if (!hasSubscription && !paymentMethodId && selectedObj.price > 0) {
       toast.error("Please add a payment method first.");
       return;
     }
@@ -138,7 +142,7 @@ function ChangePlanModalInner({
         ? await createSubscription.mutateAsync({
             type: apiType,
             accept_terms: true,
-            ...(defaultMethod?.id ? { payment_method: defaultMethod.id } : {}),
+            ...(paymentMethodId ? { payment_method: paymentMethodId } : {}),
           })
         : await swapPlan.mutateAsync(apiType);
 
@@ -152,14 +156,14 @@ function ChangePlanModalInner({
           toast.error("Stripe isn't ready yet. Please try again.");
           return;
         }
-        if (!defaultMethod?.id) {
+        if (!paymentMethodId) {
           toast.error("No payment method on file to confirm with.");
           return;
         }
 
         toast("Verifying with your bank…");
         const { error } = await stripe.confirmCardPayment(clientSecret, {
-          payment_method: defaultMethod.id,
+          payment_method: paymentMethodId,
         });
         if (error) {
           toast.error(error.message ?? "Bank verification failed");
@@ -184,6 +188,7 @@ function ChangePlanModalInner({
         if (!v) {
           setSelectedPlan(suggestedPlan);
           setAcceptedTerms(false);
+          setAddedPaymentMethodId("");
         }
         onOpenChange(v);
       }}
@@ -207,8 +212,19 @@ function ChangePlanModalInner({
                 : `Your plan will change to ${selectedObj.name} (${selectedObj.price === 0 ? "Free" : `$${selectedObj.price}/mo`}) at the end of your billing period.`}
             </p>
             {needsPaymentMethod && (
-              <div className="rounded-[4px] bg-[#4879f8]/[0.06] px-3 py-2.5 dark:bg-[#4879f8]/[0.08]">
-                <p className="text-sm leading-[1.4] text-[#4879f8]">You need to add a payment method before upgrading to a paid plan.</p>
+              <div className="flex flex-col gap-3 pt-1">
+                <p className="text-sm leading-5 tracking-[-0.0224px] text-dash-text-body">Add payment method</p>
+                <AddCardForm
+                  onClose={() => {}}
+                  showHeader={false}
+                  showCancel={false}
+                  animated={false}
+                  submitLabel="Add card"
+                  onSuccess={(paymentMethod) => {
+                    setAddedPaymentMethodId(paymentMethod);
+                    void refetchPaymentMethods();
+                  }}
+                />
               </div>
             )}
             {isDowngrade && (

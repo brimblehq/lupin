@@ -90,7 +90,7 @@ import { usePaymentMethods } from "@/hooks/use-payments";
 import { PaymentProvider } from "@/providers/payment-provider";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
-const AddCardForm = lazy(() => import("@/components/settings/billing-form").then((m) => ({ default: m.AddCardForm })));
+const AddCardForm = lazy(() => import("@/components/shared/add-card-form").then((m) => ({ default: m.AddCardForm })));
 import { estimateComputeCost } from "@/utils/compute-pricing";
 import { formatUsdMonthly } from "@/utils/billing";
 import { generateStrongPassword } from "@/utils/password";

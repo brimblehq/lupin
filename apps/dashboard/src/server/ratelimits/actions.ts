@@ -2,9 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import * as Yup from "yup";
 import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 
-const WINDOW_VALUES = ["10s", "60s", "120s", "300s", "600s", "3600s"];
 const KEY_PATTERN = /^(ip\.src|cf\..+|http\..+)$/;
 const PATH_PATTERN = /^(?!\w+:\/\/)\S+$/;
+const WINDOW_PATTERN = /^\d+s$/;
 
 const projectScopeSchema = Yup.object({
   projectId: Yup.string().trim().required("Project id is required"),
@@ -14,7 +14,7 @@ const projectScopeSchema = Yup.object({
 const zoneSchema = Yup.object({
   name: Yup.string().trim().required("Each rule needs a name"),
   key: Yup.string().trim().required().matches(KEY_PATTERN, "Key must be ip.src or start with cf. or http."),
-  window: Yup.string().oneOf(WINDOW_VALUES, "Pick a supported window").required(),
+  window: Yup.string().required("Pick a supported window").matches(WINDOW_PATTERN, "Invalid window"),
   events: Yup.number().integer().min(1, "Limit must be at least 1").required(),
   matcher: Yup.object({
     methods: Yup.array().of(Yup.string().required()).optional(),
@@ -49,4 +49,10 @@ export const updateRatelimitSettingsServerFn = createServerFn({
     const teamId = await resolveTeamId(api, workspace);
     return api.ratelimits.updateSettings(projectId, { enabled, zones, teamId });
   });
+});
+
+export const getRatelimitOptionsServerFn = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  return withTokenRefresh((api) => api.ratelimits.getOptions());
 });

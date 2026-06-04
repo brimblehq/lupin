@@ -28,9 +28,14 @@ export interface RatelimitSettingsInput {
   zones?: RateLimitZone[];
 }
 
+export interface RatelimitOptions {
+  rateLimitPeriods: number[];
+}
+
 export interface RatelimitsApi {
   getSettings(projectId: string, input?: { teamId?: string }): Promise<RatelimitSettings>;
   updateSettings(projectId: string, input: RatelimitSettingsInput & { teamId?: string }): Promise<RatelimitSettings>;
+  getOptions(): Promise<RatelimitOptions>;
 }
 
 interface Envelope<T> {
@@ -55,6 +60,10 @@ export function createRatelimitsApi(client: ApiClient): RatelimitsApi {
         query: { teamId: input.teamId },
         body: { enabled: input.enabled, zones: input.zones },
       });
+      return response.data;
+    },
+    async getOptions() {
+      const response = await client.request<Envelope<RatelimitOptions>>(`${basePath}/options`, { method: "GET" });
       return response.data;
     },
   };
