@@ -109,6 +109,19 @@ export const Route = createFileRoute("/projects/new")({
 const ease = [0.16, 1, 0.3, 1] as const;
 
 const inputClass = dashInputClassName;
+const projectMountPathPattern = /^\/[A-Za-z0-9._/-]*$/;
+const projectPersistentStorageSchema = Yup.object({
+  diskSizeGb: Yup.number()
+    .integer("Disk size must be a whole number")
+    .min(10, "Disk size must be at least 10 GB")
+    .max(150, "Disk size must be at most 150 GB")
+    .required("Disk size is required"),
+  mountPath: Yup.string()
+    .trim()
+    .required("Mount path is required when using persistent storage")
+    .matches(projectMountPathPattern, "Mount path must be an absolute unix path")
+    .notOneOf(["/"], 'Mount path cannot be "/"'),
+});
 
 /* ─── Icons ─── */
 
@@ -2146,6 +2159,22 @@ function Phase3Configure({
       return null;
     }
 
+    let persistentStorage: Pick<Phase3DeployInput, "diskSizeGb" | "mountPath"> = {};
+    if (diskEnabled) {
+      try {
+        persistentStorage = projectPersistentStorageSchema.validateSync(
+          {
+            diskSizeGb: Number(diskSize),
+            mountPath,
+          },
+          { stripUnknown: true },
+        );
+      } catch (error) {
+        toast.error(error instanceof Yup.ValidationError ? error.message : "Storage settings are invalid.");
+        return null;
+      }
+    }
+
     return {
       name: projectName.trim(),
       regionId: region,
@@ -2163,8 +2192,7 @@ function Phase3Configure({
       cpu: effectiveCpu,
       memory: effectiveMemory,
       diskEnabled,
-      diskSizeGb: diskEnabled ? Number(diskSize) : undefined,
-      mountPath: diskEnabled ? mountPath.trim() : undefined,
+      ...persistentStorage,
     };
   }
 
@@ -3222,11 +3250,8 @@ function NewProjectPage() {
     }
 
     if (input.diskEnabled && input.mountPath && input.diskSizeGb) {
-      payload.volumeMount = input.mountPath;
+      payload.mountPath = input.mountPath;
       payload.diskSize = input.diskSizeGb;
-    } else {
-      payload.volumeMount = "";
-      payload.diskSize = 10;
     }
     payload.deploy = deploy;
 

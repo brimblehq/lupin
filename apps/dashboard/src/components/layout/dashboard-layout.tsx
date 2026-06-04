@@ -46,7 +46,6 @@ import { getTwoFactorStatusServerFn } from "@/server/auth/actions";
 import type { TwoFactorStatus } from "@/backend/auth/types";
 import { identifyPostHog, isPostHogEnabled } from "@/lib/posthog";
 import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/feature-flags";
-import { usePlanGate } from "@/hooks/use-plan-gate";
 import { AddonDetailPending } from "@/components/shared/route-pending";
 
 const CommandPalette = lazy(() => import("./command-palette").then((m) => ({ default: m.CommandPalette })));
@@ -624,11 +623,9 @@ function MobileNavMenu({ onSettingsClick }: { onSettingsClick: () => void }) {
 
   const domainsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DOMAINS);
   const scalingEnabled = useFeatureFlag(FeatureFlags.ENABLE_AUTO_SCALING);
-  const { objectStorageEnabled } = usePlanGate();
-  const bucketFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
-  const bucketsEnabled = bucketFeatureEnabled && objectStorageEnabled;
+  const bucketsEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
   const sandboxEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
-  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS) && objectStorageEnabled;
+  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS);
   const sandboxStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
   const mcpServersStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
 

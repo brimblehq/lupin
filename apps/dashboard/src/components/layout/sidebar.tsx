@@ -9,7 +9,6 @@ import { useHaptics } from "@/hooks/use-haptics";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { useFeatureFlag, useFeatureFlagStrict, FeatureFlags } from "@/lib/feature-flags";
 import { isPostHogEnabled } from "@/lib/posthog";
-import { usePlanGate } from "@/hooks/use-plan-gate";
 import { mainNav, moreNav } from "./sidebar-nav";
 
 const navItemBase =
@@ -24,12 +23,10 @@ export function Sidebar({ onProfileOpenChange }: { onProfileOpenChange: (open: b
 
   const domainsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DOMAINS);
   const scalingEnabled = useFeatureFlag(FeatureFlags.ENABLE_AUTO_SCALING);
-  const { objectStorageEnabled } = usePlanGate();
-  const bucketFeatureEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
-  const bucketsEnabled = bucketFeatureEnabled && objectStorageEnabled;
+  const bucketsEnabled = useFeatureFlag(FeatureFlags.ENABLE_BUCKETS);
   const sandboxEnabled = useFeatureFlag(FeatureFlags.ENABLE_SANDBOX);
 
-  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS) && objectStorageEnabled;
+  const bucketsStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_BUCKETS);
   const sandboxStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_SANDBOX);
   const mcpServersStrict = useFeatureFlagStrict(FeatureFlags.ENABLE_MCP_SERVERS);
 
