@@ -3,10 +3,12 @@ import { Drawer } from "vaul";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Plus, ChevronDown } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
+import * as Yup from "yup";
 import { ToggleSwitch } from "@/components/shared/toggle-switch";
 import { Dropdown, type DropdownOption } from "@/components/shared/dropdown";
 import { GlossyButton } from "@/components/shared/glossy-button";
 import { Spinner } from "@/components/shared/spinner";
+import { FolderTrashIcon } from "@/components/shared/folder-trash-icon";
 import { dashInputClassName } from "@/components/shared/dash-input";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import type { RatelimitSettings, RateLimitZone } from "@/backend/ratelimits";
@@ -32,21 +34,19 @@ const WINDOW_OPTIONS: DropdownOption[] = [
   { id: "3600s", label: "1 hour" },
 ];
 
-const WINDOW_VALUES = WINDOW_OPTIONS.map((option) => option.id);
-
 const KEY_OPTIONS: DropdownOption[] = [
   { id: "ip.src", label: "Client IP", description: "Count requests per client IP address." },
   { id: "cf.unique_visitor_id", label: "Unique visitor", description: "Count per unique visitor identified at the edge." },
   { id: "http.request.uri.path", label: "Request path", description: "Count per requested URL path." },
 ];
 
+const WINDOW_VALUES = WINDOW_OPTIONS.map((option) => option.id);
+const KEY_VALUES = KEY_OPTIONS.map((option) => option.id);
+const METHOD_VALUES = [...METHODS];
+
 const LIST_SEPARATOR = /[\n,]/;
 // A path token: no whitespace and not a full URL (no scheme://host). Backend adds the leading "/".
 const PATH_PATTERN = /^(?!\w+:\/\/)\S+$/;
-
-function isValidPath(value: string): boolean {
-  return PATH_PATTERN.test(value);
-}
 
 interface ZoneForm {
   id: string;
@@ -65,6 +65,30 @@ interface RateLimitForm {
   zones: ZoneForm[];
 }
 
+const pathTokenSchema = Yup.string().trim().matches(PATH_PATTERN, "Use a path like /login — no spaces or full URLs.");
+const windowSchema = Yup.string().oneOf(WINDOW_VALUES);
+
+const pathsTextSchema = Yup.string().test("rate-limit-paths", "Use a path like /login — no spaces or full URLs.", (value) => {
+  return parseList(value ?? "").every((path) => pathTokenSchema.isValidSync(path));
+});
+
+const zoneFormSchema = Yup.object({
+  id: Yup.string().required(),
+  name: Yup.string().trim().required("Each rule needs a name"),
+  key: Yup.string().oneOf(KEY_VALUES).required("Select a rate limit key"),
+  window: windowSchema.required("Pick a supported window"),
+  events: Yup.number().integer().min(1, "Limit must be at least 1").required("Limit is required"),
+  methods: Yup.array().of(Yup.string().oneOf(METHOD_VALUES).required()).required(),
+  pathsText: pathsTextSchema.default("").defined(),
+  ipv4Prefix: Yup.number().integer().min(0).max(32).optional(),
+  ipv6Prefix: Yup.number().integer().min(0).max(128).optional(),
+});
+
+const rateLimitFormSchema = Yup.object({
+  enabled: Yup.boolean().required(),
+  zones: Yup.array().of(zoneFormSchema).required(),
+});
+
 function makeZone(): ZoneForm {
   return { id: crypto.randomUUID(), name: "New rule", key: "ip.src", window: "60s", events: 100, methods: [], pathsText: "" };
 }
@@ -76,6 +100,14 @@ function parseList(text: string): string[] {
     .filter(Boolean);
 }
 
+function normalizeWindow(value: string): string {
+  if (windowSchema.isValidSync(value)) {
+    return value;
+  }
+
+  return "60s";
+}
+
 function toForm(settings: RatelimitSettings): RateLimitForm {
   return {
     enabled: settings.enabled ?? true,
@@ -83,7 +115,7 @@ function toForm(settings: RatelimitSettings): RateLimitForm {
       id: crypto.randomUUID(),
       name: zone.name,
       key: zone.key,
-      window: WINDOW_VALUES.includes(zone.window) ? zone.window : "60s",
+      window: normalizeWindow(zone.window),
       events: zone.events,
       methods: zone.matcher?.methods ?? [],
       pathsText: (zone.matcher?.paths ?? []).join("\n"),
@@ -94,7 +126,9 @@ function toForm(settings: RatelimitSettings): RateLimitForm {
 }
 
 function toZones(form: RateLimitForm): RateLimitZone[] {
-  return form.zones.map((zone) => {
+  const payload = rateLimitFormSchema.validateSync(form, { abortEarly: false, stripUnknown: true }) as RateLimitForm;
+
+  return payload.zones.map((zone) => {
     const paths = parseList(zone.pathsText);
     const matcher = {
       ...(zone.methods.length ? { methods: zone.methods } : {}),
@@ -112,6 +146,15 @@ function toZones(form: RateLimitForm): RateLimitZone[] {
   });
 }
 
+function isRateLimitFormValid(form: RateLimitForm | null): boolean {
+  if (!form) return false;
+  return rateLimitFormSchema.isValidSync(form, { abortEarly: false });
+}
+
+function getInvalidPaths(pathsText: string): string[] {
+  return parseList(pathsText).filter((path) => !pathTokenSchema.isValidSync(path));
+}
+
 export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: RateLimitDrawerProps) {
   const getSettings = useServerFn(getRatelimitSettingsServerFn as any) as (args: {
     data: { projectId: string; workspace?: string };
@@ -122,6 +165,7 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
 
   const [form, setForm] = useState<RateLimitForm | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -131,7 +175,10 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
     setLoading(true);
     getSettings({ data: { projectId, workspace } })
       .then((result) => {
-        if (!cancelled) setForm(toForm(result));
+        if (cancelled) return;
+        const next = toForm(result);
+        setForm(next);
+        setCollapsed(next.zones.length > 1 ? new Set(next.zones.map((zone) => zone.id)) : new Set());
       })
       .catch((error: unknown) => {
         if (!cancelled) toast.error((error as Error)?.message || "Couldn't load rate limit settings");
@@ -169,6 +216,11 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
 
   function removeZone(id: string) {
     setForm((prev) => (prev ? { ...prev, zones: prev.zones.filter((zone) => zone.id !== id) } : prev));
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   function toggleExpanded(id: string) {
@@ -180,9 +232,16 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
     });
   }
 
-  const formValid = Boolean(
-    form && form.zones.every((zone) => zone.name.trim() && zone.events >= 1 && parseList(zone.pathsText).every(isValidPath)),
-  );
+  function toggleCollapsed(id: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const formValid = isRateLimitFormValid(form);
 
   async function handleSave() {
     if (!form || !formValid) return;
@@ -235,7 +294,9 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
                 <SettingRow
                   title="Enable rate limiting"
                   description="Turn request limiting on for this project. Rules below only apply while this is enabled."
-                  control={<ToggleSwitch checked={form.enabled} onChange={(v) => setForm((prev) => (prev ? { ...prev, enabled: v } : prev))} />}
+                  control={
+                    <ToggleSwitch checked={form.enabled} onChange={(v) => setForm((prev) => (prev ? { ...prev, enabled: v } : prev))} />
+                  }
                 />
 
                 <div className="flex flex-col">
@@ -259,7 +320,9 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
                         <ZoneCard
                           zone={zone}
                           index={index}
+                          collapsed={collapsed.has(zone.id)}
                           expanded={expanded.has(zone.id)}
+                          onToggleCollapsed={() => toggleCollapsed(zone.id)}
                           onChange={(patch) => updateZone(zone.id, patch)}
                           onToggleMethod={(method) => toggleMethod(zone.id, method)}
                           onToggleExpanded={() => toggleExpanded(zone.id)}
@@ -311,29 +374,46 @@ export function RateLimitDrawer({ open, onOpenChange, projectId, workspace }: Ra
 interface ZoneCardProps {
   zone: ZoneForm;
   index: number;
+  collapsed: boolean;
   expanded: boolean;
+  onToggleCollapsed: () => void;
   onChange: (patch: Partial<ZoneForm>) => void;
   onToggleMethod: (method: string) => void;
   onToggleExpanded: () => void;
   onRemove: () => void;
 }
 
-function ZoneCard({ zone, index, expanded, onChange, onToggleMethod, onToggleExpanded, onRemove }: ZoneCardProps) {
-  const invalidPaths = parseList(zone.pathsText).filter((path) => !isValidPath(path));
+function ZoneCard({ zone, index, collapsed, expanded, onToggleCollapsed, onChange, onToggleMethod, onToggleExpanded, onRemove }: ZoneCardProps) {
+  const invalidPaths = getInvalidPaths(zone.pathsText);
+  const windowLabel = WINDOW_OPTIONS.find((option) => option.id === zone.window)?.label ?? zone.window;
 
   return (
     <div className="flex flex-col gap-4 border-b-[0.5px] border-dash-border py-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wider text-dash-text-faded">Rule {index + 1}</span>
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-expanded={!collapsed}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <ChevronDown className={`size-4 shrink-0 text-dash-text-faded transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+          <span className="truncate text-sm font-medium text-dash-text-strong">{zone.name.trim() || `Rule ${index + 1}`}</span>
+          <span className="shrink-0 text-xs text-dash-text-faded">
+            {zone.events} / {windowLabel}
+          </span>
+        </button>
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Remove rule ${index + 1}`}
           className="shrink-0 transition-opacity hover:opacity-70"
         >
-          <img src="/icons/folder-trash.svg" alt="" className="size-4 dark:invert" />
+          <FolderTrashIcon className="size-4" color="#ef2f1f" />
         </button>
       </div>
+
+      {!collapsed ? (
+        <>
 
       <Field label="Name">
         <input
@@ -370,7 +450,7 @@ function ZoneCard({ zone, index, expanded, onChange, onToggleMethod, onToggleExp
                 key={method}
                 type="button"
                 onClick={() => onToggleMethod(method)}
-                className={`rounded-[3px] border-[0.5px] px-2 py-1 text-xs font-medium uppercase tracking-wider transition-colors ${
+                className={`flex-1 basis-[64px] rounded-[3px] border-[0.5px] px-2 py-1 text-center text-xs font-medium uppercase tracking-wider transition-colors ${
                   active
                     ? "border-[#3964d5] bg-[#4879f8] text-white"
                     : "border-dash-border bg-dash-bg text-dash-text-faded hover:bg-dash-bg-elevated hover:text-dash-text-strong"
@@ -389,9 +469,7 @@ function ZoneCard({ zone, index, expanded, onChange, onToggleMethod, onToggleExp
           onChange={(event) => onChange({ pathsText: event.target.value })}
           rows={2}
           placeholder={"/api/*\n/login"}
-          className={`${dashInputClassName} min-h-[56px] resize-y font-mono text-xs ${
-            invalidPaths.length ? "ring-1 ring-red-400/60" : ""
-          }`}
+          className={`${dashInputClassName} min-h-[56px] resize-y font-mono text-xs ${invalidPaths.length ? "ring-1 ring-red-400/60" : ""}`}
         />
         {invalidPaths.length > 0 ? (
           <span className="text-[11px] leading-[1.4] text-red-400">
@@ -440,6 +518,8 @@ function ZoneCard({ zone, index, expanded, onChange, onToggleMethod, onToggleExp
             </Field>
           </div>
         </div>
+      ) : null}
+        </>
       ) : null}
     </div>
   );
