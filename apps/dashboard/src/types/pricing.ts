@@ -25,6 +25,7 @@ export interface PlanSpecs {
   customDomain: boolean;
   deployPrivateOrganization: boolean;
   autoscalingEnabled: boolean;
+  rateLimitEnabled: boolean;
   objectStorageEnabled: boolean;
   sandboxEnabled: boolean;
   sandboxMaxCount: number;

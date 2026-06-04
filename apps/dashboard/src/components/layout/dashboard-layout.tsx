@@ -14,6 +14,7 @@ import { RouterProgressBar } from "./router-progress-bar";
 import { TooltipProvider } from "../shared/tooltip";
 import { Snackbar } from "../shared/snackbar";
 import { DashToaster } from "../shared/toaster";
+import { ReportErrorModal } from "../shared/report-error-modal";
 import { ScoutBarProvider, useScoutBar } from "../../contexts/scoutbar-context";
 import { useTheme } from "../../hooks/use-theme";
 import { setHapticsEnabled } from "../../hooks/use-haptics";
@@ -1374,6 +1375,7 @@ export function DashboardLayout({
               <TooltipProvider>
                 <RouterProgressBar />
                 <DashToaster />
+                <ReportErrorModal />
                 {children}
               </TooltipProvider>
             </WorkspaceRoleProvider>
@@ -1394,6 +1396,7 @@ export function DashboardLayout({
                   <StepUpTwoFactorProvider>
                     <RouterProgressBar />
                     <DashToaster />
+                    <ReportErrorModal />
                     <CommandPaletteSlot />
                     <div className="flex h-dvh flex-col bg-dash-bg">
                       <Topbar

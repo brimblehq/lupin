@@ -458,6 +458,7 @@ function BucketsPage() {
       <div>
         <BucketList
           buckets={rows}
+          workspace={workspace}
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           searchLoading={isSearching || isBucketsLoading}

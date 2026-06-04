@@ -4,6 +4,8 @@ import { SearchFilterBar } from "./search-filter-bar";
 import { BucketCard } from "./bucket-card";
 import { WarningModal } from "./warning-modal";
 import { CreateBucketCard } from "./create-bucket-card";
+import { ViewToggle } from "./view-toggle";
+import { useViewMode } from "@/hooks/use-view-mode";
 
 export interface Bucket {
   id: string;
@@ -18,6 +20,7 @@ export interface Bucket {
 
 export function BucketList({
   buckets,
+  workspace,
   searchQuery: searchQueryProp,
   onSearchQueryChange,
   searchLoading = false,
@@ -26,6 +29,7 @@ export function BucketList({
   disableClientFilter = false,
 }: {
   buckets: Bucket[];
+  workspace?: string;
   searchQuery?: string;
   onSearchQueryChange?: (value: string) => void;
   searchLoading?: boolean;
@@ -37,6 +41,7 @@ export function BucketList({
   const [deletingBucket, setDeletingBucket] = useState<Bucket | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [viewMode, changeViewMode] = useViewMode("brimble:buckets-view", workspace);
 
   const searchQuery = searchQueryProp ?? searchQueryInternal;
   const setSearchQuery = onSearchQueryChange ?? setSearchQueryInternal;
@@ -52,6 +57,7 @@ export function BucketList({
           placeholder="Search storage buckets..."
           loading={searchLoading}
           className="w-full max-w-[1000px]"
+          rightSlot={<ViewToggle value={viewMode} onChange={changeViewMode} />}
         />
       </div>
 
@@ -67,13 +73,18 @@ export function BucketList({
         </div>
       )}
 
-      {/* Buckets Grid */}
+      {/* Buckets Grid / List */}
       {filtered.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          className={
+            viewMode === "list" ? "flex flex-col gap-2" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          }
+        >
           {filtered.map((bucket) => (
             <BucketCard
               key={bucket.id}
               bucket={bucket}
+              view={viewMode}
               onDelete={() => {
                 setDeleteConfirmName("");
                 setDeletingBucket(bucket);

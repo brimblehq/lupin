@@ -13,6 +13,8 @@ import { SandboxesListPending } from "@/components/shared/route-pending";
 import { CreateSandboxCard } from "@/components/sandboxes/create-sandbox-card";
 import { SandboxCard } from "@/components/sandboxes/sandbox-card";
 import { SandboxIntroModal } from "@/components/sandboxes/sandbox-intro-modal";
+import { ViewToggle } from "@/components/shared/view-toggle";
+import { useViewMode } from "@/hooks/use-view-mode";
 import type { Region } from "@/backend/regions";
 import { buildRegionLabel } from "@/lib/regions/format";
 import { listRegionsServerFn } from "@/server/regions/actions";
@@ -113,6 +115,7 @@ function SandboxesListPage() {
   const [isSandboxesLoading, setIsSandboxesLoading] = useState(false);
   const [loadingPage, setLoadingPage] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [viewMode, changeViewMode] = useViewMode("brimble:sandboxes-view", workspace);
   const [sandboxes, setSandboxes] = useState<SandboxResponse[]>(loaderData.sandboxes);
   const [regionLabels, setRegionLabels] = useState<Record<string, string>>(loaderData.regionLabels);
   const [pagination, setPagination] = useState(loaderData.pagination);
@@ -275,13 +278,17 @@ function SandboxesListPage() {
           placeholder="Search sandboxes"
           loading={isSearching || isSandboxesLoading}
           rightSlot={
-            <FilterDropdown
-              value={statusFilter}
-              onChange={(value) => setStatusFilter(value as StatusFilter)}
-              options={STATUS_OPTIONS}
-              placeholder="All Statuses"
-              dropdownWidth={180}
-            />
+            <>
+              <ViewToggle value={viewMode} onChange={changeViewMode} />
+              <div className="h-full w-px self-stretch bg-dash-border" />
+              <FilterDropdown
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value as StatusFilter)}
+                options={STATUS_OPTIONS}
+                placeholder="All Statuses"
+                dropdownWidth={180}
+              />
+            </>
           }
         />
       </div>
@@ -300,16 +307,16 @@ function SandboxesListPage() {
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
-          key={`${searchQuery}:${statusFilter}`}
+          key={`${searchQuery}:${statusFilter}:${viewMode}`}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className={viewMode === "list" ? "flex flex-col gap-2" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"}>
             {filtered.map((sandbox) => (
               <motion.div layout key={sandbox.id}>
-                <SandboxCard sandbox={sandbox} regionLabel={regionLabels[sandbox.region]} />
+                <SandboxCard sandbox={sandbox} regionLabel={regionLabels[sandbox.region]} view={viewMode} />
               </motion.div>
             ))}
           </div>

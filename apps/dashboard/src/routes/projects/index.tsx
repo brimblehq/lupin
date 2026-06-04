@@ -4,6 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { FolderOpen } from "@phosphor-icons/react";
+import { useViewMode } from "@/hooks/use-view-mode";
+import { ViewToggle } from "@/components/shared/view-toggle";
 import { Formik, Form as FormikForm } from "formik";
 import * as Yup from "yup";
 import { PageHeader } from "../../components/shared/page-header";
@@ -609,6 +611,7 @@ function ProjectsPage() {
     },
   );
   const [searchQuery, setSearchQuery] = useState(q);
+  const [viewMode, changeViewMode] = useViewMode("brimble:projects-view", search.workspace);
   const [isFilterChanging, setIsFilterChanging] = useState(false);
   const [isStatusFilterChanging, setIsStatusFilterChanging] = useState(false);
   const [isProjectsLoading, setIsProjectsLoading] = useState(false);
@@ -942,6 +945,8 @@ function ProjectsPage() {
           loading={isSearchSettling}
           rightSlot={
             <>
+              <ViewToggle value={viewMode} onChange={changeViewMode} />
+              <div className="h-full w-px self-stretch bg-dash-border" />
               <FilterDropdown
                 value={activeStatus}
                 onChange={(value) => {
@@ -1018,16 +1023,20 @@ function ProjectsPage() {
           </motion.div>
         ) : (
           <motion.div
-            key={`${q}:${activeTagId ?? "all"}:${activeStatus}:${activeEnvironmentId}:${pagination.currentPage}`}
+            key={`${q}:${activeTagId ?? "all"}:${activeStatus}:${activeEnvironmentId}:${pagination.currentPage}:${viewMode}`}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className={viewMode === "list" ? "flex flex-col gap-2" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"}>
               {filteredProjects.map((project, i) => (
                 <motion.div layout key={`${project.name}-${i}`}>
-                  <ProjectCard project={project} onTagsChange={(nextTags) => handleProjectTagsChange(project.id, nextTags)} />
+                  <ProjectCard
+                    project={project}
+                    view={viewMode}
+                    onTagsChange={(nextTags) => handleProjectTagsChange(project.id, nextTags)}
+                  />
                 </motion.div>
               ))}
             </div>

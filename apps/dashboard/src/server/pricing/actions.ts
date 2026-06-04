@@ -148,6 +148,7 @@ function normalizePlanSpecs(raw: UnknownRecord, defaults?: PlanSpecs): PlanSpecs
     customDomain: toBool(raw.custom_domain),
     deployPrivateOrganization: toBool(raw.deploy_private_organization),
     autoscalingEnabled: toBool(raw.autoscaling_enabled),
+    rateLimitEnabled: toBool(raw.rate_limit_enabled, defaults?.rateLimitEnabled ?? false),
     objectStorageEnabled: toBool(raw.object_storage_enabled, defaults?.objectStorageEnabled ?? false),
     sandboxEnabled: sandboxEnabledFlag || sandboxEnabledByLimits,
     sandboxMaxCount: getNumber(sandbox, "sandbox_max_count", defaults?.sandboxMaxCount ?? 0),

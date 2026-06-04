@@ -9,6 +9,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { DomainList, type Domain } from "../../../../components/shared/domain-list";
 import { TabHeader } from "../../../../components/shared/tab-header";
+import { NetworkSettingsDrawer } from "@/components/project/network-settings-drawer";
+import { RateLimitDrawer } from "@/components/project/rate-limit-drawer";
+import { ChangePlanModal } from "@/components/shared/change-plan-modal";
 import { ProjectDomainsPending } from "@/components/shared/route-pending";
 import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
@@ -171,10 +174,13 @@ function ProjectDomainsPage() {
   );
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const { settingsSnapshot } = (RootRoute.useLoaderData() ?? {}) as any;
-  const { customDomain } = usePlanGate();
+  const { customDomain, rateLimitEnabled, planKey } = usePlanGate();
   const { canWrite } = useWorkspaceRole();
   const { domains: initialDomainsResult, projects } = Route.useLoaderData();
   const [addDomainOpen, setAddDomainOpen] = useState(false);
+  const [networkSettingsOpen, setNetworkSettingsOpen] = useState(false);
+  const [rateLimitOpen, setRateLimitOpen] = useState(false);
+  const [rateLimitUpgradeOpen, setRateLimitUpgradeOpen] = useState(false);
   const [domainsResult, setDomainsResult] = useState<PaginatedDomainsResponse>(initialDomainsResult);
   const [rows, setRows] = useState<Domain[]>(() => initialDomainsResult.items.map((item) => mapDomainToRow(item, project.name)));
   const [isDomainsLoading, setIsDomainsLoading] = useState(false);
@@ -261,7 +267,7 @@ function ProjectDomainsPage() {
   if (!shouldShowProjectDomainsTab(project)) {
     return (
       <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
-        <TabHeader title="Project domains">Domains are not available for this project type.</TabHeader>
+        <TabHeader title="Domains & Networking">Domains are not available for this project type.</TabHeader>
       </div>
     );
   }
@@ -269,7 +275,7 @@ function ProjectDomainsPage() {
   if (!customDomain) {
     return (
       <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
-        <TabHeader title="Project domains">Connect your own domain to this project.</TabHeader>
+        <TabHeader title="Domains & Networking">Connect your own domain to this project.</TabHeader>
         <PlanUpgradePrompt feature="Custom Domains" description="Upgrade to connect your own domain to this project." />
       </div>
     );
@@ -472,7 +478,7 @@ function ProjectDomainsPage() {
 
   return (
     <div className="mx-auto flex max-w-[1000px] flex-col gap-6 py-8">
-      <TabHeader title="Project domains">
+      <TabHeader title="Domains & Networking">
         Manage all your domains on this project. You get a default ".brimble.app" domain with each project you deploy.
       </TabHeader>
 
@@ -507,6 +513,63 @@ function ProjectDomainsPage() {
           loadingPage={loadingPage}
         />
       </div>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-[11px] font-medium uppercase tracking-wider text-dash-text-extra-faded">Network</h3>
+        <div className="flex items-center justify-between gap-4 rounded-[4px] border-[0.5px] border-dash-border px-4 py-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium leading-5 text-dash-text-strong">Edge cache, headers & firewall</p>
+            <p className="mt-0.5 text-sm font-light leading-[1.3] text-dash-text-faded">
+              Configure caching, security response headers, and edge firewall rules for this project.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setNetworkSettingsOpen(true)}
+            className="h-9 shrink-0 rounded-[6px] border-[0.5px] border-dash-border px-4 text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+          >
+            Configure
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-[11px] font-medium uppercase tracking-wider text-dash-text-extra-faded">Rate limiting</h3>
+        <div className="flex items-center justify-between gap-4 rounded-[4px] border-[0.5px] border-dash-border px-4 py-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium leading-5 text-dash-text-strong">Rate limit rules</p>
+            <p className="mt-0.5 text-sm font-light leading-[1.3] text-dash-text-faded">
+              Set request limits per time window, with optional method and path matching.
+            </p>
+          </div>
+          {rateLimitEnabled ? (
+            <button
+              type="button"
+              onClick={() => setRateLimitOpen(true)}
+              className="h-9 shrink-0 rounded-[6px] border-[0.5px] border-dash-border px-4 text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+            >
+              Configure
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRateLimitUpgradeOpen(true)}
+              className="h-9 shrink-0 rounded-[6px] border-[0.5px] border-dash-border px-4 text-sm font-medium text-dash-text-strong transition-colors hover:bg-dash-bg-elevated"
+            >
+              Upgrade to access
+            </button>
+          )}
+        </div>
+      </div>
+
+      <NetworkSettingsDrawer
+        open={networkSettingsOpen}
+        onOpenChange={setNetworkSettingsOpen}
+        projectId={project.id}
+        workspace={workspace}
+      />
+      <RateLimitDrawer open={rateLimitOpen} onOpenChange={setRateLimitOpen} projectId={project.id} workspace={workspace} />
+      <ChangePlanModal open={rateLimitUpgradeOpen} onOpenChange={setRateLimitUpgradeOpen} currentPlan={planKey} />
 
       {canWrite && (
         <AddDomainModal

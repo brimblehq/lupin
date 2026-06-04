@@ -12,6 +12,7 @@ import { createFrameworksApi, type FrameworksApi } from "./frameworks";
 import { createLogsApi, type LogsApi } from "./logs";
 import { createMessagesApi, type MessagesApi } from "./messages";
 import { createMcpApi, type McpApi } from "./mcp";
+import { createNetworkingApi, type NetworkSettingsApi } from "./networking";
 import { createNotificationsApi, type NotificationsApi } from "./notifications";
 import { createObservabilityApi, type ObservabilityApi } from "./observability";
 import { createOverviewApi, type OverviewApi } from "./overview";
@@ -23,6 +24,7 @@ import { createSandboxesApi, type SandboxesApi } from "./sandboxes";
 
 import { createSettingsApi, type SettingsApi } from "./settings";
 import { createTeamsApi, type TeamsApi } from "./teams";
+import { createRatelimitsApi, type RatelimitsApi } from "./ratelimits";
 import { createRegionsApi, type RegionsApi } from "./regions";
 import { createScalingApi, type ScalingApi } from "./scaling";
 import { createTagsApi, type TagsApi } from "./tags";
@@ -30,6 +32,7 @@ import { createVolumesApi, type VolumesApi } from "./volumes";
 
 import { createWorkspacesApi, type WorkspacesApi } from "./workspaces";
 import { createStorageApi, type StorageApi } from "./storage";
+import { createSupportApi, type SupportApi } from "./support";
 
 export * from "./activity-logs";
 export * from "./ably";
@@ -46,12 +49,14 @@ export * from "./frameworks";
 export * from "./logs";
 export * from "./messages";
 export * from "./mcp";
+export * from "./networking";
 export * from "./notifications";
 export * from "./observability";
 export * from "./overview";
 export * from "./payments";
 export * from "./user-overview";
 export * from "./projects";
+export * from "./ratelimits";
 export * from "./regions";
 export * from "./repositories";
 export * from "./sandboxes";
@@ -65,6 +70,7 @@ export * from "./volumes";
 
 export * from "./workspaces";
 export * from "./storage";
+export * from "./support";
 
 export interface BackendApi {
   client: BackendClient;
@@ -83,6 +89,7 @@ export interface BackendApi {
   logs: LogsApi;
   messages: MessagesApi;
   mcp: McpApi;
+  networking: NetworkSettingsApi;
   notifications: NotificationsApi;
   overview: OverviewApi;
   payments: PaymentsApi;
@@ -91,6 +98,7 @@ export interface BackendApi {
   workspaces: WorkspacesApi;
   settings: SettingsApi;
   teams: TeamsApi;
+  ratelimits: RatelimitsApi;
   regions: RegionsApi;
   sandboxes: SandboxesApi;
 
@@ -99,6 +107,7 @@ export interface BackendApi {
   volumes: VolumesApi;
 
   storage: StorageApi;
+  support: SupportApi;
 }
 
 export function createBackendApi(config: BackendClientConfig): BackendApi {
@@ -121,6 +130,7 @@ export function createBackendApi(config: BackendClientConfig): BackendApi {
     logs: createLogsApi(client),
     messages: createMessagesApi(client),
     mcp: createMcpApi(client),
+    networking: createNetworkingApi(client),
     notifications: createNotificationsApi(client),
     overview: createOverviewApi(client),
     payments: createPaymentsApi(client),
@@ -129,6 +139,7 @@ export function createBackendApi(config: BackendClientConfig): BackendApi {
     workspaces: createWorkspacesApi(client),
     settings: createSettingsApi(client),
     teams: createTeamsApi(client),
+    ratelimits: createRatelimitsApi(client),
     regions: createRegionsApi(client),
     sandboxes: createSandboxesApi(client),
 
@@ -137,5 +148,6 @@ export function createBackendApi(config: BackendClientConfig): BackendApi {
     volumes: createVolumesApi(client),
 
     storage: createStorageApi(client),
+    support: createSupportApi(client),
   };
 }

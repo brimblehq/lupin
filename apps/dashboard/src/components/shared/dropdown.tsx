@@ -13,6 +13,8 @@ export interface DropdownOption {
   iconClassName?: string;
   disabled?: boolean;
   asideText?: string;
+  /** Optional helper text rendered under the label to explain the option. */
+  description?: string;
 }
 
 type ObjectProps = {
@@ -32,6 +34,7 @@ type StringProps = {
 type DropdownProps = (ObjectProps | StringProps) & {
   placeholder?: string;
   className?: string;
+  menuMinWidth?: number;
   searchable?: boolean;
   searchPlaceholder?: string;
 };
@@ -42,6 +45,7 @@ export function Dropdown({
   onChange,
   placeholder,
   className,
+  menuMinWidth,
   renderOption,
   searchable = false,
   searchPlaceholder = "Search...",
@@ -57,7 +61,9 @@ export function Dropdown({
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, placement: "bottom" as "bottom" | "top" });
   const safeOptions = useMemo(() => (Array.isArray(options) ? options : []), [options]);
   const isObject = safeOptions.length > 0 && typeof safeOptions[0] === "object";
-  const menuWidth = pos.width > 0 ? pos.width : 240;
+  const menuWidth = Math.max(pos.width > 0 ? pos.width : 240, menuMinWidth ?? 0);
+  const viewportWidth = typeof window === "undefined" ? 0 : window.innerWidth;
+  const menuLeft = viewportWidth > 0 ? Math.max(8, Math.min(pos.left, viewportWidth - menuWidth - 8)) : pos.left;
   const trimmedQuery = query.trim().toLowerCase();
   const showSearch = searchable && safeOptions.length > 0;
 
@@ -318,13 +324,13 @@ export function Dropdown({
             }}
             className={`flex min-h-[46px] w-full items-center justify-between input-base px-3 py-2.5 text-sm leading-6 text-dash-text-strong placeholder:text-[#9ca3af] ${className ?? ""}`}
           >
-            <span className={`flex items-center gap-2 ${displayLabel ? "" : "text-[#9ca3af]"}`}>
+            <span className={`flex min-w-0 items-center gap-2 ${displayLabel ? "" : "text-[#9ca3af]"}`}>
               {selectedOption?.icon && (
                 <img src={selectedOption.icon} alt="" className={`size-4 shrink-0 object-contain ${selectedOption.iconClassName ?? ""}`} />
               )}
-              {displayLabel || placeholder || "Select..."}
+              <span className="truncate">{displayLabel || placeholder || "Select..."}</span>
             </span>
-            <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2, ease }}>
+            <motion.span className="shrink-0" animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2, ease }}>
               <ChevronDown className="size-3.5 text-dash-text-faded" />
             </motion.span>
           </button>
@@ -344,7 +350,7 @@ export function Dropdown({
                 style={{
                   position: "fixed",
                   top: pos.top,
-                  left: pos.left,
+                  left: menuLeft,
                   width: menuWidth,
                   zIndex: 9999,
                   pointerEvents: "auto",
@@ -373,7 +379,9 @@ export function Dropdown({
                           setOpen(false);
                         }}
                         disabled={opt.disabled}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-dash-bg-elevated ${
+                        className={`flex w-full px-3 text-left text-sm transition-colors hover:bg-dash-bg-elevated ${
+                          opt.description ? "flex-col items-start gap-0.5 py-2" : "items-center gap-2 py-1.5"
+                        } ${
                           opt.disabled
                             ? "cursor-not-allowed text-dash-text-extra-faded hover:bg-transparent"
                             : opt.id === value
@@ -381,13 +389,16 @@ export function Dropdown({
                               : "text-dash-text-faded"
                         } ${index === highlightedIndex && !opt.disabled ? "bg-dash-bg-elevated" : ""}`}
                       >
-                        <span className="flex min-w-0 items-center gap-2">
+                        <span className="flex w-full min-w-0 items-center gap-2">
                           {opt.icon && (
                             <img src={opt.icon} alt="" className={`size-4 shrink-0 object-contain ${opt.iconClassName ?? ""}`} />
                           )}
                           <span className="truncate">{opt.label}</span>
+                          {opt.asideText && <span className="ml-auto shrink-0 text-[11px] text-[#4879f8]">{opt.asideText}</span>}
                         </span>
-                        {opt.asideText && <span className="ml-auto shrink-0 text-[11px] text-[#4879f8]">{opt.asideText}</span>}
+                        {opt.description && (
+                          <span className="text-xs font-normal leading-snug text-dash-text-faded">{opt.description}</span>
+                        )}
                       </button>
                     ))
                   : filteredStringOptions.map((opt, index) => (

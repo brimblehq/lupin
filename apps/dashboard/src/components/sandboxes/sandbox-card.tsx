@@ -14,6 +14,7 @@ const cardMetaIconClass = "size-3.5 shrink-0 opacity-60 invert dark:invert-0";
 interface SandboxCardProps {
   sandbox: SandboxResponse;
   regionLabel?: string;
+  view?: "card" | "list";
 }
 
 function formatCountdown(targetMs: number, nowMs: number): string {
@@ -72,7 +73,7 @@ function formatAbsoluteDate(timestamp: string | null | undefined): string {
   }).format(date);
 }
 
-export function SandboxCard({ sandbox, regionLabel }: SandboxCardProps) {
+export function SandboxCard({ sandbox, regionLabel, view = "card" }: SandboxCardProps) {
   const memoryMb = sandbox.specs?.memory ?? 0;
   const cpuMhz = sandbox.specs?.cpu ?? 0;
   const diskGb = sandbox.specs?.disk ?? 0;
@@ -83,12 +84,83 @@ export function SandboxCard({ sandbox, regionLabel }: SandboxCardProps) {
   const destroyAtAbsolute = sandbox.expiresAt ? formatAbsoluteDate(sandbox.expiresAt) : undefined;
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
 
+  const templateIcon = (() => {
+    const icon = getTemplateIcon(sandbox.template);
+    if (icon) {
+      return <img src={icon.src} alt="" className={`size-5 shrink-0 object-contain ${icon.shouldInvert ? "dark:invert" : ""}`} />;
+    }
+    return (
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-dash-bg-elevated text-[10px] font-semibold uppercase text-dash-text-faded">
+        {sandboxName.charAt(0)}
+      </span>
+    );
+  })();
+
+  const metaItems = (
+    <>
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        <img src="/icons/cpu.svg" alt="" className={cardMetaIconClass} />
+        {cpuMhz} MHz
+      </span>
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        <img src="/icons/memory.svg" alt="" className={cardMetaIconClass} />
+        {memoryMb} MB
+      </span>
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        <img src="/icons/disk.svg" alt="" className={cardMetaIconClass} />
+        {diskGb} GB
+      </span>
+      <span className="inline-flex min-w-0 items-center gap-1.5 overflow-hidden">
+        <img src="/icons/region.svg" alt="" className={cardMetaIconClass} />
+        <span className="truncate whitespace-nowrap">{regionLabel ?? sandbox.region}</span>
+      </span>
+    </>
+  );
+
+  const linkTo = withWorkspaceQuery({ pathname: `/sandboxes/${sandbox.id}`, searchStr }) as any;
+
+  if (view === "list") {
+    return (
+      <Link to={linkTo} preload="intent" className="block w-full text-left">
+        <motion.div
+          whileHover={{ scale: 1.004 }}
+          whileTap={{ scale: 0.997 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="flex cursor-pointer items-center gap-3 overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg px-3.5 py-3 text-sm tracking-[-0.02px]"
+        >
+          {templateIcon}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 leading-tight">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 truncate font-medium text-dash-text-strong">{sandboxName}</span>
+              <StatusChip status={sandbox.status} className="shrink-0 origin-left scale-[0.85]" />
+            </div>
+            <span className="min-w-0 truncate text-xs font-light text-dash-text-faded">{sandbox.template}</span>
+          </div>
+
+          <div className="hidden shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-dash-text-faded md:flex">{metaItems}</div>
+
+          <span
+            className="hidden shrink-0 text-xs leading-[18px] tracking-[-0.02px] text-dash-text-extra-faded lg:inline"
+            title={lastActivityAbsolute}
+          >
+            {lastActivityLabel}
+          </span>
+          {destroyCountdown ? (
+            <span
+              className="hidden shrink-0 items-center gap-1.5 text-xs tabular-nums leading-[18px] tracking-[-0.02px] text-dash-text-faded sm:inline-flex"
+              title={destroyAtAbsolute ? `Expires at ${destroyAtAbsolute}` : undefined}
+            >
+              <Timer className="size-3.5 shrink-0" />
+              destroys in {destroyCountdown}
+            </span>
+          ) : null}
+        </motion.div>
+      </Link>
+    );
+  }
+
   return (
-    <Link
-      to={withWorkspaceQuery({ pathname: `/sandboxes/${sandbox.id}`, searchStr }) as any}
-      preload="intent"
-      className="block w-full text-left"
-    >
+    <Link to={linkTo} preload="intent" className="block w-full text-left">
       <motion.div
         whileHover={{ y: -3, scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
@@ -98,19 +170,7 @@ export function SandboxCard({ sandbox, regionLabel }: SandboxCardProps) {
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-3.5 pt-3 pb-3 text-sm tracking-[-0.02px]">
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              {(() => {
-                const icon = getTemplateIcon(sandbox.template);
-                if (icon) {
-                  return (
-                    <img src={icon.src} alt="" className={`size-5 shrink-0 object-contain ${icon.shouldInvert ? "dark:invert" : ""}`} />
-                  );
-                }
-                return (
-                  <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-dash-bg-elevated text-[10px] font-semibold uppercase text-dash-text-faded">
-                    {sandboxName.charAt(0)}
-                  </span>
-                );
-              })()}
+              {templateIcon}
               <div className="flex min-w-0 flex-col leading-tight">
                 <span className="min-w-0 truncate font-medium text-dash-text-strong">{sandboxName}</span>
                 <span className="min-w-0 truncate text-xs font-light text-dash-text-faded">{sandbox.template}</span>
@@ -119,24 +179,7 @@ export function SandboxCard({ sandbox, regionLabel }: SandboxCardProps) {
             <StatusChip status={sandbox.status} className="shrink-0 origin-top-right scale-[0.92]" />
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-dash-text-faded">
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-              <img src="/icons/cpu.svg" alt="" className={cardMetaIconClass} />
-              {cpuMhz} MHz
-            </span>
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-              <img src="/icons/memory.svg" alt="" className={cardMetaIconClass} />
-              {memoryMb} MB
-            </span>
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-              <img src="/icons/disk.svg" alt="" className={cardMetaIconClass} />
-              {diskGb} GB
-            </span>
-            <span className="inline-flex min-w-0 items-center gap-1.5 overflow-hidden">
-              <img src="/icons/region.svg" alt="" className={cardMetaIconClass} />
-              <span className="truncate whitespace-nowrap">{regionLabel ?? sandbox.region}</span>
-            </span>
-          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-dash-text-faded">{metaItems}</div>
         </div>
 
         <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-t-[0.5px] border-dash-border px-3.5">

@@ -31,6 +31,34 @@ function getErrorMeta(error: any) {
   };
 }
 
+type VerifyEmailCodePayload = VerifyEmailCodeInput & { geo?: ClientGeoData | null };
+type VerifyTwoFactorChallengePayload = VerifyTwoFactorChallengeInput & { geo?: ClientGeoData | null };
+type FinalizeOauthSessionPayload = {
+  accessToken: string;
+  refreshToken?: string;
+  user?: Partial<AuthSession["user"]>;
+  geo?: ClientGeoData | null;
+};
+
+const verifyEmailCodeSchema = Yup.object({
+  email: Yup.string().trim().required("Email is required"),
+  code: Yup.string().trim().required("Code is required"),
+  geo: Yup.mixed<ClientGeoData>().nullable().optional(),
+});
+
+const verifyTwoFactorChallengeSchema = Yup.object({
+  challengeToken: Yup.string().trim().required("Missing challenge token. Please log in again."),
+  code: Yup.string().trim().required("Enter a verification code."),
+  geo: Yup.mixed<ClientGeoData>().nullable().optional(),
+});
+
+const finalizeOauthSessionSchema = Yup.object({
+  accessToken: Yup.string().trim().required("Access token is required"),
+  refreshToken: Yup.string().trim().optional(),
+  user: Yup.mixed<Partial<AuthSession["user"]>>().optional(),
+  geo: Yup.mixed<ClientGeoData>().nullable().optional(),
+});
+
 export const requestLoginOtpServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
   const payload = data as (LoginInput & { geo?: ClientGeoData }) | undefined;
   if (!payload?.email) {
@@ -75,67 +103,65 @@ export const resendAuthCodeServerFn = createServerFn({ method: "POST" }).handler
   return { ok: true } as const;
 });
 
-export const verifyEmailCodeServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
-  const { geo, ...rest } = data as VerifyEmailCodeInput & { geo?: ClientGeoData };
-  const result = await getServerBackendApi(geo).auth.verifyEmailCode(rest);
+export const verifyEmailCodeServerFn = createServerFn({ method: "POST" })
+  .inputValidator((data: VerifyEmailCodePayload | undefined) => {
+    return verifyEmailCodeSchema.validateSync(data ?? {}, { stripUnknown: true }) as VerifyEmailCodePayload;
+  })
+  .handler(async ({ data }) => {
+    const { geo, ...rest } = data;
+    const result = await getServerBackendApi(geo).auth.verifyEmailCode(rest);
 
-  if (result.requiresTwoFactor) {
+    if (result.requiresTwoFactor) {
+      return {
+        ok: true as const,
+        requiresTwoFactor: true as const,
+        challengeToken: result.challengeToken,
+        expiresIn: result.expiresIn,
+      };
+    }
+
+    const session = result.session;
+    setServerAuthCookies(session);
+
+    authLogger.info("verifyEmailCode success", {
+      userId: session.user?.id ?? null,
+      hasAccessToken: Boolean(session.accessToken),
+      hasRefreshToken: Boolean(session.refreshToken),
+    });
+
     return {
       ok: true as const,
-      requiresTwoFactor: true as const,
-      challengeToken: result.challengeToken,
-      expiresIn: result.expiresIn,
+      requiresTwoFactor: false as const,
+      user: session.user,
     };
-  }
-
-  const session = result.session;
-  setServerAuthCookies(session);
-
-  authLogger.info("verifyEmailCode success", {
-    userId: session.user?.id ?? null,
-    hasAccessToken: Boolean(session.accessToken),
-    hasRefreshToken: Boolean(session.refreshToken),
   });
-
-  return {
-    ok: true as const,
-    requiresTwoFactor: false as const,
-    user: session.user,
-  };
-});
 
 export const verifyTwoFactorChallengeServerFn = createServerFn({
   method: "POST",
-}).handler(async ({ data }) => {
-  const payload = data as VerifyTwoFactorChallengeInput & { geo?: ClientGeoData };
-  const challengeToken = payload.challengeToken?.trim();
-  const code = String(payload.code ?? "").trim();
+})
+  .inputValidator((data: VerifyTwoFactorChallengePayload | undefined) => {
+    return verifyTwoFactorChallengeSchema.validateSync(data ?? {}, { stripUnknown: true }) as VerifyTwoFactorChallengePayload;
+  })
+  .handler(async ({ data }) => {
+    const { challengeToken, code, geo } = data;
 
-  if (!challengeToken) {
-    throw new Error("Missing challenge token. Please log in again.");
-  }
+    const session = await getServerBackendApi(geo).auth.verifyTwoFactorChallenge({
+      challengeToken,
+      code,
+    });
+    setServerAuthCookies(session);
 
-  if (!code) {
-    throw new Error("Enter a verification code.");
-  }
+    authLogger.info("verifyTwoFactorChallenge success", {
+      userId: session.user?.id ?? null,
+      hasAccessToken: Boolean(session.accessToken),
+      hasRefreshToken: Boolean(session.refreshToken),
+    });
 
-  const session = await getServerBackendApi(payload.geo).auth.verifyTwoFactorChallenge({
-    challengeToken,
-    code,
+    return {
+      ok: true as const,
+      user: session.user,
+    };
   });
-  setServerAuthCookies(session);
-
-  authLogger.info("verifyTwoFactorChallenge success", {
-    userId: session.user?.id ?? null,
-    hasAccessToken: Boolean(session.accessToken),
-    hasRefreshToken: Boolean(session.refreshToken),
-  });
-
-  return {
-    ok: true as const,
-    user: session.user,
-  };
-});
 
 export const getTwoFactorStatusServerFn = createServerFn({ method: "GET" }).handler(async () => {
   return withTokenRefresh((api) => api.auth.getTwoFactorStatus());
@@ -341,60 +367,59 @@ export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler
   }
 });
 
-export const finalizeOauthSessionServerFn = createServerFn({ method: "POST" }).handler(async ({ data }) => {
-  const { geo, ...rest } = data as {
-    accessToken: string;
-    refreshToken?: string;
-    user?: Partial<AuthSession["user"]>;
-    geo?: ClientGeoData;
-  };
-  const payload = rest;
+export const finalizeOauthSessionServerFn = createServerFn({ method: "POST" })
+  .inputValidator((data: FinalizeOauthSessionPayload | undefined) => {
+    return finalizeOauthSessionSchema.validateSync(data ?? {}, { stripUnknown: true }) as FinalizeOauthSessionPayload;
+  })
+  .handler(async ({ data }) => {
+    const { geo, ...rest } = data;
+    const payload = rest;
 
-  const geoHeaders: Record<string, string> = {};
-  if (geo?.ip) geoHeaders["X-Forwarded-For"] = geo.ip;
-  if (geo?.city || geo?.region || geo?.country) {
-    geoHeaders["X-Client-Location"] = [geo?.city, geo?.region, geo?.country].filter(Boolean).join(", ");
-  }
-  if (geo?.timezone) geoHeaders["X-Client-Timezone"] = geo.timezone;
+    const geoHeaders: Record<string, string> = {};
+    if (geo?.ip) geoHeaders["X-Forwarded-For"] = geo.ip;
+    if (geo?.city || geo?.region || geo?.country) {
+      geoHeaders["X-Client-Location"] = [geo?.city, geo?.region, geo?.country].filter(Boolean).join(", ");
+    }
+    if (geo?.timezone) geoHeaders["X-Client-Timezone"] = geo.timezone;
 
-  const backendWithOauthToken = createBackendApi({
-    baseUrl: serverConfig.apiUrl,
-    getAccessToken: () => payload.accessToken,
-    defaultHeaders: geoHeaders,
-    signatureSecret: serverConfig.hmacSecretKey,
-    apiKey: serverConfig.apiKey,
+    const backendWithOauthToken = createBackendApi({
+      baseUrl: serverConfig.apiUrl,
+      getAccessToken: () => payload.accessToken,
+      defaultHeaders: geoHeaders,
+      signatureSecret: serverConfig.hmacSecretKey,
+      apiKey: serverConfig.apiKey,
+    });
+
+    const currentSession = await backendWithOauthToken.auth.getCurrentSession();
+
+    const session: AuthSession = {
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken,
+      user: currentSession?.user ?? {
+        id: String(payload.user?.id ?? ""),
+        email: String(payload.user?.email ?? ""),
+        username: payload.user?.username,
+        firstName: payload.user?.firstName,
+        lastName: payload.user?.lastName,
+        company: payload.user?.company,
+        name: payload.user?.name,
+        onboarded: payload.user?.onboarded,
+      },
+    };
+
+    setServerAuthCookies(session);
+
+    authLogger.info("finalizeOauthSession success", {
+      userId: session.user?.id ?? null,
+      hasAccessToken: Boolean(session.accessToken),
+      hasRefreshToken: Boolean(session.refreshToken),
+    });
+
+    return {
+      ok: true as const,
+      user: session.user,
+    };
   });
-
-  const currentSession = await backendWithOauthToken.auth.getCurrentSession();
-
-  const session: AuthSession = {
-    accessToken: payload.accessToken,
-    refreshToken: payload.refreshToken,
-    user: currentSession?.user ?? {
-      id: String(payload.user?.id ?? ""),
-      email: String(payload.user?.email ?? ""),
-      username: payload.user?.username,
-      firstName: payload.user?.firstName,
-      lastName: payload.user?.lastName,
-      company: payload.user?.company,
-      name: payload.user?.name,
-      onboarded: payload.user?.onboarded,
-    },
-  };
-
-  setServerAuthCookies(session);
-
-  authLogger.info("finalizeOauthSession success", {
-    userId: session.user?.id ?? null,
-    hasAccessToken: Boolean(session.accessToken),
-    hasRefreshToken: Boolean(session.refreshToken),
-  });
-
-  return {
-    ok: true as const,
-    user: session.user,
-  };
-});
 
 function createRecoveryBackend(recoveryToken: string) {
   return createBackendApi({

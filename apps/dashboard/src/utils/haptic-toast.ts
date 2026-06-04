@@ -14,39 +14,10 @@ const VIBRATE = {
   warning: [40, 100, 40],
 };
 
-const REPORT_ERROR_EMAIL = "hello@brimble.app";
-const REPORT_ERROR_SUBJECT = "Dashboard Error Report";
+export const REPORT_ERROR_EVENT = "brimble:report-error";
 
-function getProjectIdFromUrl(url: string): string | undefined {
-  const match = url.match(/\/projects\/([^/?#]+)/);
-  return match?.[1];
-}
-
-function buildReportErrorBody(message?: string): string {
-  const timestamp = new Date().toISOString();
-  const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-  const projectId = getProjectIdFromUrl(currentUrl);
-  const lines = [
-    "Hi Brimble team,",
-    "",
-    "I encountered an error in the dashboard.",
-    "",
-    `Error message: ${message || "N/A"}`,
-    `Page URL: ${currentUrl || "N/A"}`,
-    `Project ID: ${projectId || "N/A"}`,
-    `Time (UTC): ${timestamp}`,
-    "",
-    "What I was doing:",
-    "[Please describe what you were doing when this happened]",
-    "",
-    "Expected result:",
-    "[Please describe what you expected to happen]",
-    "",
-    "Actual result:",
-    "[Please describe what happened instead]",
-  ];
-
-  return lines.join("\n");
+export interface ReportErrorEventDetail {
+  message?: string;
 }
 
 function getToastMessageText(message: unknown): string | undefined {
@@ -58,14 +29,12 @@ function getToastMessageText(message: unknown): string | undefined {
   return trimmed || undefined;
 }
 
-function openErrorReportMail(message?: string) {
+function openErrorReport(message?: string) {
   if (typeof window === "undefined") {
     return;
   }
 
-  const subject = encodeURIComponent(REPORT_ERROR_SUBJECT);
-  const body = encodeURIComponent(buildReportErrorBody(message));
-  window.location.href = `mailto:${REPORT_ERROR_EMAIL}?subject=${subject}&body=${body}`;
+  window.dispatchEvent(new CustomEvent<ReportErrorEventDetail>(REPORT_ERROR_EVENT, { detail: { message } }));
 }
 
 export const hapticToast = Object.assign((...args: Parameters<typeof sonnerToast>) => sonnerToast(...args), {
@@ -85,7 +54,7 @@ export const hapticToast = Object.assign((...args: Parameters<typeof sonnerToast
         ? options?.action
         : {
             label: "Report error",
-            onClick: () => openErrorReportMail(messageText),
+            onClick: () => openErrorReport(messageText),
           },
     });
   },

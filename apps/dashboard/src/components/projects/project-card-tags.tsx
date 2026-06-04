@@ -6,6 +6,10 @@ import type { Tag } from "@/types/tags";
 interface ProjectCardTagsProps {
   tags: Tag[];
   maxVisible?: number;
+  /** Override the trigger row classes (layout/padding). Defaults to the card layout. */
+  className?: string;
+  /** Render tag name labels next to the dots. Set false for a compact dots-only row. */
+  showLabels?: boolean;
 }
 
 const springTransition = {
@@ -15,7 +19,7 @@ const springTransition = {
   mass: 0.8,
 };
 
-export function ProjectCardTags({ tags, maxVisible = 2 }: ProjectCardTagsProps) {
+export function ProjectCardTags({ tags, maxVisible = 2, className, showLabels = true }: ProjectCardTagsProps) {
   const [open, setOpen] = useState(false);
   if (tags.length === 0) return null;
 
@@ -24,11 +28,11 @@ export function ProjectCardTags({ tags, maxVisible = 2 }: ProjectCardTagsProps) 
   const showTooltip = tags.length > 1;
 
   const trigger = (
-    <div className="flex items-center gap-2 px-3.5 pb-1.5">
+    <div className={className ?? "flex items-center gap-2 pb-1.5 pl-[19px] pr-3.5"}>
       {visible.map((tag) => (
         <span key={tag.id} className="flex items-center gap-1.5">
           <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} />
-          <span className="text-xs text-dash-text-faded">{tag.name}</span>
+          {showLabels ? <span className="text-xs text-dash-text-faded">{tag.name}</span> : null}
         </span>
       ))}
       {overflow > 0 && (

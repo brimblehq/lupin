@@ -136,7 +136,15 @@ function ProjectIdentityIcon({ project }: { project: Project }) {
   );
 }
 
-export function ProjectCard({ project, onTagsChange }: { project: Project; onTagsChange?: (tags: Project["tags"]) => void }) {
+export function ProjectCard({
+  project,
+  onTagsChange,
+  view = "card",
+}: {
+  project: Project;
+  onTagsChange?: (tags: Project["tags"]) => void;
+  view?: "card" | "list";
+}) {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspace = getWorkspaceFromSearch({ searchStr });
   const slug = (project.slug || project.name).toLowerCase().replace(/\s+/g, "-");
@@ -180,6 +188,97 @@ export function ProjectCard({ project, onTagsChange }: { project: Project; onTag
     onTagsChange?.(nextTags);
   }
 
+  const kebabButton = (
+    <button
+      ref={dotsRef}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setTagPopoverOpen((v) => !v);
+      }}
+      className="shrink-0 text-dash-text-extra-faded transition-colors hover:text-dash-text-faded"
+    >
+      <MoreVertical className="size-4" />
+    </button>
+  );
+
+  const transferButton = (
+    <button
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setTransferOpen(true);
+      }}
+      aria-label="Transfer project to workspace"
+      className="shrink-0 text-dash-text-extra-faded transition-colors hover:text-dash-text-strong"
+    >
+      <ArrowLeftRight className="size-4" />
+    </button>
+  );
+
+  if (view === "list") {
+    return (
+      <Link to="/projects/$projectId" params={{ projectId: projectRouteId }} search={workspace ? { workspace } : {}} className="block">
+        <motion.div
+          whileHover={{ scale: 1.004 }}
+          whileTap={{ scale: 0.997 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="flex cursor-pointer items-center gap-3 overflow-clip rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-3"
+        >
+          <ProjectIdentityIcon project={project} />
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-sm font-medium leading-5 tracking-[-0.02px] text-dash-text-strong">{project.name}</span>
+              {project.status ? <StatusChip status={project.status} className="shrink-0 scale-[0.85] origin-left" /> : null}
+            </div>
+            <span className="truncate text-xs font-light leading-[18px] text-dash-text-faded">{project.commitMessage}</span>
+          </div>
+
+          <ProjectCardTags
+            tags={projectTags}
+            maxVisible={3}
+            showLabels={false}
+            className="hidden shrink-0 items-center gap-1.5 sm:flex"
+          />
+
+          <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+            {isDatabaseProject ? (
+              <img src="/icons/database.svg" alt="" className="size-5 shrink-0" />
+            ) : (
+              <img src="/icons/git-circle.svg" alt="" className="size-5 shrink-0" />
+            )}
+            <span className="text-[13px] tracking-[-0.02px] text-dash-text-strong">From {project.branch}</span>
+          </div>
+
+          <span className="hidden shrink-0 font-mono text-xs uppercase tracking-[-0.02px] text-dash-text-extra-faded opacity-80 lg:inline">
+            Updated {project.updatedAt}
+          </span>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            {kebabButton}
+            {transferButton}
+          </div>
+        </motion.div>
+        <TagAssignmentPopover
+          projectId={projectTagTargetId}
+          anchorRef={dotsRef}
+          open={tagPopoverOpen}
+          onOpenChange={setTagPopoverOpen}
+          assignedTagIds={projectTags.map((t) => t.id)}
+          onAssignedTagIdsChange={handleAssignedTagIdsChange}
+        />
+        <TransferProjectModal
+          open={transferOpen}
+          onOpenChange={setTransferOpen}
+          projectId={projectTagTargetId}
+          projectName={project.name}
+          currentWorkspaceSlug={workspace}
+        />
+      </Link>
+    );
+  }
+
   return (
     <Link to="/projects/$projectId" params={{ projectId: projectRouteId }} search={workspace ? { workspace } : {}} className="block">
       <motion.div
@@ -205,13 +304,13 @@ export function ProjectCard({ project, onTagsChange }: { project: Project; onTag
         {/* Branch with git icon + vertical line */}
         <div className="relative flex shrink-0 items-center gap-2 px-3 pb-1 pt-0.5">
           {/* Vertical line above icon */}
-          <div className="absolute left-[23px] top-[-6px] h-[16px] w-px bg-dash-border" />
+          <div className="absolute left-[21px] top-[-6px] h-[16px] w-px bg-dash-border" />
           {isDatabaseProject ? (
             <img src="/icons/database.svg" alt="" className="size-5 shrink-0" />
           ) : (
-            <img src="/icons/git-circle.svg" alt="" className="size-6 shrink-0" />
+            <img src="/icons/git-circle.svg" alt="" className="size-5 shrink-0" />
           )}
-          <span className="text-sm tracking-[-0.02px] text-dash-text-strong">From {project.branch}</span>
+          <span className="text-[13px] tracking-[-0.02px] text-dash-text-strong">From {project.branch}</span>
         </div>
 
         {/* Updated timestamp + star */}
@@ -220,29 +319,8 @@ export function ProjectCard({ project, onTagsChange }: { project: Project; onTag
             Updated {project.updatedAt}
           </span>
           <div className="flex items-center gap-1.5">
-            <button
-              ref={dotsRef}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setTagPopoverOpen((v) => !v);
-              }}
-              className="shrink-0 text-dash-text-extra-faded transition-colors hover:text-dash-text-faded"
-            >
-              <MoreVertical className="size-4" />
-            </button>
-            <button
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setTransferOpen(true);
-              }}
-              aria-label="Transfer project to workspace"
-              className="shrink-0 text-dash-text-extra-faded transition-colors hover:text-dash-text-strong"
-            >
-              <ArrowLeftRight className="size-4" />
-            </button>
+            {kebabButton}
+            {transferButton}
           </div>
         </div>
       </motion.div>
