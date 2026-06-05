@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { X } from "lucide-react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { hapticToast as toast } from "@/utils/haptic-toast";
@@ -19,6 +20,16 @@ import { usePaymentMethods } from "@/hooks/use-payments";
 import { hasCompletedTour, startProductTour } from "./product-tour";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+const DISMISS_STORAGE_KEY = "brimble:onboarding-checklist-dismissed";
+
+function readDismissed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(DISMISS_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 interface OnboardingTask {
   label: string;
@@ -108,6 +119,7 @@ export function OnboardingChecklist({
   const [expanded, setExpanded] = useState(false);
   const [hasFollowed, setHasFollowed] = useState(Boolean(settingsSnapshot?.profile?.followedX));
   const [hasTakenTour, setHasTakenTour] = useState(() => hasCompletedTour());
+  const [dismissed, setDismissed] = useState(readDismissed);
 
   useEffect(() => {
     function handleStorage(event: StorageEvent) {
@@ -347,11 +359,25 @@ export function OnboardingChecklist({
     [navigate, searchStr, haptics, updateFollowedX],
   );
 
-  // Avoid flash-then-disappear while workspace-specific checks are still resolving.
-  if (!checklistSignalsReady) return null;
+  const handleDismiss = useCallback(() => {
+    haptics.selection();
+    try {
+      localStorage.setItem(DISMISS_STORAGE_KEY, "true");
+    } catch {
+      // ignore — dismissal just won't persist
+    }
+    setDismissed(true);
+  }, [haptics]);
 
-  // Hide if all tasks are done or if user is a Viewer
-  if (!canWrite || completedCount === tasks.length) return null;
+  const visible = checklistSignalsReady && canWrite && completedCount < tasks.length && !dismissed;
+
+  useEffect(() => {
+    if (!visible) return;
+    document.body.setAttribute("data-onboarding-checklist", "visible");
+    return () => document.body.removeAttribute("data-onboarding-checklist");
+  }, [visible]);
+
+  if (!visible) return null;
 
   return (
     <motion.div
@@ -363,31 +389,32 @@ export function OnboardingChecklist({
     >
       {/* Collapsed pill */}
       {!expanded && (
-        <motion.button
-          key="pill"
-          onClick={() => {
-            haptics.soft();
-            setExpanded(true);
-          }}
-          className="ml-auto flex items-center gap-2 rounded-full border-[0.5px] border-dash-border bg-dash-bg px-4 py-2.5 text-sm font-medium text-dash-text-strong shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] transition-colors hover:bg-dash-bg-elevated dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-            rotate: [0, 0, -2, 2, -2, 2, 0, 0],
-          }}
-          transition={{
-            duration: 0.2,
-            ease: EASE,
-            rotate: {
-              duration: 0.5,
-              ease: "easeInOut",
-              repeat: Infinity,
-              repeatDelay: 8,
-              delay: 5,
-            },
-          }}
-        >
+        <div className="flex items-center justify-end gap-2">
+          <motion.button
+            key="pill"
+            onClick={() => {
+              haptics.soft();
+              setExpanded(true);
+            }}
+            className="flex items-center gap-2 rounded-full border-[0.5px] border-dash-border bg-dash-bg px-4 py-2.5 text-sm font-medium text-dash-text-strong shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] transition-colors hover:bg-dash-bg-elevated dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              rotate: [0, 0, -2, 2, -2, 2, 0, 0],
+            }}
+            transition={{
+              duration: 0.2,
+              ease: EASE,
+              rotate: {
+                duration: 0.5,
+                ease: "easeInOut",
+                repeat: Infinity,
+                repeatDelay: 8,
+                delay: 5,
+              },
+            }}
+          >
           {/* Progress ring */}
           <svg width="20" height="20" viewBox="0 0 20 20" className="shrink-0">
             <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2" className="text-dash-border" />
@@ -406,10 +433,19 @@ export function OnboardingChecklist({
           <span>
             {completedCount}/{tasks.length} completed
           </span>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-dash-text-faded">
-            <path d="M4 10L8 6L12 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </motion.button>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-dash-text-faded">
+              <path d="M4 10L8 6L12 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </motion.button>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            aria-label="Dismiss checklist"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full border-[0.5px] border-dash-border bg-dash-bg text-dash-text-faded shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,0.3)] transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
       )}
 
       {/* Expanded card */}
@@ -432,17 +468,28 @@ export function OnboardingChecklist({
                   {completedCount}/{tasks.length} completed
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  haptics.selection();
-                  setExpanded(false);
-                }}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-strong"
-              >
-                <motion.svg width="16" height="16" viewBox="0 0 16 16" fill="none" animate={{ rotate: 180 }} transition={{ duration: 0.2 }}>
-                  <path d="M4 10L8 6L12 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </motion.svg>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleDismiss}
+                  aria-label="Dismiss checklist"
+                  title="Don't show this again"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-strong"
+                >
+                  <X className="size-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    haptics.selection();
+                    setExpanded(false);
+                  }}
+                  aria-label="Collapse"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-dash-text-faded transition-colors hover:bg-dash-bg hover:text-dash-text-strong"
+                >
+                  <motion.svg width="16" height="16" viewBox="0 0 16 16" fill="none" animate={{ rotate: 180 }} transition={{ duration: 0.2 }}>
+                    <path d="M4 10L8 6L12 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </motion.svg>
+                </button>
+              </div>
             </div>
 
             {/* Progress bar */}

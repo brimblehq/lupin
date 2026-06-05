@@ -36,6 +36,7 @@ function formatBytes(bytes: number): string {
 
 /** Backend/service frameworks that don't produce browser screenshots */
 const SERVICE_FRAMEWORKS = new Set(["other", "custom", "docker", "laravel", "php", "python", "golang", "ruby"]);
+const META_VALUE_CLASS = "font-mono text-xs leading-[18px] text-dash-text-strong";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -367,7 +368,7 @@ function ProjectDetailPage() {
                   <img src="/icons/schedule.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Created on</span>
                 </div>
-                <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{createdOnText}</span>
+                <span className={META_VALUE_CLASS}>{createdOnText}</span>
               </div>
               <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                 <div className="flex items-center gap-2">
@@ -385,7 +386,7 @@ function ProjectDetailPage() {
                   {typeof statusCode === "number" ? (
                     <span className="rounded-[4px] bg-[#13d282]/15 px-2 py-0.5 text-xs font-medium text-[#13d282]">{statusCode}</span>
                   ) : (
-                    <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">N/A</span>
+                    <span className={META_VALUE_CLASS}>N/A</span>
                   )}
                 </div>
               ) : null}
@@ -394,7 +395,7 @@ function ProjectDetailPage() {
                   <img src="/icons/region.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Region</span>
                 </div>
-                <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{regionText}</span>
+                <span className={META_VALUE_CLASS}>{regionText}</span>
               </div>
               {showSitePasswordRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
@@ -402,13 +403,13 @@ function ProjectDetailPage() {
                     <img src="/icons/lock.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Site password enabled</span>
                   </div>
-                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{passwordEnabledText}</span>
+                  <span className={META_VALUE_CLASS}>{passwordEnabledText}</span>
                 </div>
               ) : null}
               {showMcpAuthRow ? (
                 <div className="flex items-center justify-between border-b-[0.5px] border-dash-border p-3.5">
                   <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Authentication enabled</span>
-                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{project?.authEnabled ? "Yes" : "No"}</span>
+                  <span className={META_VALUE_CLASS}>{project?.authEnabled ? "Yes" : "No"}</span>
                 </div>
               ) : null}
               {showBuildCacheRow ? (
@@ -417,7 +418,7 @@ function ProjectDetailPage() {
                     <img src="/icons/storage.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Build cache enabled</span>
                   </div>
-                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{project?.buildCacheEnabled ? "Yes" : "No"}</span>
+                  <span className={META_VALUE_CLASS}>{project?.buildCacheEnabled ? "Yes" : "No"}</span>
                 </div>
               ) : null}
               {showComputeSizeRow ? (
@@ -426,7 +427,7 @@ function ProjectDetailPage() {
                     <img src="/icons/cpu.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Compute size</span>
                   </div>
-                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{computeSizeText}</span>
+                  <span className={META_VALUE_CLASS}>{computeSizeText}</span>
                 </div>
               ) : null}
               {isDatabaseProject ? (
@@ -435,7 +436,7 @@ function ProjectDetailPage() {
                     <img src="/icons/info.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light leading-[1.3] text-dash-text-faded">Public access</span>
                   </div>
-                  <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{publicAccessText}</span>
+                  <span className={META_VALUE_CLASS}>{publicAccessText}</span>
                 </div>
               ) : null}
               {showFrameworkRow ? (
@@ -444,7 +445,7 @@ function ProjectDetailPage() {
                 >
                   <div className="flex items-center gap-2">
                     <img
-                      src={isDatabaseProject ? "/icons/container.svg" : "/icons/box.svg"}
+                      src={isDatabaseProject ? "/icons/container.svg" : "/icons/code.svg"}
                       alt=""
                       aria-hidden="true"
                       className="size-4 invert dark:invert-0"
@@ -454,7 +455,7 @@ function ProjectDetailPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[13px] leading-[1.4] text-dash-text-strong">{frameworkLabel}</span>
+                    <span className={META_VALUE_CLASS}>{frameworkLabel}</span>
                     {frameworkLogo ? (
                       frameworkLogo.trim().startsWith("<svg") || frameworkLogo.includes("<svg") ? (
                         <div
@@ -477,7 +478,7 @@ function ProjectDetailPage() {
                   <div className="flex items-center gap-2">
                     {repositoryHref ? (
                       <a href={repositoryHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-                        <span className="font-mono text-sm leading-5 text-dash-text-strong">
+                        <span className={META_VALUE_CLASS}>
                           From <span className="underline">{repoName}</span>
                         </span>
                         {isGitlab ? (
@@ -498,7 +499,7 @@ function ProjectDetailPage() {
                       </a>
                     ) : (
                       <>
-                        <span className="font-mono text-sm leading-5 text-dash-text-strong">
+                        <span className={META_VALUE_CLASS}>
                           From <span className="underline">{repoName}</span>
                         </span>
                         {isGitlab ? (

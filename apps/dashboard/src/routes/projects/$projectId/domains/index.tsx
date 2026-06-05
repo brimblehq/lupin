@@ -33,7 +33,6 @@ import {
 import { formatRelativeTime } from "@/utils/dashboard";
 import { shouldShowProjectDomainsTab } from "@/utils/project-capabilities";
 import { usePlanGate } from "@/hooks/use-plan-gate";
-import { PlanUpgradePrompt } from "@/components/shared/plan-upgrade-prompt";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
@@ -174,7 +173,7 @@ function ProjectDomainsPage() {
   );
   const { project, workspace } = parentRoute.useLoaderData() as any;
   const { settingsSnapshot } = (RootRoute.useLoaderData() ?? {}) as any;
-  const { customDomain, rateLimitEnabled, planKey } = usePlanGate();
+  const { rateLimitEnabled, planKey } = usePlanGate();
   const { canWrite } = useWorkspaceRole();
   const { domains: initialDomainsResult, projects } = Route.useLoaderData();
   const [addDomainOpen, setAddDomainOpen] = useState(false);
@@ -268,15 +267,6 @@ function ProjectDomainsPage() {
     return (
       <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
         <TabHeader title="Domains & Networking">Domains are not available for this project type.</TabHeader>
-      </div>
-    );
-  }
-
-  if (!customDomain) {
-    return (
-      <div className="mx-auto flex max-w-[1000px] flex-col gap-4 py-8">
-        <TabHeader title="Domains & Networking">Connect your own domain to this project.</TabHeader>
-        <PlanUpgradePrompt feature="Custom Domains" description="Upgrade to connect your own domain to this project." />
       </div>
     );
   }

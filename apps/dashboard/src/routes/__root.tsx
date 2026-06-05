@@ -37,7 +37,6 @@ const chatwootBootstrapScript = `(function(d,t){
     if (allowedHosts.indexOf(host)===-1) return;
     if (window.__brimbleChatwootBooted) return;
     window.__brimbleChatwootBooted = true;
-    window.chatwootSettings = Object.assign({}, window.chatwootSettings, { position: "left" });
     var BASE_URL="https://app.chatwoot.com";
     var existing=d.getElementById("brimble-chatwoot-sdk");
     if (existing) return;
