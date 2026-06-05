@@ -87,6 +87,14 @@ function delay(ms: number) {
   });
 }
 
+function getPopupClosedState(popup: Window): boolean | undefined {
+  try {
+    return popup.closed;
+  } catch {
+    return undefined;
+  }
+}
+
 async function synchronizeSessionFromRefreshCookie(): Promise<{ id?: string; firstName?: string } | undefined> {
   const deadline = Date.now() + SESSION_SYNC_TIMEOUT_MS;
 
@@ -197,7 +205,8 @@ export async function startOauthPopup(provider: OauthProvider, opts?: { timeoutM
     let popupClosedAt: number | null = null;
 
     const popupPollId = window.setInterval(() => {
-      if (popup.closed) {
+      const popupClosed = getPopupClosedState(popup);
+      if (popupClosed) {
         if (!popupClosedAt) {
           popupClosedAt = Date.now();
           return;
@@ -206,6 +215,10 @@ export async function startOauthPopup(provider: OauthProvider, opts?: { timeoutM
           finish(() => reject(new Error("Sign-in window was closed.")));
         }
         return;
+      }
+
+      if (popupClosed === undefined) {
+        popupClosedAt = null;
       }
 
       try {

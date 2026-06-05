@@ -7,6 +7,7 @@ import { invalidateSessionCache } from "../lib/auth-guards";
 import { getClientGeo } from "@/lib/client-geo";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
+import { useResendCooldown } from "@/hooks/use-resend-cooldown";
 import { AuthDivider, AuthField, AuthProviderButton, AuthSplitLayout, OtpInput } from "../components/auth/auth-split-layout";
 import {
   lookupAuthServerFn,
@@ -180,6 +181,7 @@ function OtpStep({
   onVerify,
   onBack,
   onResend,
+  resendCooldownRemaining,
   loading,
 }: {
   email: string;
@@ -188,6 +190,7 @@ function OtpStep({
   onVerify: () => void;
   onBack: () => void;
   onResend: () => void;
+  resendCooldownRemaining: number;
   loading: boolean;
 }) {
   function handleOtpChange(value: string) {
@@ -239,8 +242,13 @@ function OtpStep({
 
       <p className="mt-4 text-center text-[13px] text-dash-text-faded">
         Didn&apos;t receive it?{" "}
-        <button onClick={onResend} className="font-medium text-[#006fff] transition-colors hover:text-[#0060e0] dark:text-[#4879f8]">
-          Resend code
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={loading || resendCooldownRemaining > 0}
+          className="font-medium text-[#006fff] transition-colors hover:text-[#0060e0] disabled:cursor-not-allowed disabled:text-dash-text-extra-faded dark:text-[#4879f8] dark:disabled:text-dash-text-extra-faded"
+        >
+          {resendCooldownRemaining > 0 ? `Resend in ${resendCooldownRemaining}s` : "Resend code"}
         </button>
       </p>
     </motion.div>
@@ -277,6 +285,7 @@ function SignupPage() {
   otpRef.current = otp;
   const [loading, setLoading] = useState(false);
   const [oauthLoadingProvider, setOauthLoadingProvider] = useState<OauthProvider | null>(null);
+  const resendCooldown = useResendCooldown();
 
   async function handleOauth(provider: OauthProvider) {
     if (oauthLoadingProvider) {
@@ -322,6 +331,7 @@ function SignupPage() {
 
       await startSignup({ data: { email, username, geo: await getClientGeo() } });
       toast.success("Verification code sent");
+      resendCooldown.startCooldown();
       setStep("otp");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Signup failed");
@@ -362,9 +372,14 @@ function SignupPage() {
   }
 
   async function handleResend() {
+    if (resendCooldown.isCoolingDown) {
+      return;
+    }
+
     haptics.selection();
     setOtp("");
     if (!email.trim()) return;
+    resendCooldown.startCooldown();
     setLoading(true);
     try {
       await resendAuthCode({ data: { email, geo: await getClientGeo() } });
@@ -447,6 +462,7 @@ function SignupPage() {
               setOtp("");
             }}
             onResend={handleResend}
+            resendCooldownRemaining={resendCooldown.remainingSeconds}
             loading={loading}
           />
         )}

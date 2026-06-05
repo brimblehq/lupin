@@ -8,6 +8,7 @@ import { logAuthFlow, warnAuthFlow } from "@/lib/auth-flow-logger";
 import { getClientGeo } from "@/lib/client-geo";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { useHaptics } from "@/hooks/use-haptics";
+import { useResendCooldown } from "@/hooks/use-resend-cooldown";
 import { AuthDivider, AuthField, AuthProviderButton, AuthSplitLayout, OtpInput } from "../components/auth/auth-split-layout";
 import {
   getPasskeyAuthOptionsServerFn,
@@ -223,6 +224,7 @@ function OtpStep({
   onVerify,
   onBack,
   onResend,
+  resendCooldownRemaining,
   loading,
 }: {
   email: string;
@@ -231,6 +233,7 @@ function OtpStep({
   onVerify: () => void;
   onBack: () => void;
   onResend: () => void;
+  resendCooldownRemaining: number;
   loading: boolean;
 }) {
   function handleOtpChange(value: string) {
@@ -282,8 +285,13 @@ function OtpStep({
 
       <p className="mt-4 text-center text-[13px] text-dash-text-faded">
         Didn&apos;t receive it?{" "}
-        <button onClick={onResend} className="font-medium text-[#006fff] transition-colors hover:text-[#0060e0] dark:text-[#4879f8]">
-          Resend code
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={loading || resendCooldownRemaining > 0}
+          className="font-medium text-[#006fff] transition-colors hover:text-[#0060e0] disabled:cursor-not-allowed disabled:text-dash-text-extra-faded dark:text-[#4879f8] dark:disabled:text-dash-text-extra-faded"
+        >
+          {resendCooldownRemaining > 0 ? `Resend in ${resendCooldownRemaining}s` : "Resend code"}
         </button>
       </p>
 
@@ -410,8 +418,13 @@ function LoginPage() {
   otpRef.current = otp;
   const [loading, setLoading] = useState(false);
   const [oauthLoadingProvider, setOauthLoadingProvider] = useState<OauthProvider | null>(null);
-  const [lastAuthMethod] = useState<AuthMethod | null>(() => getLastAuthMethod());
+  const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod | null>(null);
+  const resendCooldown = useResendCooldown();
   const sessionExpiredToastShownRef = useRef(false);
+
+  useEffect(() => {
+    setLastAuthMethod(getLastAuthMethod());
+  }, []);
 
   useEffect(() => {
     if (sessionExpiredToastShownRef.current) {
@@ -589,6 +602,7 @@ function LoginPage() {
       await requestLoginOtp({ data: { email, geo: await getClientGeo() } });
       logAuthFlow("email otp request successful");
       toast.success("Verification code sent");
+      resendCooldown.startCooldown();
       setStep("otp");
     } catch (error) {
       warnAuthFlow("email otp request failed", {
@@ -642,9 +656,14 @@ function LoginPage() {
   }
 
   async function handleResend() {
+    if (resendCooldown.isCoolingDown) {
+      return;
+    }
+
     haptics.selection();
     setOtp("");
     if (!email.trim()) return;
+    resendCooldown.startCooldown();
     setLoading(true);
     logAuthFlow("email otp resend started");
     try {
@@ -752,6 +771,7 @@ function LoginPage() {
               setOtp("");
             }}
             onResend={handleResend}
+            resendCooldownRemaining={resendCooldown.remainingSeconds}
             loading={loading}
           />
         )}
