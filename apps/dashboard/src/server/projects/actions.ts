@@ -797,7 +797,7 @@ export const deleteProjectServerFn = createServerFn({
   return withTokenRefresh(
     async (api) => {
       const teamId = await resolveTeamId(api, workspaceSlug);
-      await api.projects.remove(projectId, { teamId });
+      await Promise.all([api.networking.purgeCache(projectId, { teamId }), api.projects.remove(projectId, { teamId })]);
       return { success: true };
     },
     { stepUpToken: payload?.twoFactorToken },

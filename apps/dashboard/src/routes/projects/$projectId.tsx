@@ -19,7 +19,7 @@ import { sortDeploymentDrawerEntries } from "@/utils/deployment-logs";
 import { usePushNotification } from "@/hooks/use-push-notification";
 import { getProjectScopedAblyOptions } from "@/lib/ably-auth";
 import type { ProjectDetailRouteProject } from "./project-detail.types";
-import { PROJECT_CACHE_TTL, markProjectCacheStale, projectCache } from "./project-route-cache";
+import { PROJECT_CACHE_TTL, getProjectCacheKey, markProjectCacheStale, projectCache } from "./project-route-cache";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const SUCCESS_LOG_PATTERN = /site (is )?(live|running)\b/i;
@@ -114,7 +114,7 @@ export const Route = createFileRoute("/projects/$projectId")({
     const workspace =
       typeof rawSearch.workspace === "string" && rawSearch.workspace.trim().length > 0 ? rawSearch.workspace.trim() : undefined;
 
-    const cacheKey = `${params.projectId}:${workspace ?? ""}`;
+    const cacheKey = getProjectCacheKey(params.projectId, workspace);
     const cached = projectCache.get(cacheKey);
 
     if (cached && Date.now() - cached.fetchedAt < PROJECT_CACHE_TTL) {

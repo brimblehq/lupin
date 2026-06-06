@@ -89,7 +89,7 @@ import { ProjectConfigurationPending } from "@/components/shared/route-pending";
 import { PasswordProtectionModal } from "@/components/project/password-protection-modal";
 import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
-import { markProjectCacheStale } from "@/routes/projects/project-route-cache";
+import { deleteProjectCacheEntries, markProjectCacheStale } from "@/routes/projects/project-route-cache";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
 
 const parentRoute = getRouteApi("/projects/$projectId");
@@ -1723,12 +1723,14 @@ function DangerSection({
   setMaintenanceMode,
   projectName,
   projectId,
+  routeProjectId,
   workspace,
 }: {
   maintenanceMode: boolean;
   setMaintenanceMode: (v: boolean) => void;
   projectName: string;
   projectId: string;
+  routeProjectId: string;
   workspace?: string;
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -1796,6 +1798,7 @@ function DangerSection({
           let deleted = false;
           try {
             await withStepUp((twoFactorToken) => deleteProject({ data: { projectId, workspace, twoFactorToken } }), requestStepUp);
+            deleteProjectCacheEntries([projectId, routeProjectId, projectName], workspace);
             toast.success("Project deleted successfully");
             deleted = true;
           } catch (error) {
@@ -2415,6 +2418,7 @@ function ConfigurationPage() {
                   setMaintenanceMode={setMaintenanceMode}
                   projectName={project?.name || ""}
                   projectId={project?.id || params.projectId}
+                  routeProjectId={params.projectId}
                   workspace={workspace}
                 />
               )}

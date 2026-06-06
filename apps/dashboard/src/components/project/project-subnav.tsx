@@ -54,6 +54,7 @@ import { useFeatureFlag, FeatureFlags } from "@/lib/feature-flags";
 import { useStepUpTwoFactor } from "@/hooks/use-step-up-two-factor";
 import { withStepUp } from "@/lib/auth/two-factor-step-up";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
+import { deleteProjectCacheEntries } from "@/routes/projects/project-route-cache";
 
 const baseTabs = [
   { label: "Projects details", slug: "", Icon: GlobeSimple },
@@ -706,6 +707,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
             toast.success(`${projectName} deleted successfully`, {
               id: toastId,
             });
+            deleteProjectCacheEntries([actualProjectId, projectId, projectName], workspace);
             deleted = true;
           } catch (error: any) {
             toast.error("Failed to delete project", {
