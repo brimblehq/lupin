@@ -8,6 +8,7 @@ import type {
   UpdateSpendingLimitInput,
   UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
+  VerifyTransactionResult,
 } from "@/backend/payments";
 import { withTokenRefresh, resolveTeamId } from "@/server/shared/backend";
 
@@ -195,7 +196,7 @@ export const purchaseServerFn = createServerFn({
 
 export const verifyTransactionServerFn = createServerFn({
   method: "POST",
-}).handler(async ({ data }) => {
+}).handler<Promise<VerifyTransactionResult>>(async ({ data }) => {
   const payload = data as { reference?: string } | undefined;
   const reference = payload?.reference?.trim();
 

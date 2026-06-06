@@ -27,6 +27,7 @@ import type {
   UpdateTeamSubscriptionInput,
   SpendingLimitStatus,
   DeveloperTrialResult,
+  JsonObject,
 } from "./payments/types";
 
 export type { PaymentsApi } from "./payments/types";
@@ -64,6 +65,7 @@ export type {
   UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
   SpendingLimitStatus,
+  JsonObject,
 } from "./payments/types";
 
 function unwrapData<T = any>(payload: any): T {
@@ -74,6 +76,22 @@ function unwrapData<T = any>(payload: any): T {
 
 function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function asJsonObject(value: unknown): JsonObject {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as JsonObject;
+  }
+
+  return {};
+}
+
+function asJsonObjectArray(value: unknown): JsonObject[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.map((item) => asJsonObject(item));
 }
 
 function mapPaymentConfirmationError(error: unknown, fallbackMessage: string): SubscriptionMutationResult {
@@ -336,7 +354,7 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
           transaction_status: String(data?.status ?? "SUCCESSFUL") as PurchaseResult["transaction_status"],
           amount: Number(data?.amount ?? input.amount ?? 0),
           type: String(data?.type ?? input.type),
-          metadata: data && typeof data?.metadata === "object" && !Array.isArray(data.metadata) ? data.metadata : {},
+          metadata: asJsonObject(data?.metadata),
         };
       } catch (error) {
         if (!(error instanceof BackendApiError) || error.status !== 402) {
@@ -353,7 +371,7 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
           transaction_status: String(data?.status ?? "PENDING") as PurchaseResult["transaction_status"],
           amount: Number(data?.amount ?? input.amount ?? 0),
           type: String(data?.type ?? input.type),
-          metadata: data && typeof data?.metadata === "object" && !Array.isArray(data.metadata) ? data.metadata : {},
+          metadata: asJsonObject(data?.metadata),
           client_secret: typeof data?.client_secret === "string" ? data.client_secret : undefined,
         };
       }
@@ -371,7 +389,7 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
         status: String(data?.status ?? "PROCESSING") as VerifyTransactionResult["status"],
         amount: Number(data?.amount ?? 0),
         type: String(data?.type ?? ""),
-        metadata: data && typeof data?.metadata === "object" && !Array.isArray(data.metadata) ? data.metadata : {},
+        metadata: asJsonObject(data?.metadata),
       };
     },
 
@@ -412,7 +430,7 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
         usage_breakdown: data?.usage_breakdown,
         outstanding_invoice_count: data?.outstanding_invoice_count,
         outstanding_amount_due: data?.outstanding_amount_due,
-        outstanding_invoices: data?.outstanding_invoices,
+        outstanding_invoices: asJsonObjectArray(data?.outstanding_invoices),
       };
     },
 

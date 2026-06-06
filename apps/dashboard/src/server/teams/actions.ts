@@ -19,6 +19,24 @@ async function resolveWorkspaceTeam(api: BackendApi, workspace?: string) {
   };
 }
 
+export const getTeamBySlugServerFn = createServerFn({
+  method: "GET",
+}).handler(async ({ data }) => {
+  const payload = data as { slug?: string } | undefined;
+  const slug = payload?.slug?.trim();
+  if (!slug) {
+    return null;
+  }
+
+  return withTokenRefresh(async (api) => {
+    try {
+      return await api.teams.getByName(slug);
+    } catch {
+      return null;
+    }
+  });
+});
+
 export const getWorkspaceTeamMembersServerFn = createServerFn({
   method: "GET",
 }).handler(async ({ data }) => {

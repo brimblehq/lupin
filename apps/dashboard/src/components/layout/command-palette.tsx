@@ -21,7 +21,6 @@ import { useWorkspaceRole } from "@/contexts/workspace-role-context";
 import type { SettingsSidebarSnapshot } from "@/backend/settings";
 import { logoutServerFn } from "@/server/auth/actions";
 import { invalidateSessionCache } from "@/lib/auth-guards";
-import { logAuthFlow, warnAuthFlow } from "@/lib/auth-flow-logger";
 import { posthog } from "@/lib/posthog";
 import { FeatureFlags, useFeatureFlagStrict } from "@/lib/feature-flags";
 
@@ -612,15 +611,9 @@ export function CommandPalette() {
                               value="logout sign out"
                               onSelect={() =>
                                 runAction(() => {
-                                  logAuthFlow("user initiated sign-out from command palette");
                                   void logoutServerFn()
-                                    .catch((error) => {
-                                      warnAuthFlow("sign-out request failed in command palette", {
-                                        message: error instanceof Error ? error.message : "Unknown error",
-                                      });
-                                    })
+                                    .catch(() => {})
                                     .then(() => {
-                                      logAuthFlow("sign-out flow navigating to login from command palette");
                                       posthog.reset();
                                       invalidateSessionCache();
                                       window.location.href = "/login";

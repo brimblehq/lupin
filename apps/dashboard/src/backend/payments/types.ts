@@ -58,6 +58,12 @@ export interface InvoicePaymentResult {
 
 /* ── Subscription stats (forecasted bill) ── */
 
+export type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
+
+export type JsonObject = {
+  [key: string]: JsonValue;
+};
+
 export interface UsageBreakdownResource {
   amount: number;
   quantity: number;
@@ -84,7 +90,7 @@ export interface SubscriptionStats {
   usage_breakdown?: UsageBreakdown;
   outstanding_invoice_count?: number;
   outstanding_amount_due?: number;
-  outstanding_invoices?: unknown[];
+  outstanding_invoices?: JsonObject[];
 }
 
 /* ── Spending limit status ── */
@@ -256,7 +262,7 @@ export interface PurchaseResult {
   transaction_status: "PROCESSING" | "SUCCESSFUL" | "PENDING" | "FAILED";
   amount: number;
   type: string;
-  metadata: Record<string, unknown>;
+  metadata: JsonObject;
   client_secret?: string;
 }
 
@@ -265,7 +271,7 @@ export interface VerifyTransactionResult {
   status: "PROCESSING" | "SUCCESSFUL" | "PENDING" | "FAILED" | "REFUNDED";
   amount: number;
   type: string;
-  metadata: Record<string, unknown>;
+  metadata: JsonObject;
 }
 
 /* ── API interface ── */

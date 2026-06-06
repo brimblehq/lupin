@@ -22,6 +22,8 @@ import { getSubscriptionStatsServerFn } from "@/server/payments/actions";
 import type { SubscriptionStats } from "@/backend/payments";
 import { getUserOverviewServerFn } from "@/server/overview/actions";
 import type { UserOverview } from "@/backend/user-overview";
+import type { TeamDetails } from "@/backend/teams";
+import { getTeamBySlugServerFn } from "@/server/teams/actions";
 
 import appCss from "../styles.css?url";
 import marfaLatinWoff2 from "../assets/fonts/ABCMarfaVariableVF-latin.woff2?url";
@@ -60,6 +62,7 @@ type RootLoaderData = {
   workspace?: string;
   settingsSnapshot?: SettingsSidebarSnapshot;
   workspaces: ApiListResponse<Workspace>;
+  workspaceTeamMembers?: TeamDetails | null;
   projectSwitcherProjects?: ApiListResponse<Project>;
   onboardingProjects?: ApiListResponse<Project>;
   tags?: BackendTag[];
@@ -144,76 +147,82 @@ export const Route = createRootRoute({
     try {
       const shouldLoadGlobalRootData = location.pathname === "/" || GLOBAL_ROOT_DATA_ROUTE_PATTERN.test(location.pathname);
       if (!shouldLoadGlobalRootData) {
-        const [settingsSnapshot, workspaces] = await Promise.allSettled([
+        const [workspaces, teamDetails] = await Promise.allSettled([
+          (listWorkspacesServerFn as unknown as () => Promise<ApiListResponse<Workspace>>)(),
+          workspace
+            ? (getTeamBySlugServerFn as unknown as (input: { data: { slug: string } }) => Promise<TeamDetails | null>)({
+                data: { slug: workspace },
+              })
+            : Promise.resolve(null),
+        ]);
+
+        const resolvedTeamDetails = teamDetails.status === "fulfilled" ? teamDetails.value : null;
+        const [settingsSnapshot] = await Promise.allSettled([
           (getSettingsSidebarSnapshotServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SettingsSidebarSnapshot>)({
             data: { workspace },
           }),
-          (listWorkspacesServerFn as unknown as () => Promise<ApiListResponse<Workspace>>)(),
         ]);
 
-        return createRootLoaderData({
+        const rootLoaderData = createRootLoaderData({
           workspace,
           settingsSnapshot: settingsSnapshot.status === "fulfilled" ? settingsSnapshot.value : undefined,
           workspaces: workspaces.status === "fulfilled" ? workspaces.value : DEFAULT_ROOT_LOADER_DATA.workspaces,
+          workspaceTeamMembers: resolvedTeamDetails,
           tags: [],
         });
+        return rootLoaderData;
       }
 
-      const workspacesRequest = (listWorkspacesServerFn as unknown as () => Promise<ApiListResponse<Workspace>>)();
+      const [workspaces, teamDetails] = await Promise.allSettled([
+        (listWorkspacesServerFn as unknown as () => Promise<ApiListResponse<Workspace>>)(),
+        workspace
+          ? (getTeamBySlugServerFn as unknown as (input: { data: { slug: string } }) => Promise<TeamDetails | null>)({
+              data: { slug: workspace },
+            })
+          : Promise.resolve(null),
+      ]);
 
-      const userOverviewRequest = (async () => {
-        let teamId: string | undefined;
+      let teamId: string | undefined;
+      if (workspace && workspaces.status === "fulfilled") {
+        teamId = workspaces.value.items.find((item) => item.slug === workspace)?.id;
+      }
 
-        if (workspace) {
-          try {
-            const availableWorkspaces = await workspacesRequest;
-            const matchedWorkspace = availableWorkspaces.items.find((item) => item.slug === workspace);
-            teamId = matchedWorkspace?.id || undefined;
-          } catch {
-            teamId = undefined;
-          }
-        }
-
-        return (getUserOverviewServerFn as unknown as (input: { data?: { teamId?: string } }) => Promise<UserOverview>)({
-          data: teamId ? { teamId } : {},
-        });
-      })();
-
-      const [settingsSnapshot, workspaces, userOverview] = await Promise.allSettled([
+      const resolvedTeamDetails = teamDetails.status === "fulfilled" ? teamDetails.value : null;
+      const skipHomeProjectsInRoot = location.pathname === "/";
+      const [settingsSnapshot, userOverview, onboardingProjects, tags, pricingResult, subscriptionStats] = await Promise.allSettled([
         (getSettingsSidebarSnapshotServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SettingsSidebarSnapshot>)({
           data: { workspace },
         }),
-        workspacesRequest,
-        userOverviewRequest,
-      ]);
-
-      const [onboardingProjects, tags] = await Promise.allSettled([
-        (listHomeProjectsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<ApiListResponse<Project>>)({
-          data: { workspace },
+        (getUserOverviewServerFn as unknown as (input: { data?: { teamId?: string } }) => Promise<UserOverview>)({
+          data: teamId ? { teamId } : {},
         }),
+        skipHomeProjectsInRoot
+          ? Promise.resolve(undefined)
+          : (listHomeProjectsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<ApiListResponse<Project>>)({
+              data: { workspace },
+            }),
         (listTagsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<BackendTag[]>)({
           data: { workspace },
         }),
-      ]);
-
-      const [pricingResult, subscriptionStats] = await Promise.allSettled([
         (getSubscriptionSpecsServerFn as unknown as () => Promise<Pricing>)(),
         (getSubscriptionStatsServerFn as unknown as (input: { data?: { workspace?: string } }) => Promise<SubscriptionStats>)({
           data: { workspace },
         }),
       ]);
 
-      return createRootLoaderData({
+      const rootLoaderData = createRootLoaderData({
         workspace,
         settingsSnapshot: settingsSnapshot.status === "fulfilled" ? settingsSnapshot.value : undefined,
         workspaces: workspaces.status === "fulfilled" ? workspaces.value : DEFAULT_ROOT_LOADER_DATA.workspaces,
-        projectSwitcherProjects: onboardingProjects.status === "fulfilled" ? (onboardingProjects.value as any) : undefined,
-        onboardingProjects: onboardingProjects.status === "fulfilled" ? onboardingProjects.value : undefined,
+        workspaceTeamMembers: resolvedTeamDetails,
+        projectSwitcherProjects: onboardingProjects.status === "fulfilled" ? (onboardingProjects.value ?? undefined) as any : undefined,
+        onboardingProjects: onboardingProjects.status === "fulfilled" ? onboardingProjects.value ?? undefined : undefined,
         tags: tags.status === "fulfilled" ? tags.value : undefined,
         subscriptionStats: subscriptionStats.status === "fulfilled" ? subscriptionStats.value : undefined,
         userOverview: userOverview.status === "fulfilled" ? userOverview.value : undefined,
         pricing: pricingResult.status === "fulfilled" ? pricingResult.value : DEFAULT_PRICING,
       });
+      return rootLoaderData;
     } catch (err) {
       console.error("[root loader] unexpected error:", err);
       return createRootLoaderData();
@@ -268,6 +277,7 @@ function RootComponent() {
     workspace: loaderWorkspace,
     settingsSnapshot,
     workspaces,
+    workspaceTeamMembers,
     projectSwitcherProjects,
     onboardingProjects,
     tags,
@@ -358,6 +368,7 @@ function RootComponent() {
         initialWorkspaceSlug={loaderWorkspace}
         initialSettingsSnapshot={settingsSnapshot}
         initialWorkspaces={workspaces}
+        initialWorkspaceTeamMembers={workspaceTeamMembers ?? null}
         initialProjectSwitcherProjects={projectSwitcherProjects}
         initialOnboardingProjects={onboardingProjects}
         initialSubscriptionStats={subscriptionStats ?? null}

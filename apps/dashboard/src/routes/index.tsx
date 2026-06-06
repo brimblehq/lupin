@@ -37,6 +37,7 @@ import type { Workspace } from "@/backend/workspaces";
 import type { Project as ProjectCardProject } from "../components/shared/project-card";
 import { formatRelativeTime } from "@/utils/dashboard";
 import { mapMcpTemplateToAddon } from "@/utils/discover-mcp";
+import type { DiscoverAddon } from "@/utils/discover-mcp";
 import { resolveEnvironmentId } from "@/utils/environment-selection";
 import { workspaceLoaderDeps } from "@/utils/workspace-route-search";
 import { getRouteApi } from "@tanstack/react-router";
@@ -59,6 +60,15 @@ const EMPTY_OVERVIEW: OverviewSummary = {
 };
 const EMPTY_BANDWIDTH: BandwidthSummary = { results: [], total: 0 };
 
+type HomeRouteLoaderData = {
+  projects: BackendProject[];
+  overview: OverviewSummary;
+  bandwidth: BandwidthSummary;
+  featuredAddons: DiscoverAddon[];
+  frameworkLogos: Record<string, string>;
+  workspace: string | undefined;
+};
+
 export const Route = createFileRoute("/")({
   staleTime: 300_000,
   preloadStaleTime: 300_000,
@@ -73,7 +83,7 @@ export const Route = createFileRoute("/")({
     environmentId: search.environmentId,
     transferOwnership: search.transferOwnership,
   }),
-  loader: async ({ deps }) => {
+  loader: async ({ deps }): Promise<HomeRouteLoaderData> => {
     const workspace = deps.workspace;
     const [environments, persistedEnvironmentId, mcpTemplatesResult, frameworksList] = await Promise.all([
       (
@@ -105,39 +115,43 @@ export const Route = createFileRoute("/")({
     let overview = EMPTY_OVERVIEW;
     let bandwidth = EMPTY_BANDWIDTH;
 
-    try {
-      const projectsResponse = await (
+    const [projectsResult, overviewResult, bandwidthResult] = await Promise.allSettled([
+      (
         listHomeProjectsServerFn as unknown as (input: {
           data: { workspace?: string; environmentId?: string };
         }) => Promise<ApiListResponse<BackendProject>>
       )({
         data: { workspace, environmentId },
-      });
-      projects = projectsResponse.items;
-    } catch (error) {
-      console.warn("[dashboard-home loader] failed to load projects", error);
-    }
-
-    try {
-      overview = await (
+      }),
+      (
         getHomeOverviewServerFn as unknown as (input: { data: { workspace?: string; environmentId?: string } }) => Promise<OverviewSummary>
       )({
         data: { workspace, environmentId },
-      });
-    } catch (error) {
-      console.warn("[dashboard-home loader] failed to load overview", error);
-    }
-
-    try {
-      bandwidth = await (
+      }),
+      (
         getHomeBandwidthServerFn as unknown as (input: {
           data: { workspace?: string; environmentId?: string };
         }) => Promise<BandwidthSummary>
       )({
         data: { workspace, environmentId },
-      });
-    } catch (error) {
-      console.warn("[dashboard-home loader] failed to load bandwidth", error);
+      }),
+    ]);
+    if (projectsResult.status === "fulfilled") {
+      projects = projectsResult.value.items;
+    } else {
+      console.warn("[dashboard-home loader] failed to load projects", projectsResult.reason);
+    }
+
+    if (overviewResult.status === "fulfilled") {
+      overview = overviewResult.value;
+    } else {
+      console.warn("[dashboard-home loader] failed to load overview", overviewResult.reason);
+    }
+
+    if (bandwidthResult.status === "fulfilled") {
+      bandwidth = bandwidthResult.value;
+    } else {
+      console.warn("[dashboard-home loader] failed to load bandwidth", bandwidthResult.reason);
     }
 
     const frameworkLogoMap = new Map<string, string>();
@@ -160,7 +174,8 @@ export const Route = createFileRoute("/")({
 
 function DashboardHome() {
   const search = Route.useSearch();
-  const { projects, overview, bandwidth, featuredAddons, frameworkLogos, workspace } = Route.useLoaderData();
+  const { projects, overview, bandwidth, featuredAddons, frameworkLogos, workspace } =
+    Route.useLoaderData() as HomeRouteLoaderData;
   const {
     settingsSnapshot,
     workspaces,
