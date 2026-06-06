@@ -2,6 +2,8 @@ import config from "@/config";
 import { BackendApiError } from "./errors";
 import type { ApiClient } from "./types";
 import type { BackendClient } from "./client";
+import { asRecord, pickString } from "./normalize";
+import { mapDeveloperTrialError } from "./payments/developer-trial";
 import type {
   PaymentsApi,
   PaymentMethod,
@@ -11,6 +13,7 @@ import type {
   Subscription,
   SubscriptionStats,
   SubscriptionMutationResult,
+  DeveloperTrialData,
   CreateSubscriptionInput,
   SwapPlanInput,
   CancelSubscriptionInput,
@@ -23,6 +26,7 @@ import type {
   UpdateTeamSpendingLimitInput,
   UpdateTeamSubscriptionInput,
   SpendingLimitStatus,
+  DeveloperTrialResult,
 } from "./payments/types";
 
 export type { PaymentsApi } from "./payments/types";
@@ -51,6 +55,10 @@ export type {
   VerifyTransactionResult,
   UpdateSpendingLimitInput,
   SubscriptionStats,
+  DeveloperTrialData,
+  DeveloperTrialResult,
+  OutstandingDeveloperTrialInvoice,
+  OutstandingDeveloperTrialInvoiceData,
   UsageBreakdown,
   UsageBreakdownResource,
   UpdateTeamSpendingLimitInput,
@@ -232,6 +240,19 @@ export function createPaymentsApi(client: ApiClient): PaymentsApi {
         return { status: "success", message, data: unwrapData<Subscription>(res) ?? null };
       } catch (error) {
         return mapPaymentConfirmationError(error, "Plan change requires payment confirmation");
+      }
+    },
+
+    async startDeveloperTrial(): Promise<DeveloperTrialResult> {
+      try {
+        const res = await client.request<unknown>(`${base}/subscription/developer-trial`, {
+          method: "POST",
+        });
+        const response = asRecord(res);
+        const message = pickString(response, "message")?.trim() || "Developer trial started successfully";
+        return { status: "success", message, data: unwrapData<DeveloperTrialData>(res) };
+      } catch (error) {
+        return mapDeveloperTrialError(error);
       }
     },
 

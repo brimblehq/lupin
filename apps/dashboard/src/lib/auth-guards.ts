@@ -48,11 +48,6 @@ export async function enforceRouteAuth(pathname: string, search?: string, option
     return { session: null };
   }
 
-  if (!isPublicRoute && recentlyVerified) {
-    logAuthFlow("skipping auth check due to recent verification cache", { pathname });
-    return { session: null };
-  }
-
   if (isPublicRoute && !isTwoFactorRoute && recentlyVerified) {
     const nextParam = new URLSearchParams(search?.startsWith("?") ? search : `?${search || ""}`).get("next");
     logAuthFlow("redirecting away from public auth route due to active session cache", {
@@ -105,6 +100,7 @@ export async function enforceRouteAuth(pathname: string, search?: string, option
     !isPublicRoute &&
     (refreshStatus === RefreshSessionStatus.Expired ||
       refreshStatus === RefreshSessionStatus.Missing ||
+      refreshStatus === RefreshSessionStatus.Retry ||
       refreshStatus === RefreshSessionStatus.Error ||
       authCheckFailed);
 

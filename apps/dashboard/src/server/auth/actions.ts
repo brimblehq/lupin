@@ -347,6 +347,11 @@ export const refreshSessionServerFn = createServerFn({ method: "POST" }).handler
       authLogger.warn("refreshSession stale refresh token response", {
         status,
       });
+
+      if (!getServerAccessToken()) {
+        clearServerAuthCookies();
+      }
+
       return {
         status: RefreshSessionStatus.Retry,
       } satisfies RefreshSessionServerResult;

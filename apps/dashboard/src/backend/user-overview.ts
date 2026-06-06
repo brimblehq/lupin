@@ -44,6 +44,8 @@ export interface UserOverview {
   buildMinutes: UserOverviewBuildMinutes;
   planConfiguration: UserOverviewPlanConfig | null;
   llmTokens: UserOverviewLlmTokens;
+  developer_trial_started_at?: string | null;
+  developer_trial_ends_at?: string | null;
 }
 
 export interface UserOverviewApi {
@@ -92,6 +94,8 @@ interface UserOverviewRoot {
     total: number;
     cost: number;
   };
+  developer_trial_started_at?: string | null;
+  developer_trial_ends_at?: string | null;
 }
 
 export function createUserOverviewApi(client: ApiClient): UserOverviewApi {
@@ -141,6 +145,8 @@ export function createUserOverviewApi(client: ApiClient): UserOverviewApi {
             }
           : null,
         llmTokens: root.llmTokens,
+        developer_trial_started_at: root.developer_trial_started_at ?? null,
+        developer_trial_ends_at: root.developer_trial_ends_at ?? null,
       };
     },
   };

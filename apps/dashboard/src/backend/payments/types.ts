@@ -150,6 +150,58 @@ export interface SubscriptionMutationPendingResult {
 
 export type SubscriptionMutationResult = SubscriptionMutationSuccessResult | SubscriptionMutationPendingResult;
 
+/* ── Developer trial ── */
+
+export interface DeveloperTrialData {
+  plan_type: "DEVELOPER_PLAN";
+  from_plan: "FREE_PLAN" | "HACKER_PLAN";
+  trial_days: 14;
+  trial_ends_at: string;
+  subscription_id: string;
+  stripe_subscription_id: string;
+}
+
+export interface OutstandingDeveloperTrialInvoice {
+  id: string;
+  subscription_id: string;
+  amount_due: number;
+  currency: string;
+  status: string;
+  attempt_count: number;
+  next_payment_attempt: string | null;
+  created: string;
+  hosted_invoice_url: string | null;
+  invoice_pdf: string | null;
+}
+
+export interface OutstandingDeveloperTrialInvoiceData {
+  error_code: "OUTSTANDING_INVOICE_REQUIRED";
+  scope: "customer_core_plan";
+  customer_id: string;
+  invoice_count: number;
+  invoices: OutstandingDeveloperTrialInvoice[];
+}
+
+export interface DeveloperTrialSuccessResult {
+  status: "success";
+  message: string;
+  data: DeveloperTrialData;
+}
+
+export interface DeveloperTrialPendingResult {
+  status: "pending";
+  message: string;
+  data: SubscriptionPaymentPendingData;
+}
+
+export interface DeveloperTrialErrorResult {
+  status: "error";
+  message: string;
+  data: OutstandingDeveloperTrialInvoiceData | null;
+}
+
+export type DeveloperTrialResult = DeveloperTrialSuccessResult | DeveloperTrialPendingResult | DeveloperTrialErrorResult;
+
 /* ── Mutation inputs ── */
 
 export interface AddPaymentMethodInput {
@@ -228,6 +280,7 @@ export interface PaymentsApi {
   getSubscription(): Promise<Subscription | null>;
   createSubscription(input: CreateSubscriptionInput): Promise<SubscriptionMutationResult>;
   swapPlan(input: SwapPlanInput): Promise<SubscriptionMutationResult>;
+  startDeveloperTrial(): Promise<DeveloperTrialResult>;
   cancelSubscription(input: CancelSubscriptionInput): Promise<void>;
   listInvoices(input?: { cursor?: string | null; per_page?: number; team_id?: string }): Promise<InvoicePage>;
   payInvoice(input: { invoice_id: string; team_id?: string }): Promise<InvoicePaymentResult>;

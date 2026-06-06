@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
 import { useEffect, useState } from "react";
 import { hapticToast as toast } from "@/utils/haptic-toast";
 import { WelcomeSection } from "../components/overview/welcome-section";
+import { DeveloperTrialBanner } from "../components/overview/developer-trial-banner";
 import { StatsRow } from "../components/overview/stats-row";
 import { DeployedProjects } from "../components/overview/deployed-projects";
 import { ConnectedDomains } from "../components/overview/connected-domains";
@@ -249,6 +250,11 @@ function DashboardHome() {
   return (
     <div className="max-w-[1000px]">
       <WelcomeSection />
+      <DeveloperTrialBanner
+        planType={planType}
+        isTeamWorkspace={isTeamWorkspace}
+        developerTrialStartedAt={userOverview?.developer_trial_started_at}
+      />
       <StatsRow
         overview={visibleOverview}
         bandwidth={visibleBandwidth}

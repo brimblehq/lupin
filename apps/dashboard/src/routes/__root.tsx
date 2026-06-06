@@ -282,6 +282,7 @@ function RootComponent() {
   }, []);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthRoute = AUTH_ROUTE_PATTERN.test(pathname);
 
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
   const workspace = (() => {
@@ -322,6 +323,10 @@ function RootComponent() {
   }, [pathname]);
 
   useEffect(() => {
+    if (isAuthRoute) {
+      return;
+    }
+
     if (tags) {
       hydrate(
         tags.map((t: BackendTag) => ({
@@ -337,7 +342,15 @@ function RootComponent() {
     if (!hydrated || storeWorkspace !== workspace) {
       void fetchTags(workspace);
     }
-  }, [fetchTags, hydrate, hydrated, storeWorkspace, tags, workspace]);
+  }, [fetchTags, hydrate, hydrated, isAuthRoute, storeWorkspace, tags, workspace]);
+
+  if (isAuthRoute) {
+    return (
+      <NuqsAdapter>
+        <Outlet />
+      </NuqsAdapter>
+    );
+  }
 
   return (
     <NuqsAdapter>

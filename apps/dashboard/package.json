@@ -37,6 +37,7 @@
     "@types/react-simple-maps": "^3.0.6",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "@xyflow/react": "^12.11.0",
     "ably": "^2.18.0",
     "axios": "^1.15.1",
     "class-variance-authority": "^0.7.1",

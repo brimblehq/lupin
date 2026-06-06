@@ -23,3 +23,16 @@ export async function invalidateActiveMatches(router: RouterLike): Promise<void>
     filter: (route) => Boolean(route.routeId && routeIds.includes(route.routeId)),
   });
 }
+
+export async function invalidateActiveMatchesWithRoot(router: RouterLike): Promise<void> {
+  const routeIds = getActiveRouteIds(router);
+
+  if (routeIds.length === 0) {
+    await router.invalidate();
+    return;
+  }
+
+  await router.invalidate({
+    filter: (route) => Boolean(route.routeId && routeIds.includes(route.routeId)),
+  });
+}

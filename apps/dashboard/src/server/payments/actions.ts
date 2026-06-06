@@ -139,6 +139,14 @@ export const swapPlanServerFn = createServerFn({
   });
 });
 
+export const startDeveloperTrialServerFn = createServerFn({
+  method: "POST",
+}).handler(async () => {
+  return withTokenRefresh(async (api) => {
+    return api.payments.startDeveloperTrial();
+  });
+});
+
 export const cancelSubscriptionServerFn = createServerFn({
   method: "POST",
 }).handler(async ({ data }) => {

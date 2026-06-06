@@ -15,7 +15,7 @@ const PLAN_TYPE_TO_SPEC_KEY = new Map([
   ["team_plan", "team"],
 ]);
 
-function resolvePlanKey(planType?: string): string {
+export function resolvePlanKey(planType?: string): string {
   const raw = planType?.trim();
   if (!raw) {
     return "free";

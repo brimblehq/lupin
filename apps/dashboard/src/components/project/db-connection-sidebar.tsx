@@ -213,7 +213,7 @@ function ConnectionField({
     <div className="flex flex-col gap-1.5 py-2.5">
       <span className="text-[11px] font-medium uppercase tracking-[0.5px] text-dash-text-faded">{label}</span>
       <div className="flex items-start gap-2">
-        <span title={value} className={`min-w-0 flex-1 break-all text-sm leading-[1.4] text-dash-text-strong ${mono ? "font-mono" : ""}`}>
+        <span title={value} className={`min-w-0 flex-1 break-all text-xs leading-[1.4] text-dash-text-strong ${mono ? "font-mono" : ""}`}>
           {value}
         </span>
         <button

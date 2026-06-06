@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
-import { ExternalLink, Copy, Check, ArrowUpRight, Terminal } from "lucide-react";
+import { motion } from "motion/react";
+import { ExternalLink, Copy, Check, ArrowUpRight, Terminal, Workflow } from "lucide-react";
 import { SimpleTooltip } from "../../../components/shared/tooltip";
 import { StatusChip } from "../../../components/shared/status-chip";
 import { getProjectScreenshotServerFn } from "@/server/projects/actions";
 import { listFrameworksServerFn } from "@/server/frameworks/actions";
 import { listDeploymentsServerFn } from "@/server/deployments/actions";
+import { getNetworkingSettingsServerFn } from "@/server/networking/actions";
+import { listScalingGroupsServerFn } from "@/server/scaling/actions";
+import type { NetworkSettings } from "@/backend/networking";
+import type { ScalingGroup } from "@/backend/scaling";
 import type { DeploymentLog } from "@/backend/deployments";
 import type { FrameworkOption } from "@/backend/frameworks";
 import { useHaptics } from "@/hooks/use-haptics";
@@ -17,7 +22,9 @@ import {
   isStaticProject as getIsStaticProject,
   isWebLikeProject,
 } from "@/utils/project-capabilities";
-import { RegionMap } from "@/components/project/region-map";
+import { InfrastructureDiagram, DatabaseInfrastructureDiagram } from "@/components/project/infrastructure-diagram";
+import { ToggleSwitch } from "@/components/shared/toggle-switch";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { DbConnectionCard, DbQuickActionsCard } from "@/components/project/db-connection-sidebar";
 import { redeployProjectServerFn } from "@/server/projects/actions";
 import { useServerFn } from "@tanstack/react-start";
@@ -37,6 +44,7 @@ function formatBytes(bytes: number): string {
 /** Backend/service frameworks that don't produce browser screenshots */
 const SERVICE_FRAMEWORKS = new Set(["other", "custom", "docker", "laravel", "php", "python", "golang", "ruby"]);
 const META_VALUE_CLASS = "font-mono text-xs leading-[18px] text-dash-text-strong";
+const PREVIEW_VIEW_STORAGE_KEY = "brimble:project-preview-view";
 
 const parentRoute = getRouteApi("/projects/$projectId");
 
@@ -51,8 +59,9 @@ export const Route = createFileRoute("/projects/$projectId/")({
     const framework = String(project?.framework ?? "").toLowerCase();
     const isService = SERVICE_FRAMEWORKS.has(framework);
     const needsScreenshot = isWebLike && !isService && !project?.screenshot && project?.id;
+    const scalingGroupId = project?.autoscalingGroup?.id as string | undefined;
 
-    const [deploymentsResult, screenshotResult, frameworksResult] = await Promise.allSettled([
+    const [deploymentsResult, screenshotResult, frameworksResult, networkingResult, scalingResult] = await Promise.allSettled([
       project?.id
         ? (listDeploymentsServerFn as unknown as ListDeploymentsServerFnCaller)({
             data: { projectId: project.id, workspace, page: 1, limit: 5 },
@@ -64,15 +73,32 @@ export const Route = createFileRoute("/projects/$projectId/")({
           })
         : Promise.resolve(null),
       listFrameworksServerFn(),
+      isWebLike && project?.id
+        ? (getNetworkingSettingsServerFn as unknown as (input: {
+            data: { projectId: string; workspace?: string };
+          }) => Promise<{ settings: NetworkSettings; hosts: string[] }>)({
+            data: { projectId: project.id, workspace },
+          })
+        : Promise.resolve(null),
+      isWebLike && scalingGroupId
+        ? (listScalingGroupsServerFn as unknown as (input: { data: { workspace?: string } }) => Promise<{ items: ScalingGroup[] }>)({
+            data: { workspace },
+          })
+        : Promise.resolve(null),
     ]);
 
     const recentDeployments =
       deploymentsResult.status === "fulfilled" && deploymentsResult.value ? (deploymentsResult.value.items ?? []) : [];
     const screenshotUrl = project?.screenshot ?? (screenshotResult.status === "fulfilled" ? screenshotResult.value : null);
     const frameworks = frameworksResult.status === "fulfilled" ? frameworksResult.value : [];
+    const networking = networkingResult.status === "fulfilled" && networkingResult.value ? networkingResult.value.settings : null;
+    let scaling: ScalingGroup | null = null;
+    if (scalingGroupId && scalingResult.status === "fulfilled" && scalingResult.value) {
+      scaling = scalingResult.value.items.find((group) => group.id === scalingGroupId) ?? null;
+    }
 
     if (!isWebLike) {
-      return { screenshotUrl: null, frameworks, recentDeployments };
+      return { screenshotUrl: null, frameworks, recentDeployments, networking: null, scaling: null };
     }
 
     if (isService) {
@@ -81,10 +107,12 @@ export const Route = createFileRoute("/projects/$projectId/")({
         isServiceFramework: true,
         frameworks,
         recentDeployments,
+        networking,
+        scaling,
       };
     }
 
-    return { screenshotUrl, frameworks, recentDeployments };
+    return { screenshotUrl, frameworks, recentDeployments, networking, scaling };
   },
   component: ProjectDetailPage,
   pendingComponent: ProjectOverviewPending,
@@ -95,6 +123,7 @@ function ProjectDetailPage() {
   const [restartingDb, setRestartingDb] = useState(false);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [screenshotLoadFailed, setScreenshotLoadFailed] = useState(false);
+  const isMobile = useIsMobile();
   const haptics = useHaptics();
   const router = useRouter();
   const { openDeploymentDrawer } = useProjectDeploymentLogsDrawer();
@@ -111,13 +140,33 @@ function ProjectDetailPage() {
   }, [router]);
   const navigate = useNavigate();
   const { projectId } = Route.useParams();
-  const { project } = parentRoute.useLoaderData() as any;
-  const { screenshotUrl, isServiceFramework, frameworks, recentDeployments } = Route.useLoaderData() as {
+  const { project, workspace } = parentRoute.useLoaderData() as any;
+  const { screenshotUrl, isServiceFramework, frameworks, recentDeployments, networking, scaling } = Route.useLoaderData() as {
     screenshotUrl: string | null;
     isServiceFramework?: boolean;
     frameworks?: FrameworkOption[];
     recentDeployments?: DeploymentLog[];
+    networking?: NetworkSettings | null;
+    scaling?: ScalingGroup | null;
   };
+
+  const [previewMode, setPreviewMode] = useState<"screenshot" | "diagram">("diagram");
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(PREVIEW_VIEW_STORAGE_KEY);
+      if (stored === "diagram" || stored === "screenshot") setPreviewMode(stored);
+    } catch {
+      // no-op
+    }
+  }, []);
+  function changePreviewMode(mode: "screenshot" | "diagram") {
+    setPreviewMode(mode);
+    try {
+      localStorage.setItem(PREVIEW_VIEW_STORAGE_KEY, mode);
+    } catch {
+      // no-op
+    }
+  }
 
   useEffect(() => {
     setScreenshotLoadFailed(false);
@@ -254,42 +303,96 @@ function ProjectDetailPage() {
       <div className="flex flex-col gap-4">
         {showPreviewBanner ? (
           <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
-            {/* Gradient banner */}
-            <div className="relative h-[232px] overflow-clip bg-gradient-to-b from-[#ea51bd] to-[#f1558a]">
-              {/* Browser window mockup */}
-              <div className="absolute inset-x-[3.38%] top-[27px] h-[236px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-white">
-                <div className="flex h-[13px] items-center border-b-[0.5px] border-dash-border px-2 py-[6px]">
-                  <div className="flex gap-1">
-                    <span className="size-[4px] rounded-full bg-[#FF5F57]" />
-                    <span className="size-[4px] rounded-full bg-[#FEBC2E]" />
-                    <span className="size-[4px] rounded-full bg-[#28C840]" />
+            {(() => {
+              const diagramView = (
+                <InfrastructureDiagram
+                  project={project}
+                  networking={networking ?? null}
+                  scaling={scaling ?? null}
+                  projectId={projectId}
+                  workspace={workspace}
+                />
+              );
+              const screenshotView = (
+                /* Gradient banner */
+                <div className="relative h-[232px] overflow-clip bg-gradient-to-b from-[#ea51bd] to-[#f1558a]">
+                  {/* Browser window mockup */}
+                  <div className="absolute inset-x-[3.38%] top-[27px] h-[236px] overflow-clip rounded-[4px] border-[0.5px] border-dash-border bg-white">
+                    <div className="flex h-[13px] items-center border-b-[0.5px] border-dash-border px-2 py-[6px]">
+                      <div className="flex gap-1">
+                        <span className="size-[4px] rounded-full bg-[#FF5F57]" />
+                        <span className="size-[4px] rounded-full bg-[#FEBC2E]" />
+                        <span className="size-[4px] rounded-full bg-[#28C840]" />
+                      </div>
+                    </div>
+                    <div className="relative h-[222px] w-full bg-dash-bg-elevated">
+                      {screenshotUrl && !screenshotLoadFailed ? (
+                        <img
+                          src={screenshotUrl}
+                          alt={`${projectName} screenshot`}
+                          className="h-full w-full object-cover object-top"
+                          onError={() => setScreenshotLoadFailed(true)}
+                        />
+                      ) : isServiceFramework ? (
+                        <div className="flex h-full flex-col items-center justify-center gap-2 bg-dash-bg">
+                          <Terminal className="size-10 text-dash-text-extra-faded" />
+                          <span className="text-sm font-light text-dash-text-faded">Service deployed successfully</span>
+                        </div>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-sm font-light text-dash-text-faded">
+                          No screenshot available yet.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="relative h-[222px] w-full bg-dash-bg-elevated">
-                  {screenshotUrl && !screenshotLoadFailed ? (
-                    <img
-                      src={screenshotUrl}
-                      alt={`${projectName} screenshot`}
-                      className="h-full w-full object-cover object-top"
-                      onError={() => setScreenshotLoadFailed(true)}
-                    />
-                  ) : isServiceFramework ? (
-                    <div className="flex h-full flex-col items-center justify-center gap-2 bg-dash-bg">
-                      <Terminal className="size-10 text-dash-text-extra-faded" />
-                      <span className="text-sm font-light text-dash-text-faded">Service deployed successfully</span>
-                    </div>
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-sm font-light text-dash-text-faded">
-                      No screenshot available yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+              );
+
+              if (isMobile) {
+                return <div>{previewMode === "diagram" ? diagramView : screenshotView}</div>;
+              }
+
+              return (
+                <motion.div
+                  className="relative overflow-hidden"
+                  initial={false}
+                  animate={{ height: previewMode === "diagram" ? 460 : 232 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <motion.div
+                    className="absolute inset-0"
+                    initial={false}
+                    animate={{ opacity: previewMode === "diagram" ? 1 : 0 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    style={{ pointerEvents: previewMode === "diagram" ? "auto" : "none" }}
+                  >
+                    {diagramView}
+                  </motion.div>
+                  <motion.div
+                    className="absolute inset-0"
+                    initial={false}
+                    animate={{ opacity: previewMode === "screenshot" ? 1 : 0 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    style={{ pointerEvents: previewMode === "screenshot" ? "auto" : "none" }}
+                  >
+                    {screenshotView}
+                  </motion.div>
+                </motion.div>
+              );
+            })()}
             {/* Project name bar */}
             <div className="flex h-10 items-center justify-between border-t-[0.5px] border-dash-border bg-dash-bg-elevated px-3.5">
               <span className="text-sm leading-5 tracking-[-0.02px] text-dash-text-faded">{projectName}</span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <Workflow className="size-3.5 text-dash-text-faded" />
+                  <span className="text-xs font-light tracking-[-0.02px] text-dash-text-faded">Infrastructure</span>
+                  <ToggleSwitch
+                    size="sm"
+                    checked={previewMode === "diagram"}
+                    onChange={(checked) => changePreviewMode(checked ? "diagram" : "screenshot")}
+                  />
+                </label>
                 {liveHref ? (
                   <a href={liveHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                     <span className="text-xs font-light leading-[18px] tracking-[-0.02px] text-dash-text-faded opacity-80">View live</span>
@@ -297,6 +400,17 @@ function ProjectDetailPage() {
                   </a>
                 ) : null}
               </div>
+            </div>
+          </div>
+        ) : null}
+
+        {isDatabaseProject ? (
+          <div className="overflow-clip rounded-[4px] border-[0.5px] border-dash-border">
+            <div className={isMobile ? "" : "h-[400px]"}>
+              <DatabaseInfrastructureDiagram project={project} projectId={projectId} />
+            </div>
+            <div className="flex h-10 items-center justify-between border-t-[0.5px] border-dash-border bg-dash-bg-elevated px-3.5">
+              <span className="text-sm leading-5 tracking-[-0.02px] text-dash-text-faded">{projectName}</span>
             </div>
           </div>
         ) : null}
@@ -547,7 +661,7 @@ function ProjectDetailPage() {
                     <img src="/icons/storage.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light text-dash-text-faded">Backup size</span>
                   </div>
-                  <span className="font-mono text-sm text-dash-text-strong">
+                  <span className="font-mono text-xs text-dash-text-strong">
                     {project?.backupSize != null ? formatBytes(project.backupSize) : "N/A"}
                   </span>
                 </div>
@@ -556,7 +670,7 @@ function ProjectDetailPage() {
                     <img src="/icons/schedule.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light text-dash-text-faded">Backup frequency</span>
                   </div>
-                  <span className="font-mono text-sm text-dash-text-strong">Daily</span>
+                  <span className="font-mono text-xs text-dash-text-strong">Daily</span>
                 </div>
                 <div className="flex items-center justify-between px-3.5 py-3.5">
                   <div className="flex items-center gap-2">
@@ -569,13 +683,13 @@ function ProjectDetailPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       download={`${projectName}-${Date.now().toString(36)}-backup.zip`}
-                      className="font-mono text-sm text-[#4879f8] underline transition-colors hover:text-[#3a63d6]"
+                      className="font-mono text-xs text-[#4879f8] underline transition-colors hover:text-[#3a63d6]"
                       onClick={(e) => e.stopPropagation()}
                     >
                       Download Now
                     </a>
                   ) : (
-                    <span className="font-mono text-sm text-dash-text-extra-faded">No backup available</span>
+                    <span className="font-mono text-xs text-dash-text-extra-faded">No backup available</span>
                   )}
                 </div>
                 <div className="flex items-center justify-between px-3.5 py-3.5">
@@ -583,16 +697,13 @@ function ProjectDetailPage() {
                     <img src="/icons/clock.svg" alt="" aria-hidden="true" className="size-4 invert dark:invert-0" />
                     <span className="text-sm font-light text-dash-text-faded">Last backup</span>
                   </div>
-                  <span className="font-mono text-sm text-dash-text-strong">
+                  <span className="font-mono text-xs text-dash-text-strong">
                     {project?.lastBackup ? formatRelativeTime(project.lastBackup) : "N/A"}
                   </span>
                 </div>
               </div>
             </div>
           ) : null}
-
-          {isDatabaseProject ? <div className="hidden lg:block" /> : null}
-          {isDatabaseProject ? <RegionMap regionText={regionText} /> : null}
 
           {/* Deployments card */}
           {!isDatabaseProject ? (
