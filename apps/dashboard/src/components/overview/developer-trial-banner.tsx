@@ -1,22 +1,9 @@
-import { useState } from "react";
-import { useRouter } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { DashButton } from "@/components/shared/dash-button";
-import type { DeveloperTrialResult, OutstandingDeveloperTrialInvoiceData, Subscription } from "@/backend/payments";
-import config from "@/config";
+import { LoadingButtonContent } from "@/components/shared/loading-button-content";
 import { resolvePlanKey } from "@/hooks/use-plan-gate";
-import { getSubscriptionServerFn, startDeveloperTrialServerFn } from "@/server/payments/actions";
-import { hapticToast as toast } from "@/utils/haptic-toast";
-import { invalidateActiveMatchesWithRoot } from "@/utils/router-invalidate";
+import { hasOutstandingInvoices, useDeveloperTrial } from "@/hooks/use-developer-trial";
 
 const TRIAL_PLAN_KEYS = new Set<string>(["free", "hacker"]);
-
-const startDeveloperTrial = startDeveloperTrialServerFn as () => Promise<DeveloperTrialResult>;
-const getSubscription = getSubscriptionServerFn as () => Promise<Subscription | null>;
-
-function hasOutstandingInvoices(data: OutstandingDeveloperTrialInvoiceData | null): data is OutstandingDeveloperTrialInvoiceData {
-  return Boolean(data?.invoices.length);
-}
 
 export function DeveloperTrialBanner({
   planType,
@@ -27,80 +14,9 @@ export function DeveloperTrialBanner({
   isTeamWorkspace?: boolean;
   developerTrialStartedAt?: string | null;
 }) {
-  const router = useRouter();
-  const startTrial = useServerFn(startDeveloperTrial);
-  const refreshSubscription = useServerFn(getSubscription);
-  const [loading, setLoading] = useState(false);
-  const [outstandingInvoices, setOutstandingInvoices] = useState<OutstandingDeveloperTrialInvoiceData | null>(null);
+  const { start: handleStartTrial, loading, outstandingInvoices } = useDeveloperTrial();
   const eligible = !isTeamWorkspace && TRIAL_PLAN_KEYS.has(resolvePlanKey(planType)) && !developerTrialStartedAt;
   if (!eligible) return null;
-
-  async function handlePendingConfirmation(result: Extract<DeveloperTrialResult, { status: "pending" }>) {
-    const clientSecret = result.data.client_secret;
-    if (!clientSecret) {
-      toast.error("Payment confirmation is required, but confirmation details are missing.");
-      return;
-    }
-
-    if (!config.stripePublishableKey) {
-      toast.error("Payment confirmation is unavailable. Please try again later.");
-      return;
-    }
-
-    const { loadStripe } = await import("@stripe/stripe-js");
-    const stripe = await loadStripe(config.stripePublishableKey);
-    if (!stripe) {
-      toast.error("Payment confirmation is unavailable. Please try again later.");
-      return;
-    }
-
-    const confirmation = await stripe.confirmCardPayment(clientSecret);
-    if (confirmation.error) {
-      toast.error(confirmation.error.message || "Card confirmation failed.");
-      return;
-    }
-
-    toast.success("Developer trial confirmation received.");
-    await refreshSubscription();
-    await invalidateActiveMatchesWithRoot(router);
-  }
-
-  async function handleStartTrial() {
-    if (loading) {
-      return;
-    }
-
-    setLoading(true);
-    setOutstandingInvoices(null);
-
-    try {
-      const result = await startTrial();
-
-      if (result.status === "success") {
-        toast.success(result.message || "You're on the Developer plan — free for the next 14 days.");
-        await refreshSubscription();
-        await invalidateActiveMatchesWithRoot(router);
-        return;
-      }
-
-      if (result.status === "pending") {
-        await handlePendingConfirmation(result);
-        return;
-      }
-
-      if (hasOutstandingInvoices(result.data)) {
-        setOutstandingInvoices(result.data);
-        toast.error(result.message || "Pay outstanding invoices before starting the trial.");
-        return;
-      }
-
-      toast.error(result.message || "Developer trial could not be started.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Developer trial could not be started.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return (
     <div className="mb-8 rounded-[4px] border-[0.5px] border-dash-border px-4 py-4">
@@ -118,7 +34,9 @@ export function DeveloperTrialBanner({
         </div>
         <div className="shrink-0">
           <DashButton onClick={() => void handleStartTrial()} disabled={loading || hasOutstandingInvoices(outstandingInvoices)}>
-            {loading ? "Starting..." : "Start free trial"}
+            <LoadingButtonContent loading={loading} loadingLabel="Starting..." spinnerClassName="text-current">
+              Start free trial
+            </LoadingButtonContent>
           </DashButton>
         </div>
       </div>

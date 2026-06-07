@@ -1,5 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { Modal, ModalFooter, ModalCancelButton, ModalContinueButton } from "@/components/shared/modal";
+import { useDeveloperTrial } from "@/hooks/use-developer-trial";
 
 interface ConfirmServerRuntimeModalProps {
   open: boolean;
@@ -18,9 +19,10 @@ export function ConfirmServerRuntimeModal({
   loading = false,
   onConfirm,
 }: ConfirmServerRuntimeModalProps) {
+  const { start: startTrial, loading: startingTrial } = useDeveloperTrial({ onSuccess: () => onOpenChange(false) });
   const body =
     tooltipMessage?.trim() ||
-    `Deploying as a Static Site may fail to build or render incorrectly if your project requires a server runtime.`;
+    `This project may need a server runtime — a static deploy could fail or render incorrectly.`;
 
   return (
     <Modal open={open} onOpenChange={onOpenChange} width={460}>
@@ -34,15 +36,35 @@ export function ConfirmServerRuntimeModal({
           </Dialog.Title>
           <Dialog.Description className="text-sm leading-5 text-dash-text-faded">
             {body}
-            {isFreePlan && " Upgrade to deploy it as a Web Service."}
+            {isFreePlan && " Start a free 14-day Developer trial to deploy it as a Web Service."}
           </Dialog.Description>
         </div>
       </div>
       <ModalFooter>
         <ModalCancelButton />
-        <ModalContinueButton onClick={onConfirm} loading={loading} loadingLabel="Deploying...">
-          Deploy anyway
-        </ModalContinueButton>
+        {isFreePlan ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void onConfirm()}
+              disabled={loading || startingTrial}
+              className="flex h-[34px] items-center rounded-[4px] border border-dash-border bg-dash-bg px-3.5 text-sm font-medium text-dash-text-strong shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated disabled:pointer-events-none disabled:opacity-40"
+            >
+              Deploy anyway
+            </button>
+            <ModalContinueButton
+              onClick={() => void startTrial()}
+              loading={startingTrial}
+              disabled={loading}
+              loadingLabel="Starting..."
+            >
+              Start free trial
+            </ModalContinueButton>
+          </div>
+        ) : (
+          <ModalContinueButton onClick={onConfirm} loading={loading} loadingLabel="Deploying...">
+            Deploy anyway
+          </ModalContinueButton>
+        )}
       </ModalFooter>
     </Modal>
   );
