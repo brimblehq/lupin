@@ -196,7 +196,6 @@ export function OnboardingChecklist({
       cancelled = true;
       if (retryTimeout) clearTimeout(retryTimeout);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- listGithubAccounts is stable in behavior but unstable in reference (useServerFn)
   }, [gitRefreshKey]);
 
   useEffect(() => {
@@ -242,7 +241,6 @@ export function OnboardingChecklist({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- getTeamMembers is stable in behavior but unstable in reference (useServerFn)
   }, [activeWorkspaceSlug, isTeamWorkspace, teamDetails, teamDetailsByWorkspace]);
 
   useEffect(() => {
@@ -304,7 +302,6 @@ export function OnboardingChecklist({
         hasTeamMembers,
         showInviteTeamMemberTask,
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       hasGit,
       hasProject,

@@ -200,7 +200,6 @@ export function SecurityForm({
       return;
     }
     void refreshStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialStatus]);
 
   function resetSetupModal() {
@@ -346,7 +345,6 @@ export function SecurityForm({
     if (!passkeyPanelVisible) return;
     if (hasInitialPasskeys) return;
     void refreshPasskeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasInitialPasskeys, passkeyPanelVisible]);
 
   async function handleEnrollPasskey() {

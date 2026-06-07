@@ -36,6 +36,7 @@ import type { ScalingGroup } from "@/backend/scaling";
 import { SimpleTooltip } from "@/components/shared/tooltip";
 import { decryptDatabaseConnectionUriServerFn } from "@/server/projects/actions";
 import { NetworkSettingsDrawer } from "./network-settings-drawer";
+import { isStaticProject } from "@/utils/project-capabilities";
 
 type Tone = "green" | "amber" | "red" | "blue" | "gray";
 
@@ -113,6 +114,12 @@ interface NetworkPanelProps {
 interface ClusterPanelProps {
   region: string;
   compute: string;
+  status: { label: string; tone: Tone };
+  onClick: () => void;
+}
+
+interface StaticHostingPanelProps {
+  region: string;
   status: { label: string; tone: Tone };
   onClick: () => void;
 }
@@ -228,6 +235,23 @@ function ClusterPanel({ region, compute, status, onClick }: ClusterPanelProps) {
   );
 }
 
+function StaticHostingPanel({ region, status, onClick }: StaticHostingPanelProps) {
+  return (
+    <div className="rounded-[10px] border-[0.5px] border-dash-border bg-dash-bg-elevated p-2.5">
+      <div className="px-1.5 pb-2.5 pt-1 text-[13px] text-dash-text-faded">{region}</div>
+      <DiagramCard title="Static hosting" icon={<HardDrive className={ICON_CLASS} />} onClick={onClick}>
+        <Row
+          icon={<HardDrive className={ICON_CLASS} />}
+          label="Storage"
+          value={<span className="text-[13px] text-dash-text-strong">Distributed object storage</span>}
+        />
+        <Row icon={<GlobeSimple className={ICON_CLASS} />} label="Delivery" value={<span className="text-[13px] text-dash-text-strong">Edge CDN</span>} />
+        <Row icon={<Lightning className={ICON_CLASS} />} label="Status" value={<StatusValue {...status} />} />
+      </DiagramCard>
+    </div>
+  );
+}
+
 function ScalingPanel({ configured, instances, cpu, memory, status, onClick }: ScalingPanelProps) {
   return (
     <div className="rounded-[10px] border-[0.5px] border-dash-border bg-dash-bg-elevated p-2.5">
@@ -283,6 +307,19 @@ function ClusterNode({ data }: NodeProps<Node<WithHover<ClusterPanelProps>>>) {
   );
 }
 
+function StaticHostingNode({ data }: NodeProps<Node<WithHover<StaticHostingPanelProps>>>) {
+  return (
+    <div
+      className="pointer-events-auto w-[320px]"
+      onMouseEnter={() => data.onHover(true)}
+      onMouseLeave={() => data.onHover(false)}
+    >
+      <StaticHostingPanel {...data} />
+      <Handle type="target" position={Position.Left} className="!size-2 !border-0 !bg-transparent" />
+    </div>
+  );
+}
+
 function ScalingNode({ data }: NodeProps<Node<WithHover<ScalingPanelProps>>>) {
   return (
     <div
@@ -296,7 +333,7 @@ function ScalingNode({ data }: NodeProps<Node<WithHover<ScalingPanelProps>>>) {
   );
 }
 
-const nodeTypes = { network: NetworkNode, cluster: ClusterNode, scaling: ScalingNode };
+const nodeTypes = { network: NetworkNode, cluster: ClusterNode, staticHosting: StaticHostingNode, scaling: ScalingNode };
 
 function RegionPill({ region }: { region: string }) {
   return (
@@ -352,6 +389,7 @@ export function InfrastructureDiagram({
   const [networkDrawerOpen, setNetworkDrawerOpen] = useState(false);
   const [edgeHot, setEdgeHot] = useState(false);
   const backendProject = project.id || projectId;
+  const staticProject = isStaticProject(project);
 
   useEffect(() => setMounted(true), []);
 
@@ -388,6 +426,12 @@ export function InfrastructureDiagram({
       onClick: () => navigate({ to: "/projects/$projectId/configuration", params: { projectId }, search: (prev) => prev }),
     };
 
+    const staticHosting: StaticHostingPanelProps = {
+      region: project.region || "Global edge",
+      status: buildStatus(project),
+      onClick: () => navigate({ to: "/projects/$projectId/configuration", params: { projectId }, search: (prev) => prev }),
+    };
+
     const scalingPanel: ScalingPanelProps = scaling
       ? {
           configured: true,
@@ -402,17 +446,24 @@ export function InfrastructureDiagram({
           onClick: () => navigate({ to: "/scaling", search: { workspace } }),
         };
 
-    return { network, cluster, scaling: scalingPanel };
+    return { network, cluster, staticHosting, scaling: scalingPanel };
   }, [project, networking, scaling, projectId, workspace, navigate]);
 
-  const nodes = useMemo<Node[]>(
-    () => [
-      { id: "network", type: "network", position: { x: 0, y: 0 }, data: { ...panelData.network, onHover: setEdgeHot } },
+  const nodes = useMemo<Node[]>(() => {
+    const networkNode = { id: "network", type: "network", position: { x: 0, y: 0 }, data: { ...panelData.network, onHover: setEdgeHot } };
+    if (staticProject) {
+      return [
+        networkNode,
+        { id: "static-hosting", type: "staticHosting", position: { x: 450, y: 0 }, data: { ...panelData.staticHosting, onHover: setEdgeHot } },
+      ];
+    }
+
+    return [
+      networkNode,
       { id: "cluster", type: "cluster", position: { x: 450, y: -40 }, data: { ...panelData.cluster, onHover: setEdgeHot } },
       { id: "scaling", type: "scaling", position: { x: 450, y: 200 }, data: { ...panelData.scaling, onHover: setEdgeHot } },
-    ],
-    [panelData],
-  );
+    ];
+  }, [panelData, staticProject]);
 
   const edges = useMemo<Edge[]>(() => {
     const edgeStyle = {
@@ -420,11 +471,15 @@ export function InfrastructureDiagram({
       strokeWidth: edgeHot ? 2 : 1.5,
       strokeDasharray: "5 4",
     };
+    if (staticProject) {
+      return [{ id: "network-static-hosting", source: "network", target: "static-hosting", type: "smoothstep", animated: edgeHot, style: edgeStyle }];
+    }
+
     return [
       { id: "network-cluster", source: "network", target: "cluster", type: "smoothstep", animated: edgeHot, style: edgeStyle },
       { id: "cluster-scaling", source: "cluster", target: "scaling", type: "smoothstep", animated: edgeHot, style: edgeStyle },
     ];
-  }, [edgeHot]);
+  }, [edgeHot, staticProject]);
 
   const drawer = (
     <NetworkSettingsDrawer open={networkDrawerOpen} onOpenChange={setNetworkDrawerOpen} projectId={backendProject} workspace={workspace} />
@@ -434,8 +489,14 @@ export function InfrastructureDiagram({
     return (
       <div className="flex flex-col gap-3 p-3">
         <NetworkPanel {...panelData.network} />
-        <ClusterPanel {...panelData.cluster} />
-        <ScalingPanel {...panelData.scaling} />
+        {staticProject ? (
+          <StaticHostingPanel {...panelData.staticHosting} />
+        ) : (
+          <>
+            <ClusterPanel {...panelData.cluster} />
+            <ScalingPanel {...panelData.scaling} />
+          </>
+        )}
         {drawer}
       </div>
     );

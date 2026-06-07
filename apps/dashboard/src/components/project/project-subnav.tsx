@@ -60,9 +60,9 @@ const baseTabs = [
   { label: "Projects details", slug: "", Icon: GlobeSimple },
   { label: "Configuration", slug: "configuration", Icon: GearSix },
   { label: "Observability", slug: "observability", Icon: ChartBar },
-  { label: "Web analytics", slug: "web-analytics", Icon: Pulse },
-  { label: "Domains", slug: "domains", Icon: FileText },
   { label: "Secrets", slug: "environment", Icon: LockKey },
+  { label: "Domains", slug: "domains", Icon: FileText },
+  { label: "Web analytics", slug: "web-analytics", Icon: Pulse },
   {
     label: "Deployment history",
     slug: "deployment-history",

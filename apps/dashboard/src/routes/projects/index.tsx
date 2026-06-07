@@ -39,7 +39,7 @@ import {
   parsePositivePageSearchValue,
   parseTextSearchValue,
   parseWorkspaceSearchValue,
-  workspacePageLoaderDeps,
+  workspaceLoaderDeps,
 } from "@/utils/workspace-route-search";
 import { useTagsStore } from "@/hooks/use-tags-store";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
@@ -161,9 +161,7 @@ export const Route = createFileRoute("/projects/")({
     return next;
   },
   loaderDeps: ({ search }) => ({
-    ...workspacePageLoaderDeps(search),
-    type: parseTextSearchValue(search.type),
-    status: parseTextSearchValue(search.status),
+    ...workspaceLoaderDeps(search),
     environmentId: parseTextSearchValue(search.environmentId),
   }),
   loader: async ({ deps }): Promise<ProjectsRouteLoaderData> => {
@@ -193,10 +191,7 @@ export const Route = createFileRoute("/projects/")({
         };
       }) => Promise<PaginatedProjectsResponse>)({
         data: {
-          page: deps.page,
           workspace: deps.workspace,
-          serviceType: deps.type && deps.type !== "all" ? deps.type : undefined,
-          status: deps.status && deps.status !== "all" ? deps.status : undefined,
           environmentId,
         },
       });
@@ -319,7 +314,6 @@ function EnvironmentManagerModal({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, environments.length]);
 
   const selectedEnvironment = environments.find((env) => env._id === selectedEnvironmentId) ?? null;
@@ -752,7 +746,6 @@ function ProjectsPage() {
       }
       cleanup?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleProjectIdsKey, router]);
 
   useEffect(() => {
@@ -849,6 +842,8 @@ function ProjectsPage() {
         if (cancelled) {
           return;
         }
+        setIsFilterChanging(false);
+        setIsStatusFilterChanging(false);
         setIsProjectsLoading(false);
         setLoadingPage(null);
       });
@@ -856,7 +851,7 @@ function ProjectsPage() {
     return () => {
       cancelled = true;
     };
-  }, [effectiveEnvironmentId, listProjectsPage, loaderData.frameworkLogos, page, q, search.status, search.type, search.workspace]);
+  }, [effectiveEnvironmentId, loaderData.frameworkLogos, page, q, search.status, search.type, search.workspace]);
 
   useEffect(() => {
     if (prevSignal.current === refreshSignal) return;

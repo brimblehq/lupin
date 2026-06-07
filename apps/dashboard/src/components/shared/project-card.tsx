@@ -219,47 +219,49 @@ export function ProjectCard({
 
   if (view === "list") {
     return (
-      <Link to="/projects/$projectId" params={{ projectId: projectRouteId }} search={workspace ? { workspace } : {}} className="block">
-        <motion.div
-          whileHover={{ scale: 1.004 }}
-          whileTap={{ scale: 0.997 }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          className="flex cursor-pointer items-center gap-3 overflow-clip rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-3"
-        >
-          <ProjectIdentityIcon project={project} />
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-sm font-medium leading-5 tracking-[-0.02px] text-dash-text-strong">{project.name}</span>
-              {project.status ? <StatusChip status={project.status} className="shrink-0 scale-[0.85] origin-left" /> : null}
+      <>
+        <Link to="/projects/$projectId" params={{ projectId: projectRouteId }} search={workspace ? { workspace } : {}} className="block">
+          <motion.div
+            whileHover={{ scale: 1.004 }}
+            whileTap={{ scale: 0.997 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="flex cursor-pointer items-center gap-3 overflow-clip rounded-[4px] border-[0.5px] border-dash-border px-3.5 py-3"
+          >
+            <ProjectIdentityIcon project={project} />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-medium leading-5 tracking-[-0.02px] text-dash-text-strong">{project.name}</span>
+                {project.status ? <StatusChip status={project.status} className="shrink-0 scale-[0.85] origin-left" /> : null}
+              </div>
+              <span className="truncate text-xs font-light leading-[18px] text-dash-text-faded">{project.commitMessage}</span>
             </div>
-            <span className="truncate text-xs font-light leading-[18px] text-dash-text-faded">{project.commitMessage}</span>
-          </div>
 
-          <ProjectCardTags
-            tags={projectTags}
-            maxVisible={3}
-            showLabels={false}
-            className="hidden shrink-0 items-center gap-1.5 sm:flex"
-          />
+            <ProjectCardTags
+              tags={projectTags}
+              maxVisible={3}
+              showLabels={false}
+              className="hidden shrink-0 items-center gap-1.5 sm:flex"
+            />
 
-          <div className="hidden shrink-0 items-center gap-1.5 md:flex">
-            {isDatabaseProject ? (
-              <img src="/icons/database.svg" alt="" className="size-5 shrink-0" />
-            ) : (
-              <img src="/icons/git-circle.svg" alt="" className="size-5 shrink-0" />
-            )}
-            <span className="text-[13px] tracking-[-0.02px] text-dash-text-strong">From {project.branch}</span>
-          </div>
+            <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+              {isDatabaseProject ? (
+                <img src="/icons/database.svg" alt="" className="size-5 shrink-0" />
+              ) : (
+                <img src="/icons/git-circle.svg" alt="" className="size-5 shrink-0" />
+              )}
+              <span className="text-[13px] tracking-[-0.02px] text-dash-text-strong">From {project.branch}</span>
+            </div>
 
-          <span className="hidden shrink-0 font-mono text-xs uppercase tracking-[-0.02px] text-dash-text-extra-faded opacity-80 lg:inline">
-            Updated {project.updatedAt}
-          </span>
+            <span className="hidden shrink-0 font-mono text-xs uppercase tracking-[-0.02px] text-dash-text-extra-faded opacity-80 lg:inline">
+              Updated {project.updatedAt}
+            </span>
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            {kebabButton}
-            {transferButton}
-          </div>
-        </motion.div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {kebabButton}
+              {transferButton}
+            </div>
+          </motion.div>
+        </Link>
         <TagAssignmentPopover
           projectId={projectTagTargetId}
           anchorRef={dotsRef}
@@ -275,55 +277,57 @@ export function ProjectCard({
           projectName={project.name}
           currentWorkspaceSlug={workspace}
         />
-      </Link>
+      </>
     );
   }
 
   return (
-    <Link to="/projects/$projectId" params={{ projectId: projectRouteId }} search={workspace ? { workspace } : {}} className="block">
-      <motion.div
-        whileHover={{ y: -3, scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        className="flex min-h-[168px] cursor-pointer flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border"
-      >
-        {/* Project name + commit message */}
-        <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-3.5 pt-3 pb-2 text-sm tracking-[-0.02px]">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <ProjectIdentityIcon project={project} />
-              <span className="min-w-0 shrink font-medium leading-5 text-dash-text-strong">{project.name}</span>
+    <>
+      <Link to="/projects/$projectId" params={{ projectId: projectRouteId }} search={workspace ? { workspace } : {}} className="block">
+        <motion.div
+          whileHover={{ y: -3, scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="flex min-h-[168px] cursor-pointer flex-col overflow-clip rounded-[4px] border-[0.5px] border-dash-border"
+        >
+          {/* Project name + commit message */}
+          <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-3.5 pt-3 pb-2 text-sm tracking-[-0.02px]">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <ProjectIdentityIcon project={project} />
+                <span className="min-w-0 shrink font-medium leading-5 text-dash-text-strong">{project.name}</span>
+              </div>
+              {project.status ? <StatusChip status={project.status} className="shrink-0 scale-[0.92] origin-top-right" /> : null}
             </div>
-            {project.status ? <StatusChip status={project.status} className="shrink-0 scale-[0.92] origin-top-right" /> : null}
+            <span className="line-clamp-1 font-light leading-[22px] text-dash-text-faded">{project.commitMessage}</span>
           </div>
-          <span className="line-clamp-1 font-light leading-[22px] text-dash-text-faded">{project.commitMessage}</span>
-        </div>
 
-        <ProjectCardTags tags={projectTags} />
+          <ProjectCardTags tags={projectTags} />
 
-        {/* Branch with git icon + vertical line */}
-        <div className="relative flex shrink-0 items-center gap-2 px-3 pb-1 pt-0.5">
-          {/* Vertical line above icon */}
-          <div className="absolute left-[21px] top-[-6px] h-[16px] w-px bg-dash-border" />
-          {isDatabaseProject ? (
-            <img src="/icons/database.svg" alt="" className="size-5 shrink-0" />
-          ) : (
-            <img src="/icons/git-circle.svg" alt="" className="size-5 shrink-0" />
-          )}
-          <span className="text-[13px] tracking-[-0.02px] text-dash-text-strong">From {project.branch}</span>
-        </div>
-
-        {/* Updated timestamp + star */}
-        <div className="flex h-10 shrink-0 items-center justify-between border-t-[0.5px] border-dash-border px-3.5">
-          <span className="font-mono text-xs uppercase leading-[18px] tracking-[-0.02px] text-dash-text-extra-faded opacity-80">
-            Updated {project.updatedAt}
-          </span>
-          <div className="flex items-center gap-1.5">
-            {kebabButton}
-            {transferButton}
+          {/* Branch with git icon + vertical line */}
+          <div className="relative flex shrink-0 items-center gap-2 px-3 pb-1 pt-0.5">
+            {/* Vertical line above icon */}
+            <div className="absolute left-[21px] top-[-6px] h-[16px] w-px bg-dash-border" />
+            {isDatabaseProject ? (
+              <img src="/icons/database.svg" alt="" className="size-5 shrink-0" />
+            ) : (
+              <img src="/icons/git-circle.svg" alt="" className="size-5 shrink-0" />
+            )}
+            <span className="text-[13px] tracking-[-0.02px] text-dash-text-strong">From {project.branch}</span>
           </div>
-        </div>
-      </motion.div>
+
+          {/* Updated timestamp + star */}
+          <div className="flex h-10 shrink-0 items-center justify-between border-t-[0.5px] border-dash-border px-3.5">
+            <span className="font-mono text-xs uppercase leading-[18px] tracking-[-0.02px] text-dash-text-extra-faded opacity-80">
+              Updated {project.updatedAt}
+            </span>
+            <div className="flex items-center gap-1.5">
+              {kebabButton}
+              {transferButton}
+            </div>
+          </div>
+        </motion.div>
+      </Link>
       <TagAssignmentPopover
         projectId={projectTagTargetId}
         anchorRef={dotsRef}
@@ -339,6 +343,6 @@ export function ProjectCard({
         projectName={project.name}
         currentWorkspaceSlug={workspace}
       />
-    </Link>
+    </>
   );
 }
