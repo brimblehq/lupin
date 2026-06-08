@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import * as Sentry from "@sentry/tanstackstart-react";
 import { BackendApiError } from "@/backend/errors";
+import { capturePostHogException } from "@/lib/posthog";
 import { withWorkspaceQuery } from "@/utils/topbar-navigation";
 import { AccessDenied } from "./access-denied";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
@@ -45,8 +46,6 @@ function isNetworkError(error: unknown): boolean {
 }
 
 function getFriendlyError(error: unknown): { title: string; description: string } {
-  console.log(`ERROR: APPLICATION HERE HERE ->`, error);
-
   if (isNetworkError(error)) {
     return {
       title: "Can't reach our servers",
@@ -78,14 +77,19 @@ function getFriendlyError(error: unknown): { title: string; description: string 
 
 export function DefaultErrorComponent({ error }: { error: Error }) {
   const router = useRouter();
-  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const location = useRouterState({ select: (s) => s.location });
   const forbidden = isForbiddenError(error);
 
   useEffect(() => {
     if (!forbidden) {
       Sentry.captureException(error);
+      capturePostHogException(error, {
+        route_path: location.pathname,
+        route_search: location.searchStr,
+        source: "tanstack_route_error",
+      });
     }
-  }, [error, forbidden]);
+  }, [error, forbidden, location.pathname, location.searchStr]);
 
   if (forbidden) {
     return (
@@ -112,7 +116,7 @@ export function DefaultErrorComponent({ error }: { error: Error }) {
       }}
       secondaryAction={{
         label: "Back to dashboard",
-        href: withWorkspaceQuery({ pathname: "/", searchStr }),
+        href: withWorkspaceQuery({ pathname: "/", searchStr: location.searchStr }),
       }}
     />
   );

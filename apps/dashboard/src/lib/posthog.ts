@@ -15,6 +15,7 @@ type PostHogClient = {
   init: (apiKey: string, config?: Record<string, unknown>) => void;
   set_config: (config: Record<string, unknown>) => void;
   capture: (event: string, properties?: Record<string, unknown>) => void;
+  captureException: (error: unknown, properties?: Record<string, unknown>) => void;
   identify: (distinctId: string, properties?: Record<string, unknown>) => void;
   reset: () => void;
   isFeatureEnabled?: (flag: string) => boolean | undefined;
@@ -134,6 +135,11 @@ export async function initPostHog(): Promise<PostHogClient | null> {
     defaults: "2026-01-30",
     capture_pageview: false,
     capture_pageleave: true,
+    capture_exceptions: {
+      capture_unhandled_errors: true,
+      capture_unhandled_rejections: true,
+      capture_console_errors: false,
+    },
     disable_surveys: true,
     disable_surveys_automatic_display: true,
     advanced_enable_surveys: false,
@@ -158,6 +164,13 @@ export function capturePostHog(event: string, properties?: Record<string, unknow
   if (typeof window === "undefined" || !isPostHogEnabled) return;
   void initPostHog().then((client) => {
     client?.capture(event, properties);
+  });
+}
+
+export function capturePostHogException(error: unknown, properties?: Record<string, unknown>) {
+  if (typeof window === "undefined" || !isPostHogEnabled) return;
+  void initPostHog().then((client) => {
+    client?.captureException(error, properties);
   });
 }
 
@@ -218,6 +231,7 @@ export async function getPostHogFeatureFlag(flag: string): Promise<boolean | und
 
 export const posthog = {
   capture: capturePostHog,
+  captureException: capturePostHogException,
   identify: identifyPostHog,
   reset: resetPostHog,
 };
