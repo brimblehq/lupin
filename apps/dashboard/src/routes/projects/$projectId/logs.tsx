@@ -682,7 +682,14 @@ function ApplicationLogs({ projectId, logRetentionDays }: { projectId: string; l
         />
 
         <div className="flex items-stretch rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
-          <DateRangePicker value={dateRange} onChange={setDateRange} minDate={minSelectableDate} maxDate={maxSelectableDate} includeTime>
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            getResetValue={() => clampRangeToBounds(defaultApplicationLogsDateRange(), minSelectableDate, maxSelectableDate)}
+            minDate={minSelectableDate}
+            maxDate={maxSelectableDate}
+            includeTime
+          >
             <button type="button" className="flex items-center gap-2 px-3 py-3 transition-colors hover:bg-dash-bg-elevated">
               <Calendar className="size-3.5 text-dash-text-faded" />
               <span className="max-w-[260px] truncate">{formatLogRangeLabel(dateRange)}</span>
@@ -1324,7 +1331,14 @@ function RequestLogs({ projectId, logRetentionDays }: { projectId: string; logRe
         />
 
         <div className="flex items-stretch rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg text-sm text-dash-text-body">
-          <DateRangePicker value={dateRange} onChange={setDateRange} minDate={minSelectableDate} maxDate={maxSelectableDate} includeTime>
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            getResetValue={() => clampRangeToBounds(defaultRequestLogsDateRange(), minSelectableDate, maxSelectableDate)}
+            minDate={minSelectableDate}
+            maxDate={maxSelectableDate}
+            includeTime
+          >
             <button type="button" className="flex items-center gap-2 px-3 py-3 transition-colors hover:bg-dash-bg-elevated">
               <Calendar className="size-3.5 text-dash-text-faded" />
               <span className="max-w-[260px] truncate">{formatLogRangeLabel(dateRange)}</span>

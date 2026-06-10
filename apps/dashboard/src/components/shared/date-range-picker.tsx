@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "motion/react";
 interface DateRangePickerProps {
   value?: DateRange;
   onChange: (range: DateRange | undefined) => void;
+  getResetValue?: () => DateRange | undefined;
   minDate?: Date;
   maxDate?: Date;
   includeTime?: boolean;
@@ -74,7 +75,7 @@ function formatRangeLabel(range: DateRange | undefined, dateFormat: string): str
   return "Select a range";
 }
 
-export function DateRangePicker({ value, onChange, minDate, maxDate, includeTime = false, children }: DateRangePickerProps) {
+export function DateRangePicker({ value, onChange, getResetValue, minDate, maxDate, includeTime = false, children }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [isMobileView, setIsMobileView] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(max-width: 639px)").matches : false,
@@ -117,6 +118,15 @@ export function DateRangePicker({ value, onChange, minDate, maxDate, includeTime
 
   function handleCancel() {
     setDraft(value);
+    setOpen(false);
+  }
+
+  function handleReset() {
+    if (!getResetValue) return;
+
+    const next = clampRangeToBounds(getResetValue(), minDate, maxDate);
+    setDraft(next);
+    onChange(next);
     setOpen(false);
   }
 
@@ -240,6 +250,14 @@ export function DateRangePicker({ value, onChange, minDate, maxDate, includeTime
                   <span className="ml-1 inline-block max-w-full truncate align-bottom text-dash-text-strong">{rangeLabel}</span>
                 </div>
                 <div className="flex items-center gap-2 self-stretch sm:self-auto">
+                  {getResetValue && (
+                    <button
+                      onClick={handleReset}
+                      className="flex h-[34px] flex-1 items-center justify-center rounded-[4px] border border-transparent bg-transparent px-3 text-sm font-medium text-dash-text-faded transition-colors hover:bg-dash-bg-elevated hover:text-dash-text-strong sm:flex-none"
+                    >
+                      Reset
+                    </button>
+                  )}
                   <button
                     onClick={handleCancel}
                     className="flex h-[34px] flex-1 items-center justify-center rounded-[4px] border border-dash-border-soft bg-dash-bg px-3.5 text-sm font-medium text-dash-text-body shadow-[0px_1px_2px_rgba(18,18,23,0.05)] transition-colors hover:bg-dash-bg-elevated sm:flex-none"

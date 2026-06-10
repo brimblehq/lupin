@@ -1045,7 +1045,7 @@ export function DatabaseConnectionModal({ open, onOpenChange, connectionUri, isA
                 <div className="h-3 w-[60%] animate-pulse rounded bg-white/10" />
               </div>
             ) : (
-              <code className="block break-all px-4 py-3 font-family-mono text-[12px] leading-5 text-[#e8eaed]">
+              <code className="block break-all px-4 py-3 font-mono text-[12px] leading-5 text-[#e8eaed]">
                 {!connectionUri
                   ? "Connection URI not available yet."
                   : revealed && decryptedUri
@@ -1078,12 +1078,12 @@ export function DatabaseConnectionModal({ open, onOpenChange, connectionUri, isA
               <div className="mt-1 mb-1.5 flex items-center justify-between gap-3 px-0.5 py-2 text-xs text-dash-text-faded">
                 <div className="min-w-0">
                   <span className="font-medium text-dash-text-body">Install:</span>{" "}
-                  <code className="font-family-mono text-[11px] text-dash-text-body">{activeGuide?.install}</code>
+                  <code className="font-mono text-[11px] text-dash-text-body">{activeGuide?.install}</code>
                   {activeGuide?.file ? (
                     <>
                       {" "}
                       <span className="text-dash-text-extra-faded">|</span> <span className="font-medium text-dash-text-body">File:</span>{" "}
-                      <code className="font-family-mono text-[11px] text-dash-text-body">{activeGuide.file}</code>
+                      <code className="font-mono text-[11px] text-dash-text-body">{activeGuide.file}</code>
                     </>
                   ) : null}
                 </div>
@@ -1155,7 +1155,7 @@ export function DatabaseConnectionModal({ open, onOpenChange, connectionUri, isA
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                    className="m-0 max-h-[240px] overflow-auto overscroll-contain whitespace-pre px-4 py-3 font-family-mono text-[12px] leading-5 text-[#e8eaed] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.14)_transparent] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent"
+                    className="m-0 max-h-[240px] overflow-auto overscroll-contain whitespace-pre px-4 py-3 font-mono text-[12px] leading-5 text-[#e8eaed] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.14)_transparent] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent"
                   >
                     <code>
                       {highlight(guideSnippet).map((tok, i) => (
