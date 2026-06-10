@@ -57,6 +57,7 @@ import {
   withWorkspaceQuery,
 } from "@/utils/topbar-navigation";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
+import { openErrorReport } from "@/utils/haptic-toast";
 import { FeatureFlags, useFeatureFlag, useFeatureFlagStrict } from "@/lib/feature-flags";
 import { usePlanGate } from "@/hooks/use-plan-gate";
 
@@ -1368,10 +1369,16 @@ export function Topbar({
               <Newspaper className="size-4" />
               <span className="hidden md:inline">What's new ?</span>
             </a>
-            <a href="mailto:hello@brimble.app" className="flex items-center gap-1.5 text-sm hover:text-dash-text-strong transition-colors">
+            <button
+              onClick={() => {
+                haptics.selection();
+                openErrorReport();
+              }}
+              className="flex items-center gap-1.5 text-sm transition-colors hover:text-dash-text-strong"
+            >
               <HelpCircle className="size-4" />
               <span className="hidden md:inline">Help</span>
-            </a>
+            </button>
             <button
               onClick={() => {
                 haptics.selection();

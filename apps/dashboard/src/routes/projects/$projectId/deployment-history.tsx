@@ -47,6 +47,7 @@ import { PLAN_UPGRADE_REQUIRED_CODE } from "@/backend/errors";
 import { usePushNotification } from "@/hooks/use-push-notification";
 import { Route as RootRoute } from "@/routes/__root";
 import type { TeamDetails, TeamMember } from "@/backend/teams";
+import { safeCloseAblyRealtime } from "@/lib/ably-cleanup";
 import { getProjectScopedAblyOptions } from "@/lib/ably-auth";
 import type { ListDeploymentsServerFnCaller } from "../project-detail.types";
 
@@ -1145,12 +1146,12 @@ function DeploymentHistoryPage() {
 
       const ably = new Realtime(authOptions);
       const channel = ably.channels.get(`project:${projectId}`);
-      channel.subscribe("log", handleLogEvent);
+      void channel.subscribe("log", handleLogEvent);
 
       cleanup = () => {
         try {
           channel.unsubscribe("log", handleLogEvent);
-          ably.close();
+          safeCloseAblyRealtime(ably);
         } catch {
           // ignore
         }

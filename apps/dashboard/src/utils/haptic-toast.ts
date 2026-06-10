@@ -29,7 +29,7 @@ function getToastMessageText(message: unknown): string | undefined {
   return trimmed || undefined;
 }
 
-function openErrorReport(message?: string) {
+export function openErrorReport(message?: string) {
   if (typeof window === "undefined") {
     return;
   }

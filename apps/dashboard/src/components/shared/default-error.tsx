@@ -32,6 +32,20 @@ function isForbiddenError(error: unknown): boolean {
   return getHttpStatus(error) === 403;
 }
 
+function getErrorMessage(error: unknown): string {
+  const err = error as { message?: unknown } | null;
+  if (typeof err?.message === "string") return err.message.toLowerCase();
+  return String(error ?? "").toLowerCase();
+}
+
+function isProjectNotFoundError(error: unknown): boolean {
+  return getErrorMessage(error).includes("project not found");
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return getHttpStatus(error) === 404 || isProjectNotFoundError(error);
+}
+
 function isNetworkError(error: unknown): boolean {
   const err = error as { name?: unknown; message?: unknown } | null;
   const name = typeof err?.name === "string" ? err.name : "";
@@ -53,9 +67,16 @@ function getFriendlyError(error: unknown): { title: string; description: string 
     };
   }
 
+  if (isProjectNotFoundError(error)) {
+    return {
+      title: "Project not found",
+      description: "This project may have been deleted, moved, or you may not have access.",
+    };
+  }
+
   const status = getHttpStatus(error);
 
-  if (status === 404) {
+  if (isNotFoundError(error)) {
     return {
       title: "We couldn't find that page",
       description: "The page you're looking for doesn't exist or may have been moved.",
@@ -79,9 +100,10 @@ export function DefaultErrorComponent({ error }: { error: Error }) {
   const router = useRouter();
   const location = useRouterState({ select: (s) => s.location });
   const forbidden = isForbiddenError(error);
+  const notFound = isNotFoundError(error);
 
   useEffect(() => {
-    if (!forbidden) {
+    if (!forbidden && !notFound) {
       Sentry.captureException(error);
       capturePostHogException(error, {
         route_path: location.pathname,
@@ -89,7 +111,7 @@ export function DefaultErrorComponent({ error }: { error: Error }) {
         source: "tanstack_route_error",
       });
     }
-  }, [error, forbidden, location.pathname, location.searchStr]);
+  }, [error, forbidden, location.pathname, location.searchStr, notFound]);
 
   if (forbidden) {
     return (

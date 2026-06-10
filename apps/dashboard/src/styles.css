@@ -751,20 +751,20 @@ code {
   pointer-events: none !important;
 }
 
-/* Chatwoot widget — above the app, but below vaul drawers so it never blocks their controls. */
+/* App overlays reserve higher layers for dialogs launched from inside drawers. */
 .woot-widget-bubble,
 .woot--bubble-holder,
 .woot-widget-holder,
 .woot-widget-holder iframe {
-  z-index: 2147483645 !important;
+  z-index: 70 !important;
 }
 
 /* Vaul drawers must sit on top of the Chatwoot widget. */
 [data-vaul-overlay] {
-  z-index: 2147483646 !important;
+  z-index: 80 !important;
 }
 [data-vaul-drawer] {
-  z-index: 2147483647 !important;
+  z-index: 90 !important;
 }
 
 /* The onboarding checklist and the Chatwoot bubble share the bottom-right corner — hide Chatwoot

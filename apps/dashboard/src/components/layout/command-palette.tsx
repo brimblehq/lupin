@@ -4,13 +4,14 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "motion/react";
 import { Command } from "cmdk";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check, SignOut, Compass, Cube, HardDrives } from "@phosphor-icons/react";
+import { ArrowLeft, Moon, Sun, ArrowsClockwise, TreeStructure, Check, SignOut, Compass, Cube, HardDrives, WarningCircle } from "@phosphor-icons/react";
 import { startProductTour } from "../shared/product-tour";
 import { PaletteView, Theme } from "../../types/enums";
 import { useScoutBar } from "../../contexts/scoutbar-context";
 import { useTheme } from "../../hooks/use-theme";
 import { useHaptics } from "@/hooks/use-haptics";
 import { getWorkspaceFromSearch, withWorkspaceQuery } from "@/utils/topbar-navigation";
+import { openErrorReport } from "@/utils/haptic-toast";
 import { listDomainsPageServerFn } from "@/server/domains/actions";
 import { listProjectEnvironmentsServerFn } from "@/server/environments/actions";
 import type { DomainRecord } from "@/backend/domains";
@@ -606,6 +607,10 @@ export function CommandPalette() {
                             >
                               <img src="/icons/scoutbar/mail.svg" width="16" height="16" alt="" />
                               <span>Contact support</span>
+                            </Command.Item>
+                            <Command.Item value="report error issue bug problem complaint feedback" onSelect={() => runAction(() => openErrorReport())}>
+                              <WarningCircle className="size-4" />
+                              <span>Report an error</span>
                             </Command.Item>
                             <Command.Item
                               value="logout sign out"

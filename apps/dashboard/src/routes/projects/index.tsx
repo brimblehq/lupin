@@ -43,6 +43,7 @@ import {
 } from "@/utils/workspace-route-search";
 import { useTagsStore } from "@/hooks/use-tags-store";
 import { useWorkspaceRole } from "@/contexts/workspace-role-context";
+import { safeCloseAblyRealtime } from "@/lib/ably-cleanup";
 import { getProjectScopedAblyOptions } from "@/lib/ably-auth";
 import type { ProjectsRouteLoaderData } from "./types";
 import { invalidateActiveMatches } from "@/utils/router-invalidate";
@@ -725,7 +726,7 @@ function ProjectsPage() {
 
       const channels = visibleProjectIds.map((id) => {
         const channel = ably.channels.get(`project:${id}`);
-        channel.subscribe((message) => {
+        void channel.subscribe((message) => {
           if ((message.name ?? "").startsWith("deployment:")) {
             scheduleInvalidate();
           }
@@ -735,7 +736,7 @@ function ProjectsPage() {
 
       cleanup = () => {
         channels.forEach((channel) => channel.unsubscribe());
-        ably.close();
+        safeCloseAblyRealtime(ably);
       };
     })();
 

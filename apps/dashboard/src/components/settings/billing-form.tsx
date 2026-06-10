@@ -936,7 +936,7 @@ function PaymentMethodRow({
           if (!removeMutation.isPending) setConfirmOpen(next);
         }}
         title="Remove your only card?"
-        description="This is the card we use to renew your paid plan. If you remove it, we won't be able to charge you on your next renewal date — your projects may go offline until you add a new card."
+        description="Your paid plan needs a card for renewal. Add a new card before the next billing date to avoid service interruption."
         confirmLabel="Remove anyway"
         confirmLoadingLabel="Removing..."
         confirmDisabled={removeMutation.isPending}

@@ -43,7 +43,7 @@ export function Modal({ open, onOpenChange, children, width = 500, className, di
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]"
+                className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-[2px]"
               />
             </Dialog.Overlay>
 
@@ -83,7 +83,7 @@ export function Modal({ open, onOpenChange, children, width = 500, className, di
                 }}
                 style={{ width }}
                 className={cn(
-                  "fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-32px)] max-w-[calc(100vw-16px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,1)] sm:max-w-[calc(100vw-32px)] dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]",
+                  "fixed left-1/2 top-1/2 z-[101] flex max-h-[calc(100vh-32px)] max-w-[calc(100vw-16px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[4px] border-[0.5px] border-dash-border bg-dash-bg shadow-[0px_2px_3px_rgba(0,0,0,0.06),inset_0px_-3px_2px_rgba(245,245,245,1)] sm:max-w-[calc(100vw-32px)] dark:shadow-[0px_2px_3px_rgba(0,0,0,0.2)]",
                   className,
                 )}
               >

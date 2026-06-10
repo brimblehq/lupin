@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/tanstackstart-react";
 import { routeTree } from "./routeTree.gen";
 import { DefaultErrorComponent } from "./components/shared/default-error";
 import { DefaultRoutePending } from "./components/shared/route-pending";
+import { installAblyTeardownRejectionFilter } from "./lib/ably-cleanup";
 import { installServerFnPerfLogger } from "./lib/perf-logger";
 
 let sentryInitialized = false;
@@ -20,6 +21,10 @@ export function getRouter() {
     defaultPendingComponent: DefaultRoutePending,
     defaultErrorComponent: DefaultErrorComponent,
   });
+
+  if (!router.isServer) {
+    installAblyTeardownRejectionFilter();
+  }
 
   if (!router.isServer && !sentryInitialized) {
     Sentry.init({

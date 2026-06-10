@@ -8,6 +8,7 @@ import { TabHeader } from "@/components/shared/tab-header";
 import { SandboxDetailPending } from "@/components/shared/route-pending";
 import { SandboxSubnav } from "@/components/sandboxes/sandbox-subnav";
 import { SandboxTerminal } from "@/components/sandboxes/sandbox-terminal";
+import { safeCloseAblyRealtime } from "@/lib/ably-cleanup";
 import { getSandboxScopedAblyOptions } from "@/lib/ably-auth";
 import { snapshotEventBus } from "@/lib/sandboxes/snapshot-event-bus";
 import { getSandboxServerFn } from "@/server/sandboxes/actions";
@@ -126,7 +127,7 @@ function SandboxDetailLayout() {
           channel.unsubscribe("sandbox:destroyed", onDestroyed);
           channel.unsubscribe("sandbox:snapshot:completed", onSnapshotCompleted);
           channel.unsubscribe("sandbox:snapshot:failed", onSnapshotFailed);
-          ably.close();
+          safeCloseAblyRealtime(ably);
         } catch {
           // ignore teardown errors
         }

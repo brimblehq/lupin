@@ -17,6 +17,7 @@ import {
 } from "@/contexts/project-deployment-logs-drawer-context";
 import { sortDeploymentDrawerEntries } from "@/utils/deployment-logs";
 import { usePushNotification } from "@/hooks/use-push-notification";
+import { safeCloseAblyRealtime } from "@/lib/ably-cleanup";
 import { getProjectScopedAblyOptions } from "@/lib/ably-auth";
 import type { ProjectDetailRouteProject } from "./project-detail.types";
 import { PROJECT_CACHE_TTL, getProjectCacheKey, markProjectCacheStale, projectCache } from "./project-route-cache";
@@ -484,11 +485,7 @@ function ProjectLayout() {
       });
 
       cleanup = () => {
-        try {
-          ably.close();
-        } catch {
-          // ignore
-        }
+        safeCloseAblyRealtime(ably);
       };
     })();
 
