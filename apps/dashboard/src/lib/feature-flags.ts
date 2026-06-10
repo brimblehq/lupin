@@ -11,6 +11,7 @@ export const FeatureFlags = {
   ENABLE_SANDBOX: "enable_sandbox",
   ENABLE_BUCKETS: "enable_buckets",
   ENABLE_WEB_ANALYTICS: "enable_web_analytics",
+  ENABLE_TRACING: "enable_tracing",
   ENABLE_AI_DEBUG: "enable_ai_debug",
   ENABLE_ANNOUNCEMENTS: "enable_announcements",
 } as const;

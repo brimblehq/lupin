@@ -17,6 +17,7 @@ import {
   LockKey,
   RocketLaunch,
   Scroll,
+  TreeStructure,
   GitBranch,
   ArrowsClockwise,
   Tag,
@@ -42,6 +43,7 @@ import {
   shouldShowProjectDomainsTab,
   shouldShowProjectEnvironmentTab,
   shouldShowProjectLogsTab,
+  shouldShowProjectTracingTab,
   shouldShowProjectObservabilityTab,
   shouldShowProjectWebAnalyticsTab,
   shouldShowProjectVisitSite,
@@ -69,6 +71,7 @@ const baseTabs = [
     Icon: RocketLaunch,
   },
   { label: "Logs", slug: "logs", Icon: Scroll },
+  { label: "Tracing", slug: "tracing", Icon: TreeStructure },
 ];
 const MAX_VISIBLE_SUBNAV_TABS = 5;
 
@@ -216,6 +219,7 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
   const deploymentsEnabled = useFeatureFlag(FeatureFlags.ENABLE_DEPLOYMENTS);
   const databasesEnabled = useFeatureFlag(FeatureFlags.ENABLE_DATABASES);
   const webAnalyticsEnabled = useFeatureFlag(FeatureFlags.ENABLE_WEB_ANALYTICS);
+  const tracingEnabled = useFeatureFlag(FeatureFlags.ENABLE_TRACING);
   const planGate = usePlanGate();
   const planSupportsAnalytics = planGate.analytics !== false;
 
@@ -241,6 +245,10 @@ export function ProjectSubnav({ projectId }: { projectId: string }) {
     }
 
     if (tab.slug === "logs" && !shouldShowProjectLogsTab(project as any)) {
+      return false;
+    }
+
+    if (tab.slug === "tracing" && (!tracingEnabled || !shouldShowProjectTracingTab(project as any))) {
       return false;
     }
 

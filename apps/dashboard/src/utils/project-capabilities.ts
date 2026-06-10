@@ -99,6 +99,14 @@ export function shouldShowProjectLogsTab(project?: Pick<Project, "serviceType"> 
   return true;
 }
 
+export function shouldShowProjectTracingTab(project?: Pick<Project, "serviceType"> | null): boolean {
+  if (isStaticProject(project) || isDatabaseProject(project)) {
+    return false;
+  }
+
+  return true;
+}
+
 export function shouldShowBuildCacheToggle(project?: Pick<Project, "serviceType"> | null): boolean {
   if (isDatabaseProject(project) || isStaticProject(project)) {
     return false;

@@ -46,6 +46,7 @@ import { Route as SandboxesSandboxIdTerminalRouteImport } from './routes/sandbox
 import { Route as SandboxesSandboxIdSnapshotsRouteImport } from './routes/sandboxes/$sandboxId/snapshots'
 import { Route as SandboxesSandboxIdObservabilityRouteImport } from './routes/sandboxes/$sandboxId/observability'
 import { Route as ProjectsProjectIdWebAnalyticsRouteImport } from './routes/projects/$projectId/web-analytics'
+import { Route as ProjectsProjectIdTracingRouteImport } from './routes/projects/$projectId/tracing'
 import { Route as ProjectsProjectIdObservabilityRouteImport } from './routes/projects/$projectId/observability'
 import { Route as ProjectsProjectIdLogsRouteImport } from './routes/projects/$projectId/logs'
 import { Route as ProjectsProjectIdEnvironmentRouteImport } from './routes/projects/$projectId/environment'
@@ -247,6 +248,12 @@ const ProjectsProjectIdWebAnalyticsRoute =
     path: '/web-analytics',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
+const ProjectsProjectIdTracingRoute =
+  ProjectsProjectIdTracingRouteImport.update({
+    id: '/tracing',
+    path: '/tracing',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
 const ProjectsProjectIdObservabilityRoute =
   ProjectsProjectIdObservabilityRouteImport.update({
     id: '/observability',
@@ -341,6 +348,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
+  '/projects/$projectId/tracing': typeof ProjectsProjectIdTracingRoute
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/sandboxes/$sandboxId/observability': typeof SandboxesSandboxIdObservabilityRoute
   '/sandboxes/$sandboxId/snapshots': typeof SandboxesSandboxIdSnapshotsRoute
@@ -382,6 +390,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
+  '/projects/$projectId/tracing': typeof ProjectsProjectIdTracingRoute
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/sandboxes/$sandboxId/observability': typeof SandboxesSandboxIdObservabilityRoute
   '/sandboxes/$sandboxId/snapshots': typeof SandboxesSandboxIdSnapshotsRoute
@@ -432,6 +441,7 @@ export interface FileRoutesById {
   '/projects/$projectId/environment': typeof ProjectsProjectIdEnvironmentRoute
   '/projects/$projectId/logs': typeof ProjectsProjectIdLogsRoute
   '/projects/$projectId/observability': typeof ProjectsProjectIdObservabilityRoute
+  '/projects/$projectId/tracing': typeof ProjectsProjectIdTracingRoute
   '/projects/$projectId/web-analytics': typeof ProjectsProjectIdWebAnalyticsRoute
   '/sandboxes/$sandboxId/observability': typeof SandboxesSandboxIdObservabilityRoute
   '/sandboxes/$sandboxId/snapshots': typeof SandboxesSandboxIdSnapshotsRoute
@@ -483,6 +493,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
+    | '/projects/$projectId/tracing'
     | '/projects/$projectId/web-analytics'
     | '/sandboxes/$sandboxId/observability'
     | '/sandboxes/$sandboxId/snapshots'
@@ -524,6 +535,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
+    | '/projects/$projectId/tracing'
     | '/projects/$projectId/web-analytics'
     | '/sandboxes/$sandboxId/observability'
     | '/sandboxes/$sandboxId/snapshots'
@@ -573,6 +585,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/environment'
     | '/projects/$projectId/logs'
     | '/projects/$projectId/observability'
+    | '/projects/$projectId/tracing'
     | '/projects/$projectId/web-analytics'
     | '/sandboxes/$sandboxId/observability'
     | '/sandboxes/$sandboxId/snapshots'
@@ -874,6 +887,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdWebAnalyticsRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/projects/$projectId/tracing': {
+      id: '/projects/$projectId/tracing'
+      path: '/tracing'
+      fullPath: '/projects/$projectId/tracing'
+      preLoaderRoute: typeof ProjectsProjectIdTracingRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
     '/projects/$projectId/observability': {
       id: '/projects/$projectId/observability'
       path: '/observability'
@@ -999,6 +1019,7 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdEnvironmentRoute: typeof ProjectsProjectIdEnvironmentRoute
   ProjectsProjectIdLogsRoute: typeof ProjectsProjectIdLogsRoute
   ProjectsProjectIdObservabilityRoute: typeof ProjectsProjectIdObservabilityRoute
+  ProjectsProjectIdTracingRoute: typeof ProjectsProjectIdTracingRoute
   ProjectsProjectIdWebAnalyticsRoute: typeof ProjectsProjectIdWebAnalyticsRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
@@ -1011,6 +1032,7 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
   ProjectsProjectIdEnvironmentRoute: ProjectsProjectIdEnvironmentRoute,
   ProjectsProjectIdLogsRoute: ProjectsProjectIdLogsRoute,
   ProjectsProjectIdObservabilityRoute: ProjectsProjectIdObservabilityRoute,
+  ProjectsProjectIdTracingRoute: ProjectsProjectIdTracingRoute,
   ProjectsProjectIdWebAnalyticsRoute: ProjectsProjectIdWebAnalyticsRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }
